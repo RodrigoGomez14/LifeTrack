@@ -2,6 +2,7 @@ import React from 'react';
 import { Drawer as MuiDrawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Button } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import LocalTaxiIcon from '@mui/icons-material/LocalTaxi';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { Link } from 'react-router-dom';
@@ -35,6 +36,14 @@ const Drawer = ({ open, toggleDrawer }) => {
               <AccountBalanceIcon />
             </ListItemIcon>
             <ListItemText primary="Finanzas" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem component={Link} to="/Uber" button>
+          <ListItemButton>
+            <ListItemIcon>
+              <LocalTaxiIcon />
+            </ListItemIcon>
+            <ListItemText primary="Uber" />
           </ListItemButton>
         </ListItem>
       </List>
