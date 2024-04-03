@@ -6,6 +6,8 @@ import Finanzas from './pages/Finanzas.js';
 import Loading from './pages/Loading.js';
 import Uber from './pages/Uber.js';
 import NewUberEntry from './pages/NewUberEntry.js';
+import NewExpense from './pages/NewExpense.js';
+import NewIncome from './pages/NewIconme.js';
 import { database } from "./firebase.js";
 import { auth } from "./firebase.js";
 
@@ -44,9 +46,11 @@ function App() {
         <Router>
           <Routes>
             <Route exact path="/" element={<Home />} />
-            <Route exact path="/finanzas" element={<Finanzas />} />
-            <Route exact path="/uber" element={<Uber data={userData.uber}/>} />
-            <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid}/>} />
+            <Route exact path="/finanzas" element={<Finanzas incomes={userData.incomes} expenses={userData.expenses} />} />
+            <Route exact path="/uber" element={<Uber data={userData.uber} uid={useruid}/>} />
+            <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid} pending={userData.uber.pending}/>} />
+            <Route exact path="/NewExpense" element={<NewExpense/>} />
+            <Route exact path="/NewIncome" element={<NewIncome/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>

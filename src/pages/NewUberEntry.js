@@ -4,7 +4,7 @@ import { Button, TextField, Typography } from '@mui/material';
 import { database } from '../firebase';
 import { useNavigate } from 'react-router-dom'; // Importa el hook useNavigate
 
-const NewUberEntryPage = ({ uid }) => {
+const NewUberEntryPage = ({ uid ,pending}) => {
   const navigate = useNavigate(); // Obtiene la función de navegación
 
   const [amount, setAmount] = useState('');
@@ -42,12 +42,24 @@ const NewUberEntryPage = ({ uid }) => {
     const day = currentDate.getDate().toString().padStart(2, '0')
 
     // Guardar la entrada en la base de datos
-    database.ref(`${uid}/uber/${year}/${month}`).push({
+    database.ref(`${uid}/uber/data/${year}/${month}`).push({
       date: `${day}/${month}/${year}`,
       amount: parseFloat(amount),
       cash: parseFloat(totalCash),
       duration: totalMinutes,
     });
+
+    database.ref(`${uid}/uber/pending`).set(pending+(parseFloat(amount)-parseFloat(totalCash)));
+    database.ref(`${uid}/incomes/${year}/${month}`).push({
+      date: `${day}/${month}/${year}`,
+      amount: parseFloat(totalCash),
+      category:'Uber',
+      subCategory:'Efectivo Uber',
+      description:'Efectivo Uber'
+    });
+
+
+
 
     // Limpiar los campos después de enviar el formulario
     setAmount('');

@@ -4,8 +4,10 @@ import { Typography, Collapse, List, ListItem, ListItemText, ListItemIcon, Butto
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 import { formatAmount, getMonthName, formatMinutesToHours } from '../formattingUtils';
 import { Link } from 'react-router-dom';
+import { database } from '../firebase';
 
-const Uber = ({ data }) => {
+
+const Uber = ({ data,uid }) => {
   // Verificar si hay datos de Uber disponibles
   if (!data) {
     return (
@@ -17,7 +19,24 @@ const Uber = ({ data }) => {
       </Layout>
     );
   }
+  const handleResetPending = () =>{
+    
+    // Obtener la fecha actual
+    const currentDate = new Date();
+    const year = currentDate.getFullYear().toString();
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const day = currentDate.getDate().toString().padStart(2, '0')
 
+    database.ref(`${uid}/incomes/${year}/${month}`).push({
+      date: `${day}/${month}/${year}`,
+      amount: parseFloat(data.pending),
+      category:'Uber',
+      subCategory:'Semanal Uber',
+      description:'Semanal Uber'
+    });
+
+    database.ref(`${uid}/uber/pending`).set(0);
+  }
   // Función para calcular la suma de los montos totales en efectivo y minutos
   const calculateTotal = (monthData) => {
     let totalAmount = 0;
@@ -35,26 +54,25 @@ const Uber = ({ data }) => {
     return { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily };
   };
 
-  // Calcular el monto a depositar restando el efectivo recibido del total general
-  const calculateDepositAmount = (totalAmount, totalCash) => {
-    return totalAmount - totalCash;
-  };
-
   // Renderizar los movimientos de Uber
   return (
     <Layout title="Uber">
       <div>
+        <Typography variant="h1">
+          Pendiente: {formatAmount(data.pending)}
+          <Button onClick={handleResetPending} variant="contained" color="primary">
+            Reiniciar Pendiente
+          </Button>
+        </Typography>
         <Link to="/NewUberEntry">
           <Button variant="contained" color="primary">Nueva Entrada</Button>
         </Link>
-        {Object.keys(data).map(year => (
+        {Object.keys(data.data).map(year => (
           <div key={year}>
             <Typography variant="h6">{year}</Typography>
-            {Object.keys(data[year]).reverse().map(month => {
+            {Object.keys(data.data[year]).reverse().map(month => {
               const monthName = getMonthName(month);
-              const { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily } = calculateTotal(data[year][month]);
-              const depositAmount = calculateDepositAmount(totalAmount, totalCash);
-
+              const { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily } = calculateTotal(data.data[year][month]);
               return (
                 <div key={month}>
                   <Typography variant="subtitle1">
@@ -63,13 +81,10 @@ const Uber = ({ data }) => {
                   <Typography variant="body1" gutterBottom>
                     Promedio diario: {formatAmount(averageDaily)}
                   </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    Monto a depositar: {formatAmount(depositAmount)}
-                  </Typography>
                   <Collapse in={true} unmountOnExit>
                     <List>
-                      {Object.keys(data[year][month]).map(transactionId => {
-                        const transaction = data[year][month][transactionId];
+                      {Object.keys(data.data[year][month]).reverse().map(transactionId => {
+                        const transaction = data.data[year][month][transactionId];
                         const coefficient = formatAmount((transaction.amount / transaction.duration)*60); // Calcular el coeficiente total/duración
                         return (
                           <ListItem key={transactionId}>
