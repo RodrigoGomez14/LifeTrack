@@ -13,11 +13,13 @@ function App() {
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [useruid, setUseruid] = useState(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setUserLoggedIn(true);
+        setUseruid(user.uid)
         database.ref(user.uid).once('value')
           .then((snapshot) => {
             setUserData(snapshot.val());
@@ -44,7 +46,7 @@ function App() {
             <Route exact path="/" element={<Home />} />
             <Route exact path="/finanzas" element={<Finanzas />} />
             <Route exact path="/uber" element={<Uber data={userData.uber}/>} />
-            <Route exact path="/NewUberEntry" element={<NewUberEntry/>} />
+            <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid}/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>

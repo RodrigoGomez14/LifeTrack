@@ -1,53 +1,62 @@
-// NewUberEntryPage.js
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
 import { Button, TextField, Typography } from '@mui/material';
 import { database } from '../firebase';
-import { useAuth } from '../hooks/useAuth'; // Importa el hook useAuth para obtener el UID del usuario
+import { useNavigate } from 'react-router-dom'; // Importa el hook useNavigate
 
-const NewUberEntryPage = () => {
-  const auth = useAuth(); // Obtiene el contexto de autenticación
+const NewUberEntryPage = ({ uid }) => {
+  const navigate = useNavigate(); // Obtiene la función de navegación
 
   const [amount, setAmount] = useState('');
   const [cash, setCash] = useState('');
-  const [time, setTime] = useState('');
+  const [hours, setHours] = useState('');
+  const [minutes, setMinutes] = useState('');
+  const [totalCash, setTotalCash] = useState(0); // Estado para almacenar el total en efectivo
+
+  const handleCashInputChange = (e) => {
+    setCash(e.target.value);
+  };
+
+  const handleAddCash = () => {
+    const cashValue = parseFloat(cash);
+    if (!isNaN(cashValue)) {
+      setTotalCash(prevTotalCash => prevTotalCash + cashValue);
+      setCash('');
+    }
+  };
 
   const handleFormSubmit = () => {
     // Verificar que los campos no estén vacíos
-    if (!amount || !cash || !time) {
+    if (!amount || !hours || !minutes) {
       alert('Por favor complete todos los campos');
       return;
     }
 
+    // Convertir horas y minutos a minutos
+    const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
+
     // Obtener la fecha actual
     const currentDate = new Date();
     const year = currentDate.getFullYear().toString();
-    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0'); // Asegura que el mes tenga dos dígitos
-
-    // Verificar que el usuario esté autenticado y obtener su UID
-    const uid = auth.user ? auth.user.uid : null;
-
-    if (!uid) {
-      alert('No se pudo obtener el UID del usuario');
-      return;
-    }
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const day = currentDate.getDate().toString().padStart(2, '0')
 
     // Guardar la entrada en la base de datos
-    console.log(uid)
-    console.log(year)
-    console.log(month)
     database.ref(`${uid}/uber/${year}/${month}`).push({
-        amount: parseFloat(amount),
-        cash: parseFloat(cash),
-        duration: parseInt(time),
-        date: new Date()
+      date: `${day}/${month}/${year}`,
+      amount: parseFloat(amount),
+      cash: parseFloat(totalCash),
+      duration: totalMinutes,
     });
 
     // Limpiar los campos después de enviar el formulario
     setAmount('');
     setCash('');
-    setTime('');
-    alert('Entrada agregada correctamente');
+    setHours('');
+    setMinutes('');
+
+    // Redirigir al usuario a la ruta raíz "/uber"
+    navigate('/uber');
   };
 
   return (
@@ -70,16 +79,28 @@ const NewUberEntryPage = () => {
             label="Efectivo"
             type="number"
             value={cash}
-            onChange={(e) => setCash(e.target.value)}
+            onChange={handleCashInputChange}
+            fullWidth
+            margin="normal"
+          />
+          <Button variant="contained" onClick={handleAddCash}>Agregar a Total Efectivo</Button>
+          <Typography variant="body1" gutterBottom>
+            Total en Efectivo: {totalCash}
+          </Typography>
+          <TextField
+            label="Horas"
+            type="number"
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
             required
             fullWidth
             margin="normal"
           />
           <TextField
-            label="Tiempo (minutos)"
+            label="Minutos"
             type="number"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
             required
             fullWidth
             margin="normal"
