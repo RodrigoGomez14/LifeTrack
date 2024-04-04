@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
-import { Button, TextField, Typography } from '@mui/material';
+import { Button, TextField, Typography,InputAdornment,IconButton,Input,InputLabel,FormControl,Grid } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import { database } from '../firebase';
 import { useNavigate } from 'react-router-dom'; // Importa el hook useNavigate
 
-const NewUberEntryPage = ({ uid ,pending}) => {
+const NewUberEntryPage = ({ uid ,pending,dolar}) => {
   const navigate = useNavigate(); // Obtiene la función de navegación
 
   const [amount, setAmount] = useState('');
@@ -47,19 +48,19 @@ const NewUberEntryPage = ({ uid ,pending}) => {
       amount: parseFloat(amount),
       cash: parseFloat(totalCash),
       duration: totalMinutes,
+      valorUSD:dolar['venta']
     });
 
     database.ref(`${uid}/uber/pending`).set(pending+(parseFloat(amount)-parseFloat(totalCash)));
+    
     database.ref(`${uid}/incomes/${year}/${month}`).push({
       date: `${day}/${month}/${year}`,
       amount: parseFloat(totalCash),
       category:'Uber',
       subCategory:'Efectivo Uber',
-      description:'Efectivo Uber'
+      description:'Efectivo Uber',
+      valorUSD:dolar['venta']
     });
-
-
-
 
     // Limpiar los campos después de enviar el formulario
     setAmount('');
@@ -70,56 +71,66 @@ const NewUberEntryPage = ({ uid ,pending}) => {
     // Redirigir al usuario a la ruta raíz "/uber"
     navigate('/uber');
   };
-
   return (
-    <Layout title="Nueva Entrada de Uber">
-      <div>
-        <Typography variant="h4" gutterBottom>
-          Nueva Entrada de Uber
-        </Typography>
-        <form onSubmit={handleFormSubmit}>
-          <TextField
-            label="Monto"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Efectivo"
-            type="number"
-            value={cash}
-            onChange={handleCashInputChange}
-            fullWidth
-            margin="normal"
-          />
-          <Button variant="contained" onClick={handleAddCash}>Agregar a Total Efectivo</Button>
-          <Typography variant="body1" gutterBottom>
-            Total en Efectivo: {totalCash}
-          </Typography>
-          <TextField
-            label="Horas"
-            type="number"
-            value={hours}
-            onChange={(e) => setHours(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Minutos"
-            type="number"
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <Button variant="contained" type="submit">Agregar Entrada</Button>
-        </form>
-      </div>
+    <Layout title="Finalizar Jornada Uber">
+      <Grid container justifyContent='center'>
+        <Grid item xs={6}>
+          <form onSubmit={handleFormSubmit}>
+            <TextField
+              label="Monto"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <FormControl fullWidth>
+              <InputLabel htmlFor="efectivo">Efectivo</InputLabel>
+              <Input
+                id='efectivo'
+                label="Efectivo"
+                type="number"
+                value={cash}
+                onChange={handleCashInputChange}
+                margin="normal"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={handleAddCash}
+                    >
+                      <AddIcon/>
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+            </FormControl>
+            <Typography variant="body1" gutterBottom>
+              Total en Efectivo: {totalCash}
+            </Typography>
+            <TextField
+              label="Horas"
+              type="number"
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              label="Minutos"
+              type="number"
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <Button variant="contained" type="submit">Finalizar Jornada</Button>
+          </form>
+        </Grid>
+      </Grid>
     </Layout>
   );
 };

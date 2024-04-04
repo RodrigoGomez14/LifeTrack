@@ -1,10 +1,10 @@
 import React from 'react';
 import { Drawer as MuiDrawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Button } from '@mui/material';
-import HomeIcon from '@mui/icons-material/Home';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import LocalTaxiIcon from '@mui/icons-material/LocalTaxi';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
+import LocalTaxiOutlinedIcon from '@mui/icons-material/LocalTaxiOutlined';
+import EmojiObjectsOutlinedIcon  from '@mui/icons-material/EmojiObjectsOutlined';
+import ExitToAppOutlinedIcon from '@mui/icons-material/ExitToAppOutlined';
 import { Link } from 'react-router-dom';
 import { auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
 
@@ -21,19 +21,19 @@ const Drawer = ({ open, toggleDrawer }) => {
 
   return (
     <MuiDrawer open={open} onClose={() => { toggleDrawer() }}>
-      <List>
+      <List style={{flexGrow:1}}>
         <ListItem component={Link} to="/" button>
           <ListItemButton>
             <ListItemIcon>
-              <HomeIcon />
+              <HomeOutlinedIcon />
             </ListItemIcon>
             <ListItemText primary="Home" />
           </ListItemButton>
         </ListItem>
-        <ListItem component={Link} to="/finanzas" button>
+        <ListItem component={Link} to="/Finanzas" button>
           <ListItemButton>
             <ListItemIcon>
-              <AccountBalanceIcon />
+              <AccountBalanceOutlinedIcon />
             </ListItemIcon>
             <ListItemText primary="Finanzas" />
           </ListItemButton>
@@ -41,9 +41,17 @@ const Drawer = ({ open, toggleDrawer }) => {
         <ListItem component={Link} to="/Uber" button>
           <ListItemButton>
             <ListItemIcon>
-              <LocalTaxiIcon />
+              <LocalTaxiOutlinedIcon />
             </ListItemIcon>
             <ListItemText primary="Uber" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem component={Link} to="/Habitos" button>
+          <ListItemButton>
+            <ListItemIcon>
+              <EmojiObjectsOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText primary="Habitos" />
           </ListItemButton>
         </ListItem>
       </List>
@@ -51,7 +59,7 @@ const Drawer = ({ open, toggleDrawer }) => {
         fullWidth
         variant="contained"
         color="error"
-        startIcon={<ExitToAppIcon />}
+        startIcon={<ExitToAppOutlinedIcon />}
         onClick={()=>handleLogout()} // Llamar a la función handleLogout al hacer clic en el botón
       >
         Logout

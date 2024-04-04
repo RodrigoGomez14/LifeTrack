@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/Login.js';
 import Home from './pages/Home.js';
-import Finanzas from './pages/Finanzas.js';
+import Finances from './pages/Finances.js';
 import Loading from './pages/Loading.js';
 import Uber from './pages/Uber.js';
+import Habits from './pages/Habits.js';
 import NewUberEntry from './pages/NewUberEntry.js';
 import NewExpense from './pages/NewExpense.js';
-import NewIncome from './pages/NewIconme.js';
+import NewIncome from './pages/NewIncome.js';
 import { database } from "./firebase.js";
 import { auth } from "./firebase.js";
 
@@ -16,6 +17,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [useruid, setUseruid] = useState(null);
+  const [dollarRate, setDollarRate] = useState(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -26,7 +28,17 @@ function App() {
           .then((snapshot) => {
             setUserData(snapshot.val());
             setIsLoading(false);
+          });
+
+        // Hacer la petición para obtener el valor del dólar blue
+        fetch('https://dolarapi.com/v1/dolares/blue')
+          .then(response => response.json())
+          .then(data => {
+            setDollarRate(data);
           })
+          .catch(error => {
+            console.error('Error fetching dollar rate:', error);
+          });
       } else {
         setUserLoggedIn(false);
         setIsLoading(false);
@@ -46,11 +58,12 @@ function App() {
         <Router>
           <Routes>
             <Route exact path="/" element={<Home />} />
-            <Route exact path="/finanzas" element={<Finanzas incomes={userData.incomes} expenses={userData.expenses} />} />
-            <Route exact path="/uber" element={<Uber data={userData.uber} uid={useruid}/>} />
-            <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid} pending={userData.uber.pending}/>} />
-            <Route exact path="/NewExpense" element={<NewExpense/>} />
-            <Route exact path="/NewIncome" element={<NewIncome/>} />
+            <Route exact path="/Finanzas" element={<Finances incomes={userData.incomes} expenses={userData.expenses} />} />
+            <Route exact path="/Uber" element={<Uber data={userData.uber} uid={useruid}/>} />
+            <Route exact path="/Habitos" element={<Habits/>} />
+            <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid} pending={userData.uber.pending} dolar={dollarRate}/>} />
+            <Route exact path="/NewExpense" element={<NewExpense uid={useruid}/>} />
+            <Route exact path="/NewIncome" element={<NewIncome uid={useruid}/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>

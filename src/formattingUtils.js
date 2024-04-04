@@ -6,8 +6,8 @@ export const formatAmount = (amount) => {
   // Función para obtener el nombre del mes a partir de su número (1 para enero, 2 para febrero, etc.)
   export const getMonthName = (monthNumber) => {
     const monthNames = [
-      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
     return monthNames[monthNumber - 1] || '';
   };

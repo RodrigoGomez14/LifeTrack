@@ -6,7 +6,7 @@ import Drawer from './Drawer';
 const AppBar = ({toggleDrawer,title}) => {
   return (
     <div>
-      <MuiAppBar position="static">
+      <MuiAppBar position="fixed">
         <Toolbar>
           <IconButton
             edge="start"
