@@ -17,7 +17,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import HelpIcon from '@mui/icons-material/Help';
 
-const Finances = ({ incomes, expenses }) => {
+const Finances = ({ incomes, expenses,dolar }) => {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
@@ -131,7 +131,7 @@ const Finances = ({ incomes, expenses }) => {
                             style={{backgroundColor:'#263238', color:'white'}}
                             expandIcon={<ExpandMoreIcon />}
                           >
-                            <Typography variant="h6">{getMonthName(month)} - {formatAmount(calculateTotal(expenses[year][month]))}</Typography>
+                            <Typography variant="h6">{getMonthName(month)} - {formatAmount(calculateTotal(expenses[year][month]))} - {formatAmount((calculateTotal(expenses[year][month])/dolar['venta']))}</Typography>
                           </AccordionSummary>
                           <AccordionDetails>
                             <div style={{ width: '100%' }}>
@@ -163,12 +163,13 @@ const Finances = ({ incomes, expenses }) => {
                                                 {getCategoryIcon(expense.category)}
                                               </ListItemIcon>
                                               <ListItemText
-                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(expense.amount)}</Typography>}
+                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(expense.amount)} - USD {formatAmount(expense.amount/expense.valorUSD)}</Typography>}
                                                 secondary={
                                                   <div>
                                                     <Typography variant="body1">{expense.subcategory}</Typography>
                                                     <Typography variant="body1">{expense.description}</Typography>
                                                     <Typography variant="body2" color="textSecondary">Fecha: {expense.date}</Typography>
+                                                    <Typography variant="body2" color="textSecondary">1 USD = {expense.valorUSD} ARS</Typography>
                                                   </div>
                                                 }
                                               />
@@ -225,12 +226,13 @@ const Finances = ({ incomes, expenses }) => {
                                                 <DriveEtaIcon />
                                               </ListItemIcon>
                                               <ListItemText
-                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(income.amount)}</Typography>}
+                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(income.amount)} - USD {formatAmount(income.amount/income.valorUSD)}</Typography>}
                                                 secondary={
                                                   <div>
                                                     <Typography variant="body1">{income.subcategory}</Typography>
                                                     <Typography variant="body1">{income.description}</Typography>
                                                     <Typography variant="body2" color="textSecondary">Fecha: {income.date}</Typography>
+                                                    <Typography variant="body2" color="textSecondary">1 USD = {income.valorUSD} ARS</Typography>
                                                   </div>
                                                 }
                                               />

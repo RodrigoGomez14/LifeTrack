@@ -4,7 +4,7 @@ import { Button, ButtonGroup, TextField, Grid } from '@mui/material';
 import { database } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
-const NewExpense = ({ uid }) => {
+const NewExpense = ({ uid,dolar }) => {
   const navigate = useNavigate();
 
   // Define las subcategorías disponibles para cada categoría principal
@@ -14,7 +14,7 @@ const NewExpense = ({ uid }) => {
     Indoor: ['Plantas', 'Fertilizantes','Tierra', 'Herramientas'],
     Supermercado: ['General', 'Chino', 'Verduleria','Carniceria'],
     Transporte: ['Uber', 'Publico'],
-    Extras: ['-'],
+    Extras: ['Hierba', 'Otros'],
   };
 
   const [amount, setAmount] = useState('');
@@ -39,6 +39,7 @@ const NewExpense = ({ uid }) => {
       subcategory: subcategory,
       date: `${day}/${month}/${year}`,
       description: description,
+      valorUSD: dolar['venta']
     }).then(() => {
       console.log('Expense sended')
     });

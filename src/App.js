@@ -11,6 +11,7 @@ import NewExpense from './pages/NewExpense.js';
 import NewIncome from './pages/NewIncome.js';
 import { database } from "./firebase.js";
 import { auth } from "./firebase.js";
+import { Grid } from '@mui/material';
 
 function App() {
   const [userLoggedIn, setUserLoggedIn] = useState(false);
@@ -49,7 +50,7 @@ function App() {
   }, []);
 
   if (isLoading) {
-    return <Loading />;
+    return <Loading />
   }
 
   return (
@@ -58,12 +59,12 @@ function App() {
         <Router>
           <Routes>
             <Route exact path="/" element={<Home />} />
-            <Route exact path="/Finanzas" element={<Finances incomes={userData.incomes} expenses={userData.expenses} />} />
-            <Route exact path="/Uber" element={<Uber data={userData.uber} uid={useruid}/>} />
+            <Route exact path="/Finanzas" element={<Finances incomes={userData.incomes} expenses={userData.expenses} dolar={dollarRate}/>} />
+            <Route exact path="/Uber" element={<Uber data={userData.uber} uid={useruid} dolar={dollarRate}/>} />
             <Route exact path="/Habitos" element={<Habits/>} />
             <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid} pending={userData.uber.pending} dolar={dollarRate}/>} />
-            <Route exact path="/NewExpense" element={<NewExpense uid={useruid}/>} />
-            <Route exact path="/NewIncome" element={<NewIncome uid={useruid}/>} />
+            <Route exact path="/NewExpense" element={<NewExpense uid={useruid} dolar={dollarRate}/>} />
+            <Route exact path="/NewIncome" element={<NewIncome uid={useruid} dolar={dollarRate}/>} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>

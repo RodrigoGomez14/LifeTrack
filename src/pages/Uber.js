@@ -8,7 +8,7 @@ import { formatAmount, getMonthName, formatMinutesToHours } from '../formattingU
 import { Link } from 'react-router-dom';
 import { database } from '../firebase';
 
-const Uber = ({ data, uid }) => {
+const Uber = ({ data, uid, dolar }) => {
   // Verificar si hay datos de Uber disponibles
   if (!data) {
     return (
@@ -53,20 +53,28 @@ const Uber = ({ data, uid }) => {
     let totalAmount = 0;
     let totalCash = 0;
     let totalDuration = 0;
-    let dailyTotal = {}; // Objeto para almacenar el total diario
-
+    let dailyTotal = {};
+    let totalUSD = 0; // Nuevo total en USD
+  
     Object.values(monthData).forEach(transaction => {
       totalAmount += transaction.amount || 0;
       totalCash += transaction.cash || 0;
       totalDuration += transaction.duration || 0;
-      const transactionDate = transaction.date.split('/')[0]; // Obtener el día de la fecha
-      dailyTotal[transactionDate] = (dailyTotal[transactionDate] || 0) + (transaction.amount || 0); // Sumar el monto al total diario
+      const transactionDate = transaction.date.split('/')[0];
+      dailyTotal[transactionDate] = (dailyTotal[transactionDate] || 0) + (transaction.amount || 0);
+  
+      // Agregar el valor en USD de la transacción al totalUSD
+      totalUSD += transaction.amount / transaction.valorUSD; 
     });
-
-    const averageDaily = totalAmount / Object.keys(dailyTotal).length; // Calcular el promedio diario
-
-    return { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily };
+  
+    // Calcular el promedio de la cotización del USD
+    const averageUSD = totalUSD / Object.values(monthData).length;
+  
+    const averageDaily = totalAmount / Object.keys(dailyTotal).length;
+  
+    return { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily, totalUSD, averageUSD };
   };
+  
   // Función para calcular el total de un año
   const calculateYearTotal = (yearData) => {
     let total = 0;
@@ -77,6 +85,19 @@ const Uber = ({ data, uid }) => {
     });
     return total;
   };
+  // Función para calcular el total anual en USD
+  const calculateYearTotalUSD = (yearData) => {
+    let totalUSD = 0;
+
+    Object.values(yearData).forEach(month => {
+      Object.values(month).forEach(transaction => {
+        totalUSD += transaction.amount / transaction.valorUSD;
+      });
+    });
+
+    return totalUSD;
+  };
+
 
   return (
     <Layout title="Uber">
@@ -92,7 +113,7 @@ const Uber = ({ data, uid }) => {
                 </Link>
               }
               style={{backgroundColor:data.pending>0?'green':'red'}}
-              title={formatAmount(data.pending)}
+              title={`${formatAmount(data.pending)} - USD ${formatAmount(data.pending/dolar['venta'])}`}
               subheader='Pendiente de pago'
             />
           </Card>
@@ -100,11 +121,11 @@ const Uber = ({ data, uid }) => {
         {Object.keys(data.data).map(year => (
           <Grid container item xs={12} key={year} justifyContent='center' spacing={2}>
             <Grid item xs={12} >
-              <Typography variant="h6" align="center">{year} - Total: {formatAmount(calculateYearTotal(data.data[year]))}</Typography>
+              <Typography variant="h6" align="center">{year} - Total: {formatAmount(calculateYearTotal(data.data[year]))} - USD {formatAmount(calculateYearTotalUSD(data.data[year]))}</Typography>
             </Grid>
             {Object.keys(data.data[year]).reverse().map(month => {
               const monthName = getMonthName(month);
-              const { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily } = calculateTotal(data.data[year][month]);
+              const { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily,totalUSD } = calculateTotal(data.data[year][month]);
               return (
                 <Grid item xs={8}>
                   <Accordion key={month}>
@@ -113,14 +134,14 @@ const Uber = ({ data, uid }) => {
                       expandIcon={<ExpandMoreIcon />}
                     >
                       <Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>
-                        {monthName} - Total: {formatAmount(totalAmount)}
+                        {monthName} - Total: {formatAmount(totalAmount)} - USD {formatAmount(totalUSD)}
                       </Typography>
                     </AccordionSummary>
                     <AccordionDetails>
                       <List>
                         {Object.keys(data.data[year][month]).reverse().map(transactionId => {
                           const transaction = data.data[year][month][transactionId];
-                          const coefficient = formatAmount((transaction.amount / transaction.duration) * 60); // Calcular el coeficiente total/duración
+                          const coefficient = (transaction.amount / transaction.duration) * 60; // Calcular el coeficiente total/duración
                           return (
                             <ListItem key={transactionId}>
                               <ListItemIcon>
@@ -134,13 +155,13 @@ const Uber = ({ data, uid }) => {
                                       Monto: {`${formatAmount(transaction.amount)} - USD ${formatAmount(transaction.amount/transaction.valorUSD)}`}
                                     </Typography>
                                     <Typography variant="body1">
-                                      Efectivo: {formatAmount(transaction.cash)}
+                                      Efectivo: {formatAmount(transaction.cash)} - USD {formatAmount(transaction.cash/transaction.valorUSD)}
                                     </Typography>
                                     <Typography variant="body1">
                                       Duración: {formatMinutesToHours(transaction.duration)}
                                     </Typography>
                                     <Typography variant="body1">
-                                      $/Hs: {coefficient}/Hs
+                                      $/Hs: {formatAmount(coefficient)}/Hs - USD {formatAmount(coefficient/transaction.valorUSD)}/Hs
                                     </Typography>
                                     <Typography variant="body1">
                                       1 USD = {formatAmount(transaction.valorUSD)} ARS
