@@ -74,14 +74,16 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
     });
 
     // Guardar las propinas como un ingreso adicional
-    database.ref(`${uid}/incomes/${year}/${month}`).push({
-      date: `${day}/${month}/${year}`,
-      amount: parseFloat(totalTips),
-      category: 'Uber',
-      subCategory: 'Propinas Uber',
-      description: 'Propinas Uber',
-      valorUSD: dolar['venta']
-    });
+    if(tips>0){
+      database.ref(`${uid}/incomes/${year}/${month}`).push({
+        date: `${day}/${month}/${year}`,
+        amount: parseFloat(totalTips),
+        category: 'Uber',
+        subCategory: 'Propinas Uber',
+        description: 'Propinas Uber',
+        valorUSD: dolar['venta']
+      });
+    }
 
     setAmount('');
     setCash('');
