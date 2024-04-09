@@ -7,16 +7,6 @@ import { useNavigate } from 'react-router-dom';
 const NewExpense = ({ uid,dolar }) => {
   const navigate = useNavigate();
 
-  // Define las subcategorías disponibles para cada categoría principal
-  const subcategories = {
-    Auto: ['Nafta', 'Gas', 'Mantenimiento'],
-    Servicios: ['Electricidad', 'Expensas', 'Internet','Celular'],
-    Indoor: ['Plantas', 'Fertilizantes','Tierra', 'Herramientas'],
-    Supermercado: ['General', 'Chino', 'Verduleria','Carniceria'],
-    Transporte: ['Uber', 'Publico'],
-    Extras: ['Hierba', 'Otros'],
-  };
-
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
@@ -33,8 +23,9 @@ const NewExpense = ({ uid,dolar }) => {
     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
     const day = currentDate.getDate().toString().padStart(2, '0');
 
-    database.ref(`${uid}/expenses/${year}/${month}`).push({
+    database.ref(`${uid}/expenses/${year}/data/${month}/data`).push({
       amount: parseFloat(amount),
+      amountUSD: parseFloat(amount/dolar['venta']),
       category: category,
       subcategory: subcategory,
       date: `${day}/${month}/${year}`,
@@ -44,6 +35,25 @@ const NewExpense = ({ uid,dolar }) => {
       console.log('Expense sended')
     });
 
+    // Actualizar totales mensuales y anuales en la base de datos para ingresos
+    const yearlyRef = database.ref(`${uid}/expenses/${year}`);
+    yearlyRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + parseFloat(amount);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']);
+      }
+      return data;
+    });
+
+    const monthlyRef = database.ref(`${uid}/expenses/${year}/data/${month}`);
+    monthlyRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + parseFloat(amount);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']);
+      }
+      return data;
+    });
+
     setAmount('');
     setCategory('');
     setSubcategory('');
@@ -51,6 +61,17 @@ const NewExpense = ({ uid,dolar }) => {
 
     navigate('/finanzas');
   };
+
+  // Define las subcategorías disponibles para cada categoría principal
+  const subcategories = {
+    Auto: ['Nafta', 'Gas', 'Mantenimiento'],
+    Servicios: ['Electricidad', 'Expensas', 'Internet','Celular'],
+    Indoor: ['Plantas', 'Fertilizantes','Tierra', 'Herramientas'],
+    Supermercado: ['General', 'Chino', 'Verduleria','Carniceria'],
+    Transporte: ['Uber', 'Publico'],
+    Extras: ['Hierba', 'Otros'],
+  };
+
 
   return (
     <Layout title="Nuevo Gasto">

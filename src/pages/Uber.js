@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect} from 'react';
 import Layout from '../components/Layout';
 import { Typography, Accordion, AccordionSummary, AccordionDetails, List, ListItem, ListItemText, ListItemIcon, Grid, Card, CardHeader, IconButton, Button } from '@mui/material';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
@@ -8,11 +8,18 @@ import { formatAmount, getMonthName, formatMinutesToHours } from '../formattingU
 import { Link } from 'react-router-dom';
 import { database } from '../firebase';
 
-const Uber = ({ data, uid, dolar }) => {
-  const [resetDisabled, setResetDisabled] = useState(false);
+const Uber = ({ datauber, uid, dolar }) => {
+  const [resetDisabled, setResetDisabled] = useState(true);
+  useEffect(() => {
+    const currentDate = new Date();
+    const dayOfWeek = currentDate.getDay(); // 0 (Domingo) - 6 (Sábado)
+
+    // Si el día actual es lunes (1), entonces deshabilita el reset
+    setResetDisabled(dayOfWeek !== 1);
+  }, []); // Esto se ejecutará solo una vez al montar el componente
 
   // Verificar si hay datos de Uber disponibles
-  if (!data) {
+  if (!datauber) {
     return (
       <Layout title="Uber">
         <div>No hay datos de Uber disponibles.</div>
@@ -28,7 +35,7 @@ const Uber = ({ data, uid, dolar }) => {
   const resetPending = () => {
     const currentDate = new Date();
     const dayOfWeek = currentDate.getDay(); // 0 para domingo, 1 para lunes, ..., 6 para sábado
-    const pending = parseFloat(data.pending);
+    const pending = parseFloat(datauber.pending);
 
     // Verificar si hoy es lunes (dayOfWeek === 1)
     if (dayOfWeek === 1 && pending > 0) {
@@ -46,61 +53,8 @@ const Uber = ({ data, uid, dolar }) => {
       });
 
       database.ref(`${uid}/uber/pending`).set(0);
-      setResetDisabled(true); // Deshabilitar el botón después de resetear el pendiente
     }
   };
-
-  // Función para calcular la suma de los montos totales en efectivo y minutos
-  const calculateTotal = (monthData) => {
-    let totalAmount = 0;
-    let totalCash = 0;
-    let totalDuration = 0;
-    let dailyTotal = {};
-    let totalUSD = 0; // Nuevo total en USD
-  
-    Object.values(monthData).forEach(transaction => {
-      totalAmount += transaction.amount || 0;
-      totalCash += transaction.cash || 0;
-      totalDuration += transaction.duration || 0;
-      const transactionDate = transaction.date.split('/')[0];
-      dailyTotal[transactionDate] = (dailyTotal[transactionDate] || 0) + (transaction.amount || 0);
-  
-      // Agregar el valor en USD de la transacción al totalUSD
-      totalUSD += transaction.amount / transaction.valorUSD; 
-    });
-  
-    // Calcular el promedio de la cotización del USD
-    const averageUSD = totalUSD / Object.values(monthData).length;
-  
-    const averageDaily = totalAmount / Object.keys(dailyTotal).length;
-  
-    return { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily, totalUSD, averageUSD };
-  };
-  
-  // Función para calcular el total de un año
-  const calculateYearTotal = (yearData) => {
-    let total = 0;
-    Object.values(yearData).forEach(month => {
-      Object.values(month).forEach(transaction => {
-        total += transaction.amount || 0;
-      });
-    });
-    return total;
-  };
-  // Función para calcular el total anual en USD
-  const calculateYearTotalUSD = (yearData) => {
-    let totalUSD = 0;
-
-    Object.values(yearData).forEach(month => {
-      Object.values(month).forEach(transaction => {
-        totalUSD += transaction.amount / transaction.valorUSD;
-      });
-    });
-
-    return totalUSD;
-  };
-
-
   return (
     <Layout title="Uber">
       <Grid container spacing={3} justifyContent='center'>
@@ -114,8 +68,8 @@ const Uber = ({ data, uid, dolar }) => {
                   </IconButton>
                 </Link>
               }
-              style={{backgroundColor:data.pending > 0 ? 'green' : 'red'}}
-              title={`${formatAmount(data.pending)} - USD ${formatAmount(data.pending / dolar['venta'])}`}
+              style={{backgroundColor:datauber.pending > 0 ? 'green' : 'red'}}
+              title={`${formatAmount(datauber.pending)} - USD ${formatAmount(datauber.pending / dolar['venta'])}`}
               subheader='Pendiente de pago'
             />
             <Button 
@@ -128,14 +82,13 @@ const Uber = ({ data, uid, dolar }) => {
             </Button>
           </Card>
         </Grid>
-        {Object.keys(data.data).map(year => (
+        {Object.keys(datauber.data).map(year => (
           <Grid container item xs={12} key={year} justifyContent='center' spacing={2}>
             <Grid item xs={12} >
-              <Typography variant="h6" align="center">{year} - Total: {formatAmount(calculateYearTotal(data.data[year]))} - USD {formatAmount(calculateYearTotalUSD(data.data[year]))}</Typography>
+              <Typography variant="h6" align="center">{year} - Total: {formatAmount(datauber.data[year].total)} - USD {formatAmount(datauber.data[year].totalUSD)}</Typography>
             </Grid>
-            {Object.keys(data.data[year]).reverse().map(month => {
+            {Object.keys(datauber.data[year].data).reverse().map(month => {
               const monthName = getMonthName(month);
-              const { totalAmount, totalCash, totalDuration, dailyTotal, averageDaily, totalUSD } = calculateTotal(data.data[year][month]);
               return (
                 <Grid item xs={8}>
                   <Accordion key={month}>
@@ -144,13 +97,13 @@ const Uber = ({ data, uid, dolar }) => {
                       expandIcon={<ExpandMoreIcon />}
                     >
                       <Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>
-                        {monthName} - Total: {formatAmount(totalAmount)} - USD {formatAmount(totalUSD)}
+                        {monthName} - Total: {formatAmount(datauber.data[year].data[month].total)} - USD {formatAmount(datauber.data[year].data[month].totalUSD)}
                       </Typography>
                     </AccordionSummary>
                     <AccordionDetails>
                       <List>
-                        {Object.keys(data.data[year][month]).reverse().map(transactionId => {
-                          const transaction = data.data[year][month][transactionId];
+                        {Object.keys(datauber.data[year].data[month].data).reverse().map(transactionId => {
+                          const transaction = datauber.data[year].data[month].data[transactionId];
                           const coefficient = (transaction.amount / transaction.duration) * 60; // Calcular el coeficiente total/duración
                           return (
                             <ListItem key={transactionId}>
@@ -162,10 +115,10 @@ const Uber = ({ data, uid, dolar }) => {
                                 secondary={
                                   <div>
                                     <Typography variant="body1">
-                                      Monto: {`${formatAmount(transaction.amount)} - USD ${formatAmount(transaction.amount / transaction.valorUSD)}`}
+                                      Monto: {`${formatAmount(transaction.amount)} - USD ${formatAmount(transaction.amountUSD)}`}
                                     </Typography>
                                     <Typography variant="body1">
-                                      Efectivo: {formatAmount(transaction.cash)} - USD {formatAmount(transaction.cash / transaction.valorUSD)}
+                                      Efectivo: {formatAmount(transaction.cash)} - USD {formatAmount(transaction.cashUSD)}
                                     </Typography>
                                     <Typography variant="body1">
                                       Duración: {formatMinutesToHours(transaction.duration)}

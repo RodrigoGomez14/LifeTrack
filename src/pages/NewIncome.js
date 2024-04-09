@@ -23,14 +23,35 @@ const NewIncome = ({ uid,dolar }) => {
     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
     const day = currentDate.getDate().toString().padStart(2, '0');
 
-    database.ref(`${uid}/incomes/${year}/${month}`).push({
-      amount: parseFloat(amount),
+    database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
+      amount: parseFloat(amount).toFixed(2),
+      amountUSD: parseFloat(amount/dolar['venta']).toFixed(2),
       category: category,
       subcategory: subcategory,
       date: `${day}/${month}/${year}`,
       description: description,
       valorUSD: dolar['venta']
     });
+
+    // Actualizar totales mensuales y anuales en la base de datos para ingresos
+    const yearlyRef = database.ref(`${uid}/incomes/${year}`);
+    yearlyRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + parseFloat(amount).toFixed(2);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']).toFixed(2);
+      }
+      return data;
+    });
+
+    const monthlyRef = database.ref(`${uid}/incomes/${year}/data/${month}`);
+    monthlyRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + parseFloat(amount).toFixed(2);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']).toFixed(2);
+      }
+      return data;
+    });
+
 
     setAmount('');
     setCategory('');

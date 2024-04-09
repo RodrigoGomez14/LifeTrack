@@ -60,7 +60,7 @@ function App() {
           <Routes>
             <Route exact path="/" element={<Home />} />
             <Route exact path="/Finanzas" element={<Finances incomes={userData.incomes} expenses={userData.expenses} dolar={dollarRate}/>} />
-            <Route exact path="/Uber" element={<Uber data={userData.uber} uid={useruid} dolar={dollarRate}/>} />
+            <Route exact path="/Uber" element={<Uber datauber={userData.uber} uid={useruid} dolar={dollarRate}/>} />
             <Route exact path="/Habitos" element={<Habits/>} />
             <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid} pending={userData.uber.pending} dolar={dollarRate}/>} />
             <Route exact path="/NewExpense" element={<NewExpense uid={useruid} dolar={dollarRate}/>} />

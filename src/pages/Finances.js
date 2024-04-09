@@ -22,14 +22,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
   const currentMonthName = getMonthName(currentMonth);
-
-  const calculateTotal = (monthData) => {
-    let total = 0;
-    Object.values(monthData).forEach(item => {
-      total += item.amount;
-    });
-    return total;
-  };
+  
   const sumTransactionsByCategory = (transactions, category) => {
     let total = 0;
     for (const transaction of Object.values(transactions)) {
@@ -65,11 +58,6 @@ const Finances = ({ incomes, expenses,dolar }) => {
         return <HelpIcon />;
     }
   };
-  
-  
-  const totalIncomes = calculateTotal(incomes[currentYear]?.[currentMonth] || {});
-  const totalExpenses = calculateTotal(expenses[currentYear]?.[currentMonth] || {});
-  const balance = totalIncomes - totalExpenses;
 
   const [incomeTabValue, setIncomeTabValue] = useState(0);
   const [expenseTabValue, setExpenseTabValue] = useState(0);
@@ -90,12 +78,25 @@ const Finances = ({ incomes, expenses,dolar }) => {
       <div>
         <Box mb={2} >
           <Grid container spacing={2} justifyContent='center'>
-            <Grid item xs={12} sm={3}>
-              <Card style={{backgroundColor:'green' , color:'white'}}>
+          <Grid item xs={12} sm={4}>
+              <Card style={{backgroundColor:incomes[currentYear].totalUSD-expenses[currentYear].totalUSD>0?'green':"red" , color:'white'}}>
                 <CardHeader
-                  title={formatAmount(balance)}
-                  subheader={`Balance ${currentMonthName}: ${formatAmount(balance)}`}
-                />
+                  title={`${formatAmount((incomes[currentYear].total-expenses[currentYear].total))} / USD ${formatAmount((incomes[currentYear].totalUSD-expenses[currentYear].totalUSD))}`}
+                  subheader={`Balance ${currentYear}`}/>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Card style={{backgroundColor:incomes[currentYear].data[`0${currentMonth}`].totalUSD-expenses[currentYear].data[`0${currentMonth}`].totalUSD>0?'green':"red" , color:'white'}}>
+                <CardHeader
+                  title={`${formatAmount((incomes[currentYear].data[`0${currentMonth}`].total-expenses[currentYear].data[`0${currentMonth}`].total))} / USD ${formatAmount((incomes[currentYear].data[`0${currentMonth}`].totalUSD-expenses[currentYear].data[`0${currentMonth}`].totalUSD))}`}
+                  subheader={`Balance ${currentMonthName}`}/>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Card>
+                <CardHeader
+                  title={formatAmount(dolar['venta'])}
+                  subheader="Valor USD"/>
               </Card>
             </Grid>
           </Grid>
@@ -125,13 +126,13 @@ const Finances = ({ incomes, expenses,dolar }) => {
                   <Typography variant="h5" gutterBottom>{year}</Typography>
                   <Grid container justifyContent='space-around'>
                     <Grid item xs={6}>
-                      {Object.keys(expenses[year]).reverse().map(month => (
+                      {Object.keys(expenses[year].data).reverse().map(month => (
                         <Accordion key={month}>
                           <AccordionSummary
                             style={{backgroundColor:'#263238', color:'white'}}
                             expandIcon={<ExpandMoreIcon />}
                           >
-                            <Typography variant="h6">{getMonthName(month)} - {formatAmount(calculateTotal(expenses[year][month]))} - {formatAmount((calculateTotal(expenses[year][month])/dolar['venta']))}</Typography>
+                            <Typography variant="h6">{getMonthName(month)} - {formatAmount(expenses[year].data[month].total)} - USD {formatAmount(expenses[year].data[month].totalUSD)}</Typography>
                           </AccordionSummary>
                           <AccordionDetails>
                             <div style={{ width: '100%' }}>
@@ -142,7 +143,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
                                 scrollButtons="auto"
                               >
                                 {categoriesExpenses.map((category, index) => (
-                                  <Tab disabled={sumTransactionsByCategory(expenses[year][month],category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(expenses[year][month],category))}`} key={index} />
+                                  <Tab disabled={sumTransactionsByCategory(expenses[year].data[month].data,category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(expenses[year].data[month].data,category))}`} key={index} />
                                 ))}
                               </Tabs>
                               {categoriesExpenses.map((category, index) => (
@@ -155,7 +156,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
                                 >
                                   {expenseTabValue === index && (
                                     <List>
-                                      {Object.values(expenses[year][month]).reverse().map(expense => {
+                                      {Object.values(expenses[year].data[month].data).reverse().map(expense => {
                                         if (expense.category === category) {
                                           return (
                                             <ListItem key={expense.date}>
@@ -163,7 +164,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
                                                 {getCategoryIcon(expense.category)}
                                               </ListItemIcon>
                                               <ListItemText
-                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(expense.amount)} - USD {formatAmount(expense.amount/expense.valorUSD)}</Typography>}
+                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(expense.amount)} - USD {formatAmount(expense.amountUSD)}</Typography>}
                                                 secondary={
                                                   <div>
                                                     <Typography variant="body1">{expense.subcategory}</Typography>
@@ -188,13 +189,13 @@ const Finances = ({ incomes, expenses,dolar }) => {
                       ))}
                     </Grid>
                     <Grid item xs={6}>
-                      {Object.keys(incomes[year]).reverse().map(month => (
+                      {Object.keys(incomes[year].data).reverse().map(month => (
                         <Accordion key={month} >
                           <AccordionSummary
                             style={{backgroundColor:'#263238', color:'white'}}
                             expandIcon={<ExpandMoreIcon />}
                           >
-                            <Typography variant="h6">{getMonthName(month)} - {formatAmount(calculateTotal(incomes[year][month]))}</Typography>
+                            <Typography variant="h6">{getMonthName(month)} - {formatAmount(incomes[year].data[month].total)} - USD {formatAmount(incomes[year].data[month].totalUSD)}</Typography>
                           </AccordionSummary>
                           <AccordionDetails>
                             <div style={{ width: '100%' }}>
@@ -205,7 +206,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
                                 scrollButtons="auto"
                               >
                                 {categoriesIncomes.map((category, index) => (
-                                  <Tab disabled={sumTransactionsByCategory(incomes[year][month],category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(incomes[year][month],category))}`} key={index} />
+                                  <Tab disabled={sumTransactionsByCategory(incomes[year].data[month].data,category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(incomes[year].data[month].data,category))}`} key={index} />
                                 ))}
                               </Tabs>
                               {categoriesIncomes.map((category, index) => (
@@ -218,7 +219,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
                                 >
                                   {incomeTabValue === index && (
                                     <List>
-                                      {Object.values(incomes[year][month]).reverse().map(income => {
+                                      {Object.values(incomes[year].data[month].data).reverse().map(income => {
                                         if (income.category === category) {
                                           return (
                                             <ListItem key={income.date}>
@@ -226,7 +227,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
                                                 <DriveEtaIcon />
                                               </ListItemIcon>
                                               <ListItemText
-                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(income.amount)} - USD {formatAmount(income.amount/income.valorUSD)}</Typography>}
+                                                primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(income.amount)} - USD {formatAmount(income.amountUSD)}</Typography>}
                                                 secondary={
                                                   <div>
                                                     <Typography variant="body1">{income.subcategory}</Typography>

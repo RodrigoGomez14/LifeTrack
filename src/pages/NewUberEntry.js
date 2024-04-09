@@ -4,17 +4,18 @@ import { Button, TextField, Typography, InputAdornment, IconButton, Input, Input
 import AddIcon from '@mui/icons-material/Add';
 import { database } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import { formatAmount } from '../formattingUtils';
 
 const NewUberEntryPage = ({ uid, pending, dolar }) => {
   const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
   const [cash, setCash] = useState('');
-  const [tips, setTips] = useState(''); // Estado para almacenar las propinas
+  const [tips, setTips] = useState('');
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
   const [totalCash, setTotalCash] = useState(0);
-  const [totalTips, setTotalTips] = useState(0); // Estado para almacenar el total de propinas
+  const [totalTips, setTotalTips] = useState(0);
 
   const handleCashInputChange = (e) => {
     setCash(e.target.value);
@@ -47,43 +48,94 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
     }
 
     const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
+    const amountValue = parseFloat(amount);
+    const totalCashValue = parseFloat(totalCash);
+    const totalTipsValue = parseFloat(totalTips);
+    const amountUSDValue = amountValue / dolar['venta'];
+    const totalCashUSDValue = totalCashValue / dolar['venta'];
+    const totalTipsUSDValue = totalTipsValue / dolar['venta'];
 
     const currentDate = new Date();
     const year = currentDate.getFullYear().toString();
     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = currentDate.getDate().toString().padStart(2, '0')
+    const day = currentDate.getDate().toString().padStart(2, '0');
 
-    database.ref(`${uid}/uber/data/${year}/${month}`).push({
+    database.ref(`${uid}/uber/data/${year}/data/${month}/data`).push({
       date: `${day}/${month}/${year}`,
-      amount: parseFloat(amount),
-      cash: parseFloat(totalCash),
-      tips: parseFloat(totalTips), // Agregar las propinas
+      amount: amountValue,
+      amountUSD: amountUSDValue,
+      cash: totalCashValue,
+      cashUSD: totalCashUSDValue,
+      tips: totalTipsValue,
+      tipsUSD: totalTipsUSDValue,
       duration: totalMinutes,
       valorUSD: dolar['venta']
     });
 
-    database.ref(`${uid}/uber/pending`).set(pending + (parseFloat(amount) - parseFloat(totalCash)));
+    // Actualizar totales mensuales en la base de datos para Uber
+    const monthlyUberRef = database.ref(`${uid}/uber/data/${year}/data/${month}`);
+    monthlyUberRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + amountValue;
+        data.totalUSD = (data.totalUSD || 0) + amountUSDValue;
+      }
+      return data;
+    });
 
-    database.ref(`${uid}/incomes/${year}/${month}`).push({
+    // Actualizar totales anuales en la base de datos para Uber
+    const yearlyUberRef = database.ref(`${uid}/uber/data/${year}`);
+    yearlyUberRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + amountValue;
+        data.totalUSD = (data.totalUSD || 0) + amountUSDValue;
+      }
+      return data;
+    });
+    
+    // Agregar el ingreso de efectivo a la base de datos para ingresos
+    database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
       date: `${day}/${month}/${year}`,
-      amount: parseFloat(totalCash),
+      amount: totalCashValue,
+      amountUSD: totalCashUSDValue,
       category: 'Uber',
       subCategory: 'Efectivo Uber',
       description: 'Efectivo Uber',
       valorUSD: dolar['venta']
     });
 
-    // Guardar las propinas como un ingreso adicional
-    if(tips>0){
-      database.ref(`${uid}/incomes/${year}/${month}`).push({
+    if (totalTipsValue > 0) {
+      // Agregar el ingreso de propinas a la base de datos para ingresos
+      database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
         date: `${day}/${month}/${year}`,
-        amount: parseFloat(totalTips),
+        amountUSD: totalTipsUSDValue,
+        amount: totalTipsValue,
         category: 'Uber',
         subCategory: 'Propinas Uber',
         description: 'Propinas Uber',
         valorUSD: dolar['venta']
       });
     }
+
+    // Actualizar totales mensuales y anuales en la base de datos para ingresos
+    const monthlyRef = database.ref(`${uid}/incomes/${year}/data/${month}`);
+    monthlyRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + totalCashValue;
+        data.totalUSD = (data.totalUSD || 0) + totalCashUSDValue;
+      }
+      return data;
+    });
+
+    const yearlyRef = database.ref(`${uid}/incomes/${year}`);
+    yearlyRef.transaction((data) => {
+      if (data) {
+        data.total = (data.total || 0) + totalCashValue;
+        data.totalUSD = (data.totalUSD || 0) + totalCashUSDValue;
+      }
+      return data;
+    });
+
+    database.ref(`${uid}/uber/pending`).set(pending + amountValue - totalCashValue);
 
     setAmount('');
     setCash('');
@@ -120,7 +172,6 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
                 startAdornment={
                   <InputAdornment position="start">
                     <IconButton
-                      aria-label="toggle password visibility"
                       onClick={handleAddCash}
                     >
                       <AddIcon />
@@ -130,7 +181,7 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
               />
             </FormControl>
             <Typography variant="body1" gutterBottom>
-              Total en Efectivo: {totalCash}
+              Total en Efectivo: {formatAmount(totalCash)}
             </Typography>
             <FormControl fullWidth>
               <InputLabel htmlFor="propinas">Propinas</InputLabel>
@@ -154,7 +205,7 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
               />
             </FormControl>
             <Typography variant="body1" gutterBottom>
-              Total de Propinas: {totalTips}
+              Total de Propinas: {formatAmount(totalTips)}
             </Typography>
             <TextField
               label="Horas"
