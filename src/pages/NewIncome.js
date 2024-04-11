@@ -24,8 +24,8 @@ const NewIncome = ({ uid,dolar }) => {
     const day = currentDate.getDate().toString().padStart(2, '0');
 
     database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
-      amount: parseFloat(amount).toFixed(2),
-      amountUSD: parseFloat(amount/dolar['venta']).toFixed(2),
+      amount: parseFloat(amount),
+      amountUSD: parseFloat(amount/dolar['venta']),
       category: category,
       subcategory: subcategory,
       date: `${day}/${month}/${year}`,
@@ -37,8 +37,8 @@ const NewIncome = ({ uid,dolar }) => {
     const yearlyRef = database.ref(`${uid}/incomes/${year}`);
     yearlyRef.transaction((data) => {
       if (data) {
-        data.total = (data.total || 0) + parseFloat(amount).toFixed(2);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']).toFixed(2);
+        data.total = (data.total || 0) + parseFloat(amount);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']);
       }
       return data;
     });
@@ -46,8 +46,8 @@ const NewIncome = ({ uid,dolar }) => {
     const monthlyRef = database.ref(`${uid}/incomes/${year}/data/${month}`);
     monthlyRef.transaction((data) => {
       if (data) {
-        data.total = (data.total || 0) + parseFloat(amount).toFixed(2);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']).toFixed(2);
+        data.total = (data.total || 0) + parseFloat(amount);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']);
       }
       return data;
     });
