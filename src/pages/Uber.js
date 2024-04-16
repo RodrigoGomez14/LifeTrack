@@ -7,8 +7,10 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { formatAmount, getMonthName, formatMinutesToHours } from '../formattingUtils';
 import { Link } from 'react-router-dom';
 import { database } from '../firebase';
+import { useStore } from '../store'; // Importar el store de Zustand
 
-const Uber = ({ datauber, uid, dolar }) => {
+const Uber = ({uid, dolar }) => {
+  const {userData} = useStore(); // Obtener estados del store
   const [resetDisabled, setResetDisabled] = useState(true);
   useEffect(() => {
     const currentDate = new Date();
@@ -17,9 +19,9 @@ const Uber = ({ datauber, uid, dolar }) => {
     // Si el día actual es lunes (1), entonces deshabilita el reset
     setResetDisabled(dayOfWeek !== 1);
   }, []); // Esto se ejecutará solo una vez al montar el componente
-
+  console.log(userData.uber)
   // Verificar si hay datos de Uber disponibles
-  if (!datauber) {
+  if (!userData.uber) {
     return (
       <Layout title="Uber">
         <div>No hay datos de Uber disponibles.</div>
@@ -35,23 +37,42 @@ const Uber = ({ datauber, uid, dolar }) => {
   const resetPending = () => {
     const currentDate = new Date();
     const dayOfWeek = currentDate.getDay(); // 0 para domingo, 1 para lunes, ..., 6 para sábado
-    const pending = parseFloat(datauber.pending);
+    const pending = parseFloat(userData.uber.pending);
 
     // Verificar si hoy es lunes (dayOfWeek === 1)
     if (dayOfWeek === 1 && pending > 0) {
       const year = currentDate.getFullYear().toString();
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
       const day = currentDate.getDate().toString().padStart(2, '0');
-
-      database.ref(`${uid}/incomes/${year}/${month}`).push({
+      
+      database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
         date: `${day}/${month}/${year}`,
         amount: pending,
+        amountUSD: parseFloat(pending/dolar['venta']),
         category: 'Uber',
         subCategory: 'Semanal Uber',
         description: 'Semanal Uber',
         valorUSD:dolar['venta']
       });
 
+      // Actualizar totales mensuales y anuales en la base de datos para ingresos
+      const yearlyRef = database.ref(`${uid}/incomes/${year}`);
+      yearlyRef.transaction((data) => {
+        if (data) {
+          data.total = (data.total || 0) + parseFloat(pending);
+          data.totalUSD = (data.totalUSD || 0) + parseFloat(pending/dolar['venta']);
+        }
+        return data;
+      });
+
+      const monthlyRef = database.ref(`${uid}/incomes/${year}/data/${month}`);
+      monthlyRef.transaction((data) => {
+        if (data) {
+          data.total = (data.total || 0) + parseFloat(pending);
+          data.totalUSD = (data.totalUSD || 0) + parseFloat(pending/dolar['venta']);
+        }
+        return data;
+      });
       database.ref(`${uid}/uber/pending`).set(0);
     }
   };
@@ -68,8 +89,8 @@ const Uber = ({ datauber, uid, dolar }) => {
                   </IconButton>
                 </Link>
               }
-              style={{backgroundColor:datauber.pending > 0 ? 'green' : 'red'}}
-              title={`${formatAmount(datauber.pending)} - USD ${formatAmount(datauber.pending / dolar['venta'])}`}
+              style={{backgroundColor:userData.uber.pending > 0 ? 'green' : 'red'}}
+              title={`${formatAmount(userData.uber.pending)} - USD ${formatAmount(userData.uber.pending / dolar['venta'])}`}
               subheader='Pendiente de pago'
             />
             <Button 
@@ -82,12 +103,12 @@ const Uber = ({ datauber, uid, dolar }) => {
             </Button>
           </Card>
         </Grid>
-        {Object.keys(datauber.data).map(year => (
+        {Object.keys(userData.uber.data).map(year => (
           <Grid container item xs={12} key={year} justifyContent='center' spacing={2}>
             <Grid item xs={12} >
-              <Typography variant="h6" align="center">{year} - Total: {formatAmount(datauber.data[year].total)} - USD {formatAmount(datauber.data[year].totalUSD)}</Typography>
+              <Typography variant="h6" align="center">{year} - Total: {formatAmount(userData.uber.data[year].total)} - USD {formatAmount(userData.uber.data[year].totalUSD)}</Typography>
             </Grid>
-            {Object.keys(datauber.data[year].data).reverse().map(month => {
+            {Object.keys(userData.uber.data[year].data).reverse().map(month => {
               const monthName = getMonthName(month);
               return (
                 <Grid item xs={8}>
@@ -97,13 +118,13 @@ const Uber = ({ datauber, uid, dolar }) => {
                       expandIcon={<ExpandMoreIcon />}
                     >
                       <Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>
-                        {monthName} - Total: {formatAmount(datauber.data[year].data[month].total)} - USD {formatAmount(datauber.data[year].data[month].totalUSD)}
+                        {monthName} - Total: {formatAmount(userData.uber.data[year].data[month].total)} - USD {formatAmount(userData.uber.data[year].data[month].totalUSD)}
                       </Typography>
                     </AccordionSummary>
                     <AccordionDetails>
                       <List>
-                        {Object.keys(datauber.data[year].data[month].data).reverse().map(transactionId => {
-                          const transaction = datauber.data[year].data[month].data[transactionId];
+                        {Object.keys(userData.uber.data[year].data[month].data).reverse().map(transactionId => {
+                          const transaction = userData.uber.data[year].data[month].data[transactionId];
                           const coefficient = (transaction.amount / transaction.duration) * 60; // Calcular el coeficiente total/duración
                           return (
                             <ListItem key={transactionId}>

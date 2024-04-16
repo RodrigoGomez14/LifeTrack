@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { auth } from '../firebase.js';
 import { Typography, TextField, Button, Container, Grid } from '@mui/material';
 import { css } from '@emotion/react';
+import { useStore } from '../store'; // Importar el store de Zustand
 
 const formStyles = css`
   width: 100%;
@@ -13,6 +14,7 @@ const formStyles = css`
 `;
 
 const Login = () => {
+  const {isLoading,setIsLoading} = useStore(); // Obtener estados del store
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -20,8 +22,9 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
+      setIsLoading(true)
       // Iniciar sesión con Firebase Auth
-      await auth.signInWithEmailAndPassword(email, password);
+      await auth.signInWithEmailAndPassword(email, password)
       // Si el inicio de sesión es exitoso, redirigir a la página de dashboard
     } catch (error) {
       // Si hay un error al iniciar sesión, mostrar el mensaje de error

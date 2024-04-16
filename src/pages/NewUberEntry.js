@@ -5,8 +5,11 @@ import AddIcon from '@mui/icons-material/Add';
 import { database } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { formatAmount } from '../formattingUtils';
+import { useStore } from '../store'; // Importar el store de Zustand
 
 const NewUberEntryPage = ({ uid, pending, dolar }) => {
+  const {userData,setUserData} = useStore(); // Obtener estados del store
+
   const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
