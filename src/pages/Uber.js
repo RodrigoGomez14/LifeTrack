@@ -1,6 +1,6 @@
 import React, { useState,useEffect} from 'react';
 import Layout from '../components/Layout';
-import { Typography, Accordion, AccordionSummary, AccordionDetails, List, ListItem, ListItemText, ListItemIcon, Grid, Card, CardHeader, IconButton, Button } from '@mui/material';
+import { Typography, Accordion, AccordionSummary, AccordionDetails, List, ListItem, ListItemText, ListItemIcon, Grid, Card, CardHeader, IconButton, Button,LinearProgress } from '@mui/material';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 import AddIcon from '@mui/icons-material/Add';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -76,6 +76,9 @@ const Uber = ({uid, dolar }) => {
       database.ref(`${uid}/uber/pending`).set(0);
     }
   };
+  const goal = userData.uber.challenge.goal || 1000; // Por defecto, objetivo es 1000
+  const progress = userData.uber.challenge.progress || 0;
+  const progressPercentage = (progress / goal) * 100;
   return (
     <Layout title="Uber">
       <Grid container spacing={3} justifyContent='center'>
@@ -102,6 +105,11 @@ const Uber = ({uid, dolar }) => {
               Resetear Pendiente Semanal
             </Button>
           </Card>
+        </Grid>
+        <Grid container>
+          <Grid item xs={12}>
+            <LinearProgress variant="determinate" value={progressPercentage} color='primary'/>  
+          </Grid>
         </Grid>
         {Object.keys(userData.uber.data).map(year => (
           <Grid container item xs={12} key={year} justifyContent='center' spacing={2}>

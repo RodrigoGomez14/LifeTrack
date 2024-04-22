@@ -17,6 +17,7 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
   const [tips, setTips] = useState('');
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
+  const [travels, setTravels] = useState(0);
   const [totalCash, setTotalCash] = useState(0);
   const [totalTips, setTotalTips] = useState(0);
 
@@ -72,7 +73,17 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
       tips: totalTipsValue,
       tipsUSD: totalTipsUSDValue,
       duration: totalMinutes,
+      travels: parseInt(travels),
       valorUSD: dolar['venta']
+    });
+    
+    // Actualiza la cantidad de viajes de los challenge
+    const challengeRef = database.ref(`${uid}/uber/challenge`);
+    challengeRef.transaction((data) => {
+      if (data) {
+        data.progress = (data.progress || 0) + parseInt(travels);
+      }
+      return data;
     });
 
     // Actualizar totales mensuales en la base de datos para Uber
@@ -210,6 +221,15 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
             <Typography variant="body1" gutterBottom>
               Total de Propinas: {formatAmount(totalTips)}
             </Typography>
+            <TextField
+              label="Cantidad de Viajes"
+              type="number"
+              value={travels}
+              onChange={(e) => setTravels(e.target.value)}
+              required
+              fullWidth
+              margin="normal"
+            />
             <TextField
               label="Horas"
               type="number"
