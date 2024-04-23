@@ -9,6 +9,7 @@ import Habits from './pages/Habits.js';
 import NewUberEntry from './pages/NewUberEntry.js';
 import NewExpense from './pages/NewExpense.js';
 import NewIncome from './pages/NewIncome.js';
+import StartChallenge from './pages/StartChallenge.js';
 import { database } from "./firebase.js";
 import { auth } from "./firebase.js";
 import { useStore } from './store'; // Importar el store de Zustand
@@ -60,6 +61,7 @@ function App() {
             <Route exact path="/NewUberEntry" element={<NewUberEntry uid={useruid} pending={userData.uber.pending} dolar={dollarRate} />} />
             <Route exact path="/NewExpense" element={<NewExpense uid={useruid} dolar={dollarRate} />} />
             <Route exact path="/NewIncome" element={<NewIncome uid={useruid} dolar={dollarRate} />} />
+            <Route exact path="/StartChallenge" element={<StartChallenge uid={useruid} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Router>
