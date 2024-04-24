@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AppBar from './AppBar';
 import Drawer from './Drawer';
+import {Grid} from '@mui/material';
 
 const Layout = ({ children, title }) => {
   const [openDrawer, setOpenDrawer] = useState(false);
@@ -13,9 +14,9 @@ const Layout = ({ children, title }) => {
     <div>
       <AppBar toggleDrawer={toggleDrawer} title={title} />
       <Drawer open={openDrawer} toggleDrawer={toggleDrawer} />
-      <div style={{ marginTop: '64px' }}> {/* Agregando un margen de 64px para la AppBar */}
+      <Grid container spacing={3} p={1} mt={5}>
         {children}
-      </div>
+      </Grid>
     </div>
   );
 };

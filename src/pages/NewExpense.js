@@ -75,43 +75,41 @@ const NewExpense = ({ uid,dolar }) => {
 
   return (
     <Layout title="Nuevo Gasto">
-      <Grid container justifyContent='center'>
-        <Grid item xs={12}>
-          <ButtonGroup fullWidth>
-            {Object.keys(subcategories).map((cat, index) => (
-              <Button key={index} onClick={() => setCategory(cat)} variant={category === cat ? 'contained' : 'text'}>{cat}</Button>
-            ))}
-          </ButtonGroup>
-        </Grid>
-        <Grid item xs={12}>
-          <ButtonGroup fullWidth>
-            {category && subcategories[category].map((subcat, index) => (
-              <Button key={index} onClick={() => setSubcategory(subcat)} variant={subcategory === subcat ? 'contained' : 'text'}>{subcat}</Button>
-            ))}
-          </ButtonGroup>
-        </Grid>
-        <Grid item xs={6}>
-          <form onSubmit={handleFormSubmit}>
-            <TextField
-              label="Monto"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <TextField
-              label="Descripción"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <Button variant="contained" type="submit" disabled={!amount || !category || !subcategory || !description}>Agregar Gasto</Button>
-          </form>
-        </Grid>
+      <Grid item xs={12}>
+        <ButtonGroup fullWidth>
+          {Object.keys(subcategories).map((cat, index) => (
+            <Button key={index} onClick={() => setCategory(cat)} variant={category === cat ? 'contained' : 'text'}>{cat}</Button>
+          ))}
+        </ButtonGroup>
+      </Grid>
+      <Grid item xs={12}>
+        <ButtonGroup fullWidth>
+          {category && subcategories[category].map((subcat, index) => (
+            <Button key={index} onClick={() => setSubcategory(subcat)} variant={subcategory === subcat ? 'contained' : 'text'}>{subcat}</Button>
+          ))}
+        </ButtonGroup>
+      </Grid>
+      <Grid item xs={6}>
+        <form onSubmit={handleFormSubmit}>
+          <TextField
+            label="Monto"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Descripción"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <Button variant="contained" type="submit" disabled={!amount || !category || !subcategory || !description}>Agregar Gasto</Button>
+        </form>
       </Grid>
     </Layout>
   );
