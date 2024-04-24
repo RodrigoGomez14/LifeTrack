@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { database } from '../firebase';
-import { Typography, Grid, Card, CardContent, Button } from '@mui/material';
+import { Typography, Grid, Card, CardContent, Button,CardHeader } from '@mui/material';
 import Layout from '../components/Layout';
 import { formatAmount } from '../formattingUtils';
 
-const Home = () => {
+const Home = ({carMaintenance}) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uberData, setUberData] = useState(null);
   const [finanzasData, setFinanzasData] = useState(null);
@@ -64,10 +64,21 @@ const Home = () => {
   return (
     <Layout title="Home">
       <div>
-        <Typography variant="h1" gutterBottom>
-          Dashboard
-        </Typography>
         <Grid container spacing={3}>
+          <Grid container justifyContent='center'>
+              <Card>
+                  <CardHeader
+                    title='Mantenimiento Auto'
+                  />
+                  <CardContent>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12}>
+                        <Typography variant="h2" align="center">{formatAmount(carMaintenance)}</Typography>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+            </Grid>
           <Grid item xs={12} sm={6}>
             <Card>
               <CardContent>

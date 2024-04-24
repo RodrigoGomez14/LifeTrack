@@ -54,7 +54,7 @@ function App() {
       {userLoggedIn ? (
         <Router>
           <Routes>
-            <Route exact path="/" element={<Home />} />
+            <Route exact path="/" element={<Home carMaintenance={userData.savings.carMaintenance}/>} />
             <Route exact path="/Finanzas" element={<Finances incomes={userData.incomes} expenses={userData.expenses} dolar={dollarRate} />} />
             <Route exact path="/Uber" element={<Uber datauber={userData.uber} uid={useruid} dolar={dollarRate} />} />
             <Route exact path="/Habitos" element={<Habits />} />
