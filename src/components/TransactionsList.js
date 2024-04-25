@@ -13,7 +13,7 @@ import {
   Tab,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../formattingUtils';
+import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../utils';
 
 const TransactionsList = ({ data,type }) => {
   const [expenseTabValue, setExpenseTabValue] = useState(0);

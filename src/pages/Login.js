@@ -14,7 +14,6 @@ const formStyles = css`
 `;
 
 const Login = () => {
-  const {isLoading,setIsLoading} = useStore(); // Obtener estados del store
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -22,7 +21,6 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      setIsLoading(true)
       // Iniciar sesión con Firebase Auth
       await auth.signInWithEmailAndPassword(email, password)
       // Si el inicio de sesión es exitoso, redirigir a la página de dashboard

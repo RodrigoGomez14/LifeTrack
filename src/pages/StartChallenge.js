@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
 import { Button, ButtonGroup, TextField, Grid } from '@mui/material';
-import { database } from '../firebase';
+import { auth, database } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
-const StartChallenge = ({ uid,dolar }) => {
+const StartChallenge = () => {
   const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
@@ -17,7 +17,7 @@ const StartChallenge = ({ uid,dolar }) => {
     }
 
 
-    database.ref(`${uid}/uber/challenge`).set({
+    database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
       amount:amount,
       goal:goal,
       progress:0
@@ -35,29 +35,27 @@ const StartChallenge = ({ uid,dolar }) => {
 
 
   return (
-    <Layout title="Nuevo Gasto">
-      <Grid container justifyContent='center'>
-        <Grid item xs={12}>
-          <ButtonGroup fullWidth>
-            {goals.map((gl, index) => (
-              <Button key={index} onClick={() => setGoal(gl)} variant={goal === gl ? 'contained' : 'text'}>{gl}</Button>
-            ))}
-          </ButtonGroup>
-        </Grid>
-        <Grid item xs={6}>
-          <form onSubmit={handleFormSubmit}>
-            <TextField
-              label="Monto"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <Button variant="contained" type="submit" disabled={!amount || !goal }>Iniciar Challenge</Button>
-          </form>
-        </Grid>
+    <Layout title="Empezar Challenge">
+      <Grid item xs={12}>
+        <ButtonGroup fullWidth>
+          {goals.map((gl, index) => (
+            <Button key={index} onClick={() => setGoal(gl)} variant={goal === gl ? 'contained' : 'text'}>{gl}</Button>
+          ))}
+        </ButtonGroup>
+      </Grid>
+      <Grid item xs={6}>
+        <form onSubmit={handleFormSubmit}>
+          <TextField
+            label="Monto"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <Button variant="contained" type="submit" disabled={!amount || !goal }>Iniciar Challenge</Button>
+        </form>
       </Grid>
     </Layout>
   );

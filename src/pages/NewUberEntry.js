@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
-import { Button, TextField, Typography, InputAdornment, IconButton, Input, InputLabel, FormControl, Grid } from '@mui/material';
+import { Button, TextField, Typography, InputAdornment, IconButton, Input, InputLabel, FormControl, Grid,Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { database } from '../firebase';
+import { database,auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { formatAmount } from '../formattingUtils';
-import { useStore } from '../store'; // Importar el store de Zustand
+import { formatAmount } from '../utils';
+import { useStore } from '../store'; 
 
-const NewUberEntryPage = ({ uid, pending, dolar }) => {
-  const {userData,setUserData} = useStore(); // Obtener estados del store
-
+const NewUberEntryPage = () => {
+  const {userData,dollarRate} = useStore();
   const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
@@ -55,16 +54,16 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
     const amountValue = parseFloat(amount);
     const totalCashValue = parseFloat(totalCash);
     const totalTipsValue = parseFloat(totalTips);
-    const amountUSDValue = amountValue / dolar['venta'];
-    const totalCashUSDValue = totalCashValue / dolar['venta'];
-    const totalTipsUSDValue = totalTipsValue / dolar['venta'];
+    const amountUSDValue = amountValue / dollarRate['venta'];
+    const totalCashUSDValue = totalCashValue / dollarRate['venta'];
+    const totalTipsUSDValue = totalTipsValue / dollarRate['venta'];
 
     const currentDate = new Date();
     const year = currentDate.getFullYear().toString();
     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
     const day = currentDate.getDate().toString().padStart(2, '0');
 
-    database.ref(`${uid}/uber/data/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}/data`).push({
       date: `${day}/${month}/${year}`,
       amount: amountValue,
       amountUSD: amountUSDValue,
@@ -74,11 +73,11 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
       tipsUSD: totalTipsUSDValue,
       duration: totalMinutes,
       travels: parseInt(travels),
-      valorUSD: dolar['venta']
+      valorUSD: dollarRate['venta']
     });
     
     // Actualiza la cantidad de viajes de los challenge
-    const challengeRef = database.ref(`${uid}/uber/challenge`);
+    const challengeRef = database.ref(`${auth.currentUser.uid}/uber/challenge`);
     challengeRef.transaction((data) => {
       if (data) {
         data.progress = (data.progress || 0) + parseInt(travels);
@@ -87,7 +86,7 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
     });
 
     // Actualizar totales mensuales en la base de datos para Uber
-    const monthlyUberRef = database.ref(`${uid}/uber/data/${year}/data/${month}`);
+    const monthlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}`);
     monthlyUberRef.transaction((data) => {
       if (data) {
         data.total = (data.total || 0) + amountValue;
@@ -97,7 +96,7 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
     });
 
     // Actualizar totales anuales en la base de datos para Uber
-    const yearlyUberRef = database.ref(`${uid}/uber/data/${year}`);
+    const yearlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}`);
     yearlyUberRef.transaction((data) => {
       if (data) {
         data.total = (data.total || 0) + amountValue;
@@ -107,31 +106,31 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
     });
     
     // Agregar el ingreso de efectivo a la base de datos para ingresos
-    database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
       date: `${day}/${month}/${year}`,
       amount: totalCashValue,
       amountUSD: totalCashUSDValue,
       category: 'Uber',
       subCategory: 'Efectivo Uber',
       description: 'Efectivo Uber',
-      valorUSD: dolar['venta']
+      valorUSD: dollarRate['venta']
     });
-
+    
     if (totalTipsValue > 0) {
       // Agregar el ingreso de propinas a la base de datos para ingresos
-      database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
+      database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
         date: `${day}/${month}/${year}`,
         amountUSD: totalTipsUSDValue,
         amount: totalTipsValue,
         category: 'Uber',
         subCategory: 'Propinas Uber',
         description: 'Propinas Uber',
-        valorUSD: dolar['venta']
+        valorUSD: dollarRate['venta']
       });
     }
 
     // Actualizar totales mensuales y anuales en la base de datos para ingresos
-    const monthlyRef = database.ref(`${uid}/incomes/${year}/data/${month}`);
+    const monthlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}`);
     monthlyRef.transaction((data) => {
       if (data) {
         data.total = (data.total || 0) + totalCashValue;
@@ -140,7 +139,7 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
       return data;
     });
 
-    const yearlyRef = database.ref(`${uid}/incomes/${year}`);
+    const yearlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}`);
     yearlyRef.transaction((data) => {
       if (data) {
         data.total = (data.total || 0) + totalCashValue;
@@ -149,7 +148,17 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
       return data;
     });
 
-    database.ref(`${uid}/uber/pending`).set(pending + amountValue - totalCashValue);
+    database.ref(`${auth.currentUser.uid}/uber/pending`).set(userData.uber.pending + amountValue - totalCashValue);
+    database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(totalCashValue*0.15));
+
+    // Agregar el ingreso de efectivo a la base de datos para ingresos
+    database.ref(`${auth.currentUser.uid}/savings/carMaintenanceHistory`).push({
+      date: `${day}/${month}/${year}`,
+      amount: parseFloat(totalCashValue*0.15),
+      amountUSD: parseFloat(totalCashValue*0.15)/dollarRate['venta'],
+      newTotal: userData.savings.carMaintenance+parseFloat(totalCashValue*0.15),
+      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(totalCashValue*0.15)/dollarRate['venta'])
+    });
 
     setAmount('');
     setCash('');
@@ -162,95 +171,98 @@ const NewUberEntryPage = ({ uid, pending, dolar }) => {
 
   return (
     <Layout title="Finalizar Jornada Uber">
-      <Grid container justifyContent='center'>
-        <Grid item xs={6}>
-          <form onSubmit={handleFormSubmit}>
-            <TextField
-              label="Monto"
+      <Grid container item xs={12} justifyContent='center'>
+        <form onSubmit={handleFormSubmit}>
+          <TextField
+            label="Monto"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <FormControl fullWidth>
+            <InputLabel htmlFor="efectivo">Efectivo</InputLabel>
+            <Input
+              id='efectivo'
+              label="Efectivo"
               type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              fullWidth
+              value={cash}
+              onChange={handleCashInputChange}
               margin="normal"
+              startAdornment={
+                <InputAdornment position="start">
+                  <IconButton
+                    onClick={handleAddCash}
+                  >
+                    <AddIcon />
+                  </IconButton>
+                </InputAdornment>
+              }
             />
-            <FormControl fullWidth>
-              <InputLabel htmlFor="efectivo">Efectivo</InputLabel>
-              <Input
-                id='efectivo'
-                label="Efectivo"
-                type="number"
-                value={cash}
-                onChange={handleCashInputChange}
-                margin="normal"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <IconButton
-                      onClick={handleAddCash}
-                    >
-                      <AddIcon />
-                    </IconButton>
-                  </InputAdornment>
-                }
-              />
-            </FormControl>
-            <Typography variant="body1" gutterBottom>
-              Total en Efectivo: {formatAmount(totalCash)}
-            </Typography>
-            <FormControl fullWidth>
-              <InputLabel htmlFor="propinas">Propinas</InputLabel>
-              <Input
-                id='propinas'
-                label="Propinas"
-                type="number"
-                value={tips}
-                onChange={handleTipsInputChange}
-                margin="normal"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={handleAddTips}
-                    >
-                      <AddIcon />
-                    </IconButton>
-                  </InputAdornment>
-                }
-              />
-            </FormControl>
-            <Typography variant="body1" gutterBottom>
-              Total de Propinas: {formatAmount(totalTips)}
-            </Typography>
-            <TextField
-              label="Cantidad de Viajes"
+          </FormControl>
+          <Typography variant="body1" gutterBottom>
+            Total en Efectivo: {formatAmount(totalCash)}
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel htmlFor="propinas">Propinas</InputLabel>
+            <Input
+              id='propinas'
+              label="Propinas"
               type="number"
-              value={travels}
-              onChange={(e) => setTravels(e.target.value)}
-              required
-              fullWidth
+              value={tips}
+              onChange={handleTipsInputChange}
               margin="normal"
+              startAdornment={
+                <InputAdornment position="start">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={handleAddTips}
+                  >
+                    <AddIcon />
+                  </IconButton>
+                </InputAdornment>
+              }
             />
-            <TextField
-              label="Horas"
-              type="number"
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <TextField
-              label="Minutos"
-              type="number"
-              value={minutes}
-              onChange={(e) => setMinutes(e.target.value)}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <Button variant="contained" type="submit">Finalizar Jornada</Button>
-          </form>
-        </Grid>
+          </FormControl>
+          <Typography variant="body1" gutterBottom>
+            Total de Propinas: {formatAmount(totalTips)}
+          </Typography>
+          <TextField
+            label="Cantidad de Viajes"
+            type="number"
+            value={travels}
+            onChange={(e) => setTravels(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Horas"
+            type="number"
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <TextField
+            label="Minutos"
+            type="number"
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
+          />
+          <Button variant="contained" type="submit">Finalizar Jornada</Button>
+        </form>
+      </Grid>
+      <Grid container item xs={12} justifyContent='center'>
+        <Alert severity="success" variant='filled'>
+          FONDO DE MANTENIMIENTO DEL AUTO : {formatAmount(parseFloat(totalCash*0.15))}
+        </Alert>
       </Grid>
     </Layout>
   );

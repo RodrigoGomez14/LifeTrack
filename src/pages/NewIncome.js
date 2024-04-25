@@ -3,8 +3,11 @@ import Layout from '../components/Layout';
 import { Button, TextField, Typography, ButtonGroup, Grid } from '@mui/material';
 import { database } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
+import { useStore } from '../store'; // Importar el store de Zustand
 
-const NewIncome = ({ uid,dolar }) => {
+const NewIncome = () => {
+  const { dollarRate} = useStore();
   const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
@@ -23,31 +26,31 @@ const NewIncome = ({ uid,dolar }) => {
     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
     const day = currentDate.getDate().toString().padStart(2, '0');
 
-    database.ref(`${uid}/incomes/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
       amount: parseFloat(amount),
-      amountUSD: parseFloat(amount/dolar['venta']),
+      amountUSD: parseFloat(amount/dollarRate['venta']),
       category: category,
       subcategory: subcategory,
       date: `${day}/${month}/${year}`,
       description: description,
-      valorUSD: dolar['venta']
+      valorUSD: dollarRate['venta']
     });
 
     // Actualizar totales mensuales y anuales en la base de datos para ingresos
-    const yearlyRef = database.ref(`${uid}/incomes/${year}`);
+    const yearlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}`);
     yearlyRef.transaction((data) => {
       if (data) {
         data.total = (data.total || 0) + parseFloat(amount);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dollarRate['venta']);
       }
       return data;
     });
 
-    const monthlyRef = database.ref(`${uid}/incomes/${year}/data/${month}`);
+    const monthlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}`);
     monthlyRef.transaction((data) => {
       if (data) {
         data.total = (data.total || 0) + parseFloat(amount);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dolar['venta']);
+        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dollarRate['venta']);
       }
       return data;
     });
@@ -77,13 +80,17 @@ const NewIncome = ({ uid,dolar }) => {
           ))}
         </ButtonGroup>
       </Grid>
-      <Grid item xs={12}>
-        <ButtonGroup fullWidth>
-          {category && subcategories[category].map((subcat, index) => (
-            <Button key={index} onClick={() => setSubcategory(subcat)} variant={subcategory === subcat ? 'contained' : 'text'}>{subcat}</Button>
-          ))}
-        </ButtonGroup>
-      </Grid>
+      {!category?
+        null
+        :
+        <Grid item xs={12}>
+          <ButtonGroup fullWidth>
+            {category && subcategories[category].map((subcat, index) => (
+              <Button key={index} onClick={() => setSubcategory(subcat)} variant={subcategory === subcat ? 'contained' : 'text'}>{subcat}</Button>
+            ))}
+          </ButtonGroup>
+        </Grid>
+      }
       <Grid item xs={6}>
         <form onSubmit={handleFormSubmit}>
           <TextField

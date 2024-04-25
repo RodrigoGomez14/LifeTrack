@@ -1,11 +1,12 @@
 import React from 'react';
 import Layout from '../components/Layout'
+import { Grid } from '@mui/material';
 const Habits = () => {
   return (
     <Layout title='Habitos'>
-        <div>
+      <Grid item xs={12}>
             Habitos Component
-        </div>
+      </Grid>
     </Layout>
   );
 };

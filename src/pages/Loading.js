@@ -1,9 +1,11 @@
 import React from 'react';
-import { CircularProgress } from '@mui/material';
+import { CircularProgress,Backdrop } from '@mui/material';
 
-const Loading = () => {
+const Loading = ({open}) => {
   return (
+    <Backdrop open={open}>
       <CircularProgress/>
+    </Backdrop>
   );
 };
 

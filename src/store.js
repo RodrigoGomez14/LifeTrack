@@ -7,8 +7,6 @@ const useStore = create((set) => ({
   setIsLoading: (value) => set({ isLoading: value }),
   userData: null,
   setUserData: (data) => set({ userData: data }),
-  useruid: null,
-  setUseruid: (uid) => set({ useruid: uid }),
   dollarRate: null,
   setDollarRate: (rate) => set({ dollarRate: rate }),
 }));

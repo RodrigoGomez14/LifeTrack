@@ -11,13 +11,13 @@ const Layout = ({ children, title }) => {
   };
 
   return (
-    <div>
+    <>
       <AppBar toggleDrawer={toggleDrawer} title={title} />
       <Drawer open={openDrawer} toggleDrawer={toggleDrawer} />
       <Grid container spacing={3} p={1} mt={5}>
         {children}
       </Grid>
-    </div>
+    </>
   );
 };
 

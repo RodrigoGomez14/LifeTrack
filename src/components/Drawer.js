@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer as MuiDrawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Button } from '@mui/material';
+import { Drawer as MuiDrawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Button, Typography } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import LocalTaxiOutlinedIcon from '@mui/icons-material/LocalTaxiOutlined';
@@ -55,15 +55,20 @@ const Drawer = ({ open, toggleDrawer }) => {
           </ListItemButton>
         </ListItem>
       </List>
-      <Button
-        fullWidth
-        variant="contained"
-        color="error"
-        startIcon={<ExitToAppOutlinedIcon />}
-        onClick={()=>handleLogout()} // Llamar a la función handleLogout al hacer clic en el botón
-      >
-        Logout
-      </Button>
+      <>
+        <Typography variant='caption'>
+          {auth.currentUser.email}
+        </Typography>
+        <Button
+          fullWidth
+          variant="contained"
+          color="error"
+          startIcon={<ExitToAppOutlinedIcon />}
+          onClick={()=>handleLogout()} // Llamar a la función handleLogout al hacer clic en el botón
+        >
+          Logout
+        </Button>
+      </>
     </MuiDrawer>
   );
 };

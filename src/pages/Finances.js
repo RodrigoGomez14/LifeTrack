@@ -1,13 +1,14 @@
 import React from 'react';
 import Layout from '../components/Layout';
 import { Typography, Grid, Card, CardHeader, Button, Box,Tabs,Tab} from '@mui/material';
-import TabPanel from '@mui/lab/TabPanel'
-import AddIcon from '@mui/icons-material/Add';
-import { formatAmount, getMonthName } from '../formattingUtils';
+import { formatAmount, getMonthName } from '../utils';
 import { Link } from 'react-router-dom';
 import TransactionsList from '../components/TransactionsList'
+import SavingsList from '../components/SavingsList'
+import { useStore } from '../store'; // Importar el store de Zustand
 
-const Finances = ({ incomes, expenses,dolar }) => {
+const Finances = () => {
+  const {userData,dollarRate} = useStore(); // Obtener estados del store
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
@@ -40,23 +41,23 @@ const Finances = ({ incomes, expenses,dolar }) => {
     <Layout title="Finanzas">
         <Grid container item xs={12} spacing={3} >
           <Grid item xs={12} sm={4}>
-            <Card style={{backgroundColor:incomes[currentYear].totalUSD-expenses[currentYear].totalUSD>0?'green':"red" , color:'white'}}>
+            <Card style={{backgroundColor:userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD>0?'green':"red" , color:'white'}}>
               <CardHeader
-                title={`${formatAmount((incomes[currentYear].total-expenses[currentYear].total))} / USD ${formatAmount((incomes[currentYear].totalUSD-expenses[currentYear].totalUSD))}`}
+                title={`${formatAmount((userData.incomes[currentYear].total-userData.expenses[currentYear].total))} / USD ${formatAmount((userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD))}`}
                 subheader={`Balance ${currentYear}`}/>
             </Card>
           </Grid>
           <Grid item xs={12} sm={4}>
-            <Card style={{backgroundColor:incomes[currentYear].data[`0${currentMonth}`].totalUSD-expenses[currentYear].data[`0${currentMonth}`].totalUSD>0?'green':"red" , color:'white'}}>
+            <Card style={{backgroundColor:userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD>0?'green':"red" , color:'white'}}>
               <CardHeader
-                title={`${formatAmount((incomes[currentYear].data[`0${currentMonth}`].total-expenses[currentYear].data[`0${currentMonth}`].total))} / USD ${formatAmount((incomes[currentYear].data[`0${currentMonth}`].totalUSD-expenses[currentYear].data[`0${currentMonth}`].totalUSD))}`}
+                title={`${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].total-userData.expenses[currentYear].data[`0${currentMonth}`].total))} / USD ${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD))}`}
                 subheader={`Balance ${currentMonthName}`}/>
             </Card>
           </Grid>
           <Grid item xs={12} sm={4}>
             <Card>
               <CardHeader
-                title={formatAmount(dolar['venta'])}
+                title={formatAmount(dollarRate['venta'])}
                 subheader="Valor USD"/>
             </Card>
           </Grid>
@@ -75,7 +76,7 @@ const Finances = ({ incomes, expenses,dolar }) => {
         </Grid>
         <Grid container item xs={12} spacing={3}>
           <Grid item xs={12}>
-              {Object.keys(expenses).map(year => (
+              {Object.keys(userData.expenses).map(year => (
                 <div key={year}>
                   <Typography variant="h5" gutterBottom>{year}</Typography>
                   <Grid container>
@@ -83,14 +84,18 @@ const Finances = ({ incomes, expenses,dolar }) => {
                       <Tabs value={tabValue} onChange={handleChange} centered>
                         <Tab label="Gastos" />
                         <Tab label="Ingresos" />
+                        <Tab label="Ahorros" />
                       </Tabs>
                     </Grid>
                     <Grid item xs={12}>
                       <CustomTabPanel value={tabValue} index={0}>
-                        <TransactionsList data={expenses[year].data} type="expenses"/>
+                        <TransactionsList data={userData.expenses[year].data} type="expenses"/>
                       </CustomTabPanel>
                       <CustomTabPanel value={tabValue} index={1}>
-                        <TransactionsList data={incomes[year].data} type="incomes"/>  
+                        <TransactionsList data={userData.incomes[year].data} type="incomes"/>  
+                      </CustomTabPanel>
+                      <CustomTabPanel value={tabValue} index={2}>
+                        <SavingsList data={userData.savings}/>  
                       </CustomTabPanel>
                     </Grid>
                   </Grid>
