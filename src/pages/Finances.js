@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { Typography, Grid, Card, CardHeader, Button, Box,Tabs,Tab} from '@mui/material';
 import { formatAmount, getMonthName } from '../utils';
 import { Link } from 'react-router-dom';
-import TransactionsList from '../components/TransactionsList'
+import TransactionsTabs from '../components/TransactionsTabs'
 import SavingsList from '../components/SavingsList'
 import { useStore } from '../store'; // Importar el store de Zustand
 
@@ -89,10 +89,10 @@ const Finances = () => {
                     </Grid>
                     <Grid item xs={12}>
                       <CustomTabPanel value={tabValue} index={0}>
-                        <TransactionsList data={userData.expenses[year].data} type="expenses"/>
+                        <TransactionsTabs data={userData.expenses[year].data} type="expenses"/>
                       </CustomTabPanel>
                       <CustomTabPanel value={tabValue} index={1}>
-                        <TransactionsList data={userData.incomes[year].data} type="incomes"/>  
+                        <TransactionsTabs data={userData.incomes[year].data} type="incomes"/>  
                       </CustomTabPanel>
                       <CustomTabPanel value={tabValue} index={2}>
                         <SavingsList data={userData.savings}/>  

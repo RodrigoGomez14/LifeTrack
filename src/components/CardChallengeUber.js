@@ -5,12 +5,13 @@ import { formatAmount} from '../utils';
 import { useStore } from '../store'; // Importar el store de Zustand
 import { database, auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
 
-const CardChallengeUber = ({data,pend}) => {
-    const {dollarRate} = useStore(); // Obtener estados del store
+const CardChallengeUber = () => {
+    const {userData, dollarRate} = useStore(); // Obtener estados del store
+
     const completeChallenge = () => {
-        const amountValue = parseFloat(data.amount);
+        const amountValue = parseFloat(userData.uber.challenge.amount);
         const amountUSDValue = amountValue / dollarRate['venta'];
-        const pending = parseFloat(pend);
+        const pending = parseFloat(userData.uber.pending);
 
         const currentDate = new Date();
         const year = currentDate.getFullYear().toString();
@@ -29,8 +30,8 @@ const CardChallengeUber = ({data,pend}) => {
         const monthlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}`);
         monthlyUberRef.transaction((data) => {
             if (data) {
-            data.total = (data.total || 0) + amountValue;
-            data.totalUSD = (data.totalUSD || 0) + amountUSDValue;
+            userData.uber.challenge.total = (userData.uber.challenge.total || 0) + amountValue;
+            userData.uber.challenge.totalUSD = (userData.uber.challenge.totalUSD || 0) + amountUSDValue;
             }
             return data;
         });
@@ -39,8 +40,8 @@ const CardChallengeUber = ({data,pend}) => {
         const yearlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}`);
         yearlyUberRef.transaction((data) => {
             if (data) {
-            data.total = (data.total || 0) + amountValue;
-            data.totalUSD = (data.totalUSD || 0) + amountUSDValue;
+            userData.uber.challenge.total = (userData.uber.challenge.total || 0) + amountValue;
+            userData.uber.challenge.totalUSD = (userData.uber.challenge.totalUSD || 0) + amountUSDValue;
             }
             return data;
         });
@@ -61,30 +62,31 @@ const CardChallengeUber = ({data,pend}) => {
         progress:0
     })
     };
-    const goal = data.goal || 1000; // Por defecto, objetivo es 1000
-    const progress = data.progress || 0;
+    
+    const goal = userData.uber.challenge.goal || 0
+    const progress = userData.uber.challenge.progress || 0;
     const progressPercentage = progress>goal?100:(progress / goal) * 100;
-    console.log(data.goal)
+    
     return(
-        data.goal>0?
+        userData.uber.challenge.goal>0?
         <Grid container justifyContent='center'>
             <Grid item>
                 <Card>
                     <CardHeader
-                        title={formatAmount(data.amount)}
+                        title={formatAmount(userData.uber.challenge.amount)}
                         subheader='Challenge Semanal'
                     />
                     <CardContent>
                         <Grid container spacing={3}>
                         <Grid item xs={12}>
-                            <Typography variant="h2" align="center">{data.progress}/{data.goal}</Typography>
+                            <Typography variant="h2" align="center">{userData.uber.challenge.progress}/{userData.uber.challenge.goal}</Typography>
                         </Grid>
                         <Grid item xs={12}>
                             <LinearProgress variant="determinate" value={progressPercentage} color='primary'/>  
                         </Grid>
                         <Grid container item alignItems='center' direction='column' spacing={1}>
                             <Grid item>
-                            <Button variant='contained' onClick={completeChallenge} disabled={data.progress>=data.goal?false:true}>
+                            <Button variant='contained' onClick={completeChallenge} disabled={userData.uber.challenge.progress>=userData.uber.challenge.goal?false:true}>
                                 COMPLETAR CHALLENGE
                             </Button>
                             </Grid>

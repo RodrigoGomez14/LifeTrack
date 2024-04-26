@@ -149,15 +149,15 @@ const NewUberEntryPage = () => {
     });
 
     database.ref(`${auth.currentUser.uid}/uber/pending`).set(userData.uber.pending + amountValue - totalCashValue);
-    database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(totalCashValue*0.15));
+    database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(totalCashValue*userData.savings.carMaintenancePercentage));
 
     // Agregar el ingreso de efectivo a la base de datos para ingresos
     database.ref(`${auth.currentUser.uid}/savings/carMaintenanceHistory`).push({
       date: `${day}/${month}/${year}`,
-      amount: parseFloat(totalCashValue*0.15),
-      amountUSD: parseFloat(totalCashValue*0.15)/dollarRate['venta'],
-      newTotal: userData.savings.carMaintenance+parseFloat(totalCashValue*0.15),
-      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(totalCashValue*0.15)/dollarRate['venta'])
+      amount: parseFloat(totalCashValue*userData.savings.carMaintenancePercentage),
+      amountUSD: parseFloat(totalCashValue*userData.savings.carMaintenancePercentage)/dollarRate['venta'],
+      newTotal: userData.savings.carMaintenance+parseFloat(totalCashValue*userData.savings.carMaintenancePercentage),
+      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(totalCashValue*userData.savings.carMaintenancePercentage)/dollarRate['venta'])
     });
 
     setAmount('');
@@ -261,7 +261,7 @@ const NewUberEntryPage = () => {
       </Grid>
       <Grid container item xs={12} justifyContent='center'>
         <Alert severity="success" variant='filled'>
-          FONDO DE MANTENIMIENTO DEL AUTO : {formatAmount(parseFloat(totalCash*0.15))}
+          FONDO DE MANTENIMIENTO DEL AUTO : {formatAmount(parseFloat(totalCash*userData.savings.carMaintenancePercentage))}
         </Alert>
       </Grid>
     </Layout>
