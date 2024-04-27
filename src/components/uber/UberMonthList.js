@@ -1,7 +1,7 @@
 import React from 'react';
 import {Grid,Typography,} from '@mui/material';
-import { formatAmount} from '../utils';
-import UberMonth from '../components/UberMonth'
+import { formatAmount} from '../../utils';
+import UberMonth from './UberMonth'
 
 const UberMonthList = ({data}) => {
   return (

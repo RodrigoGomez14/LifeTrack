@@ -1,13 +1,13 @@
 import React, { useState} from 'react';
-import Layout from '../components/Layout';
+import Layout from '../../components/layout/Layout';
 import { Typography, Grid, IconButton, Dialog, DialogTitle} from '@mui/material';
-import { formatAmount } from '../utils';
+import { formatAmount } from '../../utils';
 import { Link } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
-import { useStore } from '../store'; // Importar el store de Zustand
-import CardChallengeUber from '../components/CardChallengeUber';
-import CardPendingUber from '../components/CardPendingUber';
-import UberMonthList from '../components/UberMonthList';
+import { useStore } from '../../store'; // Importar el store de Zustand
+import CardChallengeUber from '../../components/uber/CardChallengeUber';
+import CardPendingUber from '../../components/uber/CardPendingUber';
+import UberMonthList from '../../components/uber/UberMonthList';
 
 const Uber = () => {
   const {userData} = useStore(); // Obtener estados del store

@@ -1,15 +1,15 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import Login from './pages/Login.js';
-import Home from './pages/Home.js';
-import Finances from './pages/Finances.js';
-import Loading from './pages/Loading.js';
-import Uber from './pages/Uber.js';
-import Habits from './pages/Habits.js';
-import NewUberEntry from './pages/NewUberEntry.js';
-import NewExpense from './pages/NewExpense.js';
-import NewIncome from './pages/NewIncome.js';
-import StartChallenge from './pages/StartChallenge.js';
+import Login from './pages/basics/Login.js';
+import Home from './pages/basics/Home.js';
+import Finances from './pages/finances/Finances.js';
+import Loading from './pages/basics/Loading.js';
+import Uber from './pages/uber/Uber.js';
+import Habits from './pages/habits/Habits.js';
+import NewUberEntry from './pages/uber/NewUberEntry.js';
+import NewExpense from './pages/finances/NewExpense.js';
+import NewIncome from './pages/finances/NewIncome.js';
+import StartChallenge from './pages/uber/StartChallenge.js';
 import { database } from "./firebase.js";
 import { auth } from "./firebase.js";
 import { useStore } from './store'; // Importar el store de Zustand

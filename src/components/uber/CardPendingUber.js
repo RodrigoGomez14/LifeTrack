@@ -3,9 +3,9 @@ import {Grid,Typography,Card,CardHeader,IconButton,LinearProgress,Button,Alert} 
 import RestoreIcon from '@mui/icons-material/Restore';
 import AddIcon from '@mui/icons-material/Add';
 import { Link } from 'react-router-dom';
-import { formatAmount} from '../utils';
-import { useStore } from '../store'; // Importar el store de Zustand
-import { database, auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
+import { formatAmount} from '../../utils';
+import { useStore } from '../../store'; // Importar el store de Zustand
+import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
 
 const CardPendingUber = ({setShowDialog}) => {
     const {userData, dollarRate} = useStore(); // Obtener estados del store

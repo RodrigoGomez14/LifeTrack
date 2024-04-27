@@ -6,7 +6,7 @@ import LocalTaxiOutlinedIcon from '@mui/icons-material/LocalTaxiOutlined';
 import EmojiObjectsOutlinedIcon  from '@mui/icons-material/EmojiObjectsOutlined';
 import ExitToAppOutlinedIcon from '@mui/icons-material/ExitToAppOutlined';
 import { Link } from 'react-router-dom';
-import { auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
+import { auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
 
 const Drawer = ({ open, toggleDrawer }) => {
 

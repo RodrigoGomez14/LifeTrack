@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Typography, Grid, Card, CardContent, Button,CardHeader } from '@mui/material';
-import Layout from '../components/Layout';
-import { formatAmount } from '../utils';
-import { useStore } from '../store'; // Importar el store de Zustand
+import Layout from '../../components/layout/Layout';
+import { formatAmount } from '../../utils';
+import { useStore } from '../../store'; // Importar el store de Zustand
 
 const Home = () => {
   const {userData } = useStore();

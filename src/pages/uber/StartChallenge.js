@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import Layout from '../components/Layout';
+import Layout from '../../components/layout/Layout';
 import { Button, ButtonGroup, TextField, Grid } from '@mui/material';
-import { auth, database } from '../firebase';
+import { auth, database } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 
 const StartChallenge = () => {

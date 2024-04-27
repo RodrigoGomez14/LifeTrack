@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {Accordion,AccordionSummary,AccordionDetails,Grid,Typography,Tabs,Tab} from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../utils';
+import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../../utils';
 import TransactionsTabsList from './TransactionsTabsList';
 
 const TransactionsTabs = ({ data,type }) => {

@@ -1,9 +1,9 @@
 import React from 'react';
 import {Grid,Typography,Card,CardHeader,CardContent,LinearProgress,Button,Alert} from '@mui/material';
 import { Link } from 'react-router-dom';
-import { formatAmount} from '../utils';
-import { useStore } from '../store'; // Importar el store de Zustand
-import { database, auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
+import { formatAmount} from '../../utils';
+import { useStore } from '../../store'; // Importar el store de Zustand
+import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
 
 const CardChallengeUber = () => {
     const {userData, dollarRate} = useStore(); // Obtener estados del store

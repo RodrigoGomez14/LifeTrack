@@ -1,7 +1,7 @@
 import React from 'react';
 import {List,ListItem,ListItemIcon,ListItemText,Typography,} from '@mui/material';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
-import { formatAmount,formatMinutesToHours} from '../utils';
+import { formatAmount,formatMinutesToHours} from '../../utils';
 
 const UberEntry = ({data}) => {
   return (

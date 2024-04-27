@@ -1,14 +1,15 @@
 import React from 'react';
-import Layout from '../components/Layout';
+import Layout from '../../components/layout/Layout';
 import { Typography, Grid, Card, CardHeader, Button, Box,Tabs,Tab} from '@mui/material';
-import { formatAmount, getMonthName } from '../utils';
+import { formatAmount, getMonthName } from '../../utils';
 import { Link } from 'react-router-dom';
-import TransactionsTabs from '../components/TransactionsTabs'
-import SavingsList from '../components/SavingsList'
-import { useStore } from '../store'; // Importar el store de Zustand
+import TransactionsTabs from '../../components/finances/TransactionsTabs'
+import SavingsList from '../../components/finances/SavingsList'
+import { useStore } from '../../store'; 
+import CardHeaderFinances from '../../components/finances/CardHeaderFinances';
 
 const Finances = () => {
-  const {userData,dollarRate} = useStore(); // Obtener estados del store
+  const {userData,dollarRate} = useStore();
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
@@ -39,23 +40,11 @@ const Finances = () => {
 }
   return (
     <Layout title="Finanzas">
-        <Grid container item xs={12} spacing={3} >
-          <Grid item xs={12} sm={4}>
-            <Card style={{backgroundColor:userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD>0?'green':"red" , color:'white'}}>
-              <CardHeader
-                title={`${formatAmount((userData.incomes[currentYear].total-userData.expenses[currentYear].total))} / USD ${formatAmount((userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD))}`}
-                subheader={`Balance ${currentYear}`}/>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <Card style={{backgroundColor:userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD>0?'green':"red" , color:'white'}}>
-              <CardHeader
-                title={`${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].total-userData.expenses[currentYear].data[`0${currentMonth}`].total))} / USD ${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD))}`}
-                subheader={`Balance ${currentMonthName}`}/>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <Card>
+        <Grid container item xs={12} spacing={3} style={{overflow:'scroll',flexWrap:'nowrap'}} >
+          <CardHeaderFinances subheader={`Balance ${currentYear}`} title={`${formatAmount((userData.incomes[currentYear].total-userData.expenses[currentYear].total))} / USD ${formatAmount((userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD))}`} cond={userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD>0}/>
+          <CardHeaderFinances subheader={`Balance ${currentMonthName} ${currentYear}`} title={`${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].total-userData.expenses[currentYear].data[`0${currentMonth}`].total))} / USD ${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD))}`} cond={userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD>0}/>
+          <Grid item>
+            <Card style={{width:'150px'}}>
               <CardHeader
                 title={formatAmount(dollarRate['venta'])}
                 subheader="Valor USD"/>

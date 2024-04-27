@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import Layout from '../components/Layout';
+import Layout from '../../components/layout/Layout';
 import { Button, ButtonGroup, TextField, Grid } from '@mui/material';
-import { database } from '../firebase';
+import { database } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../firebase'; // Importar el módulo de autenticación de Firebase
-import { useStore } from '../store'; // Importar el store de Zustand
+import { auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
+import { useStore } from '../../store'; // Importar el store de Zustand
 
 const NewExpense = () => {
   const { dollarRate} = useStore();

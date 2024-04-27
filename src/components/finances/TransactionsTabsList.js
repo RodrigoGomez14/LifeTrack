@@ -1,6 +1,6 @@
 import React from 'react';
 import {List,ListItem,ListItemIcon,ListItemText,Typography} from '@mui/material';
-import { formatAmount,getCategoryIcon } from '../utils';
+import { formatAmount,getCategoryIcon } from '../../utils';
 
 const TransactionsTabsList = ({ data,category }) => {
   return (
