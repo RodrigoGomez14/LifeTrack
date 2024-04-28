@@ -68,5 +68,18 @@ export const formatAmount = (amount) => {
     }
   };
 
+export function getPreviousMonday() {
+  const currentDate = new Date();
+  const currentDay = currentDate.getDay(); // 0 (Domingo) - 6 (Sábado)
+  
+  // Calcular el número de días que debemos restar para llegar al lunes
+  const daysToMonday = (currentDay + 6) % 7; // Si es domingo, devuelve 6. Si es lunes, devuelve 0
+  
+  // Obtener el lunes anterior
+  const previousMonday = new Date(currentDate);
+  previousMonday.setDate(currentDate.getDate() - daysToMonday);
+
+  return previousMonday;
+}
 
   

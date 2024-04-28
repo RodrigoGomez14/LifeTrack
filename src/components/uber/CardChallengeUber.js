@@ -1,9 +1,12 @@
 import React from 'react';
-import {Grid,Typography,Card,CardHeader,CardContent,LinearProgress,Button,Alert} from '@mui/material';
+import {Grid,Typography,Card,CardHeader,CardContent,LinearProgress,Button,Alert,IconButton} from '@mui/material';
 import { Link } from 'react-router-dom';
 import { formatAmount} from '../../utils';
 import { useStore } from '../../store'; // Importar el store de Zustand
 import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
+import RestoreIcon from '@mui/icons-material/Restore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AddIcon from '@mui/icons-material/Add';
 
 const CardChallengeUber = () => {
     const {userData, dollarRate} = useStore(); // Obtener estados del store
@@ -69,61 +72,66 @@ const CardChallengeUber = () => {
     
     return(
         userData.uber.challenge.goal>0?
-        <Grid container justifyContent='center'>
-            <Grid item>
-                <Card>
-                    <CardHeader
-                        title={formatAmount(userData.uber.challenge.amount)}
-                        subheader='Challenge Semanal'
-                    />
-                    <CardContent>
-                        <Grid container spacing={3}>
-                        <Grid item xs={12}>
-                            <Typography variant="h2" align="center">{userData.uber.challenge.progress}/{userData.uber.challenge.goal}</Typography>
-                        </Grid>
-                        <Grid item xs={12}>
-                            <LinearProgress variant="determinate" value={progressPercentage} color='primary'/>  
-                        </Grid>
-                        <Grid container item alignItems='center' direction='column' spacing={1}>
-                            <Grid item>
-                            <Button variant='contained' onClick={completeChallenge} disabled={userData.uber.challenge.progress>=userData.uber.challenge.goal?false:true}>
-                                COMPLETAR CHALLENGE
-                            </Button>
-                            </Grid>
-                            <Grid item>
-                            <Button variant='text' onClick={resetChallenge}>
-                                RESETEAR
-                            </Button>
-                            </Grid>
-                        </Grid>
-                        </Grid>
-                    </CardContent>
-                </Card>
-            </Grid>
+        <Grid item>
+            <Card>
+                <CardHeader
+                style={{ backgroundColor: 'grey', color: 'white' }}
+                action={
+                    <IconButton 
+                        aria-label="settings"
+                        onClick={resetChallenge} 
+                    >
+                        <RestoreIcon style={{color:'white'}}/>
+                    </IconButton>
+                  }
+                title={
+                    <>
+                        <Typography variant="caption">
+                            Challenge Semanal
+                        </Typography>
+                        <Typography variant="h4">
+                            {userData.uber.challenge.progress}/{userData.uber.challenge.goal}
+                        </Typography>
+                        <LinearProgress variant="determinate" value={progressPercentage} color='primary'/>  
+                        <Typography variant="body2">
+                            {formatAmount(userData.uber.challenge.amount)}
+                        </Typography>
+
+                        {
+                            userData.uber.challenge.progress>=userData.uber.challenge.goal?
+                            <IconButton 
+                                aria-label="settings"
+                                onClick={completeChallenge}
+                            >
+                                <CheckCircleIcon style={{color:'white'}}/>
+                            </IconButton>
+                            :
+                            null
+                        }
+                    </>
+                }
+                />
+            </Card>
         </Grid>
         :
-        <Grid container justifyContent='center'>
-            <Grid item>
-                <Card>
-                    <CardHeader
-                        title='Challenge Semanal'
-                    />
-                    <CardContent>
-                        <Grid container justifyContent='center'>
-                        <Grid item xs={12}>
-                            <Alert severity='warning'>Aun no hay un Challenge Activo!</Alert>
-                        </Grid>
-                        <Grid item xs={12}>
-                            <Link to="/StartChallenge">
-                            <Button variant='contained'>
-                                INICIAR CHALLENGE SEMANAL
-                            </Button>
-                            </Link>
-                        </Grid>
-                        </Grid>
-                    </CardContent>
-                </Card>
-            </Grid>
+        <Grid item>
+            <Card>
+                <CardHeader
+                style={{ backgroundColor: 'grey', color: 'white' }}
+                title={
+                    <>
+                        <Typography variant="caption">
+                            Aun no hay un Challenge Activo!
+                        </Typography>
+                        <Link to="/StartChallenge">
+                            <IconButton>
+                                <AddIcon style={{color:'white'}}/>
+                            </IconButton>
+                        </Link>
+                    </>
+                }
+                />
+            </Card>
         </Grid>
     )
 }
