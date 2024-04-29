@@ -9,13 +9,10 @@ const CardAverageDailyUber = () => {
   const { userData, dollarRate } = useStore(); // Obtener estados del store
   const [totalMonthlyEarnings, setTotalMonthlyEarnings] = useState(0);
   const currentDate = new Date();
-  const currentMonth = `0${currentDate.getMonth() + 1}`;
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+  
   useEffect(() => {
-    const currentMonday = getPreviousMonday(); // Obtén el lunes anterior
-    const currentYear = currentMonday.getFullYear();
-    const currentMonth = (currentMonday.getMonth() + 1).toString().padStart(2, '0');
-    const currentDay = currentMonday.getDate().toString().padStart(2, '0');
-
     // Calcula las ganancias desde el último lunes
     let MonthlyEarnings = 0;
 

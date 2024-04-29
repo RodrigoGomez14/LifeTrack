@@ -9,16 +9,17 @@ const CardPendingUber = ({setShowDialog}) => {
     const {userData, dollarRate} = useStore(); // Obtener estados del store
     const [resetDisabled, setResetDisabled] = useState(true);
 
+    const currentDate = new Date();
+    const dayOfWeek = currentDate.getDay(); // 0 para domingo, 1 para lunes, ..., 6 para sábado
+    
     const resetPending = () => {
-        const currentDate = new Date();
-        const dayOfWeek = currentDate.getDay(); // 0 para domingo, 1 para lunes, ..., 6 para sábado
         const pending = parseFloat(userData.uber.pending);
     
         // Verificar si hoy es lunes (dayOfWeek === 1)
         if (dayOfWeek === 1 && pending > 0) {
           const year = currentDate.getFullYear().toString();
-          const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-          const day = currentDate.getDate().toString().padStart(2, '0');
+          const month = (currentDate.getMonth() + 1).toString();
+          const day = currentDate.getDate().toString();
           
           database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
             date: `${day}/${month}/${year}`,
@@ -68,9 +69,6 @@ const CardPendingUber = ({setShowDialog}) => {
       };
 
     useEffect(() => {
-        const currentDate = new Date();
-        const dayOfWeek = currentDate.getDay(); // 0 (Domingo) - 6 (Sábado)
-    
         // Si el día actual es lunes (1), entonces deshabilita el reset
         setResetDisabled(dayOfWeek !== 1);
       }, []); 

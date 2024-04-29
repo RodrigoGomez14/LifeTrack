@@ -7,12 +7,10 @@ const CardTotalGasExpenses = () => {
   const { userData, dollarRate } = useStore(); // Obtener estados del store
   const [totalMonthlyGasExpenses, setTotalMonthlyGasExpenses] = useState(0);
   const currentDate = new Date();
-  const currentMonth = `0${currentDate.getMonth() + 1}`;
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+  
   useEffect(() => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = (currentDate.getMonth() + 1).toString().padStart(2, '0'); // Convertir a formato de dos dígitos
-
     let monthlyGasExpenses = 0;
 
     if (userData.expenses && userData.expenses[currentYear] && userData.expenses[currentYear].data[currentMonth]) {

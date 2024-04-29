@@ -12,8 +12,8 @@ const CardTotalWeeklyUber = () => {
   useEffect(() => {
     const currentMonday = getPreviousMonday(); // Obtén el lunes anterior
     const currentYear = currentMonday.getFullYear();
-    const currentMonth = (currentMonday.getMonth() + 1).toString().padStart(2, '0');
-    const currentDay = currentMonday.getDate().toString().padStart(2, '0');
+    const currentMonth = currentMonday.getMonth() + 1;
+    const currentDay = currentMonday.getDate().toString();
 
     // Calcula las ganancias desde el último lunes
     let weeklyEarnings = 0;

@@ -42,7 +42,7 @@ const Finances = () => {
     <Layout title="Finanzas">
         <Grid container item xs={12} spacing={3} style={{overflow:'scroll',flexWrap:'nowrap'}} >
           <CardHeaderFinances subheader={`Balance ${currentYear}`} title={`${formatAmount((userData.incomes[currentYear].total-userData.expenses[currentYear].total))} / USD ${formatAmount((userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD))}`} cond={userData.incomes[currentYear].totalUSD-userData.expenses[currentYear].totalUSD>0}/>
-          <CardHeaderFinances subheader={`Balance ${currentMonthName} ${currentYear}`} title={`${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].total-userData.expenses[currentYear].data[`0${currentMonth}`].total))} / USD ${formatAmount((userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD))}`} cond={userData.incomes[currentYear].data[`0${currentMonth}`].totalUSD-userData.expenses[currentYear].data[`0${currentMonth}`].totalUSD>0}/>
+          <CardHeaderFinances subheader={`Balance ${currentMonthName} ${currentYear}`} title={`${formatAmount((userData.incomes[currentYear].data[currentMonth].total-userData.expenses[currentYear].data[currentMonth].total))} / USD ${formatAmount((userData.incomes[currentYear].data[currentMonth].totalUSD-userData.expenses[currentYear].data[currentMonth].totalUSD))}`} cond={userData.incomes[currentYear].data[currentMonth].totalUSD-userData.expenses[currentYear].data[currentMonth].totalUSD>0}/>
           <Grid item>
             <Card style={{width:'150px'}}>
               <CardHeader

@@ -21,7 +21,7 @@ const Uber = () => {
   const coefficientData = [];
   const earningsData = [];
   const currentDate = new Date();
-  const currentMonth = `0${currentDate.getMonth() + 1}`;
+  const currentMonth = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
 
   let totalEarnings = 0;
@@ -32,12 +32,12 @@ const Uber = () => {
   if (userData.uber.data[currentYear] && userData.uber.data[currentYear].data[currentMonth]) {
     Object.keys(userData.uber.data[currentYear].data[currentMonth].data).forEach((transactionId) => {
       const transaction = userData.uber.data[currentYear].data[currentMonth].data[transactionId];
-      totalEarnings += transaction.amount;
-      earningsData.push({
-        x: transaction.date,
-        y: totalEarnings,
-      });
       if (!transaction.challenge) {
+        totalEarnings += transaction.amount;
+        earningsData.push({
+          x: transaction.date,
+          y: totalEarnings,
+        });
         meanCoeficient += (transaction.amount / transaction.duration) * 60;
         coefficientData.push({
           x: transaction.date,

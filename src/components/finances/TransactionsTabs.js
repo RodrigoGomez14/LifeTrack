@@ -21,7 +21,7 @@ const TransactionsTabs = ({ data,type }) => {
   const labelsPieChart = [];
   
   categories.map((category, index) => {
-    const total = sumTransactionsByCategory(data[`0${currentMonth}`].data, category);
+    const total = sumTransactionsByCategory(data[currentMonth].data, category);
     seriesPieChart.push(total)
     labelsPieChart.push(category)
   });

@@ -1,20 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Typography, Card, CardHeader, IconButton, Alert } from '@mui/material';
+import { Grid, Typography, Card, CardHeader, CardContent, Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Link } from 'react-router-dom';
 import { formatAmount, getMonthName, getPreviousMonday } from '../../utils'; // Suponiendo que tienes una función que obtiene el lunes anterior
 import { useStore } from '../../store'; // Importar el store de Zustand
+import ReactApexChart from 'react-apexcharts';
 
 const CardTotalMonthlyUber = () => {
   const { userData, dollarRate } = useStore(); // Obtener estados del store
   const [totalMonthlyEarnings, setTotalMonthlyEarnings] = useState(0);
   const currentDate = new Date();
-  const currentMonth = `0${currentDate.getMonth() + 1}`;
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+
+  let totalEarnings = 0;
+  const earningsData = [];
+  const labels = [];
+
+  // Calcular datos para gráficos limitados al mes actual
+  if (userData.uber.data[currentYear] && userData.uber.data[currentYear].data[currentMonth]) {
+    Object.keys(userData.uber.data[currentYear].data[currentMonth].data).forEach((transactionId) => {
+      const transaction = userData.uber.data[currentYear].data[currentMonth].data[transactionId];
+        earningsData.push(totalEarnings+= transaction.amount);
+        labels.push(transaction.date);
+    });
+  }
+
+  // Configuración para el gráfico de línea para ganancias acumuladas
+  const optionsEarningsChart = {
+    labels,
+    chart: {
+      id: 'earnings-chart',
+      sparkline:{
+        enabled:true
+      }
+    },
+    xaxis: {
+      type: 'category',
+    },
+    tooltip: {
+      y: {
+        formatter: (val) => formatAmount(val),
+      },
+    },
+  };
+
   useEffect(() => {
     const currentMonday = getPreviousMonday(); // Obtén el lunes anterior
     const currentYear = currentMonday.getFullYear();
-    const currentMonth = (currentMonday.getMonth() + 1).toString().padStart(2, '0');
-    const currentDay = currentMonday.getDate().toString().padStart(2, '0');
+    const currentMonth = (currentMonday.getMonth() + 1).toString();
+    const currentDay = currentMonday.getDate().toString();
 
     // Calcula las ganancias desde el último lunes
     let MonthlyEarnings = 0;
@@ -48,6 +83,14 @@ const CardTotalMonthlyUber = () => {
             </>
           }
         />
+        <CardContent>
+          <ReactApexChart
+              options={optionsEarningsChart}
+              series={[{ name: 'Ganancias', data: earningsData }]}
+              type="line"
+              height={100}
+            />
+        </CardContent>
       </Card>
     </Grid>
   );
