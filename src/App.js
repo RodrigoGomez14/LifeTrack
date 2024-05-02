@@ -17,8 +17,7 @@ function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
 
   const filterData = (data) => {
-    const groupedIncomes = {};
-    const groupedExpenses = {};
+    const groupdedFinances = {incomes:{},expenses:{}};
     const groupedSavings = {};
     const groupedUberData = {data:{}};
     const earningsUberData = [];
@@ -28,8 +27,8 @@ function App() {
       Object.keys(data.incomes).forEach((transactionId) => {
         const transaction = data.incomes[transactionId];
         const [day, month, year] = transaction.date.split('/').map(Number);
-        if (!groupedIncomes[year]) {
-          groupedIncomes[year] = {
+        if (!groupdedFinances.incomes[year]) {
+          groupdedFinances.incomes[year] = {
             total: 0,
             totalUSD: 0,
             months: {
@@ -49,11 +48,11 @@ function App() {
           };
         }
 
-        groupedIncomes[year].months[month].data.push(transaction);
-        groupedIncomes[year].months[month].total += transaction.amount;
-        groupedIncomes[year].months[month].totalUSD += transaction.amountUSD;
-        groupedIncomes[year].total += transaction.amount;
-        groupedIncomes[year].totalUSD += transaction.amountUSD;
+        groupdedFinances.incomes[year].months[month].data.push(transaction);
+        groupdedFinances.incomes[year].months[month].total += transaction.amount;
+        groupdedFinances.incomes[year].months[month].totalUSD += transaction.amountUSD;
+        groupdedFinances.incomes[year].total += transaction.amount;
+        groupdedFinances.incomes[year].totalUSD += transaction.amountUSD;
       });
     }
 
@@ -61,8 +60,8 @@ function App() {
       Object.keys(data.expenses).forEach((transactionId) => {
         const transaction = data.expenses[transactionId];
         const [day, month, year] = transaction.date.split('/').map(Number);
-        if (!groupedExpenses[year]) {
-          groupedExpenses[year] = {
+        if (!groupdedFinances.expenses[year]) {
+          groupdedFinances.expenses[year] = {
             total: 0,
             totalUSD: 0,
             months: {
@@ -82,11 +81,11 @@ function App() {
           };
         }
         
-        groupedExpenses[year].months[month].data.push(transaction);
-        groupedExpenses[year].months[month].total += transaction.amount;
-        groupedExpenses[year].months[month].totalUSD += transaction.amountUSD;
-        groupedExpenses[year].total += transaction.amount;
-        groupedExpenses[year].totalUSD += transaction.amountUSD;
+        groupdedFinances.expenses[year].months[month].data.push(transaction);
+        groupdedFinances.expenses[year].months[month].total += transaction.amount;
+        groupdedFinances.expenses[year].months[month].totalUSD += transaction.amountUSD;
+        groupdedFinances.expenses[year].total += transaction.amount;
+        groupdedFinances.expenses[year].totalUSD += transaction.amountUSD;
       });
     }
     
@@ -136,9 +135,10 @@ function App() {
 
     if (data.savings) {
       groupedSavings.carMaintenancePercentage = data.savings.carMaintenancePercentage
+      groupedSavings.carMaintenance = data.savings.carMaintenance
     }
 
-    return { incomes: groupedIncomes, expenses: groupedExpenses, uber: groupedUberData,savings:groupedSavings };
+    return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings };
   };
 
   useEffect(() => {
@@ -174,19 +174,30 @@ function App() {
   }
 
   return (
-    <Router>
-      <Routes>
-        <Route exact path="/" element={<Home />} />
-        <Route exact path="/Finanzas" element={<Finances />} />
-        <Route exact path="/Uber" element={<Uber />} />
-        <Route exact path="/Habitos" element={<Habits />} />
-        <Route exact path="/NewUberEntry" element={<NewUberEntry />} />
-        <Route exact path="/NewExpense" element={<NewExpense />} />
-        <Route exact path="/NewIncome" element={<NewIncome />} />
-        <Route exact path="/StartChallenge" element={<StartChallenge />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
+    <>
+      {userLoggedIn?
+      <Router>
+        <Routes>
+          <Route exact path="/" element={<Home />} />
+          <Route exact path="/Finanzas" element={<Finances />} />
+          <Route exact path="/Uber" element={<Uber />} />
+          <Route exact path="/Habitos" element={<Habits />} />
+          <Route exact path="/NewUberEntry" element={<NewUberEntry />} />
+          <Route exact path="/NewExpense" element={<NewExpense />} />
+          <Route exact path="/NewIncome" element={<NewIncome />} />
+          <Route exact path="/StartChallenge" element={<StartChallenge />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+      :
+      <Router>
+        <Routes>
+          <Route exact path="/" element={<Login />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+      }
+    </>
   );
 }
 

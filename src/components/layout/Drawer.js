@@ -56,9 +56,13 @@ const Drawer = ({ open, toggleDrawer }) => {
         </ListItem>
       </List>
       <>
-        <Typography variant='caption'>
-          {auth.currentUser.email}
-        </Typography>
+        {auth.currentUser?
+          <Typography variant='caption'>
+            {auth.currentUser.email}
+          </Typography>
+          :
+          null
+        }
         <Button
           fullWidth
           variant="contained"

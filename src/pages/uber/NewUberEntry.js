@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../../components/layout/Layout';
 import { Button, TextField, Typography, InputAdornment, IconButton, Input, InputLabel, FormControl, Grid,Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -19,6 +19,7 @@ const NewUberEntryPage = () => {
   const [travels, setTravels] = useState('');
   const [totalCash, setTotalCash] = useState(0);
   const [totalTips, setTotalTips] = useState(0);
+  const [carMaintenanceAmount, setCarMaintenanceAmount] = useState('');
 
   const handleCashInputChange = (e) => {
     setCash(e.target.value);
@@ -112,15 +113,15 @@ const NewUberEntryPage = () => {
 
 
     database.ref(`${auth.currentUser.uid}/uber/pending`).set(userData.uber.pending + amountValue - totalCashValue);
-    database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(totalCashValue*userData.savings.carMaintenancePercentage));
+    database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseInt(carMaintenanceAmount));
 
     // Agregar el ingreso de efectivo a la base de datos para ingresos
     database.ref(`${auth.currentUser.uid}/savings/carMaintenanceHistory`).push({
       date: `${day}/${month}/${year}`,
-      amount: parseFloat(totalCashValue*userData.savings.carMaintenancePercentage),
-      amountUSD: parseFloat(totalCashValue*userData.savings.carMaintenancePercentage)/dollarRate['venta'],
-      newTotal: userData.savings.carMaintenance+parseFloat(totalCashValue*userData.savings.carMaintenancePercentage),
-      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(totalCashValue*userData.savings.carMaintenancePercentage)/dollarRate['venta'])
+      amount: parseInt(carMaintenanceAmount),
+      amountUSD: parseFloat(carMaintenanceAmount)/dollarRate['venta'],
+      newTotal: userData.savings.carMaintenance+parseInt(carMaintenanceAmount),
+      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(carMaintenanceAmount)/dollarRate['venta'])
     });
 
     setAmount('');
@@ -135,7 +136,6 @@ const NewUberEntryPage = () => {
   return (
     <Layout title="Finalizar Jornada Uber">
       <Grid container item xs={12} justifyContent='center'>
-        <form onSubmit={handleFormSubmit}>
           <TextField
             label="Monto"
             type="number"
@@ -219,12 +219,20 @@ const NewUberEntryPage = () => {
             fullWidth
             margin="normal"
           />
-          <Button variant="contained" type="submit">Finalizar Jornada</Button>
-        </form>
+          <Button variant="contained" onClick={handleFormSubmit}>Finalizar Jornada</Button>
       </Grid>
       <Grid container item xs={12} justifyContent='center'>
         <Alert severity="success" variant='filled'>
-          FONDO DE MANTENIMIENTO DEL AUTO : {formatAmount(parseFloat(totalCash*userData.savings.carMaintenancePercentage))}
+          FONDO DE MANTENIMIENTO DEL AUTO : 
+          <TextField
+            label="Mantenimiento"
+            type="number"
+            placeholder={totalCash*userData.savings.carMaintenancePercentage}
+            value={carMaintenanceAmount}
+            onChange={(e) => setCarMaintenanceAmount(e.target.value)}
+            fullWidth
+            margin="normal"
+          />
         </Alert>
       </Grid>
     </Layout>
