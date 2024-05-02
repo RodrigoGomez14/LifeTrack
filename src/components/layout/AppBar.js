@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { AppBar as MuiAppBar, Toolbar, Typography, IconButton } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import Drawer from './Drawer';
-
+import { useTheme } from '@mui/material/styles';
 const AppBar = ({toggleDrawer,title}) => {
+  const theme = useTheme();
   return (
     <div>
-      <MuiAppBar position="fixed">
-        <Toolbar>
+      <MuiAppBar position="fixed" style={{backgroundColor:theme.palette.primary.light}} >
+        <Toolbar >
           <IconButton
             edge="start"
             color="inherit"

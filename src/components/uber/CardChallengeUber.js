@@ -51,7 +51,6 @@ const CardChallengeUber = () => {
         <Grid item>
             <Card>
                 <CardHeader
-                style={{ backgroundColor: 'grey', color: 'white' }}
                 action={
                     <IconButton 
                         aria-label="settings"

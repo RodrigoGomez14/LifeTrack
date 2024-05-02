@@ -12,6 +12,8 @@ import NewIncome from './pages/finances/NewIncome.js';
 import StartChallenge from './pages/uber/StartChallenge.js';
 import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
+import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
+import { orange,blue } from '@mui/material/colors';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
@@ -141,6 +143,15 @@ function App() {
     return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings };
   };
 
+  const theme = createTheme({
+    palette: {
+      mode:'dark',
+      primary: {
+        main: orange[500],
+      },
+    },
+  });
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
@@ -174,7 +185,7 @@ function App() {
   }
 
   return (
-    <>
+    <ThemeProvider theme={theme}>
       {userLoggedIn?
       <Router>
         <Routes>
@@ -197,7 +208,7 @@ function App() {
         </Routes>
       </Router>
       }
-    </>
+    </ThemeProvider>
   );
 }
 

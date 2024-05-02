@@ -7,9 +7,10 @@ import TransactionsTabs from '../../components/finances/TransactionsTabs'
 import SavingsList from '../../components/finances/SavingsList'
 import { useStore } from '../../store'; 
 import CardHeaderFinances from '../../components/finances/CardHeaderFinances';
-
+import { useTheme } from '@mui/material/styles';
 const Finances = () => {
   const {userData,dollarRate} = useStore();
+  const theme = useTheme();
 
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
@@ -52,33 +53,28 @@ const Finances = () => {
           </Grid>
         </Grid>
         <Grid container item xs={12} spacing={3}>
-          <Grid item xs={12}>
-              {Object.keys(userData.finances.expenses).map(year => (
-                <div key={year}>
-                  <Typography variant="h5" gutterBottom>{year}</Typography>
-                  <Grid container>
-                    <Grid item xs={12}>
-                      <Tabs value={tabValue} onChange={handleChange} centered>
-                        <Tab label="Gastos" />
-                        <Tab label="Ingresos" />
-                        <Tab label="Ahorros" />
-                      </Tabs>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <CustomTabPanel value={tabValue} index={0}>
-                        <TransactionsTabs data={userData.finances.expenses[year]} type="expenses"/>
-                      </CustomTabPanel>
-                      <CustomTabPanel value={tabValue} index={1}>
-                        <TransactionsTabs data={userData.finances.incomes[year]} type="incomes"/>  
-                      </CustomTabPanel>
-                      <CustomTabPanel value={tabValue} index={2}>
-                        <SavingsList data={userData.savings}/>  
-                      </CustomTabPanel>
-                    </Grid>
-                  </Grid>
-                </div>
-              ))}
-          </Grid>
+          {Object.keys(userData.finances.expenses).map(year => (
+            <Grid container item xs={12}>
+              <Grid item xs={12}>
+                <Tabs value={tabValue} onChange={handleChange} centered style={{backgroundColor:theme.palette.secondary.dark}}>
+                  <Tab label="Gastos" />
+                  <Tab label="Ingresos" />
+                  <Tab label="Ahorros" />
+                </Tabs>
+              </Grid>
+              <Grid item xs={12}>
+                <CustomTabPanel value={tabValue} index={0}>
+                  <TransactionsTabs data={userData.finances.expenses[year]} type="expenses"/>
+                </CustomTabPanel>
+                <CustomTabPanel value={tabValue} index={1}>
+                  <TransactionsTabs data={userData.finances.incomes[year]} type="incomes"/>  
+                </CustomTabPanel>
+                <CustomTabPanel value={tabValue} index={2}>
+                  <SavingsList data={userData.savings}/>  
+                </CustomTabPanel>
+              </Grid>
+            </Grid>
+          ))}
         </Grid>
     </Layout>
   );

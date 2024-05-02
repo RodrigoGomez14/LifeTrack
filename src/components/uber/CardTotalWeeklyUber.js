@@ -34,7 +34,6 @@ const CardTotalWeeklyUber = () => {
     <Grid item>
       <Card>
         <CardHeader
-          style={{ backgroundColor: 'grey', color: 'white' }}
           title={
             <>
               <Typography variant="caption">
