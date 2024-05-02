@@ -6,8 +6,8 @@ import { formatAmount, getMonthName, getPreviousMonday } from '../../utils'; // 
 import { useStore } from '../../store'; // Importar el store de Zustand
 import ReactApexChart from 'react-apexcharts';
 
-const CardTotalMonthlyUber = ({data}) => {
-  const { dollarRate } = useStore(); // Obtener estados del store
+const CardTotalMonthlyUber = () => {
+  const { userData, dollarRate } = useStore(); // Obtener estados del store
   const [totalMonthlyEarnings, setTotalMonthlyEarnings] = useState(0);
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
@@ -18,13 +18,13 @@ const CardTotalMonthlyUber = ({data}) => {
     // Calcula las ganancias del mes en curso
     let MonthlyEarnings = 0;
 
-    const monthData = data[currentYear].months[currentMonth].data;
+    const monthData = userData.uber.data[currentYear].months[currentMonth].data;
     monthData.map(transaction=>{
       MonthlyEarnings += transaction.amount;
     })
 
     setTotalMonthlyEarnings(MonthlyEarnings);
-  }, [data]); // Vuelve a calcular si data cambia
+  }, [userData]); // Vuelve a calcular si data cambia
 
   return (
     <Grid item>

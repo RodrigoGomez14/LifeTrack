@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 import { formatAmount, getMonthName, getPreviousMonday } from '../../utils'; // Suponiendo que tienes una función que obtiene el lunes anterior
 import { useStore } from '../../store'; // Importar el store de Zustand
 
-const CardAverageDailyUber = ({data}) => {
-  const { dollarRate } = useStore(); // Obtener estados del store
+const CardAverageDailyUber = () => {
+  const { userData,dollarRate } = useStore(); // Obtener estados del store
   const [totalMonthlyEarnings, setTotalMonthlyEarnings] = useState(0);
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
@@ -16,7 +16,7 @@ const CardAverageDailyUber = ({data}) => {
     // Calcula las ganancias promedio del mes en curso
     let monthlyEarnings = 0;
     let length = 0
-    const monthData = data[currentYear].months[currentMonth].data;
+    const monthData = userData.uber.data[currentYear].months[currentMonth].data;
     monthData.map((transaction) => {
       monthlyEarnings += transaction.amount;
       if(!transaction.challenge){
@@ -26,7 +26,7 @@ const CardAverageDailyUber = ({data}) => {
     monthlyEarnings = monthlyEarnings/length
 
     setTotalMonthlyEarnings(monthlyEarnings);
-  }, [data]); // Vuelve a calcular si data cambia
+  }, [userData]); // Vuelve a calcular si data cambia
 
   return (
     <Grid item>
