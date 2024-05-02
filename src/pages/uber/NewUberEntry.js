@@ -16,7 +16,7 @@ const NewUberEntryPage = () => {
   const [tips, setTips] = useState('');
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
-  const [travels, setTravels] = useState(0);
+  const [travels, setTravels] = useState('');
   const [totalCash, setTotalCash] = useState(0);
   const [totalTips, setTotalTips] = useState(0);
 
@@ -63,7 +63,7 @@ const NewUberEntryPage = () => {
     const month = (currentDate.getMonth() + 1).toString();
     const day = currentDate.getDate().toString();
 
-    database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/uber/data`).push({
       date: `${day}/${month}/${year}`,
       amount: amountValue,
       amountUSD: amountUSDValue,
@@ -85,28 +85,9 @@ const NewUberEntryPage = () => {
       return data;
     });
 
-    // Actualizar totales mensuales en la base de datos para Uber
-    const monthlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}`);
-    monthlyUberRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + amountValue;
-        data.totalUSD = (data.totalUSD || 0) + amountUSDValue;
-      }
-      return data;
-    });
-
-    // Actualizar totales anuales en la base de datos para Uber
-    const yearlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}`);
-    yearlyUberRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + amountValue;
-        data.totalUSD = (data.totalUSD || 0) + amountUSDValue;
-      }
-      return data;
-    });
     
     // Agregar el ingreso de efectivo a la base de datos para ingresos
-    database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/incomes`).push({
       date: `${day}/${month}/${year}`,
       amount: totalCashValue,
       amountUSD: totalCashUSDValue,
@@ -118,7 +99,7 @@ const NewUberEntryPage = () => {
     
     if (totalTipsValue > 0) {
       // Agregar el ingreso de propinas a la base de datos para ingresos
-      database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
+      database.ref(`${auth.currentUser.uid}/incomes`).push({
         date: `${day}/${month}/${year}`,
         amountUSD: totalTipsUSDValue,
         amount: totalTipsValue,
@@ -129,24 +110,6 @@ const NewUberEntryPage = () => {
       });
     }
 
-    // Actualizar totales mensuales y anuales en la base de datos para ingresos
-    const monthlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}`);
-    monthlyRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + totalCashValue;
-        data.totalUSD = (data.totalUSD || 0) + totalCashUSDValue;
-      }
-      return data;
-    });
-
-    const yearlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}`);
-    yearlyRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + totalCashValue;
-        data.totalUSD = (data.totalUSD || 0) + totalCashUSDValue;
-      }
-      return data;
-    });
 
     database.ref(`${auth.currentUser.uid}/uber/pending`).set(userData.uber.pending + amountValue - totalCashValue);
     database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(totalCashValue*userData.savings.carMaintenancePercentage));

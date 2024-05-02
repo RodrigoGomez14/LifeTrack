@@ -10,8 +10,8 @@ const UberMonthList = ({data}) => {
             <Grid item xs={12} >
                 <Typography variant="h6" align="center">{year} - Total: {formatAmount(data[year].total)} - USD {formatAmount(data[year].totalUSD)}</Typography>
             </Grid>
-            {Object.keys(data[year].data).reverse().map(month => (
-                <UberMonth data={data[year].data[month]} month={month}/>
+            {Object.keys(data[year].months).reverse().map(month => (
+                <UberMonth data={data[year].months[month]} month={month}/>
             ))}
         </Grid>
     ))

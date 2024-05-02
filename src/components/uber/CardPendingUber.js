@@ -17,11 +17,11 @@ const CardPendingUber = ({setShowDialog}) => {
     
         // Verificar si hoy es lunes (dayOfWeek === 1)
         if (dayOfWeek === 1 && pending > 0) {
-          const year = currentDate.getFullYear().toString();
-          const month = (currentDate.getMonth() + 1).toString();
-          const day = currentDate.getDate().toString();
+          const year = currentDate.getFullYear();
+          const month = currentDate.getMonth() + 1;
+          const day = currentDate.getDate();
           
-          database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
+          database.ref(`${auth.currentUser.uid}/incomes`).push({
             date: `${day}/${month}/${year}`,
             amount: pending,
             amountUSD: parseFloat(pending/dollarRate['venta']),
@@ -31,24 +31,6 @@ const CardPendingUber = ({setShowDialog}) => {
             valorUSD:dollarRate['venta']
           });
     
-          // Actualizar totales mensuales y anuales en la base de datos para ingresos
-          const yearlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}`);
-          yearlyRef.transaction((data) => {
-            if (data) {
-              data.total = (data.total || 0) + parseFloat(pending);
-              data.totalUSD = (data.totalUSD || 0) + parseFloat(pending/dollarRate['venta']);
-            }
-            return data;
-          });
-    
-          const monthlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}`);
-          monthlyRef.transaction((data) => {
-            if (data) {
-              data.total = (data.total || 0) + parseFloat(pending);
-              data.totalUSD = (data.totalUSD || 0) + parseFloat(pending/dollarRate['venta']);
-            }
-            return data;
-          });
           database.ref(`${auth.currentUser.uid}/uber/pending`).set(0);
           database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(pending*userData.savings.carMaintenancePercentage));
     

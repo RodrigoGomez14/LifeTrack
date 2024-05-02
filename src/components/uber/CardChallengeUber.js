@@ -17,11 +17,11 @@ const CardChallengeUber = () => {
         const pending = parseFloat(userData.uber.pending);
 
         const currentDate = new Date();
-        const year = currentDate.getFullYear().toString();
-        const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-        const day = currentDate.getDate().toString().padStart(2, '0');
+        const year = currentDate.getFullYear();
+        const month = (currentDate.getMonth() + 1);
+        const day = currentDate.getDate();
 
-        database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}/data`).push({
+        database.ref(`${auth.currentUser.uid}/uber/data`).push({
             date: `${day}/${month}/${year}`,
             amount: amountValue,
             amountUSD: amountUSDValue,
@@ -29,35 +29,11 @@ const CardChallengeUber = () => {
             valorUSD: dollarRate['venta']
         });
 
-        // Actualizar totales mensuales en la base de datos para Uber
-        const monthlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}/data/${month}`);
-        monthlyUberRef.transaction((data) => {
-            if (data) {
-            userData.uber.challenge.total = (userData.uber.challenge.total || 0) + amountValue;
-            userData.uber.challenge.totalUSD = (userData.uber.challenge.totalUSD || 0) + amountUSDValue;
-            }
-            return data;
-        });
-
-        // Actualizar totales anuales en la base de datos para Uber
-        const yearlyUberRef = database.ref(`${auth.currentUser.uid}/uber/data/${year}`);
-        yearlyUberRef.transaction((data) => {
-            if (data) {
-            userData.uber.challenge.total = (userData.uber.challenge.total || 0) + amountValue;
-            userData.uber.challenge.totalUSD = (userData.uber.challenge.totalUSD || 0) + amountUSDValue;
-            }
-            return data;
-        });
-
-
         database.ref(`${auth.currentUser.uid}/uber/pending`).set(pending + amountValue);
 
-        database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
-            amount:0,
-            goal:0,
-            progress:0
-        })
+        resetChallenge()
     };
+
     const resetChallenge = () => {
     database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
         amount:0,

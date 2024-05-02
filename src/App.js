@@ -21,6 +21,7 @@ function App() {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         database.ref(user.uid).on('value',(snapshot) => {
+          console.log(snapshot.val())
           setUserData(snapshot.val());
           setUserLoggedIn(true);
           setIsLoading(false);

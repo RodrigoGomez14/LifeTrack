@@ -26,7 +26,7 @@ const NewIncome = () => {
     const month = (currentDate.getMonth() + 1).toString();
     const day = currentDate.getDate().toString();
 
-    database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/incomes`).push({
       amount: parseFloat(amount),
       amountUSD: parseFloat(amount/dollarRate['venta']),
       category: category,
@@ -35,26 +35,6 @@ const NewIncome = () => {
       description: description,
       valorUSD: dollarRate['venta']
     });
-
-    // Actualizar totales mensuales y anuales en la base de datos para ingresos
-    const yearlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}`);
-    yearlyRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + parseFloat(amount);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dollarRate['venta']);
-      }
-      return data;
-    });
-
-    const monthlyRef = database.ref(`${auth.currentUser.uid}/incomes/${year}/data/${month}`);
-    monthlyRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + parseFloat(amount);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dollarRate['venta']);
-      }
-      return data;
-    });
-
 
     setAmount('');
     setCategory('');

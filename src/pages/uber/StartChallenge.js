@@ -16,7 +16,6 @@ const StartChallenge = () => {
       return; 
     }
 
-
     database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
       amount:amount,
       goal:goal,

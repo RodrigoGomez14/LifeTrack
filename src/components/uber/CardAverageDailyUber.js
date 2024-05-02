@@ -5,27 +5,28 @@ import { Link } from 'react-router-dom';
 import { formatAmount, getMonthName, getPreviousMonday } from '../../utils'; // Suponiendo que tienes una función que obtiene el lunes anterior
 import { useStore } from '../../store'; // Importar el store de Zustand
 
-const CardAverageDailyUber = () => {
-  const { userData, dollarRate } = useStore(); // Obtener estados del store
+const CardAverageDailyUber = ({data}) => {
+  const { dollarRate } = useStore(); // Obtener estados del store
   const [totalMonthlyEarnings, setTotalMonthlyEarnings] = useState(0);
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
   
   useEffect(() => {
-    // Calcula las ganancias desde el último lunes
-    let MonthlyEarnings = 0;
+    // Calcula las ganancias promedio del mes en curso
+    let monthlyEarnings = 0;
+    let length = 0
+    const monthData = data[currentYear].months[currentMonth].data;
+    monthData.map((transaction) => {
+      monthlyEarnings += transaction.amount;
+      if(!transaction.challenge){
+        length++
+      }
+    })
+    monthlyEarnings = monthlyEarnings/length
 
-    if (userData.uber && userData.uber.data[currentYear] && userData.uber.data[currentYear].data[currentMonth]) {
-      const monthData = userData.uber.data[currentYear].data[currentMonth];
-      Object.values(monthData.data).forEach((transaction) => {
-        MonthlyEarnings += transaction.amount;
-      });
-      MonthlyEarnings = MonthlyEarnings/Object.values(monthData.data).length
-    }
-
-    setTotalMonthlyEarnings(MonthlyEarnings);
-  }, [userData]); // Vuelve a calcular si userData cambia
+    setTotalMonthlyEarnings(monthlyEarnings);
+  }, [data]); // Vuelve a calcular si data cambia
 
   return (
     <Grid item>

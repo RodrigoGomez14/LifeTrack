@@ -26,7 +26,7 @@ const NewExpense = () => {
     const month = (currentDate.getMonth() + 1).toString();
     const day = currentDate.getDate().toString();
 
-    database.ref(`${auth.currentUser.uid}/expenses/${year}/data/${month}/data`).push({
+    database.ref(`${auth.currentUser.uid}/expenses`).push({
       amount: parseFloat(amount),
       amountUSD: parseFloat(amount/dollarRate['venta']),
       category: category,
@@ -38,24 +38,6 @@ const NewExpense = () => {
       console.log('Expense sended')
     });
 
-    // Actualizar totales mensuales y anuales en la base de datos para ingresos
-    const yearlyRef = database.ref(`${auth.currentUser.uid}/expenses/${year}`);
-    yearlyRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + parseFloat(amount);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dollarRate['venta']);
-      }
-      return data;
-    });
-
-    const monthlyRef = database.ref(`${auth.currentUser.uid}/expenses/${year}/data/${month}`);
-    monthlyRef.transaction((data) => {
-      if (data) {
-        data.total = (data.total || 0) + parseFloat(amount);
-        data.totalUSD = (data.totalUSD || 0) + parseFloat(amount/dollarRate['venta']);
-      }
-      return data;
-    });
 
     setAmount('');
     setCategory('');
@@ -68,7 +50,7 @@ const NewExpense = () => {
   // Define las subcategorías disponibles para cada categoría principal
   const subcategories = {
     Auto: ['Nafta', 'Gas', 'Mantenimiento'],
-    Servicios: ['Electricidad', 'Expensas', 'Internet','Celular'],
+    Servicios: ['Electricidad', 'Expensas','Impuestos', 'Internet','Celular'],
     Indoor: ['Plantas', 'Fertilizantes','Tierra', 'Herramientas'],
     Supermercado: ['General', 'Chino', 'Verduleria','Carniceria'],
     Transporte: ['Uber', 'Publico'],

@@ -33,11 +33,11 @@ export const formatAmount = (amount) => {
 
   export const sumTransactionsByCategory = (transactions, category) => {
     let total = 0;
-    for (const transaction of Object.values(transactions)) {
+    transactions.map(transaction=>{
       if (transaction.category === category) {
         total += transaction.amount;
       }
-    }
+    })
     return total;
   };
 

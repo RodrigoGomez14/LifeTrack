@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../../components/layout/Layout';
 import { Typography, Grid, IconButton, Dialog, DialogTitle, Button } from '@mui/material';
 import { formatAmount, formatMinutesToHours, getMonthName } from '../../utils';
@@ -25,44 +25,63 @@ const Uber = () => {
   const currentYear = currentDate.getFullYear();
 
   let totalEarnings = 0;
-  let meanCoeficient = 0;
-  let meanDuration = 0;
+  const groupedUberData = {};
 
   // Calcular datos para gráficos limitados al mes actual
-  if (userData.uber.data[currentYear] && userData.uber.data[currentYear].data[currentMonth]) {
-    Object.keys(userData.uber.data[currentYear].data[currentMonth].data).forEach((transactionId) => {
-      const transaction = userData.uber.data[currentYear].data[currentMonth].data[transactionId];
+  if (userData.uber.data) {
+    
+    // Agrupar datos por año y por mes
+    Object.keys(userData.uber.data).forEach((transactionId) => {
+      const transaction = userData.uber.data[transactionId];
+      const [day, month, year] = transaction.date.split('/').map(Number);
+      if (!groupedUberData[year]) {
+        groupedUberData[year] = { 
+          total: 0,totalUSD:0,
+          months: {
+            1:{ total: 0,totalUSD:0, data: [] },
+            2:{ total: 0,totalUSD:0, data: [] },
+            3:{ total: 0,totalUSD:0, data: [] },
+            4:{ total: 0,totalUSD:0, data: [] },
+            5:{ total: 0,totalUSD:0, data: [] },
+            6:{ total: 0,totalUSD:0, data: [] },
+            7:{ total: 0,totalUSD:0, data: [] },
+            8:{ total: 0,totalUSD:0, data: [] },
+            9:{ total: 0,totalUSD:0, data: [] },
+            10:{ total: 0,totalUSD:0, data: [] },
+            11:{ total: 0,totalUSD:0, data: [] },
+            12:{ total: 0,totalUSD:0, data: [] }
+          }
+        }
+      }
+
+      groupedUberData[year].months[month].data.push(transaction);
+      groupedUberData[year].months[month].total+=transaction.amount;
+      groupedUberData[year].months[month].totalUSD+=transaction.amountUSD;
+      groupedUberData[year].total+=transaction.amount;
+      groupedUberData[year].totalUSD+=transaction.amountUSD;
+
       if (!transaction.challenge) {
         totalEarnings += transaction.amount;
-        earningsData.push({
-          x: transaction.date,
-          y: totalEarnings,
-        });
-        meanCoeficient += (transaction.amount / transaction.duration) * 60;
+
         coefficientData.push({
           x: transaction.date,
           y: (transaction.amount / transaction.duration) * 60,
         });
-        meanDuration += transaction.duration
+
+        earningsData.push({
+          x: transaction.date,
+          y: totalEarnings,
+        });
       }
     });
-    meanCoeficient = meanCoeficient/Object.keys(userData.uber.data[currentYear].data[currentMonth].data).length
-    meanDuration = meanDuration/Object.keys(userData.uber.data[currentYear].data[currentMonth].data).length
   }
 
-  // Configuración para el gráfico de línea para coeficiente
   const optionsCoefficientChart = {
     chart: {
       id: 'coefficient-chart',
-      sparkline: {
-        enabled: true
-      },
     },
     xaxis: {
       type: 'category',
-    },
-    stroke:{
-      curve: 'smooth',
     },
     tooltip: {
       y: {
@@ -71,18 +90,12 @@ const Uber = () => {
     },
   };
 
-  // Configuración para el gráfico de línea para ganancias acumuladas
   const optionsEarningsChart = {
     chart: {
       id: 'earnings-chart',
     },
     xaxis: {
       type: 'category',
-    },
-    yaxis:{
-      labels:{
-        formatter: (val) => formatAmount(val),
-      }
     },
     tooltip: {
       y: {
@@ -105,23 +118,13 @@ const Uber = () => {
       ) : (
         <>
           <CardPendingUber setShowDialog={setShowDialog} />
-          <CardTotalGasExpenses/>
-          <CardTotalMonthlyUber/>
-          <CardAverageDailyUber/>
-          <CardChallengeUber/>
+          <CardTotalMonthlyUber data={groupedUberData}/>
+          <CardAverageDailyUber data={groupedUberData}/>
+          <CardChallengeUber />
           <Grid container spacing={2} justifyContent="center">
             <Grid item xs={12} sm={8}>
               <Typography variant="h6" align="center">
                 Evolución ($/hs) de {getMonthName(currentMonth)}
-              </Typography>
-              <Typography variant="h6" align="center">
-                {formatMinutesToHours(meanDuration)}
-              </Typography>
-              <Typography variant="h6" align="center">
-                {formatAmount(meanCoeficient)}
-              </Typography>
-              <Typography variant="h6" align="center">
-                {formatAmount(parseFloat(meanCoeficient)*parseFloat(meanDuration/60))}
               </Typography>
               <ReactApexChart
                 options={optionsCoefficientChart}
@@ -142,7 +145,7 @@ const Uber = () => {
               />
             </Grid>
           </Grid>
-          <UberMonthList data={userData.uber.data} />
+          <UberMonthList data={groupedUberData} />
           <Dialog open={showDialog}>
             <DialogTitle>Fondo de mantenimiento del auto</DialogTitle>
             <Typography variant="body1">
