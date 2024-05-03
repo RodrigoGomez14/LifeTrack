@@ -13,7 +13,7 @@ import StartChallenge from './pages/uber/StartChallenge.js';
 import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
 import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
-import { orange,blue } from '@mui/material/colors';
+import { indigo, teal,grey } from '@mui/material/colors';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
@@ -138,6 +138,8 @@ function App() {
     if (data.savings) {
       groupedSavings.carMaintenancePercentage = data.savings.carMaintenancePercentage
       groupedSavings.carMaintenance = data.savings.carMaintenance
+      groupedSavings.carMaintenanceHistory = data.savings.carMaintenanceHistory
+      groupedSavings.amountUSD = data.savings.amountUSD
     }
 
     return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings };
@@ -145,9 +147,12 @@ function App() {
 
   const theme = createTheme({
     palette: {
-      mode:'dark',
       primary: {
-        main: orange[500],
+        main: indigo[500],
+        contrastText: grey[50]
+      },
+      secondary: {
+        main: teal[500],
       },
     },
   });

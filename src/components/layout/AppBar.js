@@ -7,7 +7,7 @@ const AppBar = ({toggleDrawer,title}) => {
   const theme = useTheme();
   return (
     <div>
-      <MuiAppBar position="fixed" style={{backgroundColor:theme.palette.primary.light}} >
+      <MuiAppBar position="fixed" style={{backgroundColor:theme.palette.primary.main}} >
         <Toolbar >
           <IconButton
             edge="start"

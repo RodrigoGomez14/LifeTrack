@@ -4,7 +4,7 @@ import { Typography, Grid, Card, CardHeader, Button, Box,Tabs,Tab} from '@mui/ma
 import { formatAmount, getMonthName } from '../../utils';
 import { Link } from 'react-router-dom';
 import TransactionsTabs from '../../components/finances/TransactionsTabs'
-import SavingsList from '../../components/finances/SavingsList'
+import SavingsTab from '../../components/finances/SavingsTab'
 import { useStore } from '../../store'; 
 import CardHeaderFinances from '../../components/finances/CardHeaderFinances';
 import { useTheme } from '@mui/material/styles';
@@ -41,40 +41,28 @@ const Finances = () => {
       </div>
     );
   }
+  
   return (
     <Layout title="Finanzas">
-        <Grid container item xs={12} spacing={3} style={{overflow:'scroll',flexWrap:'nowrap'}} >
-          <Grid item>
-            <Card style={{width:'150px'}}>
-              <CardHeader
-                title={formatAmount(dollarRate['venta'])}
-                subheader="Valor USD"/>
-            </Card>
+        <Grid container item xs={12}>
+          <Grid container item xs={12} justifyContent='center'>
+            <Tabs value={tabValue} onChange={handleChange} centered>
+              <Tab label="Gastos" />
+              <Tab label="Ingresos" />
+              <Tab label="Ahorros" />
+            </Tabs>
           </Grid>
-        </Grid>
-        <Grid container item xs={12} spacing={3}>
-          {Object.keys(userData.finances.expenses).map(year => (
-            <Grid container item xs={12}>
-              <Grid item xs={12}>
-                <Tabs value={tabValue} onChange={handleChange} centered style={{backgroundColor:theme.palette.secondary.dark}}>
-                  <Tab label="Gastos" />
-                  <Tab label="Ingresos" />
-                  <Tab label="Ahorros" />
-                </Tabs>
-              </Grid>
-              <Grid item xs={12}>
-                <CustomTabPanel value={tabValue} index={0}>
-                  <TransactionsTabs data={userData.finances.expenses[year]} type="expenses"/>
-                </CustomTabPanel>
-                <CustomTabPanel value={tabValue} index={1}>
-                  <TransactionsTabs data={userData.finances.incomes[year]} type="incomes"/>  
-                </CustomTabPanel>
-                <CustomTabPanel value={tabValue} index={2}>
-                  <SavingsList data={userData.savings}/>  
-                </CustomTabPanel>
-              </Grid>
-            </Grid>
-          ))}
+          <Grid container item xs={12}>
+            <CustomTabPanel value={tabValue} index={0}>
+              <TransactionsTabs data={userData.finances.expenses} type="expenses"/>
+            </CustomTabPanel>
+            <CustomTabPanel value={tabValue} index={1}>
+              <TransactionsTabs data={userData.finances.incomes} type="incomes"/>  
+            </CustomTabPanel>
+            <CustomTabPanel value={tabValue} index={2}>
+              <SavingsTab data={userData.savings}/>  
+            </CustomTabPanel>
+          </Grid>
         </Grid>
     </Layout>
   );
