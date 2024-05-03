@@ -6,6 +6,7 @@ import Finances from './pages/finances/Finances.js';
 import Loading from './pages/basics/Loading.js';
 import Uber from './pages/uber/Uber.js';
 import Habits from './pages/habits/Habits.js';
+import Plants from './pages/plants/Plants.js';
 import NewUberEntry from './pages/uber/NewUberEntry.js';
 import NewExpense from './pages/finances/NewExpense.js';
 import NewIncome from './pages/finances/NewIncome.js';
@@ -142,7 +143,14 @@ function App() {
       groupedSavings.amountUSD = data.savings.amountUSD
     }
 
-    return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings };
+    if (data.plants) {
+      groupedSavings.carMaintenancePercentage = data.savings.carMaintenancePercentage
+      groupedSavings.carMaintenance = data.savings.carMaintenance
+      groupedSavings.carMaintenanceHistory = data.savings.carMaintenanceHistory
+      groupedSavings.amountUSD = data.savings.amountUSD
+    }
+
+    return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings, plantas:data.plantas };
   };
 
   const theme = createTheme({
@@ -198,6 +206,7 @@ function App() {
           <Route exact path="/Finanzas" element={<Finances />} />
           <Route exact path="/Uber" element={<Uber />} />
           <Route exact path="/Habitos" element={<Habits />} />
+          <Route exact path="/Plantas" element={<Plants />} />
           <Route exact path="/NewUberEntry" element={<NewUberEntry />} />
           <Route exact path="/NewExpense" element={<NewExpense />} />
           <Route exact path="/NewIncome" element={<NewIncome />} />

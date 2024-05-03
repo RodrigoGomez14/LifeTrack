@@ -5,6 +5,7 @@ import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlin
 import LocalTaxiOutlinedIcon from '@mui/icons-material/LocalTaxiOutlined';
 import EmojiObjectsOutlinedIcon  from '@mui/icons-material/EmojiObjectsOutlined';
 import ExitToAppOutlinedIcon from '@mui/icons-material/ExitToAppOutlined';
+import ForestOutlinedIcon from '@mui/icons-material/ForestOutlined';
 import { Link } from 'react-router-dom';
 import { auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
 
@@ -52,6 +53,14 @@ const Drawer = ({ open, toggleDrawer }) => {
               <EmojiObjectsOutlinedIcon />
             </ListItemIcon>
             <ListItemText primary="Habitos" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem component={Link} to="/Plantas" button>
+          <ListItemButton>
+            <ListItemIcon>
+              <ForestOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText primary="Plantas" />
           </ListItemButton>
         </ListItem>
       </List>
