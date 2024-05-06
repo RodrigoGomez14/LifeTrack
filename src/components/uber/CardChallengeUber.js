@@ -7,9 +7,11 @@ import { database, auth } from '../../firebase'; // Importar el módulo de auten
 import RestoreIcon from '@mui/icons-material/Restore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AddIcon from '@mui/icons-material/Add';
+import { useTheme } from '@mui/material/styles';
 
 const CardChallengeUber = () => {
     const {userData, dollarRate} = useStore(); // Obtener estados del store
+    const theme = useTheme();
 
     const completeChallenge = () => {
         const amountValue = parseFloat(userData.uber.challenge.amount);
@@ -31,15 +33,37 @@ const CardChallengeUber = () => {
 
         database.ref(`${auth.currentUser.uid}/uber/pending`).set(pending + amountValue);
 
-        resetChallenge()
+        if(userData.uber.challenge.secondGoal>0){
+            activeSecondChallenge()
+        }
+        else{
+            resetChallenge()
+        }
+    };
+
+    const activeSecondChallenge = () => {
+        let newProgress = 0
+        if(userData.uber.challenge.progress-userData.uber.challenge.goal>0){
+            newProgress = userData.uber.challenge.progress-userData.uber.challenge.goal
+        }
+
+        database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
+            amount:userData.uber.challenge.secondAmount,
+            secondAmount:0,
+            goal:userData.uber.challenge.secondGoal,
+            secondGoal:0,
+            progress:newProgress
+        })
     };
 
     const resetChallenge = () => {
-    database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
-        amount:0,
-        goal:0,
-        progress:0
-    })
+        database.ref(`${auth.currentUser.uid}/uber/challenge`).set({
+            amount:0,
+            secondAmount:0,
+            goal:0,
+            secondGoal:0,
+            progress:0
+        })
     };
     
     const goal = userData.uber.challenge.goal || 0
@@ -54,9 +78,14 @@ const CardChallengeUber = () => {
                 action={
                     <IconButton 
                         aria-label="settings"
-                        onClick={resetChallenge} 
+                        onClick={userData.uber.challenge.progress>=userData.uber.challenge.goal?completeChallenge:resetChallenge} 
                     >
-                        <RestoreIcon style={{color:'white'}}/>
+                        {
+                        userData.uber.challenge.progress>=userData.uber.challenge.goal?
+                            <CheckCircleIcon style={{color:theme.palette.secondary.main}}/>
+                            :
+                            <RestoreIcon style={{color:theme.palette.secondary.main}}/>
+                        }
                     </IconButton>
                   }
                 title={
@@ -71,18 +100,6 @@ const CardChallengeUber = () => {
                         <Typography variant="body2">
                             {formatAmount(userData.uber.challenge.amount)}
                         </Typography>
-
-                        {
-                            userData.uber.challenge.progress>=userData.uber.challenge.goal?
-                            <IconButton 
-                                aria-label="settings"
-                                onClick={completeChallenge}
-                            >
-                                <CheckCircleIcon style={{color:'white'}}/>
-                            </IconButton>
-                            :
-                            null
-                        }
                     </>
                 }
                 />

@@ -1,5 +1,5 @@
 import React, {useEffect,useState} from 'react';
-import {Grid,Typography,Card,CardHeader,IconButton} from '@mui/material';
+import {Grid,Typography,Card,CardHeader,IconButton,Paper} from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { formatAmount} from '../../utils';
 import { useStore } from '../../store'; // Importar el store de Zustand
@@ -55,35 +55,37 @@ const CardPendingUber = ({setShowDialog}) => {
         setResetDisabled(dayOfWeek !== 1);
       }, []); 
     return(
-          <Grid item>
-              <Card>
-                  <CardHeader
-                  action={
-                    <IconButton 
-                        aria-label="settings"
-                        disabled={resetDisabled}
-                        onClick={resetPending} 
-                    >
-                        <RestoreIcon />
-                    </IconButton>
-                  }
-                  style={{backgroundColor:userData.uber.pending > 0 ? 'green' : 'red'}}
-                  title={
-                    <>
-                      <Typography variant="caption">
-                        Pago Semanal
-                      </Typography>
-                      <Typography variant="h4">
-                      {formatAmount(userData.uber.pending)}
-                      </Typography>
-                      <Typography variant="body2">
-                       USD {formatAmount(userData.uber.pending / dollarRate['venta'])}
-                      </Typography>
-                    </>
-                  }
-                  />
-              </Card>
-          </Grid>
+      <Grid item>
+        <Paper elevation={6}>
+            <Card>
+                <CardHeader
+                action={
+                  <IconButton 
+                      aria-label="settings"
+                      disabled={resetDisabled}
+                      onClick={resetPending} 
+                  >
+                      <RestoreIcon />
+                  </IconButton>
+                }
+                style={{backgroundColor:userData.uber.pending > 0 ? 'green' : 'red'}}
+                title={
+                  <>
+                    <Typography variant="caption">
+                      Pago Semanal
+                    </Typography>
+                    <Typography variant="h4">
+                    {formatAmount(userData.uber.pending)}
+                    </Typography>
+                    <Typography variant="body2">
+                      USD {formatAmount(userData.uber.pending / dollarRate['venta'])}
+                    </Typography>
+                  </>
+                }
+                />
+            </Card>
+        </Paper>
+      </Grid>
     )
 }
 export default CardPendingUber;

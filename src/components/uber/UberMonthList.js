@@ -4,7 +4,6 @@ import { formatAmount} from '../../utils';
 import UberMonth from './UberMonth'
 
 const UberMonthList = ({data}) => {
-  console.log(data)
   return (
     Object.keys(data).map(year => (
       <Grid container item xs={12} key={year} justifyContent='center' spacing={2}>

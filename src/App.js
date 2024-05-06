@@ -7,6 +7,7 @@ import Loading from './pages/basics/Loading.js';
 import Uber from './pages/uber/Uber.js';
 import Habits from './pages/habits/Habits.js';
 import Plants from './pages/plants/Plants.js';
+import NewPlant from './pages/plants/NewPlant.js';
 import NewUberEntry from './pages/uber/NewUberEntry.js';
 import NewExpense from './pages/finances/NewExpense.js';
 import NewIncome from './pages/finances/NewIncome.js';
@@ -157,7 +158,6 @@ function App() {
     palette: {
       primary: {
         main: indigo[500],
-        contrastText: grey[50]
       },
       secondary: {
         main: teal[500],
@@ -207,6 +207,7 @@ function App() {
           <Route exact path="/Uber" element={<Uber />} />
           <Route exact path="/Habitos" element={<Habits />} />
           <Route exact path="/Plantas" element={<Plants />} />
+          <Route exact path="/NewPlant" element={<NewPlant />} />
           <Route exact path="/NewUberEntry" element={<NewUberEntry />} />
           <Route exact path="/NewExpense" element={<NewExpense />} />
           <Route exact path="/NewIncome" element={<NewIncome />} />
