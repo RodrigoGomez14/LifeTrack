@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useState} from 'react';
 import Layout from '../../components/layout/Layout';
 import { Typography, Grid, Card, CardHeader, Button, Box,Tabs,Tab} from '@mui/material';
 import { formatAmount, getMonthName } from '../../utils';
@@ -17,7 +17,7 @@ const Finances = () => {
   const currentMonth = currentDate.getMonth() + 1;
   const currentMonthName = getMonthName(currentMonth);
 
-  const [tabValue, setTabValue] = React.useState(0);
+  const [tabValue, setTabValue] = useState(0);
   
   const handleChange = (event, newValue) => {
     setTabValue(newValue);

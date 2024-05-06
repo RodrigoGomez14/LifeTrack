@@ -91,7 +91,7 @@ export const checkSearch =(search)=>{
 const checkWhiteSpace =(text)=>{
   
   var aux = text
-  while(aux.indexOf('%20')!=-1){
+  while(aux.indexOf('%20')!==-1){
       aux = aux.slice(0,aux.indexOf('%20')) + ' ' + aux.slice(aux.indexOf('%20')+3)
   }
   return aux
