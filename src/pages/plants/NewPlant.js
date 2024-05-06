@@ -21,6 +21,11 @@ const NewPlant = () => {
       return;
     }
 
+    database.ref(`${auth.currentUser.uid}/plants/active`).push({
+      name:name,
+      quantity:parseInt(quantity)
+    });
+
     setName('');
     setQuantity('');
 
