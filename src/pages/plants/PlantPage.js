@@ -56,6 +56,18 @@ const PlantPage = () => {
         type: "FIM",
       });
   };
+  const newInsecticide = () => {
+    database
+      .ref(
+        `${auth.currentUser.uid}/plants/active/${checkSearch(
+          location.search
+        )}/insecticides`
+      )
+      .push({
+        product:'Jabon Potasico',
+        appMethod:'Rociado'
+      });
+  };
 
   const handleChange = (event, newValue) => {
     setTabValue(newValue);
@@ -93,6 +105,11 @@ const PlantPage = () => {
           </Button>
         </Grid>
         <Grid item>
+          <Button variant="contained" onClick={newInsecticide}>
+            INSECTICIDA
+          </Button>
+        </Grid>
+        <Grid item>
           <Button variant="contained" onClick={newTransplant}>
             TRANSPLANTE
           </Button>
@@ -106,15 +123,23 @@ const PlantPage = () => {
       <Grid container item xs={12} justifyContent="center">
         <Tabs value={tabValue} onChange={handleChange} centered>
           <Tab label="Reigos" />
+          <Tab label="Insecticidas" />
           <Tab label="Podas" />
+          <Tab label="Transplantes" />
         </Tabs>
       </Grid>
       <Grid container item xs={12}>
         <CustomTabPanel value={tabValue} index={0}>
-          <ActionsTabsList data={plant}/>
+          <ActionsTabsList data={plant.irrigations} type='riegos'/>
         </CustomTabPanel>
         <CustomTabPanel value={tabValue} index={1}>
-          Podas
+          <ActionsTabsList data={plant.insecticides} type='insecticidas'/>
+        </CustomTabPanel>
+        <CustomTabPanel value={tabValue} index={2}>
+          <ActionsTabsList data={plant.prunings} type='podas'/>
+        </CustomTabPanel>
+        <CustomTabPanel value={tabValue} index={3}>
+          <ActionsTabsList data={plant.transplants} type='transplantes'/>
         </CustomTabPanel>
       </Grid>
     </Layout>
