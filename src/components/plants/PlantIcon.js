@@ -1,5 +1,5 @@
 import React from 'react';
-import {Grid,Typography,} from '@mui/material';
+import {Grid,Typography,Button} from '@mui/material';
 import { formatAmount} from '../../utils';
 import { Link } from 'react-router-dom';
 
@@ -8,11 +8,11 @@ const PlantIcon = ({plant,id}) => {
       <Grid item>
         <Link 
             to={{
-                pathname:'/Plant',
+                pathname:'/Planta',
                 search:`${id}`
             }}
         >
-          <Typography variant='h4'> {plant.name} </Typography>
+          <Button variant='contained'> {plant.name} </Button>
         </Link>
       </Grid>
   );

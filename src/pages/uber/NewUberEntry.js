@@ -6,6 +6,7 @@ import { database,auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 import { formatAmount } from '../../utils';
 import { useStore } from '../../store'; 
+import { getDate } from '../../utils'
 
 const NewUberEntryPage = () => {
   const {userData,dollarRate} = useStore();
@@ -59,13 +60,8 @@ const NewUberEntryPage = () => {
     const totalCashUSDValue = totalCashValue / dollarRate['venta'];
     const totalTipsUSDValue = totalTipsValue / dollarRate['venta'];
 
-    const currentDate = new Date();
-    const year = currentDate.getFullYear().toString();
-    const month = (currentDate.getMonth() + 1).toString();
-    const day = currentDate.getDate().toString();
-
     database.ref(`${auth.currentUser.uid}/uber/data`).push({
-      date: `${day}/${month}/${year}`,
+      date: getDate(),
       amount: amountValue,
       amountUSD: amountUSDValue,
       cash: totalCashValue,
@@ -89,7 +85,7 @@ const NewUberEntryPage = () => {
     
     // Agregar el ingreso de efectivo a la base de datos para ingresos
     database.ref(`${auth.currentUser.uid}/incomes`).push({
-      date: `${day}/${month}/${year}`,
+      date: getDate(),
       amount: totalCashValue,
       amountUSD: totalCashUSDValue,
       category: 'Uber',
@@ -101,7 +97,7 @@ const NewUberEntryPage = () => {
     if (totalTipsValue > 0) {
       // Agregar el ingreso de propinas a la base de datos para ingresos
       database.ref(`${auth.currentUser.uid}/incomes`).push({
-        date: `${day}/${month}/${year}`,
+        date: getDate(),
         amountUSD: totalTipsUSDValue,
         amount: totalTipsValue,
         category: 'Uber',
@@ -117,7 +113,7 @@ const NewUberEntryPage = () => {
 
     // Agregar el ingreso de efectivo a la base de datos para ingresos
     database.ref(`${auth.currentUser.uid}/savings/carMaintenanceHistory`).push({
-      date: `${day}/${month}/${year}`,
+      date: getDate(),
       amount: parseInt(carMaintenanceAmount),
       amountUSD: parseFloat(carMaintenanceAmount)/dollarRate['venta'],
       newTotal: userData.savings.carMaintenance+parseInt(carMaintenanceAmount),

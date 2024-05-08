@@ -1,6 +1,6 @@
 import React from 'react';
 import {List,ListItem,ListItemIcon,ListItemText,Typography} from '@mui/material';
-import { formatAmount,getCategoryIcon } from '../../utils';
+import { convertToDetailedDate, formatAmount,getCategoryIcon } from '../../utils';
 
 const TransactionsTabsList = ({ data,category }) => {
   return (
@@ -18,7 +18,7 @@ const TransactionsTabsList = ({ data,category }) => {
                                 <div>
                                     <Typography variant="body1">{transaction.subcategory}</Typography>
                                     <Typography variant="body1">{transaction.description}</Typography>
-                                    <Typography variant="body2" color="textSecondary">Fecha: {transaction.date}</Typography>
+                                    <Typography variant="body2" color="textSecondary">Fecha: {convertToDetailedDate(transaction.date)}</Typography>
                                     <Typography variant="body2" color="textSecondary">1 USD = {transaction.valorUSD} ARS</Typography>
                                 </div>
                             }

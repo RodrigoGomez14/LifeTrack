@@ -98,4 +98,20 @@ const checkWhiteSpace =(text)=>{
 }
 
 
+export const getDate = () =>{
+  var date=new Date()
+  return `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()}`
+}
+
+export const convertToDetailedDate = (date) =>{
+  const day = date.slice(0,date.indexOf('/'))
+  const month = date.slice(date.indexOf('/')+1,-5)
+  const year = date.slice(-4)
+  const f = new Date(year,month-1,day)
+  let meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+  let diasSemana = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"]
+  return `${diasSemana[f.getDay()]} ${f.getDate()} de ${meses[f.getMonth()]} de ${f.getFullYear()}`
+}
+
+
   

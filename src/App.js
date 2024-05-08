@@ -6,9 +6,13 @@ import Finances from './pages/finances/Finances.js';
 import Loading from './pages/basics/Loading.js';
 import Uber from './pages/uber/Uber.js';
 import Habits from './pages/habits/Habits.js';
-import Plants from './pages/plants/Plants.js';
-import PlantPage from './pages/plants/PlantPage.js';
+import PlantsList from './pages/plants/PlantsList.js';
+import Plant from './pages/plants/Plant.js';
 import NewPlant from './pages/plants/NewPlant.js';
+import NewIrrigation from './pages/plants/NewIrrigation.js';
+import NewInsecticide from './pages/plants/NewInsecticide.js';
+import NewPruning from './pages/plants/NewPruning.js';
+import NewTransplant from './pages/plants/NewTransplant.js';
 import NewUberEntry from './pages/uber/NewUberEntry.js';
 import NewExpense from './pages/finances/NewExpense.js';
 import NewIncome from './pages/finances/NewIncome.js';
@@ -200,13 +204,17 @@ function App() {
           <Route exact path="/Finanzas" element={<Finances />} />
           <Route exact path="/Uber" element={<Uber />} />
           <Route exact path="/Habitos" element={<Habits />} />
-          <Route exact path="/Plantas" element={<Plants />} />
-          <Route exact path="/Plant" element={<PlantPage />} />
-          <Route exact path="/NewPlant" element={<NewPlant />} />
-          <Route exact path="/NewUberEntry" element={<NewUberEntry />} />
-          <Route exact path="/NewExpense" element={<NewExpense />} />
-          <Route exact path="/NewIncome" element={<NewIncome />} />
-          <Route exact path="/StartChallenge" element={<StartChallenge />} />
+          <Route exact path="/Plantas" element={<PlantsList />} />
+          <Route exact path="/Planta" element={<Plant />} />
+          <Route exact path="/NuevaPlanta" element={<NewPlant />} />
+          <Route exact path="/NuevoRiego" element={<NewIrrigation />} />
+          <Route exact path="/NuevoInsecticida" element={<NewInsecticide />} />
+          <Route exact path="/NuevaPoda" element={<NewPruning />} />
+          <Route exact path="/NuevoTransplante" element={<NewTransplant />} />
+          <Route exact path="/FinalizarJornada" element={<NewUberEntry />} />
+          <Route exact path="/NuevGasto" element={<NewExpense />} />
+          <Route exact path="/NuevoIngreso" element={<NewIncome />} />
+          <Route exact path="/EmpezarChallenge" element={<StartChallenge />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

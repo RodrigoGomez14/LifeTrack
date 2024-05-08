@@ -3,8 +3,9 @@ import Layout from '../../components/layout/Layout';
 import { Button, TextField, Typography, ButtonGroup, Grid } from '@mui/material';
 import { database } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
-import { useStore } from '../../store'; // Importar el store de Zustand
+import { auth } from '../../firebase'; 
+import { useStore } from '../../store'; 
+import { getDate } from '../../utils'
 
 const NewIncome = () => {
   const { dollarRate} = useStore();
@@ -21,17 +22,13 @@ const NewIncome = () => {
       return;
     }
 
-    const currentDate = new Date();
-    const year = currentDate.getFullYear().toString();
-    const month = (currentDate.getMonth() + 1).toString();
-    const day = currentDate.getDate().toString();
 
     database.ref(`${auth.currentUser.uid}/incomes`).push({
       amount: parseFloat(amount),
       amountUSD: parseFloat(amount/dollarRate['venta']),
       category: category,
       subcategory: subcategory,
-      date: `${day}/${month}/${year}`,
+      date: getDate(),
       description: description,
       valorUSD: dollarRate['venta']
     });

@@ -9,14 +9,7 @@ import { useStore } from '../../store';
 import CardHeaderFinances from '../../components/finances/CardHeaderFinances';
 import { useTheme } from '@mui/material/styles';
 const Finances = () => {
-  const {userData,dollarRate} = useStore();
-  const theme = useTheme();
-
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
-  const currentMonthName = getMonthName(currentMonth);
-
+  const {userData} = useStore();
   const [tabValue, setTabValue] = useState(0);
   
   const handleChange = (event, newValue) => {
@@ -69,6 +62,3 @@ const Finances = () => {
 };
 
 export default Finances;
-
-//<CardHeaderFinances subheader={`Balance ${currentYear}`} title={`${formatAmount((groupedIncomes[currentYear].total-groupedExpenses[currentYear].total))} / USD ${formatAmount((groupedIncomes[currentYear].totalUSD-groupedExpenses[currentYear].totalUSD))}`} cond={groupedIncomes[currentYear].totalUSD-groupedExpenses[currentYear].totalUSD>0}/>
-//<CardHeaderFinances subheader={`Balance ${currentMonthName} ${currentYear}`} title={`${formatAmount((groupedIncomes[currentYear].months[currentMonth].total-groupedExpenses[currentYear].months[currentMonth].total))} / USD ${formatAmount((groupedIncomes[currentYear].months[currentMonth].totalUSD-groupedExpenses[currentYear].months[currentMonth].totalUSD))}`} cond={groupedIncomes[currentYear].months[currentMonth].totalUSD-groupedExpenses[currentYear].months[currentMonth].totalUSD>0}/>

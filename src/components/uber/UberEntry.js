@@ -2,7 +2,7 @@ import React from 'react';
 import {List,ListItem,ListItemIcon,ListItemText,Typography,} from '@mui/material';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 import { formatAmount,formatMinutesToHours} from '../../utils';
-
+import { convertToDetailedDate } from '../../utils'
 const UberEntry = ({data}) => {
   return (
     <List>
@@ -16,7 +16,7 @@ const UberEntry = ({data}) => {
                         <DriveEtaIcon />
                     </ListItemIcon>
                     <ListItemText
-                        primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{transaction.date} - Challenge</Typography>}
+                        primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{convertToDetailedDate(transaction.date)} - Challenge</Typography>}
                         secondary={
                             <div>
                             <Typography variant="body1">
@@ -35,7 +35,7 @@ const UberEntry = ({data}) => {
                         <DriveEtaIcon />
                     </ListItemIcon>
                     <ListItemText
-                        primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{transaction.date}</Typography>}
+                        primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{convertToDetailedDate(transaction.date)}</Typography>}
                         secondary={
                             <div>
                             <Typography variant="body1">

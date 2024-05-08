@@ -1,27 +1,76 @@
 import React from 'react';
 import {List,ListItem,ListItemIcon,ListItemText,Typography,Grid} from '@mui/material';
-import { formatAmount,getCategoryIcon } from '../../utils';
+import { convertToDetailedDate, formatAmount,getCategoryIcon } from '../../utils';
 
 const ActionsTabsList = ({ data,type }) => {
   return (
     <List>
         {data?
             Object.values(data).reverse().map(action => {
-                return (
-                    <ListItem key={action.date}>
-                        <ListItemText
-                            primary={action.quantity}
-                            secondary={
-                                <div>
-                                    <Typography variant="body1">{action.subcategory}</Typography>
-                                    <Typography variant="body1">{action.description}</Typography>
-                                    <Typography variant="body2" color="textSecondary">Fecha: {action.date}</Typography>
-                                    <Typography variant="body2" color="textSecondary">1 USD = {action.valorUSD} ARS</Typography>
-                                </div>
-                            }
-                        />
-                    </ListItem>
-                    );
+                switch (type) {
+                    case 'riegos':
+                        return (
+                            <ListItem key={action.date}>
+                                <ListItemText
+                                    primary={convertToDetailedDate(action.date)}
+                                    secondary={
+                                        <div>
+                                            <Typography variant="body1">{action.quantity}{action.measure}</Typography>
+                                            <Typography variant="body1">{action.fertilizantes?'fertilizantes':'no hay fertilizantes'}</Typography>
+                                        </div>
+                                    }
+                                />
+                            </ListItem>
+                            );
+                        break;
+                    case 'insecticidas':
+                        return (
+                            <ListItem key={action.date}>
+                                <ListItemText
+                                    primary={convertToDetailedDate(action.date)}
+                                    secondary={
+                                        <div>
+                                            <Typography variant="body1">{action.product}</Typography>
+                                            <Typography variant="body1">{action.appMethod}</Typography>
+                                        </div>
+                                    }
+                                />
+                            </ListItem>
+                            );
+                        break;
+                    case 'podas':
+                        return (
+                            <ListItem key={action.date}>
+                                <ListItemText
+                                    primary={convertToDetailedDate(action.date)}
+                                    secondary={
+                                        <div>
+                                            <Typography variant="body1">{action.type}</Typography>
+                                        </div>
+                                    }
+                                />
+                            </ListItem>
+                            );
+                        break;
+                    case 'transplantes':
+                        return (
+                            <ListItem key={action.date}>
+                                <ListItemText
+                                    primary={convertToDetailedDate(action.date)}
+                                    secondary={
+                                        <div>
+                                            <Typography variant="body1">Maceta Anterior: {action.previousPot}</Typography>
+                                            <Typography variant="body1">Maceta Nueva: {action.newPot}</Typography>
+                                        </div>
+                                    }
+                                />
+                            </ListItem>
+                            );
+                        break;
+                
+                    default:
+                        break;
+                }
             })
             :
             <Grid container>

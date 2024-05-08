@@ -8,7 +8,6 @@ import { formatAmount } from '../../utils';
 import { useStore } from '../../store'; 
 
 const NewPlant = () => {
-  const {userData,dollarRate} = useStore();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');

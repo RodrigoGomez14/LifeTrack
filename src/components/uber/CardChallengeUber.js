@@ -115,7 +115,7 @@ const CardChallengeUber = () => {
                         <Typography variant="caption">
                             Aun no hay un Challenge Activo!
                         </Typography>
-                        <Link to="/StartChallenge">
+                        <Link to="/EmpezarChallenge">
                             <IconButton>
                                 <AddIcon style={{color:'white'}}/>
                             </IconButton>

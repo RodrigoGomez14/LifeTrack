@@ -59,17 +59,17 @@ const Home = () => {
       </Grid>
       <Grid container item xs={12} spacing={3} justifyContent='center'>
         <Grid item>
-          <Link to="/NewExpense">
+          <Link to="/NuevoGasto">
             <Button variant='contained'>AÑADIR GASTO</Button>
           </Link>
         </Grid>
         <Grid item>
-          <Link to="/NewIncome">
+          <Link to="/NuevoIngreso">
             <Button variant='contained'>AÑADIR INGRESO</Button>
           </Link>
         </Grid>
         <Grid item>
-          <Link to="/NewUberEntry">
+          <Link to="/FinalizarJornada">
             <Button variant='contained'>FINALIZAR JORNADA UBER</Button>
           </Link>
         </Grid>
