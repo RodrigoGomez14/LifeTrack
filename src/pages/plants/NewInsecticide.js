@@ -35,7 +35,6 @@ const NewInsecticide = () => {
         date: getDate(),
         product: product,
         appMethod: appMethod,
-        fertilizantes: false,
       });
 
     setAppMethod("");

@@ -11,6 +11,11 @@ const PlantsList = () => {
   return (
     <Layout title='Plantas'>
       <Grid item xs={12}>
+        <Link to="/Aditivos">
+          <Button variant='contained'>VER ADITIVOS</Button>
+        </Link>
+      </Grid>
+      <Grid item xs={12}>
         <Link to="/NuevaPlanta">
           <Button variant='contained'>NUEVA PLANTA</Button>
         </Link>

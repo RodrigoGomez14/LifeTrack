@@ -13,6 +13,7 @@ import NewIrrigation from './pages/plants/NewIrrigation.js';
 import NewInsecticide from './pages/plants/NewInsecticide.js';
 import NewPruning from './pages/plants/NewPruning.js';
 import NewTransplant from './pages/plants/NewTransplant.js';
+import Aditives from './pages/plants/Aditives.js';
 import NewUberEntry from './pages/uber/NewUberEntry.js';
 import NewExpense from './pages/finances/NewExpense.js';
 import NewIncome from './pages/finances/NewIncome.js';
@@ -28,6 +29,7 @@ function App() {
   const filterData = (data) => {
     const groupdedFinances = {incomes:{},expenses:{}};
     const groupedSavings = {};
+    const groupedPlants = {};
     const groupedUberData = {data:{}};
     const earningsUberData = [];
     let totalEarningsUber = 0;
@@ -148,8 +150,20 @@ function App() {
       groupedSavings.carMaintenanceHistory = data.savings.carMaintenanceHistory
       groupedSavings.amountUSD = data.savings.amountUSD
     }
-
-    return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings, plants:data.plants };
+    if(data.plants){
+      groupedPlants['active'] = data.plants.active
+      let aditives = {fertilizantes:[],insecticidas:[]}
+      Object.keys(data.plants.aditives).forEach((aditiveId) => {
+        if(data.plants.aditives[aditiveId].type=='Fertilizante'){
+          aditives.fertilizantes.push(data.plants.aditives[aditiveId])
+        }
+        else{
+          aditives.insecticidas.push(data.plants.aditives[aditiveId])
+        }
+      });
+      groupedPlants['aditives']=aditives
+    }
+    return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings, plants:groupedPlants };
   };
 
   const theme = createTheme({
@@ -211,8 +225,9 @@ function App() {
           <Route exact path="/NuevoInsecticida" element={<NewInsecticide />} />
           <Route exact path="/NuevaPoda" element={<NewPruning />} />
           <Route exact path="/NuevoTransplante" element={<NewTransplant />} />
+          <Route exact path="/Aditivos" element={<Aditives />} />
           <Route exact path="/FinalizarJornada" element={<NewUberEntry />} />
-          <Route exact path="/NuevGasto" element={<NewExpense />} />
+          <Route exact path="/NuevoGasto" element={<NewExpense />} />
           <Route exact path="/NuevoIngreso" element={<NewIncome />} />
           <Route exact path="/EmpezarChallenge" element={<StartChallenge />} />
           <Route path="*" element={<Navigate to="/" />} />

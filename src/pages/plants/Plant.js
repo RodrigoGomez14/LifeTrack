@@ -22,45 +22,6 @@ const Plant = () => {
     setPlant(userData.plants.active[id]);
   }, [userData.plants]);
 
-  
-  const newTransplant = () => {
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/transplants`
-      )
-      .push({
-        date: getDate(),
-        previousPot: 5,
-        newPot: 10,
-      });
-  };
-  const newPruning = () => {
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/prunings`
-      )
-      .push({
-        date: getDate(),
-        type: "FIM",
-      });
-  };
-  const newInsecticide = () => {
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/insecticides`
-      )
-      .push({
-        date: getDate(),
-        product:'Jabon Potasico',
-        appMethod:'Rociado'
-      });
-  };
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]); // Guardar el archivo seleccionado
   };
@@ -130,10 +91,6 @@ const Plant = () => {
         <Typography variant="h6">{plant.potVolume} L de tierra</Typography>
       </Grid>
       <Grid item xs={12}>
-        <TextField type="file" onChange={handleFileChange}/>
-          <Button variant="contained" onClick={uploadFile}>
-            SUBIR FOTO
-          </Button>
       </Grid>
       <Grid container item justifyContent="center" spacing={3}>
         <Grid item>
