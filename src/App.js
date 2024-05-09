@@ -14,6 +14,7 @@ import NewInsecticide from './pages/plants/NewInsecticide.js';
 import NewPruning from './pages/plants/NewPruning.js';
 import NewTransplant from './pages/plants/NewTransplant.js';
 import Aditives from './pages/plants/Aditives.js';
+import NewAditive from './pages/plants/NewAditive.js';
 import NewUberEntry from './pages/uber/NewUberEntry.js';
 import NewExpense from './pages/finances/NewExpense.js';
 import NewIncome from './pages/finances/NewIncome.js';
@@ -226,6 +227,7 @@ function App() {
           <Route exact path="/NuevaPoda" element={<NewPruning />} />
           <Route exact path="/NuevoTransplante" element={<NewTransplant />} />
           <Route exact path="/Aditivos" element={<Aditives />} />
+          <Route exact path="/NuevoAditivo" element={<NewAditive />} />
           <Route exact path="/FinalizarJornada" element={<NewUberEntry />} />
           <Route exact path="/NuevoGasto" element={<NewExpense />} />
           <Route exact path="/NuevoIngreso" element={<NewIncome />} />

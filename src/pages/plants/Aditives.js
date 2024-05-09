@@ -11,21 +11,6 @@ const Aditives = () => {
   const location = useLocation();
   const [tabValue,setTabValue] = useState(0)
 
-  const addAditive = () => {
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/aditives`
-      )
-      .push({
-        name:'Jabon Potasico',
-        brand:'Growers',
-        description:'-',
-        dosis:[],
-        type:'Insecticida'
-      });
-  };
-  
-  
   const handleChange = (event, newValue) => {
     setTabValue(newValue);
   };
@@ -51,7 +36,9 @@ const Aditives = () => {
   return (
     <Layout title='Aditivos'>
       <Grid item xs={12}>
-        <Button variant='contained' onClick={addAditive}>Agregar Aditivo</Button>
+        <Link to='/NuevoAditivo'>
+          <Button variant='contained'>Agregar Aditivo</Button>
+        </Link>
       </Grid>
       <Grid container item xs={12} justifyContent="center">
         <Tabs value={tabValue} onChange={handleChange} centered>
