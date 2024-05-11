@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Button, ButtonGroup, TextField, Grid } from '@mui/material';
+import { Button, ButtonGroup, TextField, Grid,Box } from '@mui/material';
 import { auth, database } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,27 +58,29 @@ const StartChallenge = () => {
           </ButtonGroup>
         </Grid>
       }
-      <Grid item xs={6}>
-        <form onSubmit={handleFormSubmit}>
-          <TextField
-            label="Monto"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Monto Secundario"
-            type="number"
-            value={secondAmount}
-            onChange={(e) => setSecondAmount(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <Button variant="contained" type="submit" disabled={!amount || !goal }>Iniciar Challenge</Button>
+      <Grid item style={{flexGrow:1}} xs={12}>
+          <form onSubmit={handleFormSubmit}>
+            <Box >
+            <TextField
+              label="Monto"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              label="Monto Secundario"
+              type="number"
+              value={secondAmount}
+              onChange={(e) => setSecondAmount(e.target.value)}
+              required
+              fullWidth
+              margin="normal"
+            />
+          </Box>
+          <Button variant="contained" fullWidth type="submit" disabled={!amount || !goal }>Iniciar Challenge</Button>
         </form>
       </Grid>
     </Layout>

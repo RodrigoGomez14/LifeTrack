@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {Accordion,AccordionSummary,AccordionDetails,Grid,TextField,Tabs,Tab,Card,CardHeader,IconButton, CardContent} from '@mui/material';
+import {Accordion,AccordionSummary,AccordionDetails,Grid,TextField,Paper,Tab,Card,CardHeader,IconButton, CardContent} from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { PieChart, Pie, Tooltip, Cell, Legend } from 'recharts';
 import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../../utils';
@@ -17,19 +17,24 @@ const SavingsTab = ({ data }) => {
   const [editPercentageActive,setEditPercentageActive] = useState(false)
   const [newPercentage,setNewPercentage] = useState(false)
 
-  const seriesPieChart = [];
+  const seriesLineChart = [];
+  const seriesColumnChart = [];
+  const labelsChart = [];
 
   Object.keys(data.carMaintenanceHistory).map(key=>{
-    seriesPieChart.push({
-        x: data.carMaintenanceHistory[key].date,
-        y: data.carMaintenanceHistory[key].newTotal
-    });
+    seriesLineChart.push(data.carMaintenanceHistory[key].newTotal);
+    seriesColumnChart.push(data.carMaintenanceHistory[key].amount)
+    labelsChart.push(data.carMaintenanceHistory[key].date)
   })
-  const optionsPieChart = {
+  const optionsChart = {
+    labels:labelsChart,
     tooltip:{
         y:{
             formatter: val=> formatAmount(val)
         }
+    },
+    markers:{
+        size:3
     },
     stroke:{
         curve: 'smooth',
@@ -46,64 +51,81 @@ const SavingsTab = ({ data }) => {
   return (
     <Grid container item xs={12} justifyContent='center' spacing={3}>
         <Grid item>
-            <Card>
-                <CardHeader
-                    title={formatAmount(data.amountUSD)}
-                    subheader='Ahorros en USD'
-                />
-            </Card>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                        title={formatAmount(data.amountUSD)}
+                        subheader='Ahorros en USD'
+                    />
+                </Card>
+            </Paper>
         </Grid>
         <Grid item>
-            <Card>
-                <CardHeader
-                    title={formatAmount(data.carMaintenance)}
-                    subheader='Fondo Mantenimiento Auto'
-                />
-            </Card>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                        title={formatAmount(data.carMaintenance)}
+                        subheader='Fondo Mantenimiento Auto'
+                    />
+                </Card>
+            </Paper>
         </Grid>
         <Grid item>
-            <Card>
-                <CardHeader
-                    title={`%${data.carMaintenancePercentage*100}`}
-                    subheader='Fondo Mantenimiento'
-                    action={
-                        editPercentageActive?
-                            <IconButton 
-                                aria-label="settings"
-                                onClick={editPercentage} 
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                        title={formatAmount(data.carMaintenancePending)}
+                        subheader='Fondo Mantenimiento Auto Pendiente'
+                    />
+                </Card>
+            </Paper>
+        </Grid>
+        <Grid item>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                        title={`%${data.carMaintenancePercentage*100}`}
+                        subheader='Fondo Mantenimiento'
+                        action={
+                            editPercentageActive?
+                                <IconButton 
+                                    aria-label="settings"
+                                    onClick={editPercentage} 
+                                    >
+                                    <CheckIcon />
+                                </IconButton>
+                                :
+                                <IconButton 
+                                    aria-label="settings"
+                                    onClick={()=>{handleSetEditPercentageActive()}} 
                                 >
-                                <CheckIcon />
-                            </IconButton>
-                            :
-                            <IconButton 
-                                aria-label="settings"
-                                onClick={()=>{handleSetEditPercentageActive()}} 
-                            >
-                                <EditIcon />
-                            </IconButton>
-                      }
-                />
-                {editPercentageActive &&
-                    <CardContent>
-                        <TextField
-                            label="% Nuevo"
-                            type="number"
-                            value={newPercentage}
-                            onChange={(e) => setNewPercentage(e.target.value)}
-                            required
-                            fullWidth
-                            margin="normal"
-                        />
-                    </CardContent>
-                }
-            </Card>
+                                    <EditIcon />
+                                </IconButton>
+                        }
+                    />
+                    {editPercentageActive &&
+                        <CardContent>
+                            <TextField
+                                label="% Nuevo"
+                                type="number"
+                                value={newPercentage}
+                                onChange={(e) => setNewPercentage(e.target.value)}
+                                required
+                                fullWidth
+                                margin="normal"
+                            />
+                        </CardContent>
+                    }
+                </Card>
+            </Paper>
         </Grid>
         <Grid container item xs={12} justifyContent='center'>
             <ReactApexChart
-                options={optionsPieChart}
-                series={[{ name: 'Mantenimiento del Auto', data: seriesPieChart }]}
+                options={optionsChart}
+                series={[{name:'Acumulado',type:'line',data: seriesLineChart },{name:'Diario',type:'column',data: seriesColumnChart }]}
                 type="line"
-                width={500}
+                height={300}
+                width={1000}
             />
         </Grid>
     </Grid>

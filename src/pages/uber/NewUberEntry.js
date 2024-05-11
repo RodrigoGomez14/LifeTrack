@@ -109,15 +109,16 @@ const NewUberEntryPage = () => {
 
 
     database.ref(`${auth.currentUser.uid}/uber/pending`).set(userData.uber.pending + amountValue - totalCashValue);
-    database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseInt(carMaintenanceAmount));
+    database.ref(`${auth.currentUser.uid}/savings/carMaintenancePending`).set(userData.savings.carMaintenancePending + parseInt(carMaintenanceAmount));
 
+    
     // Agregar el ingreso de efectivo a la base de datos para ingresos
     database.ref(`${auth.currentUser.uid}/savings/carMaintenanceHistory`).push({
       date: getDate(),
       amount: parseInt(carMaintenanceAmount),
       amountUSD: parseFloat(carMaintenanceAmount)/dollarRate['venta'],
-      newTotal: userData.savings.carMaintenance+parseInt(carMaintenanceAmount),
-      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(carMaintenanceAmount)/dollarRate['venta'])
+      newTotal: userData.savings.carMaintenance+parseInt(carMaintenanceAmount)+userData.savings.carMaintenancePending,
+      newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(carMaintenanceAmount)/dollarRate['venta'])+(parseFloat(userData.savings.carMaintenancePending)/dollarRate['venta'])
     });
 
     setAmount('');
@@ -131,7 +132,8 @@ const NewUberEntryPage = () => {
 
   return (
     <Layout title="Finalizar Jornada Uber">
-      <Grid container item xs={12} justifyContent='center'>
+      <Grid container item xs={12} justifyContent='center' spacing={2}>
+        <Grid item xs={12}>
           <TextField
             label="Monto"
             type="number"
@@ -141,6 +143,8 @@ const NewUberEntryPage = () => {
             fullWidth
             margin="normal"
           />
+        </Grid>
+        <Grid item xs={12}>
           <FormControl fullWidth>
             <InputLabel htmlFor="efectivo">Efectivo</InputLabel>
             <Input
@@ -161,9 +165,13 @@ const NewUberEntryPage = () => {
               }
             />
           </FormControl>
+        </Grid>
+        <Grid item xs={12}>
           <Typography variant="body1" gutterBottom>
             Total en Efectivo: {formatAmount(totalCash)}
           </Typography>
+        </Grid>
+        <Grid item xs={12}>
           <FormControl fullWidth>
             <InputLabel htmlFor="propinas">Propinas</InputLabel>
             <Input
@@ -185,9 +193,13 @@ const NewUberEntryPage = () => {
               }
             />
           </FormControl>
+        </Grid>
+        <Grid item xs={12}>
           <Typography variant="body1" gutterBottom>
             Total de Propinas: {formatAmount(totalTips)}
           </Typography>
+        </Grid>
+        <Grid item xs={12}>
           <TextField
             label="Cantidad de Viajes"
             type="number"
@@ -197,6 +209,8 @@ const NewUberEntryPage = () => {
             fullWidth
             margin="normal"
           />
+        </Grid>
+        <Grid item xs={12}>
           <TextField
             label="Horas"
             type="number"
@@ -206,6 +220,8 @@ const NewUberEntryPage = () => {
             fullWidth
             margin="normal"
           />
+        </Grid>
+        <Grid item xs={12}>
           <TextField
             label="Minutos"
             type="number"
@@ -215,21 +231,24 @@ const NewUberEntryPage = () => {
             fullWidth
             margin="normal"
           />
-          <Button variant="contained" onClick={handleFormSubmit}>Finalizar Jornada</Button>
-      </Grid>
-      <Grid container item xs={12} justifyContent='center'>
-        <Alert severity="success" variant='filled'>
-          FONDO DE MANTENIMIENTO DEL AUTO : 
-          <TextField
-            label="Mantenimiento"
-            type="number"
-            placeholder={totalCash*userData.savings.carMaintenancePercentage}
-            value={carMaintenanceAmount}
-            onChange={(e) => setCarMaintenanceAmount(e.target.value)}
-            fullWidth
-            margin="normal"
-          />
-        </Alert>
+        </Grid>
+        <Grid container item xs={12} justifyContent='center'>
+          <Alert severity="success" variant='filled'>
+            FONDO DE MANTENIMIENTO DEL AUTO : 
+            <TextField
+              label="Mantenimiento"
+              type="number"
+              placeholder={amount*userData.savings.carMaintenancePercentage}
+              value={carMaintenanceAmount}
+              onChange={(e) => setCarMaintenanceAmount(e.target.value)}
+              fullWidth
+              margin="normal"
+            />
+          </Alert>
+        </Grid>
+        <Grid item xs={12}>
+          <Button variant="contained" fullWidth disabled={!amount || !totalCash || !travels || !hours || !minutes } onClick={handleFormSubmit}>Finalizar Jornada</Button>
+        </Grid>
       </Grid>
     </Layout>
   );

@@ -68,7 +68,7 @@ const NewIncome = () => {
           </ButtonGroup>
         </Grid>
       }
-      <Grid item xs={6}>
+      <Grid item xs={12}>
         <form onSubmit={handleFormSubmit}>
           <TextField
             label="Monto"
@@ -87,7 +87,7 @@ const NewIncome = () => {
             fullWidth
             margin="normal"
           />
-          <Button variant="contained" type="submit" disabled={!amount || !category || !subcategory || !description}>Agregar Ingreso</Button>
+          <Button variant="contained" type="submit" fullWidth disabled={!amount || !category || !subcategory || !description}>Agregar Ingreso</Button>
         </form>
       </Grid>
     </Layout>

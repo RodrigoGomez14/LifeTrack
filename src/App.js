@@ -148,18 +148,19 @@ function App() {
     if (data.savings) {
       groupedSavings.carMaintenancePercentage = data.savings.carMaintenancePercentage
       groupedSavings.carMaintenance = data.savings.carMaintenance
+      groupedSavings.carMaintenancePending = data.savings.carMaintenancePending
       groupedSavings.carMaintenanceHistory = data.savings.carMaintenanceHistory
       groupedSavings.amountUSD = data.savings.amountUSD
     }
     if(data.plants){
       groupedPlants['active'] = data.plants.active
-      let aditives = {fertilizantes:[],insecticidas:[]}
+      let aditives = {fertilizantes:{},insecticidas:{}}
       Object.keys(data.plants.aditives).forEach((aditiveId) => {
         if(data.plants.aditives[aditiveId].type=='Fertilizante'){
-          aditives.fertilizantes.push(data.plants.aditives[aditiveId])
+          aditives.fertilizantes[aditiveId]=data.plants.aditives[aditiveId]
         }
         else{
-          aditives.insecticidas.push(data.plants.aditives[aditiveId])
+          aditives.insecticidas[aditiveId]=data.plants.aditives[aditiveId]
         }
       });
       groupedPlants['aditives']=aditives

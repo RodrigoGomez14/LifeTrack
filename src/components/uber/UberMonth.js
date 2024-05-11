@@ -9,7 +9,7 @@ const UberMonth = ({data,month}) => {
     const theme = useTheme();
     return (
         data.data.length?
-            <Grid item xs={8}>
+            <Grid item>
                 <Accordion key={month}>
                     <AccordionSummary
                         style={{ backgroundColor: theme.palette.secondary.main, color: 'white' }}

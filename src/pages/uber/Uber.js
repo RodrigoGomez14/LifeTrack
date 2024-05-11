@@ -19,33 +19,39 @@ const Uber = () => {
   const [showDialog, setShowDialog] = useState(false);
 
   const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  const optionsCoefficientChart = {
-    chart: {
-      id: 'coefficient-chart',
+  const seriesLineChart = [];
+  let lineChartTotal = 0;
+  const seriesColumnChart = [];
+  const labelsChart = [];
+  userData.uber.data[currentYear].months[currentMonth].data.map(i=>{
+    if(!i.challenge){
+      lineChartTotal+=i.amount
+      seriesLineChart.push(lineChartTotal)
+      seriesColumnChart.push(i.amount)
+      labelsChart.push(i.date)
+    }
+    else{
+      lineChartTotal+=i.amount
+      seriesLineChart[seriesLineChart.length-1]=seriesLineChart[seriesLineChart.length-1]+i.amount
+      seriesColumnChart[seriesColumnChart.length-1]=seriesColumnChart[seriesColumnChart.length-1]+i.amount
+    }
+  })
+  const optionsChart = {
+    labels:labelsChart,
+    tooltip:{
+        y:{
+            formatter: val=> formatAmount(val)
+        }
     },
-    xaxis: {
-      type: 'category',
+    markers:{
+        size:3
     },
-    tooltip: {
-      y: {
-        formatter: (val) => formatAmount(val),
+    stroke:{
+        curve: 'smooth',
       },
-    },
-  };
-  const optionsEarningsChart = {
-    chart: {
-      id: 'earnings-chart',
-    },
-    xaxis: {
-      type: 'category',
-    },
-    tooltip: {
-      y: {
-        formatter: (val) => formatAmount(val),
-      },
-    },
   };
 
   return (
@@ -65,17 +71,14 @@ const Uber = () => {
           <CardTotalMonthlyUber/>
           <CardAverageDailyUber/>
           <CardChallengeUber />
-          <Grid container spacing={2} justifyContent="center">
-            <Grid item xs={12} sm={8}>
-              <Typography variant="h6" align="center">
-                Evolución ($/hs) de {getMonthName(currentMonth)}
-              </Typography>
-            </Grid>
-            <Grid item xs={12} sm={8}>
-              <Typography variant="h6" align="center">
-                Ganancias Acumuladas de {getMonthName(currentMonth)}
-              </Typography>
-            </Grid>
+          <Grid container item xs={12} justifyContent='center'>
+            <ReactApexChart
+                  options={optionsChart}
+                  series={[{type:'line',data: seriesLineChart,name:'Acumulado' },{type:'column',data: seriesColumnChart,name:'Diario' }]}
+                  type="line"
+                  height={300}
+                  width={1000}
+              />
           </Grid>
           <UberMonthList data={userData.uber.data} />
           <Dialog open={showDialog}>

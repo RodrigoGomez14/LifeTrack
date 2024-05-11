@@ -6,6 +6,8 @@ import { useStore } from '../../store';
 import { formatAmount, getPreviousMonday, getMonthName } from '../../utils';
 import ReactApexChart from 'react-apexcharts';
 import AddIcon from '@mui/icons-material/Add';
+import { YAxis } from 'recharts';
+import { formatters } from 'date-fns';
 
 const Home = () => {
   const { userData,dollarRate } = useStore(); // Obtener estados del store
@@ -13,6 +15,43 @@ const Home = () => {
   const currentDate = new Date();
   const currrentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+
+  const seriesLineChart = [];
+  const secondSeriesLineChart = [];
+  const thirdSeriesLineChart = [];
+  const labelsChart = [];
+
+  Object.keys(userData.finances.incomes[currrentYear].months).map(i=>{
+    seriesLineChart.push(userData.finances.incomes[currrentYear].months[i].total)
+    thirdSeriesLineChart.push(userData.finances.incomes[currrentYear].months[i].total)
+    labelsChart.push(getMonthName(i))
+  })
+  Object.keys(userData.finances.expenses[currrentYear].months).map(i=>{
+    console.log(thirdSeriesLineChart[i-1])
+    thirdSeriesLineChart[i-1]=(thirdSeriesLineChart[i-1]-userData.finances.expenses[currrentYear].months[i].total)
+    secondSeriesLineChart.push(userData.finances.expenses[currrentYear].months[i].total)
+  })
+
+  const optionsChart = {
+    labels:labelsChart,
+    tooltip:{
+        y:{
+            formatter: val=> formatAmount(val)
+        }
+    },
+    markers:{
+        size:3
+    },
+    stroke:{
+        curve: 'smooth',
+    },
+    yaxis:{
+      labels:{
+        formatter:(val)=> formatAmount(val)
+      }
+    }
+  };
+
   return (
     <Layout title="Inicio">
       <Grid container item xs={12} spacing={3}>
@@ -73,6 +112,15 @@ const Home = () => {
             <Button variant='contained'>FINALIZAR JORNADA UBER</Button>
           </Link>
         </Grid>
+      </Grid>
+      <Grid container item xs={12} spacing={3} justifyContent='center'>
+        <ReactApexChart
+            options={optionsChart}
+            series={[{type:'line',data: seriesLineChart,name:'Ingresos'},{type:'line',data: secondSeriesLineChart,name:'Gastos'},{type:'area',data: thirdSeriesLineChart,name:'Balance'}]}
+            type="line"
+            height={300}
+            width={1000}
+        />
       </Grid>
     </Layout>
   );

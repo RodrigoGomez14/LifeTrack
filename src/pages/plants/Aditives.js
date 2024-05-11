@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Grid,Button,Tab,Tabs,Box,Typography,ListItem,ListItemText } from '@mui/material';
-import { Link,useLocation } from 'react-router-dom';
+import { Grid, Button, Tab, Tabs, Typography } from '@mui/material';
+import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
-import { database, auth } from "../../firebase";
-import { getDate,checkSearch } from '../../utils'
+import AditiveAccordion from '../../components/plants/AditiveAccordion';
 
 const Aditives = () => {
-  const { userData } = useStore()
-  const location = useLocation();
-  const [tabValue,setTabValue] = useState(0)
+  const { userData } = useStore();
+  const [tabValue, setTabValue] = useState(0);
 
   const handleChange = (event, newValue) => {
     setTabValue(newValue);
   };
+
   function CustomTabPanel(props) {
     const { children, value, index, ...other } = props;
-
+  
     return (
       <div
         role="tabpanel"
@@ -26,18 +25,18 @@ const Aditives = () => {
         {...other}
       >
         {value === index && (
-          <Box sx={{ p: 1 }}>
-            <Typography>{children}</Typography>
-          </Box>
+          <div style={{ padding: '10px' }}>
+            {children}
+          </div>
         )}
       </div>
     );
   }
   return (
-    <Layout title='Aditivos'>
-      <Grid item xs={12}>
-        <Link to='/NuevoAditivo'>
-          <Button variant='contained'>Agregar Aditivo</Button>
+    <Layout title="Aditivos">
+      <Grid container item xs={12} justifyContent='center'>
+        <Link to="/NuevoAditivo">
+          <Button variant="contained">Agregar Aditivo</Button>
         </Link>
       </Grid>
       <Grid container item xs={12} justifyContent="center">
@@ -47,29 +46,23 @@ const Aditives = () => {
         </Tabs>
       </Grid>
       <Grid container item xs={12}>
-        <CustomTabPanel value={tabValue} index={0}>
-          {userData.plants.aditives.fertilizantes.map(fertilizante=>(
-            <ListItem >
-              <ListItemText
-                  primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{fertilizante.name}</Typography>}
-                  secondary={fertilizante.brand}
-              />
-          </ListItem>
-          ))}
-        </CustomTabPanel>
-        <CustomTabPanel value={tabValue} index={1}>
-          {userData.plants.aditives.insecticidas.map(insecticida=>(
-            <ListItem >
-              <ListItemText
-                  primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{insecticida.name}</Typography>}
-                  secondary={insecticida.brand}
-              />
-          </ListItem>
-          ))}
-        </CustomTabPanel>
+        <Grid item xs={12}>
+          <CustomTabPanel value={tabValue} index={0}>
+            {Object.keys(userData.plants.aditives.fertilizantes).map(fertilizante => (
+              <AditiveAccordion key={fertilizante} aditive={userData.plants.aditives.fertilizantes[fertilizante]} />
+            ))}
+          </CustomTabPanel>
+        </Grid>
+        <Grid item xs={12}>
+          <CustomTabPanel value={tabValue} index={1}>
+            {Object.keys(userData.plants.aditives.insecticidas).map(insecticida => (
+              <AditiveAccordion key={insecticida} aditive={userData.plants.aditives.insecticidas[insecticida]} />
+            ))}
+          </CustomTabPanel>
+        </Grid>
       </Grid>
     </Layout>
   );
 };
 
-export default Aditives;
+export default Aditives

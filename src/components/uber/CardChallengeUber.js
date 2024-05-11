@@ -1,5 +1,5 @@
 import React from 'react';
-import {Grid,Typography,Card,CardHeader,CardContent,LinearProgress,Button,Alert,IconButton} from '@mui/material';
+import {Grid,Typography,Card,CardHeader,CardContent,LinearProgress,Paper,Alert,IconButton} from '@mui/material';
 import { Link } from 'react-router-dom';
 import { formatAmount} from '../../utils';
 import { useStore } from '../../store'; // Importar el store de Zustand
@@ -73,57 +73,61 @@ const CardChallengeUber = () => {
     return(
         userData.uber.challenge.goal>0?
         <Grid item>
-            <Card>
-                <CardHeader
-                action={
-                    <IconButton 
-                        aria-label="settings"
-                        onClick={userData.uber.challenge.progress>=userData.uber.challenge.goal?completeChallenge:resetChallenge} 
-                    >
-                        {
-                        userData.uber.challenge.progress>=userData.uber.challenge.goal?
-                            <CheckCircleIcon style={{color:theme.palette.secondary.main}}/>
-                            :
-                            <RestoreIcon style={{color:theme.palette.secondary.main}}/>
-                        }
-                    </IconButton>
-                  }
-                title={
-                    <>
-                        <Typography variant="caption">
-                            Challenge Semanal
-                        </Typography>
-                        <Typography variant="h4">
-                            {userData.uber.challenge.progress}/{userData.uber.challenge.goal}
-                        </Typography>
-                        <LinearProgress variant="determinate" value={progressPercentage} color='primary'/>  
-                        <Typography variant="body2">
-                            {formatAmount(userData.uber.challenge.amount)}
-                        </Typography>
-                    </>
-                }
-                />
-            </Card>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                    action={
+                        <IconButton 
+                            aria-label="settings"
+                            onClick={userData.uber.challenge.progress>=userData.uber.challenge.goal?completeChallenge:resetChallenge} 
+                        >
+                            {
+                            userData.uber.challenge.progress>=userData.uber.challenge.goal?
+                                <CheckCircleIcon style={{color:theme.palette.secondary.main}}/>
+                                :
+                                <RestoreIcon style={{color:theme.palette.secondary.main}}/>
+                            }
+                        </IconButton>
+                    }
+                    title={
+                        <>
+                            <Typography variant="caption">
+                                Challenge Semanal
+                            </Typography>
+                            <Typography variant="h4">
+                                {userData.uber.challenge.progress}/{userData.uber.challenge.goal}
+                            </Typography>
+                            <LinearProgress variant="determinate" value={progressPercentage} color='primary'/>  
+                            <Typography variant="body2">
+                                {formatAmount(userData.uber.challenge.amount)}
+                            </Typography>
+                        </>
+                    }
+                    />
+                </Card>
+            </Paper>
         </Grid>
         :
         <Grid item>
-            <Card>
-                <CardHeader
-                style={{ backgroundColor: 'grey', color: 'white' }}
-                title={
-                    <>
-                        <Typography variant="caption">
-                            Aun no hay un Challenge Activo!
-                        </Typography>
-                        <Link to="/EmpezarChallenge">
-                            <IconButton>
-                                <AddIcon style={{color:'white'}}/>
-                            </IconButton>
-                        </Link>
-                    </>
-                }
-                />
-            </Card>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                    style={{ backgroundColor: 'grey', color: 'white' }}
+                    title={
+                        <>
+                            <Typography variant="caption">
+                                Aun no hay un Challenge Activo!
+                            </Typography>
+                            <Link to="/EmpezarChallenge">
+                                <IconButton>
+                                    <AddIcon style={{color:'white'}}/>
+                                </IconButton>
+                            </Link>
+                        </>
+                    }
+                    />
+                </Card>
+            </Paper>
         </Grid>
     )
 }

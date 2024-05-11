@@ -27,9 +27,7 @@ const Finances = () => {
         {...other}
       >
         {value === index && (
-          <Box sx={{ p: 1 }}>
-            <Typography>{children}</Typography>
-          </Box>
+          children
         )}
       </div>
     );
@@ -37,26 +35,24 @@ const Finances = () => {
   
   return (
     <Layout title="Finanzas">
-        <Grid container item xs={12}>
-          <Grid container item xs={12} justifyContent='center'>
-            <Tabs value={tabValue} onChange={handleChange} centered>
-              <Tab label="Gastos" />
-              <Tab label="Ingresos" />
-              <Tab label="Ahorros" />
-            </Tabs>
-          </Grid>
-          <Grid container item xs={12}>
-            <CustomTabPanel value={tabValue} index={0}>
-              <TransactionsTabs data={userData.finances.expenses} type="expenses"/>
-            </CustomTabPanel>
-            <CustomTabPanel value={tabValue} index={1}>
-              <TransactionsTabs data={userData.finances.incomes} type="incomes"/>  
-            </CustomTabPanel>
-            <CustomTabPanel value={tabValue} index={2}>
-              <SavingsTab data={userData.savings}/>  
-            </CustomTabPanel>
-          </Grid>
-        </Grid>
+      <Grid container item xs={12} justifyContent='center'>
+        <Tabs value={tabValue} onChange={handleChange} centered>
+          <Tab label="Gastos" />
+          <Tab label="Ingresos" />
+          <Tab label="Ahorros" />
+        </Tabs>
+      </Grid>
+      <Grid container item xs={12} justifyContent='center'>
+        <CustomTabPanel value={tabValue} index={0}>
+          <TransactionsTabs data={userData.finances.expenses} type="expenses"/>
+        </CustomTabPanel>
+        <CustomTabPanel value={tabValue} index={1}>
+          <TransactionsTabs data={userData.finances.incomes} type="incomes"/>  
+        </CustomTabPanel>
+        <CustomTabPanel value={tabValue} index={2}>
+          <SavingsTab data={userData.savings}/>  
+        </CustomTabPanel>
+      </Grid>
     </Layout>
   );
 };

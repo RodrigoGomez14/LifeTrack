@@ -3,14 +3,16 @@ import Layout from "../../components/layout/Layout";
 import {
   Button,
   TextField,
-  Typography,
+  List,
+  ListItem,
+  ListItemText,
   InputAdornment,
   IconButton,
   Input,
   Select,
   MenuItem,
   Grid,
-  Alert,
+  Paper,
   FormControl,
   InputLabel,
   ButtonGroup
@@ -68,6 +70,7 @@ const NewAditive = () => {
           <Button onClick={() => setType('Insecticida')} variant={type === 'Insecticida' ? 'contained' : 'text'}>Insecticida</Button>
         </ButtonGroup>
       </Grid>
+
       <Grid container item xs={12} justifyContent="center">
         <TextField
           label="Nombre"
@@ -87,50 +90,76 @@ const NewAditive = () => {
           fullWidth
           margin="normal"
         />
-        <FormControl fullWidth>
-          <InputLabel htmlFor="Etapa">Etapa</InputLabel>
-          <Input
-            id='Etapa'
-            label="Etapa"
-            type="text"
-            value={dosisName}
-            onChange={(e) => setDosisName(e.target.value)}
-            margin="normal"
-          />
-        </FormControl>
-        <FormControl fullWidth>
-          <InputLabel htmlFor="Dosis">Dosis</InputLabel>
-          <Input
-            id='Dosis'
-            label="Dosis"
-            type="number"
-            value={dosis}
-            onChange={(e) => setDosis(e.target.value)}
-            margin="normal"
-            startAdornment={
-              <InputAdornment position="start">
-                <IconButton
-                  onClick={handleAddDosis}
+      </Grid>
+
+        <Grid container item xs={12} justifyContent='center'>
+          <Paper elevation={6} >
+            <Grid container item xs={12} spacing={3} alignItems='center' padding={3}>
+              <Grid item>
+                <FormControl>
+                  <InputLabel htmlFor="Etapa">Etapa</InputLabel>
+                  <Input
+                    id='Etapa'
+                    label="Etapa"
+                    type="text"
+                    value={dosisName}
+                    onChange={(e) => setDosisName(e.target.value)}
+                    margin="normal"
+                  />
+                </FormControl>
+              </Grid>
+              <Grid item>
+                <FormControl>
+                  <InputLabel htmlFor="Dosis">Dosis</InputLabel>
+                  <Input
+                    id='Dosis'
+                    label="Dosis"
+                    type="number"
+                    value={dosis}
+                    onChange={(e) => setDosis(e.target.value)}
+                    margin="normal"
+                  />
+                </FormControl>
+              </Grid>
+              <Grid item>
+                <Select
+                  value={dosisMeasure}
+                  label="Medida"
+                  onChange={(e) => setDosisMeasure(e.target.value)}
                 >
-                  <AddIcon />
-                </IconButton>
-              </InputAdornment>
-            }
-          />
-        </FormControl>
-        <Select
-          value={dosisMeasure}
-          label="Medida"
-          onChange={(e) => setDosisMeasure(e.target.value)}
-        >
-          <MenuItem value='Ml/L'>Ml/L</MenuItem>
-          <MenuItem value='Grs/L'>Grs/L</MenuItem>
-          <MenuItem value='Cm3/L'>Cm3/L</MenuItem>
-        </Select>
+                  <MenuItem value='Ml/L'>Ml/L</MenuItem>
+                  <MenuItem value='Grs/L'>Grs/L</MenuItem>
+                  <MenuItem value='Cm3/L'>Cm3/L</MenuItem>
+                </Select>
+              </Grid>
+              <Grid item>
+                <Button
+                  variant="contained"
+                  onClick={handleAddDosis}
+                  disabled={!dosisName || !dosis || !dosisMeasure }
+                >
+                  AGREGAR DOSIS
+                </Button>
+              </Grid>
+            </Grid>
+            <Grid container item xs={12}>
+              <List>
+                {dosisList.map(dosis=>(
+                  <ListItem>
+                    <ListItemText primary={dosis.name} secondary={`${dosis.quantity} ${dosis.measure}`}/>
+                  </ListItem>
+                ))}
+              </List>
+             </Grid>
+          </Paper>
+        </Grid>
+
+      <Grid container item xs={12}>
         <Button
           variant="contained"
           onClick={handleNewAditive}
-          disabled={!name || !brand }
+          fullWidth
+          disabled={!type || !name || !brand || !dosisList.length }
         >
           AGREGAR
         </Button>
