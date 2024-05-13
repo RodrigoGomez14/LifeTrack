@@ -13,7 +13,7 @@ const Home = () => {
   const { userData,dollarRate } = useStore(); // Obtener estados del store
 
   const currentDate = new Date();
-  const currrentYear = currentDate.getFullYear();
+  const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
   const seriesLineChart = [];
@@ -21,15 +21,15 @@ const Home = () => {
   const thirdSeriesLineChart = [];
   const labelsChart = [];
 
-  Object.keys(userData.finances.incomes[currrentYear].months).map(i=>{
-    seriesLineChart.push(userData.finances.incomes[currrentYear].months[i].total)
-    thirdSeriesLineChart.push(userData.finances.incomes[currrentYear].months[i].total)
-    labelsChart.push(getMonthName(i))
+  Object.keys(userData.finances.incomes[currentYear].months).map(i=>{
+    seriesLineChart.push(userData.finances.incomes[currentYear].months[i].total)
+    thirdSeriesLineChart.push(userData.finances.incomes[currentYear].months[i].total)
+    labelsChart.push(`${getMonthName(i)} ${currentYear}`)
   })
-  Object.keys(userData.finances.expenses[currrentYear].months).map(i=>{
+  Object.keys(userData.finances.expenses[currentYear].months).map(i=>{
     console.log(thirdSeriesLineChart[i-1])
-    thirdSeriesLineChart[i-1]=(thirdSeriesLineChart[i-1]-userData.finances.expenses[currrentYear].months[i].total)
-    secondSeriesLineChart.push(userData.finances.expenses[currrentYear].months[i].total)
+    thirdSeriesLineChart[i-1]=(thirdSeriesLineChart[i-1]-userData.finances.expenses[currentYear].months[i].total)
+    secondSeriesLineChart.push(userData.finances.expenses[currentYear].months[i].total)
   })
 
   const optionsChart = {
@@ -74,7 +74,7 @@ const Home = () => {
         <Grid item>
           <Card>
             <CardHeader
-              title={formatAmount(userData.finances.incomes[currrentYear].months[currentMonth].total)}
+              title={formatAmount(userData.finances.incomes[currentYear].months[currentMonth].total)}
               subheader={`Ganancias de ${getMonthName(currentMonth)}`}
             />
           </Card>
@@ -82,7 +82,7 @@ const Home = () => {
         <Grid item>
           <Card>
             <CardHeader
-              title={formatAmount(userData.finances.expenses[currrentYear].months[currentMonth].total)}
+              title={formatAmount(userData.finances.expenses[currentYear].months[currentMonth].total)}
               subheader={`Gastos de ${getMonthName(currentMonth)}`}
             />
           </Card>
@@ -90,7 +90,7 @@ const Home = () => {
         <Grid item>
           <Card>
             <CardHeader
-              title={formatAmount(userData.finances.incomes[currrentYear].months[currentMonth].total-userData.finances.expenses[currrentYear].months[currentMonth].total)}
+              title={formatAmount(userData.finances.incomes[currentYear].months[currentMonth].total-userData.finances.expenses[currentYear].months[currentMonth].total)}
               subheader={`Balance de ${getMonthName(currentMonth)}`}
             />
           </Card>

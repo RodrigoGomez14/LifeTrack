@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {Accordion,AccordionSummary,AccordionDetails,Grid,TextField,Paper,Tab,Card,CardHeader,IconButton, CardContent} from '@mui/material';
+import {Accordion,AccordionSummary,AccordionDetails,Grid,TextField,Paper,Tab,Card,CardHeader,IconButton, CardContent, Typography,Chip} from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { PieChart, Pie, Tooltip, Cell, Legend } from 'recharts';
 import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../../utils';
@@ -64,18 +64,8 @@ const SavingsTab = ({ data }) => {
             <Paper elevation={6}>
                 <Card>
                     <CardHeader
-                        title={formatAmount(data.carMaintenance)}
+                        title={<Typography variant='h5'>{formatAmount(data.carMaintenance)}<br/><Chip color='success' label={`+${formatAmount(data.carMaintenancePending)}`}></Chip></Typography>}
                         subheader='Fondo Mantenimiento Auto'
-                    />
-                </Card>
-            </Paper>
-        </Grid>
-        <Grid item>
-            <Paper elevation={6}>
-                <Card>
-                    <CardHeader
-                        title={formatAmount(data.carMaintenancePending)}
-                        subheader='Fondo Mantenimiento Auto Pendiente'
                     />
                 </Card>
             </Paper>

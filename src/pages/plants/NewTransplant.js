@@ -52,7 +52,7 @@ const NewTransplant = () => {
 
   return (
     <Layout title="Nuevo Riego">
-      <Grid container item xs={12} justifyContent="center">
+      <Grid container item>
         <TextField
           label="Volumen de la nueva Maceta"
           type="number"
@@ -62,10 +62,13 @@ const NewTransplant = () => {
           fullWidth
           margin="normal"
         />
+      </Grid>
+      <Grid container item>
         <Button
           variant="contained"
           onClick={handleNewTransplant}
           disabled={ !newVol }
+          fullWidth
         >
           AGREGAR
         </Button>

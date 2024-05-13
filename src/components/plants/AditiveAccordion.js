@@ -1,5 +1,5 @@
 import React from 'react';
-import { Chip, Accordion, AccordionSummary, AccordionDetails, Typography, List, ListItem, ListItemText } from '@mui/material';
+import { Chip, Accordion, AccordionSummary, AccordionDetails, Typography, List, ListItem, ListItemText,Grid,Paper } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTheme } from '@mui/material/styles';
 
@@ -16,25 +16,25 @@ const AditiveAccordion = ({ aditive }) => {
         <Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{aditive.name}  <Chip label={aditive.brand} /></Typography>
     </AccordionSummary>
     <AccordionDetails>
-        <List>
-        <ListItem>
-            <ListItemText
-            primary={<Typography variant="subtitle1">Marca</Typography>}
-            secondary={aditive.brand}
-            />
-        </ListItem>
-        <ListItem>
-            <Typography variant="subtitle1">Dosis:</Typography>
-        </ListItem>
-        {aditive.dosis?.map((dose, index) => (
-            <ListItem key={index}>
-            <ListItemText
-                primary={dose.name}
-                secondary={`Cantidad: ${dose.quantity} ${dose.measure}`}
-            />
-            </ListItem>
-        ))}
-        </List>
+        <Grid container justifyContent='center'>
+            <Grid item xs={6}>
+                <Paper elevation={6}>
+                    <List>
+                        <ListItem>
+                            <Typography variant="subtitle1">Dosis:</Typography>
+                        </ListItem>
+                        {aditive.dosis?.map((dose, index) => (
+                            <ListItem key={index}>
+                            <ListItemText
+                                primary={dose.name}
+                                secondary={`Cantidad: ${dose.quantity} ${dose.measure}`}
+                            />
+                            </ListItem>
+                        ))}
+                    </List>
+                </Paper>
+            </Grid>
+        </Grid>
     </AccordionDetails>
     </Accordion>
   );
