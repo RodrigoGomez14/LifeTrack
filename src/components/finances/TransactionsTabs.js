@@ -91,20 +91,13 @@ const TransactionsTabs = ({ data,type }) => {
                 scrollButtons="auto"
             >
                 {Object.keys(data).reverse().map(year=> (
-                    <Tab label={`${year} - ${formatAmount(data[year].total)}`} value={year} />
+                    <Tab value={year} label={`${year} - ${formatAmount(data[year].total)}`}/>
                 ))}
             </Tabs>
         </Grid>
         <Grid item xs={12}>
             {Object.keys(data).reverse().map(year => (
-                <div
-                key={year}
-                role="tabpanel"
-                hidden={yearTabValue !== year}
-                id={`year-tabpanel-${year}`}
-                aria-labelledby={`year-tab-${year}`}
-            >   
-                {yearTabValue === year ? 
+                yearTabValue === year ? 
                     <Grid container item xs={12} justifyContent='center' spacing={3}>
                         <Grid item xs={12} >
                             <Typography variant="h6" align="center">{year} - Total: {formatAmount(data[year].total)} - USD {formatAmount(data[year].totalUSD)}</Typography>
@@ -152,10 +145,8 @@ const TransactionsTabs = ({ data,type }) => {
                             ))}
                         </Grid>
                     </Grid>
-                    :
-                    null
-                }
-            </div>
+                :
+                null
             ))}
         </Grid>
     </Grid>

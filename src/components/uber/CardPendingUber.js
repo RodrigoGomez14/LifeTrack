@@ -32,16 +32,6 @@ const CardPendingUber = ({setShowDialog}) => {
           });
     
           database.ref(`${auth.currentUser.uid}/uber/pending`).set(0);
-          database.ref(`${auth.currentUser.uid}/savings/carMaintenance`).set(userData.savings.carMaintenance + parseFloat(pending*userData.savings.carMaintenancePercentage));
-    
-          // Agregar el ingreso de efectivo a la base de datos para ingresos
-          database.ref(`${auth.currentUser.uid}/savings/carMaintenanceHistory`).push({
-            date: `${day}/${month}/${year}`,
-            amount: parseFloat(pending*userData.savings.carMaintenancePercentage),
-            amountUSD: parseFloat(pending*userData.savings.carMaintenancePercentage)/dollarRate['venta'],
-            newTotal: userData.savings.carMaintenance+parseFloat(pending*userData.savings.carMaintenancePercentage),
-            newTotalUSD: (userData.savings.carMaintenance/dollarRate['venta'])+(parseFloat(pending*userData.savings.carMaintenancePercentage)/dollarRate['venta'])
-          });
     
           setShowDialog(true)
           setTimeout(() => {
