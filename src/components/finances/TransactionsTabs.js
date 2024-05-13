@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {Accordion,AccordionSummary,AccordionDetails,Grid,Typography,Tabs,Tab,Card,CardHeader,Paper} from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { PieChart, Pie, Tooltip, Cell, Legend } from 'recharts';
@@ -10,6 +10,7 @@ import { useTheme } from '@mui/material/styles';
 
 const TransactionsTabs = ({ data,type }) => {
   const [tabValue, setTabValue] = useState(0);
+  const [yearTabValue, setYearTabValue] = useState(parseInt(new Date().getFullYear()));
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth() +1 ;
   const currentYear = currentDate.getFullYear();
@@ -18,6 +19,9 @@ const TransactionsTabs = ({ data,type }) => {
 
   const handleTransactionTabChange = (event, newValue) => {
     setTabValue(newValue);
+  };
+  const handleYearTabChange = (event, newValue) => {
+    setYearTabValue(newValue);
   };
   
   const categories = type=='expenses'?['Auto', 'Servicios' , 'Indoor', 'Supermercado','Transporte','Extras']:['Uber', 'Sueldo', 'Freelance', 'Camila', 'Extras'];
@@ -38,6 +42,7 @@ const TransactionsTabs = ({ data,type }) => {
         }
     },
   };
+
 
   return (
     <Grid container item xs={12}>
@@ -69,7 +74,6 @@ const TransactionsTabs = ({ data,type }) => {
             </Grid>
             <Grid container item xs={12} justifyContent='center'>
                 <Grid item>
-                    {console.log(seriesPieChart)}
                     <ReactApexChart
                         options={optionsPieChart}
                         series={seriesPieChart}
@@ -79,48 +83,81 @@ const TransactionsTabs = ({ data,type }) => {
                 </Grid>
             </Grid>
         </Grid>
-        {Object.keys(data).map(year => (
-            Object.keys(data[year].months).reverse().map(month => (
-                data[year].months[month].data.length?
-                <Grid item xs={12}>
-                    <Accordion key={month}>
-                        <AccordionSummary
-                            style={{ backgroundColor: theme.palette.secondary.main, color: 'white' }}
-                            expandIcon={<ExpandMoreIcon />}
-                        >
-                            <Typography style={{ fontWeight: 'bold' }} variant="subtitle1">{getMonthName(month)} - {formatAmount(data[year].months[month].total)} - USD {formatAmount(data[year].months[month].totalUSD)}</Typography>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                            <Tabs
-                                value={tabValue}
-                                onChange={handleTransactionTabChange}
-                                variant="scrollable"
-                                scrollButtons="auto"
-                            >
-                                {categories.map((category, index) => (
-                                    <Tab disabled={sumTransactionsByCategory(data[year].months[month].data,category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(data[year].months[month].data,category))}`} key={index} />
-                                ))}
-                            </Tabs>
-                            {categories.map((category, index) => (
-                                <div
-                                    key={index}
-                                    role="tabpanel"
-                                    hidden={tabValue !== index}
-                                    id={`expense-tabpanel-${index}`}
-                                    aria-labelledby={`expense-tab-${index}`}
-                                >
-                                    {tabValue === index && (
-                                        <TransactionsTabsList data={data[year].months[month].data} category={category}/>
-                                    )}
-                                </div>
+        <Grid item xs={12}> 
+            <Tabs
+                value={yearTabValue}
+                onChange={handleYearTabChange}
+                variant="scrollable"
+                scrollButtons="auto"
+            >
+                {Object.keys(data).reverse().map(year=> (
+                    <Tab label={`${year} - ${formatAmount(data[year].total)}`} value={year} />
+                ))}
+            </Tabs>
+        </Grid>
+        <Grid item xs={12}>
+            {Object.keys(data).reverse().map(year => (
+                <div
+                key={year}
+                role="tabpanel"
+                hidden={yearTabValue !== year}
+                id={`year-tabpanel-${year}`}
+                aria-labelledby={`year-tab-${year}`}
+            >   
+                {yearTabValue === year ? 
+                    <Grid container item xs={12} justifyContent='center' spacing={3}>
+                        <Grid item xs={12} >
+                            <Typography variant="h6" align="center">{year} - Total: {formatAmount(data[year].total)} - USD {formatAmount(data[year].totalUSD)}</Typography>
+                        </Grid>
+                        <Grid container item xs={12} >
+                            {Object.keys(data[year].months).reverse().map(month => (
+                                data[year].months[month].data.length?
+                                <Grid item xs={12}>
+                                    <Accordion key={month}>
+                                        <AccordionSummary
+                                            style={{ backgroundColor: theme.palette.secondary.main, color: 'white' }}
+                                            expandIcon={<ExpandMoreIcon />}
+                                        >
+                                            <Typography style={{ fontWeight: 'bold' }} variant="subtitle1">{getMonthName(month)} - {formatAmount(data[year].months[month].total)} - USD {formatAmount(data[year].months[month].totalUSD)}</Typography>
+                                        </AccordionSummary>
+                                        <AccordionDetails>
+                                            <Tabs
+                                                value={tabValue}
+                                                onChange={handleTransactionTabChange}
+                                                variant="scrollable"
+                                                scrollButtons="auto"
+                                            >
+                                                {categories.map((category, index) => (
+                                                    <Tab disabled={sumTransactionsByCategory(data[year].months[month].data,category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(data[year].months[month].data,category))}`} key={index} />
+                                                ))}
+                                            </Tabs>
+                                            {categories.map((category, index) => (
+                                                <div
+                                                    key={index}
+                                                    role="tabpanel"
+                                                    hidden={tabValue !== index}
+                                                    id={`expense-tabpanel-${index}`}
+                                                    aria-labelledby={`expense-tab-${index}`}
+                                                >
+                                                    {tabValue === index && (
+                                                        <TransactionsTabsList data={data[year].months[month].data} category={category}/>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </AccordionDetails>
+                                    </Accordion>
+                                </Grid>
+                                :
+                                null
                             ))}
-                        </AccordionDetails>
-                    </Accordion>
-                </Grid>
-                :
-                null
-            ))
-        ))}
+                        </Grid>
+                    </Grid>
+                    :
+                    null
+                }
+            </div>
+            ))}
+        </Grid>
     </Grid>
   );
 };

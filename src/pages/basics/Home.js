@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Grid, Button, Card, CardHeader, IconButton } from '@mui/material';
+import { Grid, Button, Card, CardHeader, CardContent,Paper } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
 import { formatAmount, getPreviousMonday, getMonthName } from '../../utils';
@@ -16,41 +16,160 @@ const Home = () => {
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  const seriesLineChart = [];
-  const secondSeriesLineChart = [];
-  const thirdSeriesLineChart = [];
-  const labelsChart = [];
+  const generateChartAnualSales = () => {
+    // Asume que tienes los datos en dos variables: sortedCompras y sortedVentas
+    let sales = []
+    let purchases = []
+    let dif = []
+    let labelsUltimoAnio =  []
 
-  Object.keys(userData.finances.incomes[currentYear].months).map(i=>{
-    seriesLineChart.push(userData.finances.incomes[currentYear].months[i].total)
-    thirdSeriesLineChart.push(userData.finances.incomes[currentYear].months[i].total)
-    labelsChart.push(`${getMonthName(i)} ${currentYear}`)
-  })
-  Object.keys(userData.finances.expenses[currentYear].months).map(i=>{
-    console.log(thirdSeriesLineChart[i-1])
-    thirdSeriesLineChart[i-1]=(thirdSeriesLineChart[i-1]-userData.finances.expenses[currentYear].months[i].total)
-    secondSeriesLineChart.push(userData.finances.expenses[currentYear].months[i].total)
-  })
+    if(userData.finances.incomes || userData.finances.expenses){
 
-  const optionsChart = {
-    labels:labelsChart,
-    tooltip:{
-        y:{
-            formatter: val=> formatAmount(val)
+        const fechaActual = new Date();
+        const mesActual = fechaActual.getMonth();
+        const anioActual = fechaActual.getFullYear();
+        
+        let auxSales = [0,0,0,0,0,0,0,0,0,0,0,0]
+        let auxPurchases = [0,0,0,0,0,0,0,0,0,0,0,0]
+
+        const mesesDesdeUltimoAnio = 12;
+        let mesInicio = mesActual - mesesDesdeUltimoAnio;
+        let anioInicio = anioActual;
+        if (mesInicio < 0) {
+            mesInicio += 12;
+            anioInicio -= 1;
         }
-    },
-    markers:{
-        size:3
-    },
-    stroke:{
-        curve: 'smooth',
-    },
-    yaxis:{
-      labels:{
-        formatter:(val)=> formatAmount(val)
-      }
+        const initialDate = new Date()
+        initialDate.setFullYear(anioInicio,mesInicio+1,1)
+
+        if(userData.finances.expenses){
+          Object.keys(userData.finances.expenses).map(year=>{
+            Object.keys(userData.finances.expenses[year].months).map(month=>{
+              const auxFecha = new Date();
+              auxFecha.setFullYear(year, month - 1, 1);
+              if(auxFecha>=initialDate && auxFecha<=fechaActual){
+                  auxPurchases[month-1]+=(userData.finances.expenses[year].months[month].total)
+              }
+            })
+          })
+        }
+
+        if(userData.finances.incomes){
+          Object.keys(userData.finances.incomes).map(year=>{
+            Object.keys(userData.finances.incomes[year].months).map(month=>{
+              const auxFecha = new Date();
+              auxFecha.setFullYear(year, month - 1, 1);
+              if(auxFecha>=initialDate && auxFecha<=fechaActual){
+                  auxSales[month-1]+=(userData.finances.incomes[year].months[month].total)
+              }
+            })
+          })
+        }
+
+        const auxMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+        const arr1Meses = auxMeses.slice(mesInicio+1);
+        const arr2Meses = auxMeses.slice(0,mesInicio+1);
+
+        
+        const arr1Sales = auxSales.slice(mesInicio+1);
+        const arr2Sales = auxSales.slice(0,mesInicio+1);
+
+        const arr1Purchases = auxPurchases.slice(mesInicio+1);
+        const arr2Purchases = auxPurchases.slice(0,mesInicio+1);
+        
+        
+        arr1Meses.map(i=>{
+            labelsUltimoAnio.push(i)
+        })
+        arr2Meses.map(i=>{
+            labelsUltimoAnio.push(i)
+        })
+        
+        arr1Sales.map(i=>{
+            sales.push(i)
+        })
+        arr2Sales.map(i=>{
+            sales.push(i)
+        })
+
+        arr1Purchases.map(i=>{
+            purchases.push(i)
+        })
+        arr2Purchases.map(i=>{
+            purchases.push(i)
+        })
+
+        sales.map(sale=>{
+            dif.push(sale)
+        })
+        purchases.map((purchase,i)=>{
+            dif[i]-=purchase
+        })
+
     }
-  };
+    // Define la configuración del gráfico
+    const options = {
+        labels:labelsUltimoAnio,
+        fill: {
+        },
+        chart:{
+            
+        },
+        stroke: {
+            curve: 'smooth'
+        },
+        grid: {
+            row: {
+                colors: ['#c3c3c3', 'transparent'], // takes an array which will be repeated on columns
+                opacity: 0.2
+            },
+        },
+        tooltip:{
+            y:{
+                formatter: val=> formatAmount(val)
+            }
+        },
+        dataLabels:{
+            enabled:false
+        },
+        yaxis:{
+            labels:{
+                formatter: val => formatAmount(val),
+            }
+        }
+    };
+    const series=[
+    {
+        name:'Ingresos',
+        type:'line',
+        data:sales
+    },
+    {
+        name:'Gastos',
+        type:'line',
+        data:purchases
+    },
+    {
+        name:'Balance',
+        type:'area',
+        data:dif
+    },
+    ]
+    // Renderiza el gráfico
+
+    return (
+      <Paper elevation={6}>
+        <Card>
+            <CardHeader
+                subheader='Ingresos & Gastos - Ultimos 12 Meses'
+            />
+            <CardContent>
+                <ReactApexChart options={options} series={series}  height={400} width={1200} />
+            </CardContent>
+        </Card>
+      </Paper>
+    )
+  }
 
   return (
     <Layout title="Inicio">
@@ -114,13 +233,7 @@ const Home = () => {
         </Grid>
       </Grid>
       <Grid container item xs={12} spacing={3} justifyContent='center'>
-        <ReactApexChart
-            options={optionsChart}
-            series={[{type:'line',data: seriesLineChart,name:'Ingresos'},{type:'line',data: secondSeriesLineChart,name:'Gastos'},{type:'area',data: thirdSeriesLineChart,name:'Balance'}]}
-            type="line"
-            height={300}
-            width={1000}
-        />
+        {generateChartAnualSales()}
       </Grid>
     </Layout>
   );
