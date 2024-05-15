@@ -10,6 +10,7 @@ import { useTheme } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
+import { SignalWifiStatusbarNullSharp } from '@mui/icons-material';
 
 const SavingsTab = ({ data }) => {
   const currentDate = new Date();
@@ -44,6 +45,17 @@ const SavingsTab = ({ data }) => {
   const editPercentage = () =>{
     database.ref(`${auth.currentUser.uid}/savings/carMaintenancePercentage`).set(parseFloat(newPercentage/100));
   }
+  const addPendingToTotal = () =>{
+    const totalRef = database.ref(`${auth.currentUser.uid}/savings`);
+    totalRef.transaction((data) => {
+      if (data) {
+        data.carMaintenance = (data.carMaintenance || 0) + parseInt(data.carMaintenancePending);
+      }
+      return data;
+    });
+
+    database.ref(`${auth.currentUser.uid}/savings/carMaintenancePending`).set(0);
+  }
 
   const handleSetEditPercentageActive = () => {
     setEditPercentageActive(!editPercentageActive);
@@ -64,8 +76,19 @@ const SavingsTab = ({ data }) => {
             <Paper elevation={6}>
                 <Card>
                     <CardHeader
-                        title={<Typography variant='h5'>{formatAmount(data.carMaintenance)}<br/><Chip color='success' label={`+${formatAmount(data.carMaintenancePending)}`}></Chip></Typography>}
+                        title={<Typography variant='h5'>{formatAmount(data.carMaintenance)}{data.carMaintenancePending?<><br/><Chip color='success' label={`+${formatAmount(data.carMaintenancePending)}`}></Chip></>:null}</Typography>}
                         subheader='Fondo Mantenimiento Auto'
+                        action={
+                            data.carMaintenancePending?
+                                <IconButton 
+                                    aria-label="settings"
+                                    onClick={addPendingToTotal} 
+                                    >
+                                    <CheckIcon />
+                                </IconButton>
+                                :
+                                null
+                        }
                     />
                 </Card>
             </Paper>
