@@ -24,7 +24,7 @@ const TransactionsTabs = ({ data,type }) => {
     setYearTabValue(newValue);
   };
   
-  const categories = type=='expenses'?['Auto', 'Servicios' , 'Indoor', 'Supermercado','Transporte','Extras']:['Uber', 'Sueldo', 'Freelance', 'Camila', 'Extras'];
+  const categories = type=='expenses'?['Auto', 'Servicios' , 'Indoor', 'Supermercado','Transporte','Extras','Exchange']:['Uber', 'Sueldo', 'Freelance', 'Camila', 'Extras','Exchange'];
 
   const seriesPieChart = [];
   const labelsPieChart = [];

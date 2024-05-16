@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Typography, Grid, IconButton, Dialog, DialogTitle, Button } from '@mui/material';
+import { Typography, Grid, IconButton, Dialog, DialogTitle } from '@mui/material';
 import { formatAmount, formatMinutesToHours, getMonthName } from '../../utils';
 import { Link } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';

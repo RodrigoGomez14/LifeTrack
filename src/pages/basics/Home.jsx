@@ -170,69 +170,6 @@ const Home = () => {
       </Paper>
     )
   }
-  const generateChart = () => {
-    let serie2023 = []
-    let labels = []
-    if(userData.finances.incomes){
-
-      Object.keys(userData.finances.incomes['2023'].months).map(month=>{
-        serie2023.push(userData.finances.incomes['2023'].months[month].totalUSD || 650)
-        labels.push(getMonthName(month))
-      })
-    }
-    // Define la configuración del gráfico
-    const options = {
-      labels,
-      fill: {
-      },
-      chart:{
-          
-      },
-      stroke: {
-          curve: 'smooth'
-      },
-      grid: {
-          row: {
-              colors: ['#c3c3c3', 'transparent'], // takes an array which will be repeated on columns
-              opacity: 0.2
-          },
-      },
-      tooltip:{
-          y:{
-              formatter: val=> formatAmount(val)
-          }
-      },
-      dataLabels:{
-          enabled:false
-      },
-      yaxis:{
-          labels:{
-              formatter: val => formatAmount(val),
-          }
-      }
-  };
-  const series=[
-  {
-      name:'Ingresos',
-      type:'line',
-      data:serie2023
-  }
-  ]
-  // Renderiza el gráfico
-
-  return (
-    <Paper elevation={6}>
-      <Card>
-          <CardHeader
-              subheader='Ingresos 2023'
-          />
-          <CardContent>
-              <ReactApexChart options={options} series={series}  height={400} width={1200} />
-          </CardContent>
-      </Card>
-    </Paper>
-  )
-  }
   return (
     <Layout title="Inicio">
       <Grid container item xs={12} spacing={3}>
@@ -293,12 +230,14 @@ const Home = () => {
             <Button variant='contained'>FINALIZAR JORNADA UBER</Button>
           </Link>
         </Grid>
+        <Grid item>
+          <Link to="/Exchange">
+            <Button variant='contained'>Exchange</Button>
+          </Link>
+        </Grid>
       </Grid>
       <Grid container item xs={12} justifyContent='center'>
         {generateChartAnualSales()}
-      </Grid>
-      <Grid container item xs={12} justifyContent='center'>
-        {generateChart()}
       </Grid>
     </Layout>
   );

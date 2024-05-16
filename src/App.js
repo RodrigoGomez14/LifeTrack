@@ -18,6 +18,7 @@ import NewAditive from './pages/plants/NewAditive.jsx';
 import NewUberEntry from './pages/uber/NewUberEntry.jsx';
 import NewExpense from './pages/finances/NewExpense.jsx';
 import NewIncome from './pages/finances/NewIncome.jsx';
+import Exchange from './pages/finances/Exchange.jsx';
 import StartChallenge from './pages/uber/StartChallenge.jsx';
 import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
@@ -232,6 +233,7 @@ function App() {
           <Route exact path="/FinalizarJornada" element={<NewUberEntry />} />
           <Route exact path="/NuevoGasto" element={<NewExpense />} />
           <Route exact path="/NuevoIngreso" element={<NewIncome />} />
+          <Route exact path="/Exchange" element={<Exchange />} />
           <Route exact path="/EmpezarChallenge" element={<StartChallenge />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
