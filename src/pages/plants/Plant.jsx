@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Layout from "../../components/layout/Layout";
-import { Grid, Button, Typography, Box, Tab, Tabs, TextField,ImageList,ImageListItem,ImageListItemBar } from "@mui/material";
+import { Grid, Button, Typography, Box, Tab, Tabs, ImageList,ImageListItem,ImageListItemBar } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "../../store";
 import { checkSearch, convertToDetailedDate } from "../../utils";
@@ -20,7 +20,7 @@ const Plant = () => {
   useEffect(() => {
     const id = checkSearch(location.search);
     setPlant(userData.plants.active[id]);
-  }, [userData.plants]);
+  }, [location.search, userData.plants]);
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]); // Guardar el archivo seleccionado
@@ -165,6 +165,7 @@ const Plant = () => {
                   srcSet={`${plant.images[img].url}`}
                   src={`${plant.images[img].url}`}
                   loading="lazy"
+                  alt=''
                 />
                 <ImageListItemBar
                   title={convertToDetailedDate(plant.images[img].date)}

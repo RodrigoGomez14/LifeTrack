@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Layout from '../../components/layout/Layout';
 import { Grid, Button, Card, CardHeader, CardContent,Paper } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
-import { formatAmount, getPreviousMonday, getMonthName } from '../../utils';
+import { formatAmount, getMonthName } from '../../utils';
 import ReactApexChart from 'react-apexcharts';
-import AddIcon from '@mui/icons-material/Add';
-import { YAxis } from 'recharts';
-import { formatters } from 'date-fns';
 
 const Home = () => {
   const { userData,dollarRate } = useStore(); // Obtener estados del store
@@ -43,8 +40,8 @@ const Home = () => {
         initialDate.setFullYear(anioInicio,mesInicio+1,1)
 
         if(userData.finances.expenses){
-          Object.keys(userData.finances.expenses).map(year=>{
-            Object.keys(userData.finances.expenses[year].months).map(month=>{
+          Object.keys(userData.finances.expenses).forEach(year=>{
+            Object.keys(userData.finances.expenses[year].months).forEach(month=>{
               const auxFecha = new Date();
               auxFecha.setFullYear(year, month - 1, 1);
               if(auxFecha>=initialDate && auxFecha<=fechaActual){
@@ -55,8 +52,8 @@ const Home = () => {
         }
 
         if(userData.finances.incomes){
-          Object.keys(userData.finances.incomes).map(year=>{
-            Object.keys(userData.finances.incomes[year].months).map(month=>{
+          Object.keys(userData.finances.incomes).forEach(year=>{
+            Object.keys(userData.finances.incomes[year].months).forEach(month=>{
               const auxFecha = new Date();
               auxFecha.setFullYear(year, month - 1, 1);
               if(auxFecha>=initialDate && auxFecha<=fechaActual){
@@ -78,31 +75,31 @@ const Home = () => {
         const arr2Purchases = auxPurchases.slice(0,mesInicio+1);
         
         
-        arr1Meses.map(i=>{
+        arr1Meses.forEach(i=>{
             labelsUltimoAnio.push(i)
         })
-        arr2Meses.map(i=>{
+        arr2Meses.forEach(i=>{
             labelsUltimoAnio.push(i)
         })
         
-        arr1Sales.map(i=>{
+        arr1Sales.forEach(i=>{
             sales.push(i)
         })
-        arr2Sales.map(i=>{
+        arr2Sales.forEach(i=>{
             sales.push(i)
         })
 
-        arr1Purchases.map(i=>{
+        arr1Purchases.forEach(i=>{
             purchases.push(i)
         })
-        arr2Purchases.map(i=>{
+        arr2Purchases.forEach(i=>{
             purchases.push(i)
         })
 
-        sales.map(sale=>{
+        sales.forEach(sale=>{
             dif.push(sale)
         })
-        purchases.map((purchase,i)=>{
+        purchases.forEach((purchase,i)=>{
             dif[i]-=purchase
         })
 

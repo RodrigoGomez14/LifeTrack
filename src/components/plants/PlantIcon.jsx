@@ -1,6 +1,5 @@
 import React from 'react';
-import {Grid,Typography,Button} from '@mui/material';
-import { formatAmount} from '../../utils';
+import {Grid,Button} from '@mui/material';
 import { Link } from 'react-router-dom';
 
 const PlantIcon = ({plant,id}) => {

@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {Accordion,AccordionSummary,AccordionDetails,Grid,Typography,Tabs,Tab,Card,CardHeader,Paper} from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { PieChart, Pie, Tooltip, Cell, Legend } from 'recharts';
-import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../../utils';
+import { formatAmount, getMonthName, sumTransactionsByCategory } from '../../utils';
 import TransactionsTabsList from './TransactionsTabsList';
 import ReactApexChart from 'react-apexcharts';
 import { useStore } from '../../store'; 
@@ -24,12 +23,12 @@ const TransactionsTabs = ({ data,type }) => {
     setYearTabValue(newValue);
   };
   
-  const categories = type=='expenses'?['Auto', 'Servicios' , 'Indoor', 'Supermercado','Transporte','Extras','Exchange']:['Uber', 'Sueldo', 'Freelance', 'Camila', 'Extras','Exchange'];
+  const categories = type==='expenses'?['Auto', 'Servicios' , 'Indoor', 'Supermercado','Transporte','Extras','Exchange']:['Uber', 'Sueldo', 'Freelance', 'Camila', 'Extras','Exchange'];
 
   const seriesPieChart = [];
   const labelsPieChart = [];
 
-  categories.map((category, index) => {
+  categories.forEach((category, index) => {
     const total = sumTransactionsByCategory(data[currentYear].months[currentMonth].data, category);
     seriesPieChart.push(total)
     labelsPieChart.push(category)
@@ -62,7 +61,7 @@ const TransactionsTabs = ({ data,type }) => {
                     <Card>
                         <CardHeader
                             title={formatAmount(data[currentYear].months[currentMonth].total)}
-                            subheader={`${type=='incomes'?'Ingresos':'Gastos'} de ${getMonthName(currentMonth)}`}
+                            subheader={`${type==='incomes'?'Ingresos':'Gastos'} de ${getMonthName(currentMonth)}`}
                         />
                     </Card>
                 </Paper>
@@ -70,7 +69,7 @@ const TransactionsTabs = ({ data,type }) => {
         </Grid>
         <Grid item xs={12} justifyContent='center'>
             <Grid container item xs={12} justifyContent='center'>
-                <Typography variant="h5">Distribucion de {type=='incomes'?'Ingresos':'Gastos'} de {getMonthName(currentMonth)}</Typography>
+                <Typography variant="h5">Distribucion de {type==='incomes'?'Ingresos':'Gastos'} de {getMonthName(currentMonth)}</Typography>
             </Grid>
             <Grid container item xs={12} justifyContent='center'>
                 <Grid item>
@@ -121,7 +120,7 @@ const TransactionsTabs = ({ data,type }) => {
                                                 scrollButtons="auto"
                                             >
                                                 {categories.map((category, index) => (
-                                                    <Tab disabled={sumTransactionsByCategory(data[year].months[month].data,category)==0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(data[year].months[month].data,category))}`} key={index} />
+                                                    <Tab disabled={sumTransactionsByCategory(data[year].months[month].data,category)===0?true:false} label={`${category} - ${formatAmount(sumTransactionsByCategory(data[year].months[month].data,category))}`} key={index} />
                                                 ))}
                                             </Tabs>
                                             {categories.map((category, index) => (

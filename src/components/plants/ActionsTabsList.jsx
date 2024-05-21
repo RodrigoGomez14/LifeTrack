@@ -1,13 +1,13 @@
 import React from 'react';
-import {List,ListItem,ListItemIcon,ListItemText,Typography,Grid} from '@mui/material';
-import { convertToDetailedDate, formatAmount,getCategoryIcon } from '../../utils';
+import {List,ListItem,ListItemText,Typography,Grid} from '@mui/material';
+import { convertToDetailedDate } from '../../utils';
 
 const ActionsTabsList = ({ data,type }) => {
   return (
     <>
         <List>
             {data?
-                Object.values(data).reverse().map(action => {
+                Object.values(data).reverse().forEach(action => {
                     switch (type) {
                         case 'riegos':
                             return (
@@ -23,7 +23,6 @@ const ActionsTabsList = ({ data,type }) => {
                                     />
                                 </ListItem>
                                 );
-                            break;
                         case 'insecticidas':
                             return (
                                 <ListItem key={action.date}>
@@ -38,7 +37,6 @@ const ActionsTabsList = ({ data,type }) => {
                                     />
                                 </ListItem>
                                 );
-                            break;
                         case 'podas':
                             return (
                                 <ListItem key={action.date}>
@@ -52,7 +50,6 @@ const ActionsTabsList = ({ data,type }) => {
                                     />
                                 </ListItem>
                                 );
-                            break;
                         case 'transplantes':
                             return (
                                 <ListItem key={action.date}>
@@ -67,7 +64,6 @@ const ActionsTabsList = ({ data,type }) => {
                                     />
                                 </ListItem>
                                 );
-                            break;
                     
                         default:
                             break;

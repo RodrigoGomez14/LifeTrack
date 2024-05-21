@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
-import {Accordion,AccordionSummary,AccordionDetails,Grid,TextField,Paper,Tab,Card,CardHeader,IconButton, CardContent, Typography,Chip} from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { PieChart, Pie, Tooltip, Cell, Legend } from 'recharts';
-import { formatAmount, getMonthName, sumTransactionsByCategory,getCategoryIcon } from '../../utils';
-import TransactionsTabsList from './TransactionsTabsList';
+import {Grid,TextField,Paper,Card,CardHeader,IconButton, CardContent, Typography,Chip} from '@mui/material';
+import { formatAmount } from '../../utils';
 import ReactApexChart from 'react-apexcharts';
-import { useStore } from '../../store'; 
-import { useTheme } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
-import { SignalWifiStatusbarNullSharp } from '@mui/icons-material';
 
 const SavingsTab = ({ data }) => {
-  const currentDate = new Date();
-  const {userData,dollarRate} = useStore();
   const [editPercentageActive,setEditPercentageActive] = useState(false)
   const [newPercentage,setNewPercentage] = useState(false)
 
@@ -22,7 +14,7 @@ const SavingsTab = ({ data }) => {
   const seriesColumnChart = [];
   const labelsChart = [];
 
-  Object.keys(data.carMaintenanceHistory).map(key=>{
+  Object.keys(data.carMaintenanceHistory).forEach(key=>{
     seriesLineChart.push(data.carMaintenanceHistory[key].newTotal);
     seriesColumnChart.push(data.carMaintenanceHistory[key].amount)
     labelsChart.push(data.carMaintenanceHistory[key].date)

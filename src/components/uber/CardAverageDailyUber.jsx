@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Typography, Card, CardHeader, IconButton, Alert,Paper } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import { Link } from 'react-router-dom';
-import { formatAmount, getMonthName, getPreviousMonday } from '../../utils'; // Suponiendo que tienes una función que obtiene el lunes anterior
+import { Grid, Typography, Card, CardHeader, Paper } from '@mui/material';
+import { formatAmount, getMonthName } from '../../utils'; // Suponiendo que tienes una función que obtiene el lunes anterior
 import { useStore } from '../../store'; // Importar el store de Zustand
 
 const CardAverageDailyUber = () => {
@@ -17,7 +15,7 @@ const CardAverageDailyUber = () => {
     let monthlyEarnings = 0;
     let length = 0
     const monthData = userData.uber.data[currentYear].months[currentMonth].data;
-    monthData.map((transaction) => {
+    monthData.forEach((transaction) => {
       monthlyEarnings += transaction.amount;
       if(!transaction.challenge){
         length++
@@ -26,7 +24,7 @@ const CardAverageDailyUber = () => {
     monthlyEarnings = monthlyEarnings/length
 
     setTotalMonthlyEarnings(monthlyEarnings);
-  }, [userData]); // Vuelve a calcular si data cambia
+  }, [currentMonth, currentYear, userData]); // Vuelve a calcular si data cambia
 
   return (
     <Grid item>

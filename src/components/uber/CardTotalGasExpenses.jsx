@@ -14,7 +14,7 @@ const CardTotalGasExpenses = ({data}) => {
     let monthlyGasExpenses = 0;
 
       const monthData = data[currentYear].months[currentMonth].data;
-      monthData.map((transaction) => {
+      monthData.forEach((transaction) => {
         // Considerar solo las transacciones de la categoria AUTO
         if (transaction.category === 'Auto') {
           monthlyGasExpenses += transaction.amount;
@@ -22,7 +22,7 @@ const CardTotalGasExpenses = ({data}) => {
       })
 
     setTotalMonthlyGasExpenses(monthlyGasExpenses);
-  }, [data]); // Vuelve a calcular si data cambia
+  }, [currentMonth, currentYear, data]); // Vuelve a calcular si data cambia
 
   return (
     <Grid item>

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Typography, Card, CardHeader, IconButton, Alert } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import { Link } from 'react-router-dom';
+import { Grid, Typography, Card, CardHeader} from '@mui/material';
 import { formatAmount, getPreviousMonday } from '../../utils'; // Suponiendo que tienes una función que obtiene el lunes anterior
 import { useStore } from '../../store'; // Importar el store de Zustand
 

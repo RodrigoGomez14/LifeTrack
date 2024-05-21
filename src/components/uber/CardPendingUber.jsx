@@ -43,7 +43,7 @@ const CardPendingUber = ({setShowDialog}) => {
     useEffect(() => {
         // Si el día actual es lunes (1), entonces deshabilita el reset
         setResetDisabled(dayOfWeek !== 1);
-      }, []); 
+      }, [dayOfWeek]); 
     return(
       <Grid item>
         <Paper elevation={6}>

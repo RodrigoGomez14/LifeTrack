@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
 import { Typography, Grid, IconButton, Dialog, DialogTitle } from '@mui/material';
-import { formatAmount, formatMinutesToHours, getMonthName } from '../../utils';
+import { formatAmount } from '../../utils';
 import { Link } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import { useStore } from '../../store';
 import CardChallengeUber from '../../components/uber/CardChallengeUber';
 import CardPendingUber from '../../components/uber/CardPendingUber';
-import CardTotalWeeklyUber from '../../components/uber/CardTotalWeeklyUber';
-import CardTotalGasExpenses from '../../components/uber/CardTotalGasExpenses';
 import CardTotalMonthlyUber from '../../components/uber/CardTotalMonthlyUber';
 import CardAverageDailyUber from '../../components/uber/CardAverageDailyUber';
 import UberMonthList from '../../components/uber/UberMonthList';
@@ -26,7 +24,8 @@ const Uber = () => {
   let lineChartTotal = 0;
   const seriesColumnChart = [];
   const labelsChart = [];
-  userData.uber.data[currentYear].months[currentMonth].data.map(i=>{
+  
+  userData.uber.data[currentYear].months[currentMonth].data.forEach(i=>{
     if(!i.challenge){
       lineChartTotal+=i.amount
       seriesLineChart.push(lineChartTotal)

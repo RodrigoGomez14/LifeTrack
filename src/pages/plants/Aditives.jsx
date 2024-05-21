@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Grid, Button, Tab, Tabs, Typography } from '@mui/material';
+import { Grid, Button, Tab, Tabs } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
 import AditiveAccordion from '../../components/plants/AditiveAccordion';

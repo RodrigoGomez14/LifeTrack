@@ -1,5 +1,5 @@
 import React from 'react';
-import {Grid,Typography,Card,CardHeader,CardContent,LinearProgress,Paper,Alert,IconButton} from '@mui/material';
+import {Grid,Typography,Card,CardHeader,LinearProgress,Paper,IconButton} from '@mui/material';
 import { Link } from 'react-router-dom';
 import { formatAmount} from '../../utils';
 import { useStore } from '../../store'; // Importar el store de Zustand

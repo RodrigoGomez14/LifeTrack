@@ -1,11 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Button, TextField, Typography, InputAdornment, MenuItem, Input, Select, FormControlLabel, Grid,Alert } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { Button, TextField, MenuItem, Input, Select, FormControlLabel, Grid } from '@mui/material';
 import { database,auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
-import { formatAmount } from '../../utils';
-import { useStore } from '../../store'; 
 
 const NewPlant = () => {
   const navigate = useNavigate();
@@ -76,14 +73,14 @@ const NewPlant = () => {
               label='Inicio de Vegetativo'
               labelPlacement='top'
               control={
-                  <Input type='date' disabled={ etapa == 'Germinacion'} value={inicioVegetativo}onChange={e=>{setInicioVegetativo(e.target.value)}}/>
+                  <Input type='date' disabled={ etapa === 'Germinacion'} value={inicioVegetativo}onChange={e=>{setInicioVegetativo(e.target.value)}}/>
               }
           />
           <FormControlLabel
               label='Inicio de Floracion'
               labelPlacement='top'
               control={
-                  <Input type='date' disabled={etapa !== 'Floracion'} value={inicioFloracion}onChange={e=>{setInicioFLoracion(e.target.value)}}/>
+                  <Input type='date' disabled={etapa !== 'Floracion'} value={inicioFloracion}onChange={e=>{setInicioFloracion(e.target.value)}}/>
               }
           />
           <Button variant="contained" onClick={handleFormSubmit} disabled={!name || !quantity}>AGREGAR</Button>

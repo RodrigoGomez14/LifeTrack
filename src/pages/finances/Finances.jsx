@@ -1,13 +1,10 @@
 import React,{useState} from 'react';
 import Layout from '../../components/layout/Layout';
-import { Typography, Grid, Card, CardHeader, Button, Box,Tabs,Tab} from '@mui/material';
-import { formatAmount, getMonthName } from '../../utils';
-import { Link } from 'react-router-dom';
+import {  Grid, Tabs,Tab} from '@mui/material';
 import TransactionsTabs from '../../components/finances/TransactionsTabs'
 import SavingsTab from '../../components/finances/SavingsTab'
 import { useStore } from '../../store'; 
-import CardHeaderFinances from '../../components/finances/CardHeaderFinances';
-import { useTheme } from '@mui/material/styles';
+
 const Finances = () => {
   const {userData} = useStore();
   const [tabValue, setTabValue] = useState(0);

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { auth } from '../../firebase.js';
 import { Typography, TextField, Button, Container, Grid } from '@mui/material';
 import { css } from '@emotion/react';
-import { useStore } from '../../store.js'; // Importar el store de Zustand
 
 const formStyles = css`
   width: 100%;

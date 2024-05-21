@@ -22,8 +22,8 @@ import Exchange from './pages/finances/Exchange.jsx';
 import StartChallenge from './pages/uber/StartChallenge.jsx';
 import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
-import { createTheme, ThemeProvider, styled } from '@mui/material/styles';
-import { indigo, teal,grey } from '@mui/material/colors';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { indigo, teal } from '@mui/material/colors';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
@@ -39,7 +39,7 @@ function App() {
     if (data.incomes) {
       Object.keys(data.incomes).forEach((transactionId) => {
         const transaction = data.incomes[transactionId];
-        const [day, month, year] = transaction.date.split('/').map(Number);
+        const [, month, year] = transaction.date.split('/').map(Number);
         if (!groupdedFinances.incomes[year]) {
           groupdedFinances.incomes[year] = {
             total: 0,
@@ -72,7 +72,7 @@ function App() {
     if (data.expenses) {
       Object.keys(data.expenses).forEach((transactionId) => {
         const transaction = data.expenses[transactionId];
-        const [day, month, year] = transaction.date.split('/').map(Number);
+        const [, month, year] = transaction.date.split('/').map(Number);
         if (!groupdedFinances.expenses[year]) {
           groupdedFinances.expenses[year] = {
             total: 0,
@@ -107,7 +107,7 @@ function App() {
       groupedUberData.challenge=data.uber.challenge
       Object.keys(data.uber.data).forEach((transactionId) => {
         const transaction = data.uber.data[transactionId];
-        const [day, month, year] = transaction.date.split('/').map(Number);
+        const [, month, year] = transaction.date.split('/').map(Number);
         
         if (!groupedUberData.data[year]) {
           groupedUberData.data[year] = {
@@ -157,7 +157,7 @@ function App() {
       groupedPlants['active'] = data.plants.active
       let aditives = {fertilizantes:{},insecticidas:{}}
       Object.keys(data.plants.aditives).forEach((aditiveId) => {
-        if(data.plants.aditives[aditiveId].type=='Fertilizante'){
+        if(data.plants.aditives[aditiveId].type==='Fertilizante'){
           aditives.fertilizantes[aditiveId]=data.plants.aditives[aditiveId]
         }
         else{

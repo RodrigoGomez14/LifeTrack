@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, {  useState } from "react";
 import Layout from "../../components/layout/Layout";
 import {
   Button,
@@ -6,8 +6,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  InputAdornment,
-  IconButton,
   Input,
   Select,
   MenuItem,
@@ -18,11 +16,8 @@ import {
   ButtonGroup
 
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import { database, auth } from "../../firebase";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useStore } from "../../store";
-import { formatAmount } from "../../utils";
+import { useNavigate } from "react-router-dom";
 
 const NewAditive = () => {
   const navigate = useNavigate();
