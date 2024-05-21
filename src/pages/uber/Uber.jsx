@@ -52,6 +52,11 @@ const Uber = () => {
     stroke:{
         curve: 'smooth',
       },
+    yaxis:{
+      labels:{
+          formatter: val => formatAmount(val),
+      }
+    }
   };
 
   return (

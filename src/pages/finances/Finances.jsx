@@ -50,7 +50,7 @@ const Finances = () => {
           <TransactionsTabs data={userData.finances.incomes} type="incomes"/>  
         </CustomTabPanel>
         <CustomTabPanel value={tabValue} index={2}>
-          <SavingsTab data={userData.savings}/>  
+          <SavingsTab data={userData.savings} type="savings"/>  
         </CustomTabPanel>
       </Grid>
     </Layout>

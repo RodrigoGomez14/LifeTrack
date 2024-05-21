@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Button, TextField, Typography, InputAdornment, IconButton, Input, InputLabel, FormControl, Grid,Alert } from '@mui/material';
+import { Button, TextField, Typography, InputAdornment, MenuItem, Input, Select, FormControlLabel, Grid,Alert } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { database,auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,10 @@ const NewPlant = () => {
 
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [etapa, setEtapa] = useState('Germinacion');
+  const [inicioGerminacion, setInicioGerminacion] = useState('');
+  const [inicioVegetativo, setInicioVegetativo] = useState('');
+  const [inicioFloracion, setInicioFloracion] = useState('');
 
 
   const handleFormSubmit = () => {
@@ -51,6 +55,36 @@ const NewPlant = () => {
             required
             fullWidth
             margin="normal"
+          />
+          <Select
+            value={etapa}
+            label="Etapa"
+            onChange={(e) => setEtapa(e.target.value)}
+          >
+            <MenuItem value='Germinacion'>Germinacion</MenuItem>
+            <MenuItem value='Vegetativo'>Vegetativo</MenuItem>
+            <MenuItem value='Floracion'>Floracion</MenuItem>
+          </Select>
+          <FormControlLabel
+              label='Inicio de Germinacion'
+              labelPlacement='top'
+              control={
+                  <Input type='date' value={inicioGerminacion} disabled={!etapa} onChange={e=>{setInicioGerminacion(e.target.value)}}/>
+              }
+          />
+          <FormControlLabel
+              label='Inicio de Vegetativo'
+              labelPlacement='top'
+              control={
+                  <Input type='date' disabled={ etapa == 'Germinacion'} value={inicioVegetativo}onChange={e=>{setInicioVegetativo(e.target.value)}}/>
+              }
+          />
+          <FormControlLabel
+              label='Inicio de Floracion'
+              labelPlacement='top'
+              control={
+                  <Input type='date' disabled={etapa !== 'Floracion'} value={inicioFloracion}onChange={e=>{setInicioFLoracion(e.target.value)}}/>
+              }
           />
           <Button variant="contained" onClick={handleFormSubmit} disabled={!name || !quantity}>AGREGAR</Button>
       </Grid>
