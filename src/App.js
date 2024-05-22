@@ -183,22 +183,21 @@ function App() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
+        // Obtener el valor del dólar blue
+        fetch('https://dolarapi.com/v1/dolares/blue')
+        .then((response) => response.json())
+        .then((data) => {
+          setDollarRate(data);
+        })
+        .catch((error) => {
+          console.error('Error fetching dollar rate:', error);
+        });
         database.ref(user.uid).on('value', (snapshot) => {
           const filteredData = filterData(snapshot.val());
           setUserData(filteredData);
           setUserLoggedIn(true);
           setIsLoading(false);
         });
-
-        // Obtener el valor del dólar blue
-        fetch('https://dolarapi.com/v1/dolares/blue')
-          .then((response) => response.json())
-          .then((data) => {
-            setDollarRate(data);
-          })
-          .catch((error) => {
-            console.error('Error fetching dollar rate:', error);
-          });
       } else {
         setUserLoggedIn(false);
         setIsLoading(false);
