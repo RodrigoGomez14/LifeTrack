@@ -7,6 +7,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+
+.rbc-time-view {
+  .rbc-label {
+  display: none;
+  }
+  .rbc-time-content {
+  display: none;
+  }
+  .rbc-today {
+    background-color: #35363f;
+}
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer as MuiDrawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Button, Typography } from '@mui/material';
+import { Drawer as MuiDrawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Button, Typography,Divider } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
 import LocalTaxiOutlinedIcon from '@mui/icons-material/LocalTaxiOutlined';
@@ -31,6 +31,7 @@ const Drawer = ({ open, toggleDrawer }) => {
             <ListItemText primary="Home" />
           </ListItemButton>
         </ListItem>
+        <Divider/>
         <ListItem component={Link} to="/Finanzas" button>
           <ListItemButton>
             <ListItemIcon>
@@ -39,6 +40,7 @@ const Drawer = ({ open, toggleDrawer }) => {
             <ListItemText primary="Finanzas" />
           </ListItemButton>
         </ListItem>
+        <Divider/>
         <ListItem component={Link} to="/Uber" button>
           <ListItemButton>
             <ListItemIcon>
@@ -47,6 +49,7 @@ const Drawer = ({ open, toggleDrawer }) => {
             <ListItemText primary="Uber" />
           </ListItemButton>
         </ListItem>
+        <Divider/>
         <ListItem component={Link} to="/Habitos" button>
           <ListItemButton>
             <ListItemIcon>
@@ -55,6 +58,7 @@ const Drawer = ({ open, toggleDrawer }) => {
             <ListItemText primary="Habitos" />
           </ListItemButton>
         </ListItem>
+        <Divider/>
         <ListItem component={Link} to="/Plantas" button>
           <ListItemButton>
             <ListItemIcon>
@@ -63,8 +67,10 @@ const Drawer = ({ open, toggleDrawer }) => {
             <ListItemText primary="Plantas" />
           </ListItemButton>
         </ListItem>
+        <Divider/>
       </List>
       <>
+        <Divider />
         {auth.currentUser?
           <Typography variant='caption'>
             {auth.currentUser.email}

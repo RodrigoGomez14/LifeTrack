@@ -5,22 +5,73 @@ import ReactApexChart from 'react-apexcharts';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
+import { useStore } from '../../store'; // Importar el store de Zustand
+import { getDate } from "../../utils";
 
 const SavingsTab = ({ data }) => {
-  const [editPercentageActive,setEditPercentageActive] = useState(false)
+    const {userData} = useStore(); // Obtener estados del store
+    const [editPercentageActive,setEditPercentageActive] = useState(false)
   const [newPercentage,setNewPercentage] = useState(false)
 
-  const seriesLineChart = [];
-  const seriesColumnChart = [];
-  const labelsChart = [];
+  const seriesCarLineChart = [];
+  const seriesCarColumnChart = [];
+  const labelsCarChart = [];
+
+  const seriesUSDLineChart = [];
+  const seriesUSDColumnChart = [];
+  const labelsUSDChart = [];
+  
+  const seriesARSLineChart = [];
+  const seriesARSColumnChart = [];
+  const labelsARSChart = [];
 
   Object.keys(data.carMaintenanceHistory).forEach(key=>{
-    seriesLineChart.push(data.carMaintenanceHistory[key].newTotal);
-    seriesColumnChart.push(data.carMaintenanceHistory[key].amount)
-    labelsChart.push(data.carMaintenanceHistory[key].date)
+    seriesCarLineChart.push(data.carMaintenanceHistory[key].newTotal);
+    seriesCarColumnChart.push(data.carMaintenanceHistory[key].amount)
+    labelsCarChart.push(data.carMaintenanceHistory[key].date)
   })
-  const optionsChart = {
-    labels:labelsChart,
+  Object.keys(data.amountUSDHistory).forEach(key=>{
+    seriesUSDLineChart.push(data.amountUSDHistory[key].newTotal);
+    seriesUSDColumnChart.push(data.amountUSDHistory[key].amountUSD)
+    labelsUSDChart.push(data.amountUSDHistory[key].date)
+  })
+  data.amountARSHistory &&
+  (Object.keys(data.amountARSHistory).forEach(key=>{
+    seriesARSLineChart.push(data.amountARSHistory[key].newTotal);
+    seriesARSColumnChart.push(data.amountARSHistory[key].amount)
+    labelsARSChart.push(data.amountARSHistory[key].date)
+  }))
+
+  const optionsCarChart = {
+    labels:labelsCarChart,
+    tooltip:{
+        y:{
+            formatter: val=> formatAmount(val)
+        }
+    },
+    markers:{
+        size:3
+    },
+    stroke:{
+        curve: 'smooth',
+      },
+  };
+  const optionsUSDChart = {
+    labels:labelsUSDChart,
+    tooltip:{
+        y:{
+            formatter: val=> formatAmount(val)
+        }
+    },
+    markers:{
+        size:3
+    },
+    stroke:{
+        curve: 'smooth',
+      },
+  };
+  const optionsARSChart = {
+    labels:labelsARSChart,
     tooltip:{
         y:{
             formatter: val=> formatAmount(val)
@@ -47,13 +98,31 @@ const SavingsTab = ({ data }) => {
     });
 
     database.ref(`${auth.currentUser.uid}/savings/carMaintenancePending`).set(0);
+
+    // Actualizar el valor de ahorros en ARS y su historial
+    database.ref(`${auth.currentUser.uid}/savings/amountARS`).set( userData.savings.amountARS - userData.savings.carMaintenancePending);
+    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
+      date: getDate(),
+      amount: -userData.savings.carMaintenancePending,
+      newTotal: (userData.savings.amountARS - userData.savings.carMaintenancePending),
+    });
   }
 
   const handleSetEditPercentageActive = () => {
     setEditPercentageActive(!editPercentageActive);
-  };
+  }; 
   return (
     <Grid container item xs={12} justifyContent='center' spacing={3}>
+        <Grid item>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                        title={formatAmount(data.amountARS)}
+                        subheader='Ahorros en ARS'
+                    />
+                </Card>
+            </Paper>
+        </Grid>
         <Grid item>
             <Paper elevation={6}>
                 <Card>
@@ -126,8 +195,26 @@ const SavingsTab = ({ data }) => {
         </Grid>
         <Grid container item xs={12} justifyContent='center'>
             <ReactApexChart
-                options={optionsChart}
-                series={[{name:'Acumulado',type:'line',data: seriesLineChart },{name:'Diario',type:'column',data: seriesColumnChart }]}
+                options={optionsCarChart}
+                series={[{name:'Acumulado',type:'line',data: seriesCarLineChart },{name:'Diario',type:'column',data: seriesCarColumnChart }]}
+                type="line"
+                height={300}
+                width={1000}
+            />
+        </Grid>
+        <Grid container item xs={12} justifyContent='center'>
+            <ReactApexChart
+                options={optionsUSDChart}
+                series={[{name:'Acumulado',type:'line',data: seriesUSDLineChart },{name:'Diario',type:'column',data: seriesUSDColumnChart }]}
+                type="line"
+                height={300}
+                width={1000}
+            />
+        </Grid>
+        <Grid container item xs={12} justifyContent='center'>
+            <ReactApexChart
+                options={optionsARSChart}
+                series={[{name:'Acumulado',type:'line',data: seriesARSLineChart },{name:'Diario',type:'column',data: seriesARSColumnChart }]}
                 type="line"
                 height={300}
                 width={1000}

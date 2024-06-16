@@ -30,10 +30,10 @@ function App() {
 
   const filterData = (data) => {
     const groupdedFinances = {incomes:{},expenses:{}};
-    const groupedSavings = {};
-    const groupedPlants = {};
-    const groupedUberData = {data:{}};
-    const earningsUberData = [];
+    let groupedSavings = {};
+    let groupedPlants = {};
+    let groupedUberData = {data:{}};
+    let earningsUberData = [];
     let totalEarningsUber = 0;
 
     if (data.incomes) {
@@ -147,11 +147,7 @@ function App() {
     }
 
     if (data.savings) {
-      groupedSavings.carMaintenancePercentage = data.savings.carMaintenancePercentage
-      groupedSavings.carMaintenance = data.savings.carMaintenance
-      groupedSavings.carMaintenancePending = data.savings.carMaintenancePending
-      groupedSavings.carMaintenanceHistory = data.savings.carMaintenanceHistory
-      groupedSavings.amountUSD = data.savings.amountUSD
+      groupedSavings = data.savings
     }
     if(data.plants){
       groupedPlants['active'] = data.plants.active
@@ -176,7 +172,9 @@ function App() {
       },
       secondary: {
         main: teal[500],
+        dark: teal[700],
       },
+      type:'dark'
     },
   });
 

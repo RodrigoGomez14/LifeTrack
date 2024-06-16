@@ -8,7 +8,7 @@ import { useStore } from '../../store';
 import { getDate } from '../../utils'
 
 const NewIncome = () => {
-  const { dollarRate} = useStore();
+  const { userData , dollarRate} = useStore();
   const navigate = useNavigate();
 
   const [amount, setAmount] = useState('');
@@ -22,7 +22,6 @@ const NewIncome = () => {
       return;
     }
 
-
     database.ref(`${auth.currentUser.uid}/incomes`).push({
       amount: parseFloat(amount),
       amountUSD: parseFloat(amount/dollarRate['venta']),
@@ -31,6 +30,14 @@ const NewIncome = () => {
       date: getDate(),
       description: description,
       valorUSD: dollarRate['venta']
+    });
+
+    // Actualizar el valor de ahorros en ARS y su historial
+    database.ref(`${auth.currentUser.uid}/savings/amountARS`).set( userData.savings.amountARS + parseFloat(amount));
+    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
+      date: getDate(),
+      amount: parseFloat(amount),
+      newTotal: (userData.savings.amountARS + parseFloat(amount)),
     });
 
     setAmount('');

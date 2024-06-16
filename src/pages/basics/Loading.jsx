@@ -10,7 +10,7 @@ const Loading = ({open}) => {
           </Typography>
         </Grid>
         <Grid container item xs={12} justifyContent='center'>
-          <Typography variant='caption' color='secondary' fontWeight='bold'>
+          <Typography variant='caption' color='secondary' fontWeight='caption'>
             Loading...
           </Typography>
         </Grid>

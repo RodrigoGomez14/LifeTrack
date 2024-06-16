@@ -21,7 +21,7 @@ const Exchange = () => {
     if (operationType === "Compra") {
       database.ref(`${auth.currentUser.uid}/expenses`).push({
           operationType: operationType,
-          amount: parseFloat(amountARS),
+          amount: -parseFloat(amountARS),
           amountUSD: parseFloat(amountARS/exRate),
           category: 'Exchange',
           date: getDate(),
@@ -32,7 +32,7 @@ const Exchange = () => {
       database.ref(`${auth.currentUser.uid}/incomes`).push({
           operationType: operationType,
           amount: parseFloat(amountARS),
-          amountUSD: parseFloat(amountARS/exRate),
+          amountUSD: -parseFloat(amountARS/exRate),
           category: 'Exchange',
           date: getDate(),
           valorUSD: exRate
@@ -40,21 +40,29 @@ const Exchange = () => {
     }
 
 
-    // Actualizar el valor de ahorros en USD
+    // Actualizar el valor de ahorros en USD y en ARS
     if (operationType === "Compra") {
       // Aumentar el valor de ahorros en USD
       database.ref(`${auth.currentUser.uid}/savings/amountUSD`).set( userData.savings.amountUSD + parseFloat(amountARS/exRate));
+      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set( userData.savings.amountARS - amountARS);
     } else {
       database.ref(`${auth.currentUser.uid}/savings/amountUSD`).set( userData.savings.amountUSD - parseFloat(amountARS/exRate));
+      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set( userData.savings.amountARS + amountARS);
     }
 
-    // Agregar el ingreso de efectivo a la base de datos para ingresos
+    // Agrega el movimiento al Historial de USD y ARS
     database.ref(`${auth.currentUser.uid}/savings/amountUSDHistory`).push({
       date: getDate(),
       operationType:operationType,
       amount: amountARS,
       amountUSD: parseFloat(amountARS/exRate),
       newTotal: operationType==='Compra'?(userData.savings.amountUSD + parseFloat(amountARS/exRate)):(userData.savings.amountUSD - parseFloat(amountARS/exRate)),
+    });
+
+    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
+      date: getDate(),
+      amount: (operationType==='Compra' ? -amountARS : amountARS),
+      newTotal: operationType==='Compra'?(userData.savings.amountARS - amountARS):(userData.savings.amountARS + amountARS),
     });
 
     navigate("/finanzas");

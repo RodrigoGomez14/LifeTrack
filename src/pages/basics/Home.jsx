@@ -169,7 +169,7 @@ const Home = () => {
   }
   return (
     <Layout title="Inicio">
-      <Grid container item xs={12} spacing={3}>
+      <Grid container item xs={12} spacing={3} justifyContent='center'>
         <Grid item>
           <Card>
             <CardHeader
@@ -177,6 +177,16 @@ const Home = () => {
               subheader='Valor USD'
             />
           </Card>
+        </Grid>
+        <Grid item>
+            <Paper elevation={6}>
+                <Card>
+                    <CardHeader
+                        title={formatAmount(userData.savings.amountARS)}
+                        subheader='Ahorros en ARS'
+                    />
+                </Card>
+            </Paper>
         </Grid>
         <Grid item>
           <Card>

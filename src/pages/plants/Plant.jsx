@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from "react";
 import Layout from "../../components/layout/Layout";
-import { Grid, Button, Typography, Box, Tab, Tabs, ImageList,ImageListItem,ImageListItemBar } from "@mui/material";
+import { Grid, Button, Typography, Box, Tab, Tabs, ImageList, ImageListItem, ImageListItemBar } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "../../store";
-import { checkSearch, convertToDetailedDate } from "../../utils";
+import { checkSearch, convertToDetailedDate, getDate } from "../../utils";
 import { database, auth } from "../../firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import ActionsTabsList from "../../components/plants/ActionsTabsList";
-import { getDate } from '../../utils'
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import "moment/locale/es"
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+moment.locale("es")
+const localizer = momentLocalizer(moment);
 
 const Plant = () => {
   const { userData } = useStore();
@@ -15,7 +21,6 @@ const Plant = () => {
   const [plant, setPlant] = useState(userData.plants.active[checkSearch(location.search)]);
   const [tabValue, setTabValue] = useState(0);
   const [selectedFile, setSelectedFile] = useState(null);
-  
 
   useEffect(() => {
     const id = checkSearch(location.search);
@@ -23,26 +28,19 @@ const Plant = () => {
   }, [location.search, userData.plants]);
 
   const handleFileChange = (event) => {
-    setSelectedFile(event.target.files[0]); // Guardar el archivo seleccionado
+    setSelectedFile(event.target.files[0]);
   };
+
   const uploadFile = async () => {
     if (selectedFile) {
       try {
-
         const storage = getStorage();
-        // Crea una referencia a donde quieres subir el archivo en Firebase Storage
         const storageRef = ref(
           storage,
           `${auth.currentUser.uid}/plants/${checkSearch(location.search)}/images`
         );
-        
-        // Sube el archivo a Firebase Storage
         const uploadResult = await uploadBytes(storageRef, selectedFile);
-  
-        // Obtén la URL de descarga del archivo subido
         const downloadURL = await getDownloadURL(uploadResult.ref);
-  
-        // Guarda la URL y otros detalles en la base de datos
         await database
           .ref(
             `${auth.currentUser.uid}/plants/active/${checkSearch(location.search)}/images`
@@ -51,11 +49,9 @@ const Plant = () => {
             date: getDate(),
             url: downloadURL,
           });
-  
-  
-        // Reinicia el estado del archivo seleccionado
         setSelectedFile(null);
       } catch (error) {
+        console.error("Error uploading file: ", error);
       }
     }
   };
@@ -63,7 +59,48 @@ const Plant = () => {
   const handleChange = (event, newValue) => {
     setTabValue(newValue);
   };
-  function CustomTabPanel(props) {
+
+  const events = [];
+
+  const actions = [
+    { type: 'riegos', data: plant.irrigations, color: '#FF6347' },
+    { type: 'insecticidas', data: plant.insecticides, color: '#4682B4' },
+    { type: 'podas', data: plant.prunings, color: '#32CD32' },
+    { type: 'transplantes', data: plant.transplants, color: '#FFD700' },
+    { type: 'fotos', data: plant.images, color: '#FFD700' }
+  ];
+
+  actions.forEach(action => {
+    if (action.data) {
+      Object.keys(action.data).forEach(key => {
+        console.log(action.data[key])
+          events.push({
+            title: `${action.type}`,
+            start: moment(action.data[key].date , "DD-MM-YYYY"),
+            end: moment(action.data[key].date , "DD-MM-YYYY"),
+            min:0,
+            max:0,
+            color: action.color
+          });
+      });
+    }
+  });
+
+  const eventStyleGetter = (event) => {
+    const backgroundColor = event.color;
+    const style = {
+      backgroundColor,
+      borderRadius: '0px',
+      opacity: 0.8,
+      color: 'black',
+      border: '0px',
+      display: 'block'
+    };
+    return {
+      style
+    };
+  };
+  const CustomTabPanel = (props) => {
     const { children, value, index, ...other } = props;
 
     return (
@@ -89,8 +126,6 @@ const Plant = () => {
         <Typography variant="h3">{plant.name}</Typography>
         <Typography variant="h6">{plant.quantity} unidades</Typography>
         <Typography variant="h6">{plant.potVolume} L de tierra</Typography>
-      </Grid>
-      <Grid item xs={12}>
       </Grid>
       <Grid container item justifyContent="center" spacing={3}>
         <Grid item>
@@ -156,11 +191,11 @@ const Plant = () => {
           <ActionsTabsList data={plant.transplants} type='transplantes'/>
         </CustomTabPanel>
       </Grid>
-      {plant.images?
+      {plant.images ?
         <Grid container item xs={12}>
           <ImageList variant="masonry" cols={3} gap={8}>
             {Object.keys(plant.images).map(img => (
-              <ImageListItem>
+              <ImageListItem key={img}>
                 <img
                   srcSet={`${plant.images[img].url}`}
                   src={`${plant.images[img].url}`}
@@ -174,9 +209,21 @@ const Plant = () => {
             ))}
           </ImageList>
         </Grid>
-        :
-        null
+        : null
       }
+      <Grid container item xs={12}>
+        <Calendar
+          localizer={localizer}
+          events={events}
+          defaultView="week"
+          views={['week']}
+          startAccessor="start"
+          endAccessor="end"
+          style={{ width: '100%' }}
+          eventPropGetter={eventStyleGetter}
+          allDayAccessor={() => true}
+        />
+      </Grid>
     </Layout>
   );
 };

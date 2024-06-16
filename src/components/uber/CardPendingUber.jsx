@@ -4,6 +4,7 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import { formatAmount} from '../../utils';
 import { useStore } from '../../store'; // Importar el store de Zustand
 import { database, auth } from '../../firebase'; // Importar el módulo de autenticación de Firebase
+import { getDate } from "../../utils";
 
 const CardPendingUber = ({setShowDialog}) => {
     const {userData, dollarRate} = useStore(); // Obtener estados del store
@@ -16,7 +17,7 @@ const CardPendingUber = ({setShowDialog}) => {
         const pending = parseFloat(userData.uber.pending);
     
         // Verificar si hoy es lunes (dayOfWeek === 1)
-        if (dayOfWeek === 1 && pending > 0) {
+        if ( pending > 0) {
           const year = currentDate.getFullYear();
           const month = currentDate.getMonth() + 1;
           const day = currentDate.getDate();
@@ -31,6 +32,14 @@ const CardPendingUber = ({setShowDialog}) => {
             valorUSD:dollarRate['venta']
           });
     
+          // Actualizar el valor de ahorros en ARS y su historial
+          database.ref(`${auth.currentUser.uid}/savings/amountARS`).set( userData.savings.amountARS + pending );
+          database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
+            date: getDate(),
+            amount: parseFloat(pending),
+            newTotal: (userData.savings.amountARS + pending),
+          });
+
           database.ref(`${auth.currentUser.uid}/uber/pending`).set(0);
     
           setShowDialog(true)
@@ -52,7 +61,7 @@ const CardPendingUber = ({setShowDialog}) => {
                 action={
                   <IconButton 
                       aria-label="settings"
-                      disabled={resetDisabled}
+                      //disabled={resetDisabled}
                       onClick={resetPending} 
                   >
                       <RestoreIcon />
