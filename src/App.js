@@ -1,11 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import './App.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/basics/Login.jsx';
 import Home from './pages/basics/Home.jsx';
 import Finances from './pages/finances/Finances.jsx';
 import Loading from './pages/basics/Loading.jsx';
 import Uber from './pages/uber/Uber.jsx';
-import Habits from './pages/habits/Habits.jsx';
+import Habits from './pages/habits/Habits';
 import PlantsList from './pages/plants/PlantsList.jsx';
 import Plant from './pages/plants/Plant.jsx';
 import NewPlant from './pages/plants/NewPlant.jsx';
@@ -24,6 +25,14 @@ import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { indigo, teal } from '@mui/material/colors';
+import NewHabit from './pages/habits/NewHabit';
+import EditHabit from './pages/habits/EditHabit';
+import HabitDetail from './components/habits/HabitDetail';
+import CreditCards from './pages/finances/CreditCards.jsx';
+import NewCard from './pages/finances/NewCard';
+import EditCard from './pages/finances/EditCard';
+import UpdateCardDates from './pages/finances/UpdateCardDates.jsx';
+import { ColorModeContext } from './utils';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
@@ -33,6 +42,7 @@ function App() {
     let groupedSavings = {};
     let groupedPlants = {};
     let groupedUberData = {data:{}};
+    let groupedHabits = {};
     let earningsUberData = [];
     let totalEarningsUber = 0;
 
@@ -162,7 +172,21 @@ function App() {
       });
       groupedPlants['aditives']=aditives
     }
-    return { finances:groupdedFinances, uber: groupedUberData,savings:groupedSavings, plants:groupedPlants };
+
+    if(data.habits) {
+      groupedHabits = data.habits;
+    }
+
+    let groupedCreditCards = data.creditCards || {};
+
+    return { 
+      finances: groupdedFinances, 
+      uber: groupedUberData, 
+      savings: groupedSavings, 
+      plants: groupedPlants,
+      habits: groupedHabits,
+      creditCards: groupedCreditCards
+    };
   };
 
   const theme = createTheme({
@@ -214,24 +238,20 @@ function App() {
       {userLoggedIn?
       <Router>
         <Routes>
-          <Route exact path="/" element={<Home />} />
-          <Route exact path="/Finanzas" element={<Finances />} />
-          <Route exact path="/Uber" element={<Uber />} />
-          <Route exact path="/Habitos" element={<Habits />} />
-          <Route exact path="/Plantas" element={<PlantsList />} />
-          <Route exact path="/Planta" element={<Plant />} />
-          <Route exact path="/NuevaPlanta" element={<NewPlant />} />
-          <Route exact path="/NuevoRiego" element={<NewIrrigation />} />
-          <Route exact path="/NuevoInsecticida" element={<NewInsecticide />} />
-          <Route exact path="/NuevaPoda" element={<NewPruning />} />
-          <Route exact path="/NuevoTransplante" element={<NewTransplant />} />
-          <Route exact path="/Aditivos" element={<Aditives />} />
-          <Route exact path="/NuevoAditivo" element={<NewAditive />} />
-          <Route exact path="/FinalizarJornada" element={<NewUberEntry />} />
-          <Route exact path="/NuevoGasto" element={<NewExpense />} />
-          <Route exact path="/NuevoIngreso" element={<NewIncome />} />
-          <Route exact path="/Exchange" element={<Exchange />} />
-          <Route exact path="/EmpezarChallenge" element={<StartChallenge />} />
+          <Route path="/finanzas" element={<Finances />} />
+          <Route path="/nuevoGasto" element={<NewExpense />} />
+          <Route path="/nuevoIngreso" element={<NewIncome />} />
+          <Route path="/NuevoHabito" element={<NewHabit />} />
+          <Route path="/EditarHabito/:habitId" element={<EditHabit />} />
+          <Route path="/DetalleHabito/:habitId" element={<HabitDetail />} />
+          <Route path="/Habitos" element={<Habits />} />
+          <Route path="/TarjetasCredito" element={<CreditCards />} />
+          <Route path="/NuevaTarjeta" element={<NewCard />} />
+          <Route path="/EditarTarjeta/:cardId" element={<EditCard />} />
+          <Route path="/ActualizarFechasTarjeta/:cardId" element={<UpdateCardDates />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Login />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

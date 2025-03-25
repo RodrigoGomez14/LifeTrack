@@ -16,7 +16,7 @@ const Layout = ({ children, title }) => {
     <>
       <AppBar toggleDrawer={toggleDrawer} title={title} />
       <Drawer open={openDrawer} toggleDrawer={toggleDrawer} />
-      <Grid container spacing={3} p={1} mt={5} style={{ backgroundColor:theme.palette.secondary.dark }}>
+      <Grid container spacing={0} p={0} mt={5} style={{ backgroundColor:theme.palette.secondary.dark }}>
         {children}
       </Grid>
     </>
