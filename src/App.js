@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import './App.css';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import Login from './pages/basics/Login.jsx';
 import Home from './pages/basics/Home.jsx';
 import Finances from './pages/finances/Finances.jsx';
 import Loading from './pages/basics/Loading.jsx';
-import Uber from './pages/uber/Uber.jsx';
 import Habits from './pages/habits/Habits';
 import PlantsList from './pages/plants/PlantsList.jsx';
 import Plant from './pages/plants/Plant.jsx';
@@ -16,15 +15,13 @@ import NewPruning from './pages/plants/NewPruning.jsx';
 import NewTransplant from './pages/plants/NewTransplant.jsx';
 import Aditives from './pages/plants/Aditives.jsx';
 import NewAditive from './pages/plants/NewAditive.jsx';
-import NewUberEntry from './pages/uber/NewUberEntry.jsx';
 import NewExpense from './pages/finances/NewExpense.jsx';
 import NewIncome from './pages/finances/NewIncome.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
-import StartChallenge from './pages/uber/StartChallenge.jsx';
 import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { indigo, teal } from '@mui/material/colors';
+import { createTheme, ThemeProvider, CssBaseline } from '@mui/material/styles';
+import { indigo, teal, blue, lightBlue, purple } from '@mui/material/colors';
 import NewHabit from './pages/habits/NewHabit';
 import EditHabit from './pages/habits/EditHabit';
 import HabitDetail from './components/habits/HabitDetail';
@@ -33,6 +30,7 @@ import NewCard from './pages/finances/NewCard';
 import EditCard from './pages/finances/EditCard';
 import UpdateCardDates from './pages/finances/UpdateCardDates.jsx';
 import { ColorModeContext } from './utils';
+import PlantCalendar from './pages/plants/PlantCalendar';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
@@ -41,10 +39,7 @@ function App() {
     const groupdedFinances = {incomes:{},expenses:{}};
     let groupedSavings = {};
     let groupedPlants = {};
-    let groupedUberData = {data:{}};
     let groupedHabits = {};
-    let earningsUberData = [];
-    let totalEarningsUber = 0;
 
     if (data.incomes) {
       Object.keys(data.incomes).forEach((transactionId) => {
@@ -112,50 +107,6 @@ function App() {
       });
     }
     
-    if (data.uber) {
-      groupedUberData.pending=data.uber.pending
-      groupedUberData.challenge=data.uber.challenge
-      Object.keys(data.uber.data).forEach((transactionId) => {
-        const transaction = data.uber.data[transactionId];
-        const [, month, year] = transaction.date.split('/').map(Number);
-        
-        if (!groupedUberData.data[year]) {
-          groupedUberData.data[year] = {
-            total: 0,
-            totalUSD: 0,
-            months: {
-              1: { total: 0, totalUSD: 0, data: [] },
-              2: { total: 0, totalUSD: 0, data: [] },
-              3: { total: 0, totalUSD: 0, data: [] },
-              4: { total: 0, totalUSD: 0, data: [] },
-              5: { total: 0, totalUSD: 0, data: [] },
-              6: { total: 0, totalUSD: 0, data: [] },
-              7: { total: 0, totalUSD: 0, data: [] },
-              8: { total: 0, totalUSD: 0, data: [] },
-              9: { total: 0, totalUSD: 0, data: [] },
-              10: { total: 0, totalUSD: 0, data: [] },
-              11: { total: 0, totalUSD: 0, data: [] },
-              12: { total: 0, totalUSD: 0, data: [] },
-            },
-          };
-        }
-
-        groupedUberData.data[year].months[month].data.push(transaction);
-        groupedUberData.data[year].months[month].total += transaction.amount;
-        groupedUberData.data[year].months[month].totalUSD += transaction.amountUSD;
-        groupedUberData.data[year].total += transaction.amount;
-        groupedUberData.data[year].totalUSD += transaction.amountUSD;
-
-        if (!transaction.challenge) {
-          totalEarningsUber += transaction.amount;
-          earningsUberData.push({
-            x: transaction.date,
-            y: totalEarningsUber,
-          });
-        }
-      });
-    }
-
     if (data.savings) {
       groupedSavings = data.savings
     }
@@ -181,7 +132,6 @@ function App() {
 
     return { 
       finances: groupdedFinances, 
-      uber: groupedUberData, 
       savings: groupedSavings, 
       plants: groupedPlants,
       habits: groupedHabits,
@@ -233,6 +183,10 @@ function App() {
     return <Loading />;
   }
 
+  const PrivateRoute = ({ children }) => {
+    return auth.currentUser ? children : <Navigate to="/login" />;
+  };
+
   return (
     <ThemeProvider theme={theme}>
       {userLoggedIn?
@@ -252,6 +206,10 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Login />} />
+          <Route path="/Plantas" element={<PrivateRoute><PlantsList /></PrivateRoute>} />
+          <Route path="/Planta" element={<PrivateRoute><Plant /></PrivateRoute>} />
+          <Route path="/PlantaCalendario" element={<PrivateRoute><PlantCalendar /></PrivateRoute>} />
+          <Route path="/NuevaPlanta" element={<PrivateRoute><NewPlant /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

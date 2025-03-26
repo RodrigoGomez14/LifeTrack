@@ -1,90 +1,267 @@
 import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { Button, TextField, MenuItem, Input, Select, FormControlLabel, Grid } from '@mui/material';
-import { database,auth } from '../../firebase';
+import { 
+  Button, 
+  TextField, 
+  MenuItem, 
+  Select, 
+  FormControlLabel, 
+  Grid, 
+  Box, 
+  Typography, 
+  Card, 
+  CardContent, 
+  Divider, 
+  Paper, 
+  Stack,
+  FormControl, 
+  FormLabel,
+  FormHelperText,
+  InputLabel,
+  Alert,
+  alpha
+} from '@mui/material';
+import { database, auth } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
+import AddIcon from '@mui/icons-material/Add';
+import ForestIcon from '@mui/icons-material/Forest';
+import SpaIcon from '@mui/icons-material/Spa';
+import GrassIcon from '@mui/icons-material/Grass';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import { useTheme } from '@mui/material/styles';
 
 const NewPlant = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [potVolume, setPotVolume] = useState('');
   const [etapa, setEtapa] = useState('Germinacion');
-  const [inicioGerminacion, setInicioGerminacion] = useState('');
-  const [inicioVegetativo, setInicioVegetativo] = useState('');
-  const [inicioFloracion, setInicioFloracion] = useState('');
+  const [inicioGerminacion, setInicioGerminacion] = useState(null);
+  const [inicioVegetativo, setInicioVegetativo] = useState(null);
+  const [inicioFloracion, setInicioFloracion] = useState(null);
+  const [errors, setErrors] = useState({});
 
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!name.trim()) {
+      newErrors.name = 'El nombre es obligatorio';
+    }
+    
+    if (!quantity || quantity <= 0) {
+      newErrors.quantity = 'Ingresa una cantidad válida';
+    }
+    
+    if (potVolume && (isNaN(potVolume) || potVolume <= 0)) {
+      newErrors.potVolume = 'Ingresa un volumen válido';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const formatDate = (date) => {
+    if (!date) return null;
+    
+    const d = new Date(date);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  };
 
   const handleFormSubmit = () => {
-    if (!name || !quantity) {
-      alert('Por favor complete todos los campos');
+    if (!validateForm()) {
       return;
     }
 
-    database.ref(`${auth.currentUser.uid}/plants/active`).push({
-      name:name,
-      quantity:parseInt(quantity)
-    });
+    const plantData = {
+      name: name.trim(),
+      quantity: parseInt(quantity),
+      potVolume: potVolume ? parseFloat(potVolume) : null,
+      etapa: etapa
+    };
+    
+    if (inicioGerminacion) {
+      plantData.inicioGerminacion = formatDate(inicioGerminacion);
+    }
+    
+    if (inicioVegetativo) {
+      plantData.inicioVegetativo = formatDate(inicioVegetativo);
+    }
+    
+    if (inicioFloracion) {
+      plantData.inicioFloracion = formatDate(inicioFloracion);
+    }
+
+    database.ref(`${auth.currentUser.uid}/plants/active`).push(plantData);
 
     setName('');
     setQuantity('');
+    setPotVolume('');
+    setEtapa('Germinacion');
+    setInicioGerminacion(null);
+    setInicioVegetativo(null);
+    setInicioFloracion(null);
 
     navigate('/Plantas');
   };
 
   return (
     <Layout title="Nueva Planta">
-      <Grid container item xs={12} justifyContent='center'>
-          <TextField
-            label="Nombre"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <TextField
-            label="Cantidad"
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            required
-            fullWidth
-            margin="normal"
-          />
-          <Select
-            value={etapa}
-            label="Etapa"
-            onChange={(e) => setEtapa(e.target.value)}
-          >
-            <MenuItem value='Germinacion'>Germinacion</MenuItem>
-            <MenuItem value='Vegetativo'>Vegetativo</MenuItem>
-            <MenuItem value='Floracion'>Floracion</MenuItem>
-          </Select>
-          <FormControlLabel
-              label='Inicio de Germinacion'
-              labelPlacement='top'
-              control={
-                  <Input type='date' value={inicioGerminacion} disabled={!etapa} onChange={e=>{setInicioGerminacion(e.target.value)}}/>
-              }
-          />
-          <FormControlLabel
-              label='Inicio de Vegetativo'
-              labelPlacement='top'
-              control={
-                  <Input type='date' disabled={ etapa === 'Germinacion'} value={inicioVegetativo}onChange={e=>{setInicioVegetativo(e.target.value)}}/>
-              }
-          />
-          <FormControlLabel
-              label='Inicio de Floracion'
-              labelPlacement='top'
-              control={
-                  <Input type='date' disabled={etapa !== 'Floracion'} value={inicioFloracion}onChange={e=>{setInicioFloracion(e.target.value)}}/>
-              }
-          />
-          <Button variant="contained" onClick={handleFormSubmit} disabled={!name || !quantity}>AGREGAR</Button>
-      </Grid>
+      <Box sx={{ maxWidth: 600, mx: 'auto', p: { xs: 2, md: 0 } }}>
+        <Card elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <Box sx={{ 
+            p: 3, 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 2,
+            bgcolor: alpha(theme.palette.secondary.main, 0.1)
+          }}>
+            <ForestIcon fontSize="large" color="secondary" />
+            <Typography variant="h5" component="h1">
+              Agregar Nueva Planta
+            </Typography>
+          </Box>
+          
+          <CardContent sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <TextField
+                  label="Nombre de la planta"
+                  placeholder="Ej: Albahaca, Tomate, etc."
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  fullWidth
+                  error={!!errors.name}
+                  helperText={errors.name}
+                  required
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Cantidad"
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  fullWidth
+                  error={!!errors.quantity}
+                  helperText={errors.quantity}
+                  required
+                  InputProps={{ inputProps: { min: 1 } }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Volumen de maceta (L)"
+                  type="number"
+                  value={potVolume}
+                  onChange={(e) => setPotVolume(e.target.value)}
+                  fullWidth
+                  error={!!errors.potVolume}
+                  helperText={errors.potVolume || 'Opcional'}
+                  InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    ETAPA DE CRECIMIENTO
+                  </Typography>
+                </Divider>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel id="etapa-label">Etapa actual</InputLabel>
+                  <Select
+                    labelId="etapa-label"
+                    value={etapa}
+                    label="Etapa actual"
+                    onChange={(e) => setEtapa(e.target.value)}
+                  >
+                    <MenuItem value="Germinacion">Germinación</MenuItem>
+                    <MenuItem value="Vegetativo">Vegetativo</MenuItem>
+                    <MenuItem value="Floracion">Floración</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Stack spacing={3}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+                    <DatePicker
+                      label="Inicio de Germinación"
+                      value={inicioGerminacion}
+                      onChange={(date) => setInicioGerminacion(date)}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          variant: 'outlined',
+                        }
+                      }}
+                    />
+                    
+                    <DatePicker
+                      label="Inicio de Vegetativo"
+                      value={inicioVegetativo}
+                      onChange={(date) => setInicioVegetativo(date)}
+                      disabled={etapa === 'Germinacion'}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          variant: 'outlined',
+                        }
+                      }}
+                    />
+                    
+                    <DatePicker
+                      label="Inicio de Floración"
+                      value={inicioFloracion}
+                      onChange={(date) => setInicioFloracion(date)}
+                      disabled={etapa !== 'Floracion'}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          variant: 'outlined',
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
+                </Stack>
+              </Grid>
+            </Grid>
+            
+            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/Plantas')}
+                sx={{ mr: 2 }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                variant="contained"
+                color="secondary"
+                onClick={handleFormSubmit}
+                disabled={!name || !quantity}
+                startIcon={<AddIcon />}
+              >
+                Agregar Planta
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
     </Layout>
   );
 };

@@ -88,21 +88,21 @@ const NewExpense = () => {
     
     if (paymentMethod === 'cash') {
       // Pago en efectivo: actualizar directamente los gastos y ahorros
-      database.ref(`${auth.currentUser.uid}/expenses`).push({
+    database.ref(`${auth.currentUser.uid}/expenses`).push({
         amount: parsedAmount,
         amountUSD: parsedAmount / dollarRate['venta'],
-        category: category,
-        subcategory: subcategory,
-        date: getDate(),
-        description: description,
+      category: category,
+      subcategory: subcategory,
+      date: getDate(),
+      description: description,
         valorUSD: dollarRate['venta'],
         paymentMethod: 'cash'
       });
 
-      // Actualizar el valor de ahorros en ARS y su historial
+    // Actualizar el valor de ahorros en ARS y su historial
       database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(userData.savings.amountARS - parsedAmount);
-      database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-        date: getDate(),
+    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
+      date: getDate(),
         amount: -parsedAmount,
         newTotal: (userData.savings.amountARS - parsedAmount),
       });
@@ -165,7 +165,7 @@ const NewExpense = () => {
     Servicios: ['Electricidad', 'Expensas','Impuestos', 'Internet','Celular'],
     Indoor: ['Plantas', 'Fertilizantes','Tierra', 'Herramientas'],
     Supermercado: ['General', 'Chino', 'Verduleria','Carniceria'],
-    Transporte: ['Uber', 'Publico'],
+    Transporte: ['Publico'],
     Extras: ['Hierba', 'Otros'],
   };
 
@@ -342,7 +342,7 @@ const NewExpense = () => {
             </Paper>
           </Grid>
         ))}
-      </Grid>
+        </Grid>
       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
         <Button
           variant="outlined"
@@ -384,14 +384,14 @@ const NewExpense = () => {
         </Typography>
       </Box>
       
-      <TextField
-        label="Monto"
-        type="number"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        required
-        fullWidth
-        margin="normal"
+          <TextField
+            label="Monto"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">$</InputAdornment>
@@ -411,13 +411,13 @@ const NewExpense = () => {
         </Box>
       )}
       
-      <TextField
-        label="Descripción"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        required
-        fullWidth
-        margin="normal"
+          <TextField
+            label="Descripción"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+            fullWidth
+            margin="normal"
         multiline
         rows={2}
         sx={{ mb: 3 }}

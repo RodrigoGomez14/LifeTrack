@@ -183,7 +183,7 @@ const Home = () => {
   const chartOptions = {
     chart: {
       height: 350,
-      type: 'area',
+      type: 'mixed',
       toolbar: {
         show: true,
         tools: {
@@ -245,14 +245,17 @@ const Home = () => {
   const chartSeries = [
     {
       name: 'Ingresos',
+      type: 'area',
       data: incomes
     },
     {
       name: 'Gastos',
+      type: 'area',
       data: expenses
     },
     {
       name: 'Balance',
+      type: 'column',
       data: balance
     }
   ];

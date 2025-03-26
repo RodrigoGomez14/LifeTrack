@@ -741,7 +741,7 @@ const CreditCards = () => {
                       Total de todas las tarjetas
                     </Typography>
                     <Typography variant="h4" fontWeight="bold" color="error.main">
-                      ${formatAmount(getAllCardsTotal())}
+                      {formatAmount(getAllCardsTotal())}
                     </Typography>
                   </Box>
                   
@@ -992,7 +992,7 @@ const CreditCards = () => {
                                 </Typography>
                               </Stack>
                               <Typography variant="h6" fontWeight="medium">
-                                ${formatAmount(getCardTotal())}
+                                {formatAmount(getCardTotal())}
                               </Typography>
                             </Paper>
                           </Grid>
@@ -1326,7 +1326,7 @@ const CreditCards = () => {
                             />
                             <ListItemSecondaryAction>
                               <Typography variant="body1" fontWeight="medium" color="error.main">
-                                ${formatAmount(transaction.amount)}
+                                {formatAmount(transaction.amount)}
                               </Typography>
                             </ListItemSecondaryAction>
                           </ListItem>

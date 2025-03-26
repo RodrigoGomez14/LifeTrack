@@ -55,8 +55,12 @@ export const formatAmount = (amount) => {
         return <DirectionsBusIcon />;
       case 'Extras':
         return <AddCircleIcon />;
-      case 'Uber':
-        return <LocalTaxiIcon />;
+      case 'Mercadopago':
+        return '#03A9F4';
+      case 'Efectivo':
+        return '#43A047';
+      case 'Transferencia':
+        return '#E91E63';
       case 'Sueldo':
         return <WorkIcon />;
       case 'Freelance':

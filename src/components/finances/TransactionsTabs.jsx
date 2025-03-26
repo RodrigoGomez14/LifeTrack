@@ -64,7 +64,7 @@ const TransactionsTabs = ({ data, type }) => {
   
   const categories = type === 'expenses' 
     ? ['Auto', 'Servicios', 'Indoor', 'Supermercado', 'Transporte', 'Extras', 'Exchange']
-    : ['Uber', 'Sueldo', 'Freelance', 'Camila', 'Extras', 'Exchange'];
+    : ['Sueldo', 'Freelance', 'Camila', 'Extras', 'Exchange'];
 
   // Comprobar si existen los datos necesarios para el gráfico de pie
   const hasCurrentMonthData = data && 

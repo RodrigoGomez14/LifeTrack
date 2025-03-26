@@ -35,7 +35,10 @@ import {
   AlertTitle,
   Tabs,
   Tab,
-  Avatar
+  Avatar,
+  SpeedDial,
+  SpeedDialIcon,
+  SpeedDialAction
 } from '@mui/material';
 import TransactionsTabs from '../../components/finances/TransactionsTabs';
 import SavingsTab from '../../components/finances/SavingsTab';
@@ -86,12 +89,20 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocalMoviesIcon from '@mui/icons-material/LocalMovies';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import FlightTakeoffIcon from '@mui/icons-material/FlightTakeoff';
+import AddIcon from '@mui/icons-material/Add';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Finances = () => {
   const { userData, dollarRate } = useStore();
   const [dataType, setDataType] = useState('expenses');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [openSpeedDial, setOpenSpeedDial] = useState(false);
+  
+  const navigate = useNavigate();
   
   // Estados para los datos procesados
   const [monthlyData, setMonthlyData] = useState(null);
@@ -1647,6 +1658,12 @@ const Finances = () => {
     );
   };
 
+  // Definir acciones para el SpeedDial
+  const actions = [
+    { icon: <TrendingDownIcon />, name: 'Nuevo Gasto', action: () => navigate('/NuevoGasto'), color: theme.palette.error.main },
+    { icon: <TrendingUpIcon />, name: 'Nuevo Ingreso', action: () => navigate('/NuevoIngreso'), color: theme.palette.success.main }
+  ];
+
   return (
     <Layout title="Análisis Financiero">
       <Box sx={{ bgcolor: theme.palette.background.main, minHeight: '100vh', pt: 2, pb: 4 }}>
@@ -1874,6 +1891,44 @@ const Finances = () => {
           </Grid>
         </Grid>
       </Box>
+
+      {/* SpeedDial para acciones rápidas */}
+      <SpeedDial
+        ariaLabel="Acciones rápidas de finanzas"
+        sx={{ 
+          position: 'fixed', 
+          bottom: 16, 
+          right: 16 
+        }}
+        icon={<SpeedDialIcon />}
+        onClose={() => setOpenSpeedDial(false)}
+        onOpen={() => setOpenSpeedDial(true)}
+        open={openSpeedDial}
+        FabProps={{
+          sx: {
+            bgcolor: theme.palette.primary.main,
+            '&:hover': {
+              bgcolor: theme.palette.primary.dark,
+            }
+          }
+        }}
+      >
+        {actions.map((action) => (
+          <SpeedDialAction
+            key={action.name}
+            icon={action.icon}
+            tooltipTitle={action.name}
+            tooltipOpen={isMobile}
+            onClick={action.action}
+            sx={{
+              '& .MuiSpeedDialAction-staticTooltipLabel': {
+                backgroundColor: action.color,
+                color: '#fff'
+              }
+            }}
+          />
+        ))}
+      </SpeedDial>
     </Layout>
   );
 };

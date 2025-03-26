@@ -16,7 +16,6 @@ import {
 } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import AccountBalanceOutlinedIcon from '@mui/icons-material/AccountBalanceOutlined';
-import LocalTaxiOutlinedIcon from '@mui/icons-material/LocalTaxiOutlined';
 import EmojiObjectsOutlinedIcon from '@mui/icons-material/EmojiObjectsOutlined';
 import ExitToAppOutlinedIcon from '@mui/icons-material/ExitToAppOutlined';
 import ForestOutlinedIcon from '@mui/icons-material/ForestOutlined';
@@ -42,7 +41,6 @@ const Drawer = ({ open, toggleDrawer }) => {
     { path: '/', icon: <HomeOutlinedIcon />, text: 'Home', color: theme.palette.primary.main },
     { path: '/Finanzas', icon: <AccountBalanceOutlinedIcon />, text: 'Finanzas', color: theme.palette.success.main },
     { path: '/TarjetasCredito', icon: <CreditCardIcon />, text: 'Tarjetas', color: theme.palette.error.main },
-    { path: '/Uber', icon: <LocalTaxiOutlinedIcon />, text: 'Uber', color: theme.palette.warning.main },
     { path: '/Habitos', icon: <EmojiObjectsOutlinedIcon />, text: 'Hábitos', color: theme.palette.info.main },
     { path: '/Plantas', icon: <ForestOutlinedIcon />, text: 'Plantas', color: theme.palette.secondary.main },
   ];
