@@ -39,6 +39,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import { useTheme } from '@mui/material/styles';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { alpha } from '@mui/material/styles';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const NewExpense = () => {
   const { userData, dollarRate } = useStore();
@@ -245,55 +249,110 @@ const NewExpense = () => {
   const installmentOptions = [1, 3, 6, 9, 12, 18, 24];
 
   const renderStep1 = () => (
-    <Box>
-      <Typography variant="h6" fontWeight="medium" gutterBottom align="center">
-        Selecciona una categoría
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h5" fontWeight="bold" gutterBottom>
+        ¿En qué categoría se encuentra tu gasto?
       </Typography>
-      <Grid container spacing={2} sx={{ mt: 1 }}>
+      <Typography variant="body1" color="text.secondary" paragraph>
+        Selecciona la categoría que mejor describe tu gasto
+      </Typography>
+
+      <Grid container spacing={2} sx={{ mt: 2, flex: 1, width: '100%' }}>
         {Object.keys(subcategories).map((cat) => (
-          <Grid item xs={6} sm={4} key={cat}>
+          <Grid item xs={12} sm={6} md={4} key={cat} sx={{ width: '100%' }}>
             <Card 
               elevation={2} 
               onClick={() => handleCategorySelect(cat)}
               sx={{ 
                 cursor: 'pointer', 
                 height: '100%',
-                transition: 'transform 0.2s, box-shadow 0.2s',
+                width: '100%',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden',
+                borderRadius: 3,
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: 4
+                  boxShadow: 6,
+                  '& .category-bg': {
+                    opacity: 0.15
+                  }
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 4,
+                  bgcolor: getCategoryColor(cat)
                 }
               }}
             >
-              <CardContent sx={{ textAlign: 'center', p: 2 }}>
+              <Box 
+                className="category-bg"
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  bgcolor: getCategoryColor(cat),
+                  opacity: 0.1,
+                  transition: 'opacity 0.3s ease'
+                }}
+              />
+              <CardContent sx={{ 
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                position: 'relative',
+                zIndex: 1,
+                p: 3
+              }}>
                 <Box
                   sx={{
-                    mb: 1,
+                    mb: 2,
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    width: 50,
-                    height: 50,
+                    width: 60,
+                    height: 60,
                     borderRadius: '50%',
                     bgcolor: `${getCategoryColor(cat)}15`,
-                    mx: 'auto'
+                    color: getCategoryColor(cat)
                   }}
                 >
-                  {React.cloneElement(getCategoryIcon(cat), { style: { color: getCategoryColor(cat) } })}
+                  {React.cloneElement(getCategoryIcon(cat), { sx: { fontSize: 30 } })}
                 </Box>
-                <Typography variant="body1" fontWeight="medium">
+                <Typography variant="h6" fontWeight="bold" gutterBottom>
                   {cat}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {subcategories[cat].join(', ')}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
         ))}
       </Grid>
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
         <Button
           variant="outlined"
           onClick={() => handleStepChange('back')}
-          sx={{ px: 3 }}
+          startIcon={<ArrowBackIcon />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            borderWidth: 2,
+            '&:hover': {
+              borderWidth: 2
+            }
+          }}
         >
           Volver
         </Button>
@@ -302,52 +361,124 @@ const NewExpense = () => {
   );
 
   const renderStep2 = () => (
-    <Box>
-      <Box mb={2} display="flex" alignItems="center">
-        <Chip
-          icon={getCategoryIcon(category)}
-          label={category}
-          sx={{ 
-            bgcolor: `${getCategoryColor(category)}15`,
-            color: getCategoryColor(category),
-            fontWeight: 'medium',
-            mr: 1
-          }}
-        />
-        <Typography variant="h6" fontWeight="medium">
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box mb={3}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
           Selecciona una subcategoría
         </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Chip
+            icon={getCategoryIcon(category)}
+            label={category}
+            sx={{ 
+              bgcolor: `${getCategoryColor(category)}15`,
+              color: getCategoryColor(category),
+              fontWeight: 'medium',
+              height: 32
+            }}
+          />
+          <Typography variant="body1" color="text.secondary">
+            Especifica el tipo de {category.toLowerCase()}
+          </Typography>
+        </Stack>
       </Box>
-      <Grid container spacing={2} sx={{ mt: 1 }}>
+
+      <Grid container spacing={2} sx={{ flex: 1, width: '100%' }}>
         {subcategories[category].map((subcat) => (
-          <Grid item xs={6} sm={4} key={subcat}>
-            <Paper 
+          <Grid item xs={12} sm={6} key={subcat} sx={{ width: '100%' }}>
+            <Card 
               elevation={2} 
               onClick={() => handleSubcategorySelect(subcat)}
               sx={{ 
                 cursor: 'pointer',
-                p: 2,
-                textAlign: 'center',
-                borderLeft: `4px solid ${getCategoryColor(category)}`,
-                transition: 'transform 0.2s, box-shadow 0.2s',
+                height: '100%',
+                width: '100%',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden',
+                borderRadius: 3,
                 '&:hover': {
                   transform: 'translateY(-4px)',
-                  boxShadow: 3
+                  boxShadow: 6,
+                  '& .subcategory-bg': {
+                    opacity: 0.15
+                  }
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: 4,
+                  bottom: 0,
+                  bgcolor: getCategoryColor(category)
                 }
               }}
             >
-              <Typography variant="body1" fontWeight="medium">
-                {subcat}
-              </Typography>
-            </Paper>
+              <Box 
+                className="subcategory-bg"
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  bgcolor: getCategoryColor(category),
+                  opacity: 0.1,
+                  transition: 'opacity 0.3s ease'
+                }}
+              />
+              <CardContent sx={{ 
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                position: 'relative',
+                zIndex: 1,
+                p: 3
+              }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: 48,
+                    height: 48,
+                    borderRadius: '50%',
+                    bgcolor: `${getCategoryColor(category)}15`,
+                    color: getCategoryColor(category),
+                    mr: 2
+                  }}
+                >
+                  {React.cloneElement(getCategoryIcon(category), { sx: { fontSize: 24 } })}
+                </Box>
+                <Box>
+                  <Typography variant="h6" fontWeight="bold">
+                    {subcat}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Subcategoría de {category}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
           </Grid>
         ))}
         </Grid>
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
         <Button
           variant="outlined"
           onClick={() => handleStepChange('back')}
-          sx={{ px: 3 }}
+          startIcon={<ArrowBackIcon />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            borderWidth: 2,
+            '&:hover': {
+              borderWidth: 2
+            }
+          }}
         >
           Volver
         </Button>
@@ -356,34 +487,63 @@ const NewExpense = () => {
   );
 
   const renderStep3 = () => (
-    <Box>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}>
       <Box mb={3}>
-        <Stack direction="row" spacing={1} mb={1}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
+          Detalles del gasto
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
           <Chip
             icon={getCategoryIcon(category)}
             label={category}
             sx={{ 
               bgcolor: `${getCategoryColor(category)}15`,
               color: getCategoryColor(category),
-              fontWeight: 'medium'
+              fontWeight: 'medium',
+              height: 32
             }}
           />
+          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
           <Chip
             label={subcategory}
-            variant="outlined"
             sx={{ 
-              color: theme.palette.text.primary,
-              borderColor: getCategoryColor(category),
-              fontWeight: 'medium'
+              bgcolor: alpha(getCategoryColor(category), 0.1),
+              color: getCategoryColor(category),
+              fontWeight: 'medium',
+              height: 32
             }}
           />
         </Stack>
-        
-        <Typography variant="h6" fontWeight="medium">
-          Detalles del gasto
-        </Typography>
       </Box>
-      
+
+      <Card 
+        elevation={2}
+        sx={{ 
+          p: 3,
+          borderRadius: 3,
+          bgcolor: 'background.paper',
+          position: 'relative',
+          overflow: 'hidden',
+          flex: 1,
+          width: '100%'
+        }}
+      >
+        <Box 
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 4,
+            bgcolor: getCategoryColor(category)
+          }}
+        />
+        
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              ¿Cuánto gastaste?
+            </Typography>
           <TextField
             label="Monto"
             type="number"
@@ -391,43 +551,101 @@ const NewExpense = () => {
             onChange={(e) => setAmount(e.target.value)}
             required
             fullWidth
-            margin="normal"
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">$</InputAdornment>
-          ),
-        }}
-        sx={{ mb: 3 }}
-      />
-      
-      {amount && (
-        <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: `1px dashed ${theme.palette.divider}` }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="body2" color="text.secondary">Equivalente en USD:</Typography>
-            <Typography variant="body1" fontWeight="medium">
-              USD {formatAmount(parseFloat(amount) / dollarRate['venta'])}
+              variant="outlined"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Typography variant="h6" color="primary" fontWeight="bold">$</Typography>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ 
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  '& fieldset': {
+                    borderWidth: 2,
+                  },
+                  '&:hover fieldset': {
+                    borderWidth: 2,
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderWidth: 2,
+                  }
+                }
+              }}
+            />
+          </Box>
+          
+          {amount && (
+            <Card 
+              elevation={0}
+              sx={{ 
+                p: 2,
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px dashed ${theme.palette.primary.main}`,
+                borderRadius: 2
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography variant="body2" color="text.secondary">
+                  Equivalente en USD:
+                </Typography>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  USD {formatAmount(parseFloat(amount) / dollarRate['venta'])}
+                </Typography>
+              </Stack>
+            </Card>
+          )}
+          
+          <Box>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              Describe tu gasto
             </Typography>
-          </Stack>
-        </Box>
-      )}
-      
           <TextField
             label="Descripción"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
             fullWidth
-            margin="normal"
-        multiline
-        rows={2}
-        sx={{ mb: 3 }}
-      />
-      
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+              multiline
+              rows={3}
+              variant="outlined"
+              placeholder="Ej: Compra semanal de supermercado"
+              sx={{ 
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  '& fieldset': {
+                    borderWidth: 2,
+                  },
+                  '&:hover fieldset': {
+                    borderWidth: 2,
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderWidth: 2,
+                  }
+                }
+              }}
+            />
+          </Box>
+        </Stack>
+      </Card>
+
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
         <Button
           variant="outlined"
           onClick={() => handleStepChange('back')}
-          sx={{ px: 3 }}
+          startIcon={<ArrowBackIcon />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            borderWidth: 2,
+            '&:hover': {
+              borderWidth: 2
+            }
+          }}
         >
           Volver
         </Button>
@@ -436,7 +654,13 @@ const NewExpense = () => {
           color="primary"
           onClick={() => handleStepChange('next')}
           disabled={!amount || !description}
-          sx={{ px: 3 }}
+          endIcon={<ArrowForwardIcon />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            boxShadow: 2
+          }}
         >
           Continuar
         </Button>
@@ -445,225 +669,327 @@ const NewExpense = () => {
   );
 
   const renderStep4 = () => (
-    <Box>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}>
       <Box mb={3}>
-        <Stack direction="row" spacing={1} mb={1}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
+          Método de pago
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
           <Chip
             icon={getCategoryIcon(category)}
             label={category}
             sx={{ 
               bgcolor: `${getCategoryColor(category)}15`,
               color: getCategoryColor(category),
-              fontWeight: 'medium'
+              fontWeight: 'medium',
+              height: 32
             }}
           />
+          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
           <Chip
             label={subcategory}
-            variant="outlined"
             sx={{ 
-              color: theme.palette.text.primary,
-              borderColor: getCategoryColor(category),
-              fontWeight: 'medium'
+              bgcolor: alpha(getCategoryColor(category), 0.1),
+              color: getCategoryColor(category),
+              fontWeight: 'medium',
+              height: 32
+            }}
+          />
+          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
+          <Chip
+            label={`$${formatAmount(parseFloat(amount))}`}
+            sx={{ 
+              bgcolor: alpha(theme.palette.success.main, 0.1),
+              color: theme.palette.success.main,
+              fontWeight: 'bold',
+              height: 32
             }}
           />
         </Stack>
-        
-        <Typography variant="h6" fontWeight="medium">
-          Forma de pago
-        </Typography>
       </Box>
-      
-      <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
-        <FormLabel component="legend">Selecciona método de pago</FormLabel>
-        <RadioGroup
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-        >
-          <Paper 
-            elevation={paymentMethod === 'cash' ? 2 : 0}
-            sx={{ 
-              mt: 2, 
-              p: 2, 
-              borderRadius: 2,
-              border: `1px solid ${paymentMethod === 'cash' ? theme.palette.primary.main : theme.palette.divider}`,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              '&:hover': {
-                borderColor: theme.palette.primary.main,
-                transform: 'translateY(-2px)',
-                boxShadow: 2
-              }
-            }}
-            onClick={() => setPaymentMethod('cash')}
-          >
-            <FormControlLabel 
-              value="cash" 
-              control={<Radio />} 
-              label={
-                <Stack direction="row" alignItems="center" spacing={1}>
+
+      <Card 
+        elevation={2}
+        sx={{ 
+          p: 3,
+          borderRadius: 3,
+          bgcolor: 'background.paper',
+          position: 'relative',
+          overflow: 'hidden',
+          flex: 1,
+          width: '100%'
+        }}
+      >
+        <Box 
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 4,
+            bgcolor: theme.palette.primary.main
+          }}
+        />
+        
+        <Stack spacing={3}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            ¿Cómo deseas pagar?
+          </Typography>
+
+          <Stack spacing={2}>
+            {/* Opción de Efectivo */}
+            <Card
+              elevation={paymentMethod === 'cash' ? 3 : 1}
+              onClick={() => setPaymentMethod('cash')}
+              sx={{ 
+                cursor: 'pointer',
+                borderRadius: 2,
+                transition: 'all 0.3s ease',
+                transform: paymentMethod === 'cash' ? 'scale(1.02)' : 'scale(1)',
+                border: `2px solid ${paymentMethod === 'cash' ? theme.palette.success.main : 'transparent'}`,
+                '&:hover': {
+                  transform: 'scale(1.02)',
+                  boxShadow: 3
+                }
+              }}
+            >
+              <CardContent sx={{ p: 2 }}>
+                <Stack direction="row" spacing={2} alignItems="center">
                   <Box 
                     sx={{ 
-                      bgcolor: theme.palette.success.light + '20',
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
                       borderRadius: '50%',
-                      p: 1,
-                      display: 'flex'
+                      p: 1.5,
+                      color: theme.palette.success.main
                     }}
                   >
-                    <PaymentsIcon sx={{ color: theme.palette.success.main }} />
+                    <PaymentsIcon fontSize="large" />
                   </Box>
-                  <Box>
-                    <Typography variant="body1" fontWeight="medium">Efectivo</Typography>
+                  <Box flex={1}>
+                    <Typography variant="h6" fontWeight="bold">
+                      Efectivo
+                    </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Se descontará inmediatamente de tus ahorros
                     </Typography>
                   </Box>
+                  <Radio 
+                    checked={paymentMethod === 'cash'}
+                    sx={{ 
+                      color: theme.palette.success.main,
+                      '&.Mui-checked': {
+                        color: theme.palette.success.main
+                      }
+                    }}
+                  />
                 </Stack>
-              }
-              sx={{ width: '100%', m: 0 }}
-            />
-          </Paper>
-          
-          <Paper 
-            elevation={paymentMethod === 'creditCard' ? 2 : 0}
-            sx={{ 
-              mt: 2, 
-              p: 2, 
-              borderRadius: 2,
-              border: `1px solid ${paymentMethod === 'creditCard' ? theme.palette.primary.main : theme.palette.divider}`,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              '&:hover': {
-                borderColor: theme.palette.primary.main,
-                transform: 'translateY(-2px)',
-                boxShadow: 2
-              }
-            }}
-            onClick={() => setPaymentMethod('creditCard')}
-          >
-            <FormControlLabel 
-              value="creditCard" 
-              control={<Radio />} 
-              label={
-                <Stack direction="row" alignItems="center" spacing={1}>
+              </CardContent>
+            </Card>
+
+            {/* Opción de Tarjeta de Crédito */}
+            <Card
+              elevation={paymentMethod === 'creditCard' ? 3 : 1}
+              onClick={() => setPaymentMethod('creditCard')}
+              sx={{ 
+                cursor: 'pointer',
+                borderRadius: 2,
+                transition: 'all 0.3s ease',
+                transform: paymentMethod === 'creditCard' ? 'scale(1.02)' : 'scale(1)',
+                border: `2px solid ${paymentMethod === 'creditCard' ? theme.palette.primary.main : 'transparent'}`,
+                '&:hover': {
+                  transform: 'scale(1.02)',
+                  boxShadow: 3
+                }
+              }}
+            >
+              <CardContent sx={{ p: 2 }}>
+                <Stack direction="row" spacing={2} alignItems="center">
                   <Box 
                     sx={{ 
-                      bgcolor: theme.palette.primary.light + '20',
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
                       borderRadius: '50%',
-                      p: 1,
-                      display: 'flex'
+                      p: 1.5,
+                      color: theme.palette.primary.main
                     }}
                   >
-                    <CreditCardIcon sx={{ color: theme.palette.primary.main }} />
+                    <CreditCardIcon fontSize="large" />
                   </Box>
-                  <Box>
-                    <Typography variant="body1" fontWeight="medium">Tarjeta de Crédito</Typography>
+                  <Box flex={1}>
+                    <Typography variant="h6" fontWeight="bold">
+                      Tarjeta de Crédito
+                    </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Elige una tarjeta y divide en cuotas si lo deseas
                     </Typography>
                   </Box>
+                  <Radio 
+                    checked={paymentMethod === 'creditCard'}
+                    sx={{ 
+                      color: theme.palette.primary.main,
+                      '&.Mui-checked': {
+                        color: theme.palette.primary.main
+                      }
+                    }}
+                  />
                 </Stack>
-              }
-              sx={{ width: '100%', m: 0 }}
-            />
-          </Paper>
-        </RadioGroup>
-      </FormControl>
-      
-      {paymentMethod === 'creditCard' && (
-        <Box 
-          sx={{ 
-            mt: 3, 
-            p: 3, 
-            borderRadius: 2, 
-            bgcolor: theme.palette.primary.light + '10',
-            border: `1px dashed ${theme.palette.primary.main}`
-          }}
-        >
-          <Typography variant="subtitle1" fontWeight="medium" mb={2}>
-            Configura el pago con tarjeta
-          </Typography>
-          
-          {availableCards.length > 0 ? (
-            <>
-              <FormControl fullWidth sx={{ mb: 3 }}>
-                <FormLabel>Selecciona una tarjeta</FormLabel>
-                <Select
-                  value={selectedCard}
-                  onChange={(e) => setSelectedCard(e.target.value)}
-                  sx={{ mt: 1 }}
-                >
-                  {availableCards.map(card => (
-                    <MenuItem key={card.id} value={card.id}>
-                      {card.name} - **** {card.lastFourDigits}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth>
-                <FormLabel>Número de cuotas</FormLabel>
-                <Select
-                  value={installments}
-                  onChange={(e) => setInstallments(e.target.value)}
-                  sx={{ mt: 1 }}
-                >
-                  {installmentOptions.map(option => (
-                    <MenuItem key={option} value={option}>
-                      {option === 1 ? 'Pago único' : `${option} cuotas`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              {installments > 1 && amount && (
-                <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="subtitle2" fontWeight="medium" mb={1}>
-                    Resumen de cuotas
-                  </Typography>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body2" color="text.secondary">Valor por cuota:</Typography>
-                    <Typography variant="body1" fontWeight="medium" color="primary.main">
-                      ${formatAmount(parseFloat(amount) / installments)}
+              </CardContent>
+            </Card>
+          </Stack>
+
+          {/* Configuración de Tarjeta de Crédito */}
+          {paymentMethod === 'creditCard' && (
+            <Box 
+              sx={{ 
+                mt: 2,
+                p: 3,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                border: `1px dashed ${theme.palette.primary.main}`
+              }}
+            >
+              {availableCards.length > 0 ? (
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Selecciona una tarjeta
                     </Typography>
-                  </Stack>
+                    <Select
+                      value={selectedCard}
+                      onChange={(e) => setSelectedCard(e.target.value)}
+                      fullWidth
+                      sx={{ 
+                        borderRadius: 2,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderWidth: 2
+                        }
+                      }}
+                    >
+                      {availableCards.map(card => (
+                        <MenuItem key={card.id} value={card.id}>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <CreditCardIcon color="primary" />
+                            <Typography>
+                              {card.name} - **** {card.lastFourDigits}
+                            </Typography>
+                          </Stack>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Número de cuotas
+                    </Typography>
+                    <Select
+                      value={installments}
+                      onChange={(e) => setInstallments(e.target.value)}
+                      fullWidth
+                      sx={{ 
+                        borderRadius: 2,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderWidth: 2
+                        }
+                      }}
+                    >
+                      {[1, 3, 6, 9, 12, 18, 24].map(option => (
+                        <MenuItem key={option} value={option}>
+                          {option === 1 ? 'Pago único' : `${option} cuotas`}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Box>
+
+                  {installments > 1 && amount && (
+                    <Card 
+                      elevation={0}
+                      sx={{ 
+                        p: 2,
+                        bgcolor: 'background.paper',
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 2
+                      }}
+                    >
+                      <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                        Resumen de cuotas
+                      </Typography>
+                      <Stack spacing={1}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2" color="text.secondary">
+                            Valor por cuota:
+                          </Typography>
+                          <Typography variant="h6" fontWeight="bold" color="primary">
+                            ${formatAmount(parseFloat(amount) / installments)}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2" color="text.secondary">
+                            Total a pagar:
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            ${formatAmount(parseFloat(amount))}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    </Card>
+                  )}
+                </Stack>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 2 }}>
+                  <Typography variant="body1" color="text.secondary" paragraph>
+                    No tienes tarjetas registradas
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={<CreditCardIcon />}
+                    onClick={() => navigate('/NuevaTarjeta')}
+                    sx={{ 
+                      borderRadius: 2,
+                      borderWidth: 2,
+                      '&:hover': {
+                        borderWidth: 2
+                      }
+                    }}
+                  >
+                    Añadir Tarjeta
+                  </Button>
                 </Box>
               )}
-            </>
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="body1" color="text.secondary" paragraph>
-                No tienes tarjetas registradas
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<CreditCardIcon />}
-                onClick={() => navigate('/NuevaTarjeta')}
-              >
-                Añadir Tarjeta
-              </Button>
             </Box>
           )}
-        </Box>
-      )}
-      
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+        </Stack>
+      </Card>
+
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
         <Button
           variant="outlined"
           onClick={() => handleStepChange('back')}
-          sx={{ px: 3 }}
+          startIcon={<ArrowBackIcon />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            borderWidth: 2,
+            '&:hover': {
+              borderWidth: 2
+            }
+          }}
         >
           Volver
         </Button>
-        
         <Button 
           variant="contained" 
           color="error"
-          type="submit" 
           onClick={handleFormSubmit}
-          disabled={(paymentMethod === 'creditCard' && (!selectedCard || availableCards.length === 0))}
-          startIcon={<AddCircleOutlineIcon />}
-          sx={{ px: 3 }}
+          disabled={paymentMethod === 'creditCard' && (!selectedCard || availableCards.length === 0)}
+          endIcon={<CheckCircleIcon />}
+          sx={{ 
+            px: 4,
+            py: 1.5,
+            borderRadius: 2,
+            boxShadow: 2
+          }}
         >
           Registrar Gasto
         </Button>
@@ -673,48 +999,108 @@ const NewExpense = () => {
 
   return (
     <Layout title="Nuevo Gasto">
-      <Container maxWidth="sm" sx={{ py: 4 }}>
-        <Card elevation={4}>
-          <Box sx={{ px: 1, py: 1.5, bgcolor: 'background.paper', borderBottom: `1px solid ${theme.palette.divider}` }}>
-            <Box sx={{ px: 2, display: 'flex', alignItems: 'center' }}>
-              <Box 
-                sx={{ 
-                  display: 'flex',
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  bgcolor: theme.palette.error.main,
-                  color: theme.palette.common.white,
-                  mr: 2
-                }}
-              >
-                {step}
+      <Box 
+        sx={{ 
+          minHeight: '100vh',
+          pt: 8, // Espacio para el AppBar
+          pb: 4,
+          px: 2,
+          width: '100%'
+        }}
+      >
+        <Container maxWidth={false} sx={{ width: '100%' }}>
+          <Box sx={{ 
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 3,
+            height: 'calc(100vh - 100px)', // Alto total menos el padding
+            alignItems: 'stretch',
+            width: '100%'
+          }}>
+            {/* Panel de progreso */}
+            <Card 
+              elevation={4} 
+              sx={{ 
+                width: { xs: '100%', md: 280 },
+                bgcolor: 'background.paper',
+                borderRadius: 3,
+                flexShrink: 0
+              }}
+            >
+              <Box sx={{ p: 3 }}>
+                <Typography variant="h5" fontWeight="bold" gutterBottom>
+                  Nuevo Gasto
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Completa los siguientes pasos para registrar tu gasto
+                </Typography>
+                
+                <Stack spacing={2} mt={4}>
+                  {[
+                    { label: 'Categoría', icon: getCategoryIcon(category || 'default') },
+                    { label: 'Subcategoría', icon: getCategoryIcon(category || 'default') },
+                    { label: 'Detalles', icon: <AddCircleOutlineIcon /> },
+                    { label: 'Método de Pago', icon: <PaymentsIcon /> }
+                  ].map((item, index) => (
+                    <Box 
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: step === index + 1 ? 'primary.main' : 'transparent',
+                        color: step === index + 1 ? 'white' : 'text.primary',
+                        border: `1px solid ${step === index + 1 ? 'transparent' : theme.palette.divider}`,
+                        opacity: step >= index + 1 ? 1 : 0.5
+                      }}
+                    >
+                      {React.cloneElement(item.icon, { 
+                        style: { 
+                          color: step === index + 1 ? 'white' : theme.palette.text.secondary 
+                        }
+                      })}
+                      <Typography variant="body1" fontWeight={step === index + 1 ? 'bold' : 'regular'}>
+                        {item.label}
+                      </Typography>
+                      {step > index + 1 && (
+                        <CheckCircleIcon sx={{ ml: 'auto', color: theme.palette.success.main }} />
+                      )}
+                    </Box>
+                  ))}
+                </Stack>
               </Box>
-              <Typography variant="body1" fontWeight="medium">
-                {step === 1 ? 'Seleccionar Categoría' : 
-                 step === 2 ? 'Seleccionar Subcategoría' : 
-                 step === 3 ? 'Completar Detalles' : 
-                 'Método de Pago'}
-              </Typography>
-              <Box sx={{ ml: 'auto' }}>
-                {step === 4 && (
-                  <Tooltip title="Listo para enviar">
-                    <CheckCircleIcon color="success" />
-                  </Tooltip>
-                )}
+            </Card>
+
+            {/* Panel principal */}
+            <Card 
+              elevation={4} 
+              sx={{ 
+                flex: 1,
+                bgcolor: 'background.paper',
+                borderRadius: 3,
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%'
+              }}
+            >
+              <Box sx={{ 
+                p: 3,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%'
+              }}>
+                {step === 1 && renderStep1()}
+                {step === 2 && renderStep2()}
+                {step === 3 && renderStep3()}
+                {step === 4 && renderStep4()}
               </Box>
-            </Box>
+            </Card>
           </Box>
-          <CardContent sx={{ p: 3 }}>
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-            {step === 4 && renderStep4()}
-          </CardContent>
-        </Card>
-      </Container>
+        </Container>
+      </Box>
     </Layout>
   );
 };
