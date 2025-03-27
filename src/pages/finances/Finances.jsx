@@ -94,6 +94,9 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import { Link, useNavigate } from 'react-router-dom';
+import OutlinedInput from '@mui/material/OutlinedInput';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 
 const Finances = () => {
   const { userData, dollarRate } = useStore();
@@ -148,15 +151,11 @@ const Finances = () => {
     if (monthData) {
       // Preparar datos de categorías para el mes seleccionado
       const categoryData = {};
-      let total = monthData.total || 0;
       
       // Si hay un array de datos, procesamos todas las transacciones para agrupar por categoría
       if (monthData.data && Array.isArray(monthData.data)) {
-        // Filtrar datos para no mostrar transacciones marcadas como ocultas
-        const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
-        
-        // Agrupar transacciones por categoría (solo las visibles)
-        visibleData.forEach(transaction => {
+        // Procesar todas las transacciones, incluidas las de tarjeta
+        monthData.data.forEach(transaction => {
           const category = transaction.category || "Sin categoría";
           
           if (!categoryData[category]) {
@@ -167,29 +166,43 @@ const Finances = () => {
             };
           }
           
-          categoryData[category].total += transaction.amount || 0;
-          
-          // Agregar subcategoría si existe
-          if (transaction.subcategory) {
-            if (!categoryData[category].subcategories[transaction.subcategory]) {
-              categoryData[category].subcategories[transaction.subcategory] = 0;
+          // Si no está oculta de la lista, sumamos al total
+          if (!transaction.hiddenFromList) {
+            categoryData[category].total += transaction.amount || 0;
+            
+            // Agregar subcategoría si existe
+            if (transaction.subcategory) {
+              if (!categoryData[category].subcategories[transaction.subcategory]) {
+                categoryData[category].subcategories[transaction.subcategory] = 0;
+              }
+              categoryData[category].subcategories[transaction.subcategory] += transaction.amount || 0;
             }
-            categoryData[category].subcategories[transaction.subcategory] += transaction.amount || 0;
           }
         });
         
-        // Recalcular el total basado solo en transacciones visibles
-        total = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+        // Calcular el total de todas las transacciones visibles
+        let total = 0;
+        Object.values(categoryData).forEach(cat => {
+          total += cat.total;
+        });
         
         // Calcular porcentajes
         Object.keys(categoryData).forEach(category => {
           categoryData[category].percentage = total > 0 ? (categoryData[category].total / total) * 100 : 0;
         });
         
-        // Actualizar monthData.data con solo las transacciones visibles
-        monthData.data = visibleData;
+        // Definir el objeto monthlyData con el total calculado
+        setMonthlyData({
+          ...monthData,
+          formattedTotal: formatAmount(total),
+          formattedTotalUSD: formatAmount(total / (dollarRate?.venta || 1)),
+          categoryData: categoryData,
+          sortedCategories: Object.entries(categoryData).sort((a, b) => b[1].total - a[1].total)
+        });
       } else if (monthData.categories) {
         // Si ya tiene las categorías procesadas, las usamos directamente
+        let total = monthData.total || 0;
+        
         Object.entries(monthData.categories).forEach(([category, data]) => {
           categoryData[category] = {
             total: data.total,
@@ -197,19 +210,21 @@ const Finances = () => {
             subcategories: { ...data.subcategories }
           };
         });
+        
+        // Ordenar categorías por monto
+        const sortedCategories = Object.entries(categoryData)
+          .sort((a, b) => b[1].total - a[1].total);
+        
+        setMonthlyData({
+          ...monthData,
+          formattedTotal: formatAmount(total),
+          formattedTotalUSD: formatAmount(total / (dollarRate?.venta || 1)),
+          categoryData: categoryData,
+          sortedCategories: sortedCategories
+        });
+      } else {
+        setMonthlyData(null);
       }
-      
-      // Ordenar categorías por monto
-      const sortedCategories = Object.entries(categoryData)
-        .sort((a, b) => b[1].total - a[1].total);
-      
-      setMonthlyData({
-        ...monthData,
-        formattedTotal: formatAmount(total),
-        formattedTotalUSD: formatAmount(total / (dollarRate?.venta || 1)),
-        categoryData: categoryData,
-        sortedCategories: sortedCategories
-      });
     } else {
       setMonthlyData(null);
     }
@@ -236,11 +251,13 @@ const Finances = () => {
     
     // Procesar datos si no tenemos monthlyData actualizado
     let categoryData = {};
-    let total = monthData.total || 0;
     
     if (monthData.data && Array.isArray(monthData.data)) {
-      // Agrupar transacciones por categoría
-      monthData.data.forEach(transaction => {
+      // Filtrar datos para no mostrar transacciones marcadas como ocultas
+      const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
+      
+      // Agrupar transacciones por categoría (solo las visibles)
+      visibleData.forEach(transaction => {
         const category = transaction.category || "Sin categoría";
         
         if (!categoryData[category]) {
@@ -249,27 +266,38 @@ const Finances = () => {
         
         categoryData[category] += transaction.amount || 0;
       });
+      
+      // Calcular el total basado solo en transacciones visibles
+      let total = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+      
+      // Ordenar categorías por monto
+      const sortedCategories = Object.entries(categoryData)
+        .sort((a, b) => b[1] - a[1]);
+      
+      setCategoryChartData({
+        labels: sortedCategories.map(([cat]) => cat),
+        data: sortedCategories.map(([_, value]) => value),
+        percentages: sortedCategories.map(([_, value]) => (total > 0 ? (value / total) * 100 : 0).toFixed(1))
+      });
     } else if (monthData.categories) {
       // Si ya tiene las categorías procesadas
       Object.entries(monthData.categories).forEach(([category, data]) => {
         categoryData[category] = data.total;
       });
+      
+      // Usar el total de monthData (que debería estar ya filtrado)
+      let total = monthData.total || 0;
+      
+      // Ordenar categorías por monto
+      const sortedCategories = Object.entries(categoryData)
+        .sort((a, b) => b[1] - a[1]);
+      
+      setCategoryChartData({
+        labels: sortedCategories.map(([cat]) => cat),
+        data: sortedCategories.map(([_, value]) => value),
+        percentages: sortedCategories.map(([_, value]) => (total > 0 ? (value / total) * 100 : 0).toFixed(1))
+      });
     }
-    
-    // Ordenar categorías por monto
-    const sortedCategories = Object.entries(categoryData)
-      .sort((a, b) => b[1] - a[1]);
-    
-    // Calcular el total si no está disponible
-    if (total === 0 && sortedCategories.length > 0) {
-      total = sortedCategories.reduce((sum, [_, value]) => sum + value, 0);
-    }
-    
-    setCategoryChartData({
-      labels: sortedCategories.map(([cat]) => cat),
-      data: sortedCategories.map(([_, value]) => value),
-      percentages: sortedCategories.map(([_, value]) => (total > 0 ? (value / total) * 100 : 0).toFixed(1))
-    });
   };
   
   // Función para actualizar tendencias mensuales
@@ -279,11 +307,20 @@ const Finances = () => {
     const incomeData = Array(12).fill(0);
     const balanceData = Array(12).fill(0);
     
-    // Llenar los datos de gastos e ingresos por mes
+    // Llenar los datos de gastos e ingresos por mes, excluyendo transacciones ocultas
     if (userData.finances?.expenses?.[selectedYear]?.months) {
       Object.keys(userData.finances.expenses[selectedYear].months).forEach(month => {
         const monthIndex = parseInt(month) - 1;
-        expenseData[monthIndex] = userData.finances.expenses[selectedYear].months[month].total || 0;
+        const monthData = userData.finances.expenses[selectedYear].months[month];
+        
+        // Si hay datos detallados, calcular el total excluyendo transacciones ocultas
+        if (monthData.data && Array.isArray(monthData.data)) {
+          const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
+          expenseData[monthIndex] = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+        } else {
+          // Si no hay datos detallados, usar el total (que puede incluir transacciones ocultas)
+          expenseData[monthIndex] = monthData.total || 0;
+        }
       });
     }
     
@@ -857,6 +894,65 @@ const Finances = () => {
       return <CategoryIcon fontSize="small" />;
     };
     
+    // Función para obtener un color para cada categoría
+    const getCategoryColor = (category, index) => {
+      // Paleta de colores atractiva y diversa
+      const colors = [
+        theme.palette.primary.main,
+        theme.palette.secondary.main,
+        theme.palette.error.main,
+        theme.palette.warning.main,
+        theme.palette.info.main,
+        theme.palette.success.main,
+        '#8E44AD', // Púrpura
+        '#16A085', // Verde azulado
+        '#D35400', // Naranja oscuro
+        '#2E86C1', // Azul
+        '#CB4335', // Rojo ladrillo
+        '#27AE60', // Verde esmeralda
+        '#F1C40F', // Amarillo
+        '#884EA0', // Púrpura oscuro
+        '#E74C3C', // Rojo
+        '#3498DB', // Azul claro
+        '#1ABC9C', // Turquesa
+        '#F39C12', // Ámbar
+        '#7D3C98', // Morado oscuro
+        '#2ECC71'  // Verde
+      ];
+      
+      // Si la categoría es común, intentar asignar un color consistente
+      const categoryColorMapping = {
+        'Supermercado': colors[0],
+        'Alimentos': colors[1],
+        'Restaurante': colors[2],
+        'Comida': colors[3],
+        'Transporte': colors[4],
+        'Auto': colors[5],
+        'Nafta': colors[6],
+        'Viajes': colors[7],
+        'Educación': colors[8],
+        'Entretenimiento': colors[9],
+        'Hogar': colors[10],
+        'Casa': colors[10], // Mismo color que Hogar
+        'Servicios': colors[11],
+        'Salud': colors[12],
+        'Ropa': colors[13],
+        'Tecnología': colors[14],
+        'Trabajo': colors[15],
+        'Extras': colors[16],
+        'Ahorro': colors[17],
+        'Inversiones': colors[18]
+      };
+      
+      // Si la categoría está en el mapping, devolver ese color
+      if (categoryColorMapping[category]) {
+        return categoryColorMapping[category];
+      }
+      
+      // Si no, devolver un color basado en el índice
+      return colors[index % colors.length];
+    };
+    
     return (
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Card 
@@ -985,43 +1081,55 @@ const Finances = () => {
                     
                     {monthlyData.sortedCategories.length > 0 ? (
                       <Box>
-                        {monthlyData.sortedCategories.slice(0, 5).map(([category, data], index) => (
-                          <Box key={index} sx={{ mb: 1.5 }}>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Box sx={{ 
-                                  color: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main
-                                }}>
-                                  {getCategoryIcon(category)}
-                                </Box>
-                                <Typography variant="body2" fontWeight="medium">
-                                  {category}
+                        {monthlyData.sortedCategories.slice(0, 3).map(([category, data], index) => {
+                          const categoryColor = getCategoryColor(category, index);
+                          
+                          return (
+                            <Box key={index} sx={{ mb: 1.5 }}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Avatar
+                                    sx={{ 
+                                      width: 28, 
+                                      height: 28, 
+                                      bgcolor: `${categoryColor}20`,
+                                      color: categoryColor
+                                    }}
+                                  >
+                                    {getCategoryIcon(category)}
+                                  </Avatar>
+                                  <Typography variant="body2" fontWeight="medium" sx={{ color: categoryColor }}>
+                                    {category}
+                                  </Typography>
+                                </Stack>
+                                <Typography 
+                                  variant="body2" 
+                                  fontWeight="bold" 
+                                  color={categoryColor}
+                                >
+                                  {formatAmount(data.total)}
                                 </Typography>
                               </Stack>
-                              <Typography 
-                                variant="body2" 
-                                fontWeight="bold" 
-                                color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
-                              >
-                                {formatAmount(data.total)}
+                              <Box sx={{ width: '100%', bgcolor: theme.palette.grey[100], borderRadius: 5, height: 8 }}>
+                                <Box
+                                  sx={{
+                                    width: `${Math.min(data.percentage, 100)}%`,
+                                    bgcolor: categoryColor,
+                                    height: 8,
+                                    borderRadius: 5
+                                  }}
+                                />
+                              </Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
+                                {data.percentage.toFixed(1)}%
                               </Typography>
-                            </Stack>
-                            <Box sx={{ width: '100%', bgcolor: theme.palette.grey[100], borderRadius: 5, height: 8 }}>
-                              <Box
-                                sx={{
-                                  width: `${Math.min(data.percentage, 100)}%`,
-                                  bgcolor: dataType === 'expenses' ? theme.palette.error.light : theme.palette.success.light,
-                                  height: 8,
-                                  borderRadius: 5
-                                }}
-                              />
                             </Box>
-                          </Box>
-                        ))}
+                          );
+                        })}
                         
-                        {monthlyData.sortedCategories.length > 5 && (
+                        {monthlyData.sortedCategories.length > 3 && (
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
-                            + {monthlyData.sortedCategories.length - 5} categorías más
+                            + {monthlyData.sortedCategories.length - 3} categorías más
                           </Typography>
                         )}
                       </Box>
@@ -1057,7 +1165,7 @@ const Finances = () => {
                     color: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main
                   }} />
                   <Typography variant="h6">
-                    Detalle por Subcategorías
+                    Análisis por Categoría
                   </Typography>
                 </Stack>
               }
@@ -1067,122 +1175,510 @@ const Finances = () => {
                 borderBottom: `1px solid ${theme.palette.divider}`
               }}
             />
+
             <CardContent sx={{ 
               p: 0, 
               overflowY: 'auto',
               flexGrow: 1, // Para que ocupe el espacio restante
               '&:last-child': { pb: 0 } // Quitar padding-bottom por defecto
             }}>
+              {/* Nuevas pestañas para diferentes tipos de análisis */}
               <Box sx={{ p: 0 }}>
-                {monthlyData.sortedCategories.map(([category, data], index) => {
-                  // Ordenar subcategorías por monto
-                  const sortedSubcategories = Object.entries(data.subcategories || {})
-                    .sort((a, b) => b[1] - a[1]);
-                  
-                  // Colores más consistentes con el esquema
-                  const categoryColor = [
-                    theme.palette.primary.main,
-                    theme.palette.secondary.main
-                  ][index % 2];
-                  
-                  return (
-                    <Box key={index}>
-                      <Box 
-                        sx={{ 
-                          px: 3, 
-                          py: 2, 
-                          borderLeft: `4px solid ${categoryColor}`,
-                          bgcolor: index % 2 === 0 ? theme.palette.background.paper : theme.palette.grey[100],
-                          transition: 'background-color 0.2s ease',
-                          '&:hover': {
-                            bgcolor: dataType === 'expenses' 
-                              ? `${theme.palette.error.light}20` 
-                              : `${theme.palette.success.light}20`
-                          }
-                        }}
-                      >
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Box sx={{ color: categoryColor }}>
-                              {getCategoryIcon(category)}
-                            </Box>
-                            <Typography 
-                              variant="subtitle1" 
-                              fontWeight="medium"
-                              sx={{ color: categoryColor }}
-                            >
-                              {category}
-                            </Typography>
-                          </Stack>
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <Typography 
-                              variant="subtitle1" 
-                              fontWeight="bold" 
-                              color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
-                            >
-                              {formatAmount(data.total)}
-                            </Typography>
-                            <Chip
-                              label={`${data.percentage.toFixed(1)}%`}
-                              size="small"
-                              sx={{ 
-                                fontWeight: 'bold',
-                                bgcolor: dataType === 'expenses' 
-                                  ? `${theme.palette.error.light}60` 
-                                  : `${theme.palette.success.light}60`,
-                                color: dataType === 'expenses' 
-                                  ? theme.palette.error.main 
-                                  : theme.palette.success.main,
-                              }}
-                            />
-                          </Stack>
-                        </Stack>
+                {/* Sección con métricas clave */}
+                <Box sx={{ p: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                  <Grid container spacing={2}>
+                    {/* Top 3 categorías */}
+                    <Grid item xs={12} md={4}>
+                      <Paper elevation={0} sx={{ 
+                        p: 2, 
+                        border: `1px solid ${theme.palette.divider}`, 
+                        borderRadius: 2,
+                        height: '100%',
+                        bgcolor: theme.palette.grey[50],
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 1 }}>
+                          Top Categorías
+                        </Typography>
                         
-                        {/* Subcategorías */}
-                        {sortedSubcategories.length > 0 && (
-                          <Box sx={{ mt: 1 }}>
-                            <Grid container spacing={1}>
-                              {sortedSubcategories.map(([subcategory, amount], subIndex) => (
-                                <Grid item xs={12} sm={6} key={subIndex}>
-                                  <Paper 
-                                    elevation={0} 
+                        {monthlyData.sortedCategories.slice(0, 3).map(([category, data], index) => {
+                          const categoryColors = [
+                            dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main,
+                            theme.palette.warning.main,
+                            theme.palette.info.main
+                          ];
+                          
+                          return (
+                            <Stack 
+                              key={index} 
+                              direction="row" 
+                              alignItems="center" 
+                              spacing={1.5} 
+                              sx={{ 
+                                mt: 1,
+                                p: 1,
+                                bgcolor: `${categoryColors[index]}15`,
+                                borderRadius: 1,
+                                border: `1px solid ${categoryColors[index]}30`
+                              }}
+                            >
+                              <Avatar 
+                                sx={{ 
+                                  width: 32, 
+                                  height: 32, 
+                                  bgcolor: `${categoryColors[index]}25`, 
+                                  color: categoryColors[index]
+                                }}
+                              >
+                                {getCategoryIcon(category)}
+                              </Avatar>
+                              <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                                <Typography 
+                                  variant="body2" 
+                                  fontWeight="medium" 
+                                  noWrap 
+                                  sx={{ color: categoryColors[index] }}
+                                >
+                                  {category}
+                                </Typography>
+                                <Typography 
+                                  variant="caption" 
+                                  sx={{ display: 'block', color: 'text.secondary' }}
+                                >
+                                  {data.percentage.toFixed(1)}% del total
+                                </Typography>
+                              </Box>
+                              <Typography 
+                                variant="subtitle2" 
+                                fontWeight="bold"
+                                sx={{ color: categoryColors[index] }}
+                              >
+                                {formatAmount(data.total)}
+                              </Typography>
+                            </Stack>
+                          );
+                        })}
+                        
+                        {monthlyData.sortedCategories.length > 3 && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+                            + {monthlyData.sortedCategories.length - 3} categorías más
+                          </Typography>
+                        )}
+                      </Paper>
+                    </Grid>
+                    
+                    {/* Frecuencia de gastos */}
+                    <Grid item xs={12} md={4}>
+                      <Paper elevation={0} sx={{ 
+                        p: 2, 
+                        border: `1px solid ${theme.palette.divider}`, 
+                        borderRadius: 2,
+                        height: '100%',
+                        bgcolor: theme.palette.grey[50],
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 1 }}>
+                          Distribución de Transacciones
+                        </Typography>
+                        
+                        {/* Calcular la cantidad de transacciones por categoría */}
+                        {(() => {
+                          // Obtener las transacciones del mes
+                          const transactionsData = userData.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth]?.data || [];
+                          
+                          // Contar transacciones por categoría
+                          const countByCategory = {};
+                          let totalCount = 0;
+                          
+                          transactionsData.forEach(transaction => {
+                            if (!transaction.hiddenFromList) {
+                              const category = transaction.category || "Sin categoría";
+                              countByCategory[category] = (countByCategory[category] || 0) + 1;
+                              totalCount++;
+                            }
+                          });
+                          
+                          // Ordenar por cantidad de transacciones
+                          const sortedByCount = Object.entries(countByCategory)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 3);
+                          
+                          return sortedByCount.map(([category, count], index) => {
+                            const percentage = totalCount > 0 ? (count / totalCount) * 100 : 0;
+                            const colors = [theme.palette.primary.main, theme.palette.secondary.main, theme.palette.info.main];
+  
+  return (
+                              <Box key={index} sx={{ mt: 1.5 }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {category}
+                                  </Typography>
+                                  <Chip 
+                                    size="small" 
+                                    label={`${count} ${count === 1 ? 'transacción' : 'transacciones'}`}
                                     sx={{ 
-                                      p: 1.5, 
-                                      borderRadius: 1.5,
-                                      bgcolor: 'background.paper',
-                                      border: `1px solid ${theme.palette.divider}`,
-                                      transition: 'transform 0.2s, box-shadow 0.2s',
-                                      '&:hover': {
-                                        transform: 'translateY(-2px)',
-                                        boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
-                                      }
+                                      bgcolor: `${colors[index]}15`,
+                                      color: colors[index],
+                                      fontWeight: 'medium',
+                                      fontSize: '0.7rem'
+                                    }} 
+                                  />
+                                </Stack>
+                                <Box sx={{ width: '100%', bgcolor: theme.palette.grey[200], borderRadius: 5, height: 6 }}>
+                                  <Box
+                                    sx={{
+                                      width: `${Math.min(percentage, 100)}%`,
+                                      bgcolor: colors[index],
+                                      height: 6,
+                                      borderRadius: 5
+                                    }}
+                                  />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
+                                  {percentage.toFixed(1)}% del total
+                                </Typography>
+                              </Box>
+                            );
+                          });
+                        })()}
+                      </Paper>
+      </Grid>
+                    
+                    {/* Promedio por transacción */}
+                    <Grid item xs={12} md={4}>
+                      <Paper elevation={0} sx={{ 
+                        p: 2, 
+                        border: `1px solid ${theme.palette.divider}`, 
+                        borderRadius: 2,
+                        height: '100%',
+                        bgcolor: theme.palette.grey[50],
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 1 }}>
+                          Promedio por Transacción
+                        </Typography>
+                        
+                        {(() => {
+                          // Obtener las transacciones del mes
+                          const transactionsData = userData.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth]?.data || [];
+                          
+                          // Calcular promedio por categoría
+                          const avgByCategory = {};
+                          const countByCategory = {};
+                          
+                          transactionsData.forEach(transaction => {
+                            if (!transaction.hiddenFromList) {
+                              const category = transaction.category || "Sin categoría";
+                              const amount = transaction.amount || 0;
+                              
+                              if (!avgByCategory[category]) {
+                                avgByCategory[category] = 0;
+                                countByCategory[category] = 0;
+                              }
+                              
+                              avgByCategory[category] += amount;
+                              countByCategory[category]++;
+                            }
+                          });
+                          
+                          // Calcular el promedio
+                          Object.keys(avgByCategory).forEach(category => {
+                            avgByCategory[category] = countByCategory[category] > 0 
+                              ? avgByCategory[category] / countByCategory[category] 
+                              : 0;
+                          });
+                          
+                          // Ordenar por promedio
+                          const sortedByAvg = Object.entries(avgByCategory)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 3);
+                          
+                          return sortedByAvg.map(([category, avg], index) => {
+                            const colors = [
+                              theme.palette.success.dark,
+                              theme.palette.warning.dark,
+                              theme.palette.info.dark
+                            ];
+                            
+                            // Encontrar el valor máximo para escalar la barra
+                            const maxAvg = sortedByAvg[0][1];
+                            const percentage = maxAvg > 0 ? (avg / maxAvg) * 100 : 0;
+                            
+                            return (
+                              <Box key={index} sx={{ mt: 1.5 }}>
+                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {category}
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight="bold" color={colors[index]}>
+                                    {formatAmount(avg)}
+                                  </Typography>
+                                </Stack>
+                                <Box sx={{ 
+                                  p: 1, 
+                                  bgcolor: `${colors[index]}15`,
+                                  borderRadius: 1,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between'
+                                }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <Box sx={{ 
+                                      bgcolor: colors[index],
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: '50%',
+                                      mr: 1
+                                    }} />
+                                    <Typography variant="caption" color="text.secondary">
+                                      {countByCategory[category]} {countByCategory[category] === 1 ? 'transacción' : 'transacciones'}
+                                    </Typography>
+                                  </Box>
+                                  <Chip 
+                                    size="small"
+                                    label={`${formatAmount(avg)}/tx`}
+                                    sx={{ 
+                                      height: 20,
+                                      fontSize: '0.7rem',
+                                      fontWeight: 'bold',
+                                      bgcolor: `${colors[index]}25`,
+                                      color: colors[index]
+                                    }}
+                                  />
+                                </Box>
+                              </Box>
+                            );
+                          });
+                        })()}
+                      </Paper>
+      </Grid>
+                  </Grid>
+                </Box>
+                
+                {/* Tabla de categorías detallada */}
+                <Box sx={{ p: 0 }}>
+                  {/* Título de sección */}
+                  <Box sx={{ 
+                    px: 3, 
+                    py: 2, 
+                    bgcolor: theme.palette.grey[50],
+                    borderBottom: `1px solid ${theme.palette.divider}`
+                  }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <EqualizerIcon color="primary" fontSize="small" />
+                      <Typography variant="subtitle1" fontWeight="medium">
+                        Desglose Detallado
+                      </Typography>
+                    </Stack>
+                  </Box>
+                  
+                  {/* Tabla de categorías */}
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: theme.palette.grey[50] }}>
+                          <TableCell width="40%">Categoría</TableCell>
+                          <TableCell align="center">Cantidad</TableCell>
+                          <TableCell align="center">Promedio</TableCell>
+                          <TableCell align="right">Total</TableCell>
+                          <TableCell align="right">%</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {monthlyData.sortedCategories.map(([category, data], index) => {
+                          // Calcular estadísticas avanzadas
+                          const transactionsData = userData.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth]?.data || [];
+                          const categoryTransactions = transactionsData.filter(
+                            t => !t.hiddenFromList && t.category === category
+                          );
+                          
+                          const count = categoryTransactions.length;
+                          const total = data.total;
+                          const average = count > 0 ? total / count : 0;
+                          
+                          // Color alternado para filas
+                          const bgColor = index % 2 === 0 ? 'transparent' : theme.palette.grey[50];
+                          
+                          return (
+                            <TableRow 
+                              key={index}
+                              sx={{ 
+                                bgcolor: bgColor,
+                                transition: 'background-color 0.2s',
+                                '&:hover': {
+                                  bgcolor: dataType === 'expenses' 
+                                    ? `${theme.palette.error.light}10`
+                                    : `${theme.palette.success.light}10`
+                                }
+                              }}
+                            >
+                              <TableCell>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Avatar sx={{ 
+                                    width: 28, 
+                                    height: 28, 
+                                    bgcolor: `${dataType === 'expenses' ? theme.palette.error.light : theme.palette.success.light}20`,
+                                    color: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main
+                                  }}>
+                                    {React.cloneElement(getCategoryIcon(category), { style: { fontSize: '1rem' } })}
+                                  </Avatar>
+                                  <Typography variant="body2" fontWeight="medium">
+                                    {category}
+                                  </Typography>
+                                </Stack>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  size="small" 
+                                  label={count}
+                                  sx={{ 
+                                    minWidth: 60,
+                                    height: 20,
+                                    fontSize: '0.75rem',
+                                    bgcolor: theme.palette.grey[100]
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Typography variant="body2" fontWeight="medium" color="text.secondary">
+                                  {formatAmount(average)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography 
+                                  variant="body2" 
+                                  fontWeight="bold"
+                                  color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
+                                >
+                                  {formatAmount(total)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Chip 
+                                  size="small" 
+                                  label={`${data.percentage.toFixed(1)}%`}
+                                  sx={{ 
+                                    minWidth: 50,
+                                    height: 20,
+                                    fontSize: '0.75rem',
+                                    bgcolor: dataType === 'expenses' 
+                                      ? `${theme.palette.error.light}20` 
+                                      : `${theme.palette.success.light}20`,
+                                    color: dataType === 'expenses' 
+                                      ? theme.palette.error.main 
+                                      : theme.palette.success.main
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  
+                  {/* Sección de subcategorías destacadas */}
+                  <Box sx={{ p: 3, borderTop: `1px solid ${theme.palette.divider}` }}>
+                    <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                      Subcategorías Destacadas
+                    </Typography>
+                    
+                    <Grid container spacing={2}>
+                      {(() => {
+                        // Aplanar todas las subcategorías
+                        const allSubcategories = [];
+                        
+                        monthlyData.sortedCategories.forEach(([category, data]) => {
+                          Object.entries(data.subcategories || {}).forEach(([subcategory, amount]) => {
+                            allSubcategories.push({
+                              category,
+                              subcategory,
+                              amount
+                            });
+                          });
+                        });
+                        
+                        // Ordenar por monto
+                        const sortedSubcategories = allSubcategories
+                          .sort((a, b) => b.amount - a.amount)
+                          .slice(0, 9); // Mostrar top 9
+                        
+                        return sortedSubcategories.map((item, index) => (
+                          <Grid item xs={12} sm={6} md={4} key={index}>
+                            <Paper elevation={0} sx={{ 
+                              p: 1.5, 
+                              border: `1px solid ${theme.palette.divider}`,
+                              borderRadius: 2,
+                              transition: 'all 0.2s',
+                              '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                              }
+                            }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Stack spacing={0} sx={{ minWidth: 0, flex: 1 }}>
+                                  <Typography 
+                                    variant="body2" 
+                                    fontWeight="medium"
+                                    sx={{ 
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
                                     }}
                                   >
-                                    <Stack direction="row" justifyContent="space-between">
-                                      <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                                        {subcategory}
-                                      </Typography>
-                                      <Typography 
-                                        variant="body2" 
-                                        fontWeight="medium"
-                                        color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
-                                      >
-                                        {formatAmount(amount)} ({((amount / data.total) * 100).toFixed(1)}%)
-                                      </Typography>
-                                    </Stack>
-                                  </Paper>
-                                </Grid>
-                              ))}
-                            </Grid>
-                          </Box>
-                        )}
-                      </Box>
-                      {index < monthlyData.sortedCategories.length - 1 && (
-                        <Divider sx={{ opacity: 0.6 }} />
-                      )}
-                    </Box>
-                  );
-                })}
+                                    {item.subcategory}
+                                  </Typography>
+                                  <Typography 
+                                    variant="caption" 
+                                    color="text.secondary"
+                                    sx={{ 
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {item.category}
+                                  </Typography>
+                                </Stack>
+                                <Typography 
+                                  variant="subtitle2" 
+                                  fontWeight="bold" 
+                                  color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
+                                >
+                                  {formatAmount(item.amount)}
+                                </Typography>
+                              </Box>
+                              
+                              {/* Barra de progreso */}
+                              <Box sx={{ 
+                                mt: 1, 
+                                width: '100%', 
+                                bgcolor: theme.palette.grey[100], 
+                                borderRadius: 5, 
+                                height: 6 
+                              }}>
+                                <Box
+                                  sx={{
+                                    width: `${Math.min((item.amount / monthlyData.sortedCategories[0][1].total) * 100, 100)}%`,
+                                    bgcolor: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main,
+                                    height: 6,
+                                    borderRadius: 5
+                                  }}
+                                />
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        ));
+                      })()}
+                    </Grid>
+                  </Box>
+                </Box>
               </Box>
             </CardContent>
           </Card>
@@ -1345,13 +1841,8 @@ const Finances = () => {
 
   // Componente para mostrar lista de transacciones individuales por categoría con tabs
   const TransactionsListPanel = () => {
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchText, setSearchText] = useState('');
     const [expandedDates, setExpandedDates] = useState({});
-    
-    // Manejar la selección de categoría
-    const handleCategoryChange = (event, newValue) => {
-      setSelectedCategory(newValue);
-    };
     
     // Cambiar el estado expandido de una fecha
     const handleToggleDate = (date) => {
@@ -1361,46 +1852,149 @@ const Finances = () => {
       }));
     };
     
-    // Inicializar todas las fechas como expandidas cuando cambia la categoría
-    useEffect(() => {
-      if (monthlyData && monthlyData.data) {
-        console.log('Formatos de fechas encontrados:', monthlyData.data.map(t => t.date).filter(Boolean));
+    // Obtener todas las transacciones, incluyendo las ocultas y las de tarjeta de crédito
+    const getAllTransactions = () => {
+      const allTransactions = [];
+      
+      // Obtener datos del mes actual directamente de userData, sin filtrar
+      try {
+        const monthData = userData?.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth];
         
+        if (!monthData) return [];
+        
+        // Si existe data como array, lo usamos directamente
+        if (monthData.data && Array.isArray(monthData.data)) {
+          // IMPORTANTE: Accedemos a los datos originales, no a los filtrados en monthlyData
+          // Obtenemos los datos directamente de userData
+          const rawData = userData.finances[dataType][selectedYear].months[selectedMonth].data;
+          
+          // Copiamos todas las transacciones (visibles, ocultas y de tarjeta)
+          rawData.forEach(transaction => {
+            // Aseguramos que creditCardTransaction sea booleano (para transacciones de tarjeta)
+            if (transaction.paymentMethod === 'creditCard' && transaction.creditCardTransaction !== true) {
+              transaction.creditCardTransaction = true;
+            }
+            
+            // Añadimos todas las transacciones sin filtrar
+            allTransactions.push({...transaction});
+          });
+          
+          console.log('Transacciones recuperadas:', allTransactions.length, 'incluyendo tarjetas:', 
+            allTransactions.filter(t => t.creditCardTransaction || t.paymentMethod === 'creditCard').length);
+        }
+      } catch (error) {
+        console.error('Error al cargar transacciones:', error);
+      }
+      
+      return allTransactions;
+    };
+    
+    // Obtener todas las transacciones
+    const allTransactions = getAllTransactions();
+    
+    // Inicializar fechas expandidas cuando cambia el mes o tipo de datos
+    // Modificar para que estén cerradas por defecto
+    useEffect(() => {
+      if (allTransactions.length > 0) {
         const dateGroups = {};
-        monthlyData.data.forEach(transaction => {
+        allTransactions.forEach(transaction => {
           const dateStr = transaction.date || 'Invalid Date';
-          dateGroups[dateStr] = true; // Expandir todas por defecto
+          dateGroups[dateStr] = false; // Inicializar como cerrado (false) en lugar de abierto (true)
         });
         setExpandedDates(dateGroups);
       }
-    }, [selectedCategory, monthlyData]);
+    }, [selectedYear, selectedMonth, dataType]);
     
     // Si no hay datos, mostrar mensaje
-    if (!monthlyData || !monthlyData.data || monthlyData.data.length === 0) {
+    if (!allTransactions || allTransactions.length === 0) {
       return (
-        <Card elevation={1} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <CardHeader 
-            title={
-              <Typography variant="h6">
-                Detalles de {dataType === 'expenses' ? 'Gastos' : 'Ingresos'}
+        <Card elevation={1} sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          borderRadius: 2,
+          overflow: 'hidden'
+        }}>
+          <Box sx={{ 
+            p: 2, 
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            background: `linear-gradient(90deg, ${theme.palette.grey[50]} 0%, ${theme.palette.background.paper} 100%)`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <CategoryIcon color="primary" />
+            <Typography variant="h6">
+              Detalles de {dataType === 'expenses' ? 'Gastos' : 'Ingresos'}
+            </Typography>
+          </Box>
+          <Box sx={{ 
+            flexGrow: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            p: 4
+          }}>
+            <Stack 
+              spacing={2} 
+              alignItems="center" 
+              sx={{ 
+                maxWidth: 400, 
+                textAlign: 'center',
+                p: 3,
+                bgcolor: theme.palette.grey[50],
+                borderRadius: 2
+              }}
+            >
+              {dataType === 'expenses' 
+                ? <TrendingDownIcon sx={{ fontSize: 48, color: theme.palette.error.light }} />
+                : <TrendingUpIcon sx={{ fontSize: 48, color: theme.palette.success.light }} />
+              }
+              <Typography variant="h6" color="textSecondary">
+                No hay datos disponibles
               </Typography>
-            }
-          />
-          <CardContent sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Alert severity="info" sx={{ width: '100%' }}>
-              <AlertTitle>Sin datos</AlertTitle>
-              No hay {dataType === 'expenses' ? 'gastos' : 'ingresos'} registrados para {getMonthName(selectedMonth)} de {selectedYear}.
-            </Alert>
-          </CardContent>
+              <Typography variant="body2" color="textSecondary">
+                No se encontraron {dataType === 'expenses' ? 'gastos' : 'ingresos'} para {getMonthName(selectedMonth)} de {selectedYear}.
+              </Typography>
+              <Button 
+                variant="contained" 
+                startIcon={dataType === 'expenses' ? <TrendingDownIcon /> : <TrendingUpIcon />}
+                color={dataType === 'expenses' ? 'error' : 'success'}
+                onClick={() => navigate(dataType === 'expenses' ? '/NuevoGasto' : '/NuevoIngreso')}
+              >
+                Añadir {dataType === 'expenses' ? 'Gasto' : 'Ingreso'}
+              </Button>
+            </Stack>
+          </Box>
         </Card>
       );
     }
     
-    // Filtrar transacciones por categoría seleccionada
-    const filteredTransactions = monthlyData.data.filter(transaction => {
-      if (selectedCategory === 'all') return true;
-      return transaction.category === selectedCategory;
-    });
+    // Filtrar transacciones según texto de búsqueda
+    const getFilteredTransactions = () => {
+      return allTransactions.filter(transaction => {
+        // Filtrar por texto de búsqueda
+        if (searchText) {
+          const searchLower = searchText.toLowerCase();
+          const descriptionMatch = transaction.description?.toLowerCase().includes(searchLower);
+          const categoryMatch = transaction.category?.toLowerCase().includes(searchLower);
+          const subcategoryMatch = transaction.subcategory?.toLowerCase().includes(searchLower);
+          const amountMatch = transaction.amount?.toString().includes(searchLower);
+          const paymentMethodMatch = 
+            (transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction) 
+              ? 'tarjeta'.includes(searchLower) 
+              : 'efectivo'.includes(searchLower);
+          
+          if (!(descriptionMatch || categoryMatch || subcategoryMatch || amountMatch || paymentMethodMatch)) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
+    };
+    
+    const filteredTransactions = getFilteredTransactions();
     
     // Agrupar transacciones por fecha
     const transactionsByDate = filteredTransactions.reduce((groups, transaction) => {
@@ -1425,11 +2019,38 @@ const Finances = () => {
         }
       }
       
-      if (!groups[dateKey]) groups[dateKey] = [];
-      groups[dateKey].push({
-        ...transaction,
-        parsedDate: dateKey !== 'Invalid Date' ? dateKey : null
-      });
+      if (!groups[dateKey]) {
+        groups[dateKey] = {
+          transactions: [],
+          total: 0,
+          visibleTotal: 0,
+          hiddenTotal: 0,
+          cashTotal: 0, // Nuevo campo para el total solo de transacciones en efectivo
+          date: dateKey
+        };
+      }
+      
+      // Sumar al total del día
+      const amount = transaction.amount || 0;
+      groups[dateKey].transactions.push(transaction);
+      
+      // Verificar si es una transacción con tarjeta de crédito
+      const isCreditCard = transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction === true;
+      
+      // Para el total general siempre sumamos todas las transacciones
+      groups[dateKey].total += amount;
+      
+      // Solo sumamos al cashTotal si NO es una transacción con tarjeta
+      if (!isCreditCard) {
+        groups[dateKey].cashTotal += amount;
+      }
+      
+      if (transaction.hiddenFromList) {
+        groups[dateKey].hiddenTotal += amount;
+      } else {
+        groups[dateKey].visibleTotal += amount;
+      }
+      
       return groups;
     }, {});
     
@@ -1447,210 +2068,439 @@ const Finances = () => {
     
     // Objeto para íconos de categoría
     const getCategoryIcon = (category) => {
-      const iconProps = { sx: { fontSize: 16, mr: 1 } };
-      switch (category?.toLowerCase()) {
-        case 'alimentación':
-        case 'alimentos':
-        case 'comida':
-          return <RestaurantIcon {...iconProps} />;
-        case 'transporte':
-          return <DirectionsCarIcon {...iconProps} />;
-        case 'entretenimiento':
-        case 'ocio':
-          return <LocalMoviesIcon {...iconProps} />;
-        case 'salud':
-          return <LocalHospitalIcon {...iconProps} />;
-        case 'hogar':
-        case 'casa':
-          return <HomeIcon {...iconProps} />;
-        case 'servicios':
-        case 'facturas':
-          return <ReceiptIcon {...iconProps} />;
-        case 'educación':
-          return <SchoolIcon {...iconProps} />;
-        case 'ropa':
-        case 'vestuario':
-          return <CheckroomIcon {...iconProps} />;
-        case 'tecnología':
-          return <DevicesIcon {...iconProps} />;
-        case 'viajes':
-          return <FlightTakeoffIcon {...iconProps} />;
-        case 'ahorro':
-        case 'inversión':
-          return <SavingsIcon {...iconProps} />;
-        case 'sueldo':
-        case 'ingresos laborales':
-          return <WorkIcon {...iconProps} />;
-        case 'otros ingresos':
-        case 'otros':
-          return <AttachMoneyIcon {...iconProps} />;
-        default:
-          return <PaymentsIcon {...iconProps} />;
+      const categoryMapping = {
+        'Supermercado': <ShoppingCartIcon />,
+        'Alimentos': <RestaurantIcon />,
+        'Restaurante': <RestaurantIcon />,
+        'Comida': <FastfoodIcon />,
+        'Transporte': <CommuteIcon />,
+        'Auto': <DirectionsCarIcon />,
+        'Nafta': <LocalGasStationIcon />,
+        'Viajes': <FlightIcon />,
+        'Educación': <SchoolIcon />,
+        'Entretenimiento': <SportsEsportsIcon />,
+        'Hogar': <HomeIcon />,
+        'Casa': <HomeIcon />,
+        'Servicios': <ElectricalServicesIcon />,
+        'Salud': <HealthAndSafetyIcon />,
+        'Ropa': <CheckroomIcon />,
+        'Tecnología': <DevicesIcon />,
+        'Trabajo': <WorkIcon />,
+        'Extras': <MoreHorizIcon />,
+        'Ahorro': <SavingsIcon />,
+        'Inversiones': <TrendingUpIcon />
+      };
+      
+      // Busca coincidencias parciales si no hay una coincidencia exacta
+      if (categoryMapping[category]) {
+        return categoryMapping[category];
+      }
+      
+      const categoryLower = category?.toLowerCase() || '';
+      for (const [key, icon] of Object.entries(categoryMapping)) {
+        if (categoryLower.includes(key.toLowerCase()) || key.toLowerCase().includes(categoryLower)) {
+          return icon;
+        }
+      }
+      
+      return <CategoryIcon />;
+    };
+    
+    // Función para obtener información visual del método de pago
+    const getPaymentMethodInfo = (transaction) => {
+      // Verificar explícitamente si es una transacción de tarjeta de crédito
+      const isCreditCard = transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction === true;
+      
+      if (isCreditCard) {
+        return {
+          icon: <CreditCardIcon />,
+          label: 'Tarjeta de crédito', // Simplificar a un texto fijo sin mostrar IDs confusos
+          color: theme.palette.info.main,
+          bgColor: `${theme.palette.info.light}20`,
+          borderColor: theme.palette.info.light
+        };
+      } else {
+        // Siempre usar el estilo verde para efectivo
+        return {
+          icon: <PaymentsIcon />,
+          label: 'Efectivo',
+          color: theme.palette.success.dark,
+          bgColor: `${theme.palette.success.light}20`,
+          borderColor: theme.palette.success.light
+        };
       }
     };
     
-    // Obtener todas las categorías únicas para los tabs
-    const uniqueCategories = Array.from(
-      new Set(monthlyData.data.map(t => t.category))
-    ).sort();
+    // Calcular totales para los contadores superiores
+    const totals = {
+      all: filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
+      visible: filteredTransactions.filter(t => !t.hiddenFromList).reduce((sum, t) => sum + (t.amount || 0), 0),
+      hidden: filteredTransactions.filter(t => t.hiddenFromList).reduce((sum, t) => sum + (t.amount || 0), 0),
+      count: filteredTransactions.length,
+      hiddenCount: filteredTransactions.filter(t => t.hiddenFromList).length,
+      visibleCount: filteredTransactions.filter(t => !t.hiddenFromList).length
+    };
     
-    return (
-      <Card elevation={1} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <CardHeader 
-          title={
-            <Typography variant="h6">
-              Detalles de {dataType === 'expenses' ? 'Gastos' : 'Ingresos'}
-            </Typography>
-          }
-        />
-        <Divider />
-        <Box sx={{ width: '100%', bgcolor: 'background.paper' }}>
-          <Tabs
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            indicatorColor="primary"
-            textColor="primary"
-            variant="scrollable"
-            scrollButtons="auto"
-          >
-            <Tab 
-              label="Todas" 
-              value="all" 
-              icon={<CategoryIcon />} 
-              iconPosition="start"
-            />
-            {Array.from(new Set(monthlyData.data.map(t => t.category))).sort().map(category => (
-              <Tab 
-                key={category}
-                label={category}
-                value={category}
-                icon={getCategoryIcon(category)}
-                iconPosition="start"
-              />
-            ))}
-        </Tabs>
-        </Box>
-        <Box 
+    // Componente para renderizar una transacción individual
+    const TransactionItem = ({ transaction, dateGroup }) => {
+      const paymentMethod = getPaymentMethodInfo(transaction);
+      // Detectar explícitamente si es transacción de tarjeta
+      const isCreditCard = transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction === true;
+      
+      return (
+        <Paper 
+          elevation={0} 
           sx={{ 
-            flexGrow: 1, // Ocupar todo el espacio disponible
-            overflow: 'auto',
-            p: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            '&::-webkit-scrollbar': {
-              width: 8,
-            },
-            '&::-webkit-scrollbar-track': {
-              bgcolor: 'background.paper',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              bgcolor: 'divider',
-              borderRadius: 4,
+            p: 2, 
+            mb: 1.5, 
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: isCreditCard ? `${theme.palette.info.light}40` : theme.palette.divider,
+            bgcolor: isCreditCard ? `${theme.palette.info.light}08` : 'background.paper',
+            transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s',
+            position: 'relative',
+            overflow: 'hidden',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.07)',
+              bgcolor: isCreditCard ? `${theme.palette.info.light}12` : theme.palette.grey[50]
             }
           }}
         >
-          {sortedDates.length === 0 ? (
-            <Alert severity="info">
-              <AlertTitle>Sin datos</AlertTitle>
-              No hay {dataType === 'expenses' ? 'gastos' : 'ingresos'} en la categoría seleccionada para {getMonthName(selectedMonth)} de {selectedYear}.
-            </Alert>
-          ) : (
-            sortedDates.map(dateStr => (
-              <Paper 
-                key={dateStr} 
-                elevation={0} 
+          {/* Indicador lateral de tipo de pago */}
+          <Box 
+            sx={{ 
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              height: '100%',
+              width: 4,
+              bgcolor: paymentMethod.color,
+              opacity: 0.7
+            }} 
+          />
+          
+          <Grid container spacing={2} alignItems="flex-start">
+            {/* Icono de categoría */}
+            <Grid item>
+              <Avatar 
                 sx={{ 
-                  mb: 2, 
-                  overflow: 'hidden',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
+                  bgcolor: `${isCreditCard ? theme.palette.info.light : theme.palette.grey[200]}20`,
+                  color: isCreditCard ? theme.palette.info.main : theme.palette.grey[700],
+                  width: 40,
+                  height: 40
                 }}
               >
-                {/* Cabecera de fecha con botón expandir/contraer */}
-                <Box 
-                  onClick={() => handleToggleDate(dateStr)}
+                {React.cloneElement(getCategoryIcon(transaction.category), { fontSize: 'small' })}
+              </Avatar>
+      </Grid>
+            
+            {/* Información principal */}
+            <Grid item xs>
+              <Stack spacing={0.5}>
+                <Typography 
+                  variant="subtitle1" 
+                  component="div" 
                   sx={{ 
-                    p: 1.5, 
-                    bgcolor: 'action.hover',
+                    fontWeight: 'medium',
+                    color: isCreditCard ? theme.palette.info.dark : 'text.primary',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.selected' }
+                    gap: 1
                   }}
                 >
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    {obtenerFechaFormateada(dateStr)}
-                  </Typography>
-                  <Box 
-                    sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center',
-                      color: 'text.secondary'
-                    }}
-                  >
-                    <Typography variant="body2" mr={1}>
-                      {transactionsByDate[dateStr].length} {transactionsByDate[dateStr].length === 1 ? 'transacción' : 'transacciones'}
-                    </Typography>
-                    {expandedDates[dateStr] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  </Box>
-                </Box>
+                  {transaction.description}
+                  {isCreditCard && (
+                    <Chip 
+                      size="small" 
+                      label="Tarjeta" 
+                      color="info" 
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.7rem' }} 
+                    />
+                  )}
+                  {transaction.installments > 1 && (
+                    <Chip 
+                      size="small"
+                      label={`${transaction.currentInstallment || 1}/${transaction.installments}`}
+                      color="warning"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
+                  )}
+                </Typography>
                 
-                {/* Lista de transacciones para esta fecha */}
-                {expandedDates[dateStr] && (
-                  <Box>
-                    {transactionsByDate[dateStr].map((transaction, index) => (
-                      <Box 
-                        key={index}
-                        sx={{ 
-                          p: 1.5, 
-                          borderTop: index === 0 ? '1px solid' : 'none',
-                          borderColor: 'divider',
-                          '&:hover': { bgcolor: 'action.hover' }
-                        }}
-                      >
-                        <Grid container alignItems="center">
-                          <Grid item xs={8}>
-                            <Typography 
-                              variant="body1" 
-                              component="div" 
-                              sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center',
-                                fontWeight: 'medium'
-                              }}
-                            >
-                              {getCategoryIcon(transaction.category)}
-                              {transaction.description}
-                            </Typography>
-                            <Typography 
-                              variant="body2" 
-                              color="text.secondary"
-                              sx={{ ml: 3.5 }}
-                            >
-                              {transaction.category}
-                            </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                  <Chip 
+                    size="small"
+                    label={transaction.category}
+                    sx={{ 
+                      height: 22,
+                      bgcolor: theme.palette.grey[100],
+                      color: theme.palette.text.secondary
+                    }}
+                  />
+                  
+                  {transaction.subcategory && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                      <ChevronRightIcon fontSize="inherit" sx={{ mx: -0.5 }} />
+                      {transaction.subcategory}
+                    </Typography>
+                  )}
+                </Box>
+              </Stack>
       </Grid>
-                          <Grid item xs={4} sx={{ textAlign: 'right' }}>
-                            <Typography 
-                              variant="body1" 
-                              sx={{ 
-                                color: dataType === 'expenses' 
-                                  ? theme.palette.error.main 
-                                  : theme.palette.success.main,
-                                fontWeight: 'bold'
-                              }}
-                            >
-                              {formatAmount(transaction.amount)}
-                            </Typography>
-      </Grid>
-                        </Grid>
-                      </Box>
-                    ))}
-                  </Box>
+            
+            {/* Método de pago e importe */}
+            <Grid item xs={12} sm="auto">
+              <Stack 
+                direction="row" 
+                spacing={2} 
+                alignItems="center" 
+                justifyContent={{ xs: 'space-between', sm: 'flex-end' }}
+                sx={{ mt: { xs: 1, sm: 0 } }}
+              >
+                <Chip
+                  size="small"
+                  icon={React.cloneElement(paymentMethod.icon, { fontSize: 'small' })}
+                  label={paymentMethod.label}
+                  sx={{
+                    bgcolor: paymentMethod.bgColor,
+                    color: paymentMethod.color,
+                    border: '1px solid',
+                    borderColor: paymentMethod.borderColor,
+                    '& .MuiChip-icon': {
+                      color: paymentMethod.color
+                    }
+                  }}
+                />
+                
+                <Typography 
+                  variant="h6" 
+                  component="div"
+                  sx={{ 
+                    fontWeight: 'bold',
+                    color: isCreditCard 
+                      ? theme.palette.info.main
+                      : dataType === 'expenses' 
+                        ? theme.palette.error.main 
+                        : theme.palette.success.main,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5
+                  }}
+                >
+                  {formatAmount(transaction.amount)}
+                </Typography>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Paper>
+      );
+    };
+    
+    // Componente para renderizar el grupo de una fecha
+    const DateGroupCard = ({ dateData, date }) => {
+      const formattedDate = obtenerFechaFormateada(date);
+      const isExpanded = expandedDates[date] === true; // Explícitamente comprobar si es true
+      
+      // Verificar si hay transacciones con tarjeta en este grupo
+      const hasCreditCardTransactions = dateData.transactions.some(
+        t => t.paymentMethod === 'creditCard' || t.creditCardTransaction === true
+      );
+      
+      return (
+        <Card 
+          elevation={1} 
+          sx={{ 
+            mb: 3, 
+            borderRadius: 2,
+            overflow: 'hidden',
+            bgcolor: 'background.paper',
+            transition: 'transform 0.2s',
+            '&:hover': {
+              boxShadow: '0 6px 20px rgba(0,0,0,0.08)'
+            }
+          }}
+        >
+          {/* Cabecera de fecha */}
+          <Box 
+            onClick={() => handleToggleDate(date)}
+            sx={{ 
+              p: 2,
+              bgcolor: theme.palette.grey[50],
+              borderBottom: isExpanded ? `1px solid ${theme.palette.divider}` : 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s',
+              '&:hover': { bgcolor: theme.palette.grey[100] },
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 2
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Avatar 
+                sx={{ 
+                  bgcolor: theme.palette.primary.main,
+                  width: 40,
+                  height: 40,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              >
+                <CalendarTodayIcon />
+              </Avatar>
+              
+              <Box>
+                <Typography variant="h6" fontWeight="medium">
+                  {formattedDate}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {dateData.transactions.length} {dateData.transactions.length === 1 ? 'transacción' : 'transacciones'}
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Stack alignItems="flex-end">
+                <Typography 
+                  variant="subtitle1" 
+                  fontWeight="bold"
+                  color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
+                >
+                  {formatAmount(dateData.cashTotal)} {/* Mostramos solo el total en efectivo */}
+                </Typography>
+                
+              </Stack>
+              
+              <IconButton 
+                size="small" 
+                edge="end"
+                sx={{ 
+                  transition: 'transform 0.2s',
+                  transform: isExpanded ? 'rotate(180deg)' : 'none'
+                }}
+              >
+                <ExpandMoreIcon />
+              </IconButton>
+            </Box>
+          </Box>
+          
+          {/* Contenido de las transacciones */}
+          {isExpanded && (
+            <Box sx={{ p: 2 }}>
+              {dateData.transactions.map((transaction, idx) => (
+                <TransactionItem 
+                  key={idx} 
+                  transaction={transaction} 
+                  dateGroup={dateData}
+                />
+              ))}
+            </Box>
+          )}
+        </Card>
+      );
+    };
+    
+    return (
+      <Card 
+        elevation={1} 
+        sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          borderRadius: 2,
+          overflow: 'hidden'
+        }}
+      >
+        {/* Cabecera */}
+        <Box sx={{ 
+          p: 2, 
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          background: `linear-gradient(90deg, ${theme.palette.grey[50]} 0%, ${theme.palette.background.paper} 100%)`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <CategoryIcon color="primary" />
+          <Typography variant="h6">
+            Detalles de {dataType === 'expenses' ? 'Gastos' : 'Ingresos'}
+          </Typography>
+        </Box>
+        
+        {/* Panel de búsqueda mejorado (quitar el panel de totales) */}
+        <Box sx={{ 
+          p: 2,
+          bgcolor: theme.palette.grey[50],
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12}>
+              <FormControl variant="outlined" size="small" fullWidth>
+                <OutlinedInput
+                  value={searchText}
+                  onChange={e => setSearchText(e.target.value)}
+                  placeholder="Buscar por descripción, categoría, subcategoría, monto o método de pago..."
+                  startAdornment={<FilterListIcon color="action" sx={{ mr: 1 }} />}
+                  sx={{
+                    bgcolor: 'white',
+                    '&:hover': {
+                      boxShadow: '0 0 5px rgba(0,0,0,0.1)'
+                    },
+                    '&.Mui-focused': {
+                      boxShadow: '0 0 8px rgba(0,0,0,0.2)'
+                    }
+                  }}
+                />
+                {searchText && (
+                  <Typography variant="caption" sx={{ mt: 0.5, ml: 1 }}>
+                    Mostrando {filteredTransactions.length} resultados para "{searchText}"
+                  </Typography>
                 )}
-              </Paper>
+              </FormControl>
+            </Grid>
+            {/* Eliminar el panel de totales que estaba aquí */}
+          </Grid>
+        </Box>
+        
+        {/* Lista de transacciones */}
+        <Box sx={{ 
+          flexGrow: 1, 
+          overflow: 'auto',
+          p: 2,
+          bgcolor: theme.palette.grey[50]
+        }}>
+          {sortedDates.length === 0 ? (
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                p: 3, 
+                borderRadius: 2,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                bgcolor: 'background.paper',
+                border: `1px dashed ${theme.palette.divider}`
+              }}
+            >
+              <FilterListIcon color="disabled" sx={{ fontSize: 40, mb: 2 }} />
+              <Typography variant="h6" color="textSecondary" gutterBottom>
+                No hay resultados
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Prueba a cambiar tu búsqueda para ver más transacciones
+              </Typography>
+            </Paper>
+          ) : (
+            sortedDates.map(date => (
+              <DateGroupCard 
+                key={date} 
+                date={date} 
+                dateData={transactionsByDate[date]} 
+              />
             ))
           )}
         </Box>
@@ -1670,8 +2520,8 @@ const Finances = () => {
         <Grid container spacing={3} sx={{ mt: 0 }}>
           <Grid item xs={12}>
             <TimeNavigator />
-          </Grid>
-        </Grid>
+      </Grid>
+      </Grid>
         
         {/* Contenido principal */}
         <Grid container spacing={3} alignItems="stretch">
@@ -1897,37 +2747,64 @@ const Finances = () => {
         ariaLabel="Acciones rápidas de finanzas"
         sx={{ 
           position: 'fixed', 
-          bottom: 16, 
-          right: 16 
+          bottom: 24, 
+          right: 24,
+          '& .MuiFab-primary': {
+            bgcolor: theme.palette.primary.main,
+            '&:hover': {
+              bgcolor: theme.palette.primary.dark
+            }
+          }
         }}
         icon={<SpeedDialIcon />}
         onClose={() => setOpenSpeedDial(false)}
         onOpen={() => setOpenSpeedDial(true)}
         open={openSpeedDial}
+        direction="up"
         FabProps={{
-          sx: {
-            bgcolor: theme.palette.primary.main,
-            '&:hover': {
-              bgcolor: theme.palette.primary.dark,
-            }
+          sx: { 
+            boxShadow: theme.shadows[8],
           }
         }}
       >
-        {actions.map((action) => (
-          <SpeedDialAction
-            key={action.name}
-            icon={action.icon}
-            tooltipTitle={action.name}
-            tooltipOpen={isMobile}
-            onClick={action.action}
-            sx={{
-              '& .MuiSpeedDialAction-staticTooltipLabel': {
-                backgroundColor: action.color,
-                color: '#fff'
+        <SpeedDialAction
+          key="nuevo-gasto"
+          icon={<TrendingDownIcon />}
+          tooltipTitle="Nuevo Gasto"
+          tooltipOpen={isMobile}
+          onClick={() => {
+            setOpenSpeedDial(false);
+            navigate('/NuevoGasto');
+          }}
+          FabProps={{
+            sx: { 
+              bgcolor: theme.palette.error.main, 
+              color: 'white',
+              '&:hover': {
+                bgcolor: theme.palette.error.dark
               }
-            }}
-          />
-        ))}
+            }
+          }}
+        />
+        <SpeedDialAction
+          key="nuevo-ingreso"
+          icon={<TrendingUpIcon />}
+          tooltipTitle="Nuevo Ingreso"
+          tooltipOpen={isMobile}
+          onClick={() => {
+            setOpenSpeedDial(false);
+            navigate('/NuevoIngreso');
+          }}
+          FabProps={{
+            sx: { 
+              bgcolor: theme.palette.success.main, 
+              color: 'white',
+              '&:hover': {
+                bgcolor: theme.palette.success.dark
+              }
+            }
+          }}
+        />
       </SpeedDial>
     </Layout>
   );

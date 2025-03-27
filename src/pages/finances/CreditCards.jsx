@@ -29,7 +29,9 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
-  Link
+  Link,
+  CardHeader,
+  ButtonGroup
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -54,6 +56,12 @@ import { database, auth, storage } from '../../firebase';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { alpha } from '@mui/material/styles';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import TodayIcon from '@mui/icons-material/Today';
 
 // Función auxiliar para formatear fechas en un formato amigable, consistente con Finances.jsx
 function obtenerFechaFormateada(dateStr) {
@@ -695,7 +703,7 @@ const CreditCards = () => {
     <Layout title="Tarjetas de Crédito">
       <Box 
         sx={{ 
-          bgcolor: '#006C68', 
+          bgcolor: '#006C68', // Restauramos el color verde original
           minHeight: '100vh',
           width: '100%',
           position: 'relative',
@@ -705,42 +713,262 @@ const CreditCards = () => {
           maxWidth: 'none'
         }}
       >
-        <Grid container spacing={3} sx={{ mt:2 }}>
-          <Grid item xs={12}>
-            <MonthNavigator 
-            selectedYear={selectedYear} 
-            selectedMonth={selectedMonth} 
-            handleYearChange={setSelectedYear} 
-            handleMonthChange={setSelectedMonth} 
-            />
-          </Grid>
+        {/* Barra de navegación mensual con borde, similar a Finances */}
+        <Paper
+          elevation={3}
+          sx={{
+            mb: 3,
+            borderRadius: '0 0 12px 12px',
+            overflow: 'hidden',
+            boxShadow: `0 4px 20px rgba(0,0,0,0.15)`,
+            position: 'sticky',
+            top: {
+              xs: 56, // Altura del AppBar en móviles
+              sm: 64  // Altura del AppBar en escritorio
+            },
+            zIndex: 10,
+            border: 'none', // Eliminar cualquier borde que pueda existir
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '100%',
+              backgroundColor: '#006C68', // Mismo color del fondo
+              zIndex: -1
+            }
+          }}
+        >
+          {/* Navegador mensual rediseñado */}
+          <Box 
+            sx={{
+              background: `linear-gradient(90deg, ${alpha(theme.palette.primary.dark, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.9)} 100%)`,
+              py: 1.5,
+              px: { xs: 1, sm: 2 }
+            }}
+          >
+            <Grid container alignItems="center" spacing={2}>
+              {/* Navegación de meses */}
+              <Grid item xs={12} md={9}>
+                <Stack 
+                  direction="row" 
+                  spacing={0.5} 
+                  alignItems="center" 
+                  sx={{ 
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    borderRadius: 2,
+                    p: 0.5,
+                    height: '100%'
+                  }}
+                >
+                  <IconButton 
+                    onClick={() => {
+                      if (selectedMonth === 1) {
+                        setSelectedMonth(12);
+                        setSelectedYear(selectedYear - 1);
+                      } else {
+                        setSelectedMonth(selectedMonth - 1);
+                      }
+                    }} 
+                    color="inherit"
+                    size="small"
+                    sx={{ 
+                      color: 'white',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
+                    }}
+                  >
+                    <ChevronLeftIcon />
+                  </IconButton>
+                  
+                  <ButtonGroup
+                    variant="text"
+                    sx={{
+                      flex: 1,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      '& .MuiButton-root': {
+                        borderRadius: 1.5,
+                        color: 'white',
+                        px: 1,
+                        mx: 0.2,
+                        minWidth: 'auto',
+                        fontSize: '0.8rem',
+                        '&.active': {
+                          bgcolor: 'rgba(255,255,255,0.25)',
+                          fontWeight: 'bold'
+                        },
+                        '&:hover': {
+                          bgcolor: 'rgba(255,255,255,0.15)'
+                        }
+                      }
+                    }}
+                  >
+                    {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((month, idx) => (
+                      <Button
+                        key={idx}
+                        className={selectedMonth === idx + 1 ? 'active' : ''}
+                        onClick={() => setSelectedMonth(idx + 1)}
+                        sx={{
+                          display: {
+                            xs: (
+                              idx === selectedMonth - 2 || 
+                              idx === selectedMonth - 1 || 
+                              idx === selectedMonth || 
+                              idx === selectedMonth - 1 + 1
+                            ) ? 'inline-flex' : 'none',
+                            sm: 'inline-flex'
+                          }
+                        }}
+                      >
+                        {month}
+                      </Button>
+                    ))}
+                  </ButtonGroup>
+                  
+                  <IconButton 
+                    onClick={() => {
+                      if (selectedMonth === 12) {
+                        setSelectedMonth(1);
+                        setSelectedYear(selectedYear + 1);
+                      } else {
+                        setSelectedMonth(selectedMonth + 1);
+                      }
+                    }} 
+                    color="inherit"
+                    size="small"
+                    sx={{ 
+                      color: 'white',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
+                    }}
+                  >
+                    <ChevronRightIcon />
+                  </IconButton>
+                </Stack>
+              </Grid>
+              
+              {/* Año y botón de mes actual */}
+              <Grid item xs={12} md={3}>
+                <Stack 
+                  direction="row" 
+                  spacing={2} 
+                  alignItems="center" 
+                  justifyContent={{ xs: 'center', md: 'flex-end' }}
+                >
+                  {/* Selector de año creativo */}
+                  <Box 
+                    sx={{ 
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <IconButton
+                      size="small"
+                      onClick={() => setSelectedYear(selectedYear - 1)}
+                      sx={{ 
+                        color: 'white',
+                        opacity: 0.8,
+                        '&:hover': { opacity: 1 }
+                      }}
+                    >
+                      <KeyboardArrowLeftIcon fontSize="small" />
+                    </IconButton>
+                    
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        bgcolor: 'rgba(255,255,255,0.15)',
+                        py: 0.75,
+                        px: 2,
+                        borderRadius: 2,
+                        minWidth: 76,
+                        textAlign: 'center'
+                      }}
+                    >
+                      <Typography
+                        variant="body1"
+                        fontWeight="medium"
+                        color="white"
+                        sx={{ userSelect: 'none' }}
+                      >
+                        {selectedYear}
+                      </Typography>
+                    </Paper>
+                    
+                    <IconButton
+                      size="small"
+                      onClick={() => setSelectedYear(selectedYear + 1)}
+                      sx={{ 
+                        color: 'white',
+                        opacity: 0.8,
+                        '&:hover': { opacity: 1 }
+                      }}
+                    >
+                      <KeyboardArrowRightIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  
+                  {/* Botón de mes actual */}
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      const now = new Date();
+                      setSelectedMonth(now.getMonth() + 1);
+                      setSelectedYear(now.getFullYear());
+                    }}
+                    startIcon={<TodayIcon />}
+                    sx={{
+                      bgcolor: 'white',
+                      color: theme.palette.primary.dark,
+                      fontWeight: 'bold',
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.background.paper, 0.9),
+                      },
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      px: { xs: 1, sm: 2 },
+                      py: 1
+                    }}
+                  >
+                    Mes Actual
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
           
-          {/* Total combinado de todas las tarjetas */}
-          {cards.length > 0 && (
-            <Grid item xs={12}>
-              <Paper 
-                elevation={2}
-                sx={{ 
-                  p: 2, 
-                  borderRadius: 2,
-                  bgcolor: 'white',
-                  border: '1px solid rgba(0,0,0,0.1)',
-                  mx: { xs: 1, sm: 2 }
-                }}
-              >
+        {/* Total combinado de todas las tarjetas - Diseño mejorado con gradiente */}
+        {cards.length > 0 && (
+          <Grid item xs={12} sx={{ mb: 3, mt: 5 }}>
+            <Card 
+              elevation={3}
+              sx={{ 
+                borderRadius: 3,
+                overflow: 'hidden',
+                boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}`,
+                mx: { xs: 2, sm: 2 }
+              }}
+            >
+              <Box sx={{ 
+                p: 2.5, 
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                color: 'white',
+              }}>
                 <Box 
                   sx={{
                     display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
                     justifyContent: 'space-between',
-                    alignItems: { xs: 'flex-start', sm: 'center' }
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    gap: 2
                   }}
                 >
                   <Box>
-                    <Typography variant="h6" fontWeight="bold" color="primary">
+                    <Typography variant="h6" fontWeight="bold" color="white">
                       Total de todas las tarjetas
                     </Typography>
-                    <Typography variant="h4" fontWeight="bold" color="error.main">
+                    <Typography variant="h3" fontWeight="bold" color="white">
                       {formatAmount(getAllCardsTotal())}
                     </Typography>
                   </Box>
@@ -754,7 +982,20 @@ const CreditCards = () => {
                     sx={{ 
                       mt: { xs: 2, sm: 0 },
                       px: 3,
-                      py: 1
+                      py: 1.2,
+                      borderRadius: 2,
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                      bgcolor: 'white',
+                      color: theme.palette.primary.main,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.9)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 8px 20px rgba(0,0,0,0.2)'
+                      },
+                      '&.Mui-disabled': {
+                        bgcolor: 'rgba(255,255,255,0.5)',
+                        color: 'rgba(0,0,0,0.3)'
+                      }
                     }}
                   >
                     {paymentDisabled && !haveAllCardsReachedClosingDate() 
@@ -764,27 +1005,55 @@ const CreditCards = () => {
                         : 'Pagar Todas las Tarjetas'}
                   </Button>
                 </Box>
-              </Paper>
-            </Grid>
-          )}
-        </Grid>
-        <Grid container spacing={2} sx={{ px: { xs: 1, sm: 2 }, mt: 0 }}>
-          {/* Panel izquierdo con lista de tarjetas */}
+              </Box>
+            </Card>
+          </Grid>
+        )}
+        
+        <Grid container spacing={3} sx={{ px: { xs: 2, sm: 2 }, mt: 0 }}>
+          {/* Panel izquierdo con lista de tarjetas - Estilo mejorado */}
           <Grid item xs={12} md={4}>
-            <Card elevation={1} sx={{ 
-              borderRadius: 1,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+            <Card elevation={3} sx={{ 
+              borderRadius: 3,
+              boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
               height: '100%',
               border: 'none',
-              bgcolor: 'white'
+              bgcolor: 'white',
+              overflow: 'hidden'
             }}>
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6" fontWeight="medium">
-                    Mis Tarjetas
-                  </Typography>
-                </Box>
-                
+              <CardHeader
+                title={
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar
+                      sx={{
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        color: theme.palette.primary.main
+                      }}
+                    >
+                      <CreditCardIcon />
+                    </Avatar>
+                    <Typography variant="h6" fontWeight="bold">
+                      Mis Tarjetas
+                    </Typography>
+                  </Stack>
+                }
+                sx={{
+                  p: 2.5,
+                  pb: 1.5,
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  bgcolor: theme.palette.primary.main,
+                  color: 'white',
+                  '& .MuiTypography-root': {
+                    color: 'white'
+                  },
+                  '& .MuiAvatar-root': {
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'white'
+                  }
+                }}
+              />
+              
+              <CardContent sx={{ p: 2 }}>
                 {cards.length === 0 ? (
                   <Paper 
                     elevation={0} 
@@ -793,10 +1062,15 @@ const CreditCards = () => {
                       p: 3, 
                       textAlign: 'center',
                       borderStyle: 'dashed',
-                      borderRadius: 2
+                      borderRadius: 2,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 200
                     }}
                   >
-                    <CreditCardIcon sx={{ fontSize: 40, color: theme.palette.text.secondary, mb: 1 }} />
+                    <CreditCardIcon sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 2, opacity: 0.7 }} />
                     <Typography variant="body1" color="textSecondary" paragraph>
                       No tienes tarjetas registradas
                     </Typography>
@@ -804,6 +1078,11 @@ const CreditCards = () => {
                       variant="contained"
                       onClick={() => navigate('/NuevaTarjeta')}
                       startIcon={<AddIcon />}
+                      sx={{
+                        borderRadius: 8,
+                        px: 2.5,
+                        py: 1
+                      }}
                     >
                       Añadir Tarjeta
                     </Button>
@@ -828,8 +1107,8 @@ const CreditCards = () => {
                             : theme.palette.background.paper,
                           '&:hover': {
                             bgcolor: theme.palette.primary.light + '10',
-                            transform: 'translateY(-2px)',
-                            boxShadow: 2
+                            transform: 'translateY(-3px)',
+                            boxShadow: '0 6px 20px rgba(0,0,0,0.1)'
                           }
                         }}
                         onClick={() => handleCardSelect(card.id)}
@@ -839,10 +1118,11 @@ const CreditCards = () => {
                             <Box display="flex" alignItems="center">
                               <Avatar 
                                 sx={{ 
-                                  bgcolor: theme.palette.primary.main,
-                                  width: 36,
-                                  height: 36,
-                                  mr: 1.5
+                                  bgcolor: selectedCard === card.id ? theme.palette.primary.main : alpha(theme.palette.primary.main, 0.7),
+                                  width: 40,
+                                  height: 40,
+                                  mr: 1.5,
+                                  transition: 'all 0.2s'
                                 }}
                               >
                                 <CreditCardIcon />
@@ -856,15 +1136,20 @@ const CreditCards = () => {
                                 </Typography>
                               </Box>
                             </Box>
-                            <IconButton 
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenMenu(e, card.id);
-                              }}
-                            >
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
+                            <Box display="flex" alignItems="center">
+                              <Typography variant="body2" fontWeight="bold" color="error.main" mr={1}>
+                                {formatAmount(getCardTotal(card.id))}
+                              </Typography>
+                              <IconButton 
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenMenu(e, card.id);
+                                }}
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </Box>
                         </Box>
                       </Paper>
@@ -875,130 +1160,185 @@ const CreditCards = () => {
             </Card>
           </Grid>
           
-          {/* Panel derecho con detalles de la tarjeta seleccionada */}
+          {/* Panel derecho con detalles de la tarjeta seleccionada - Estilo mejorado */}
           <Grid item xs={12} md={8}>
             {selectedCard && cards.length > 0 ? (
-              <Card elevation={1} sx={{ 
-                borderRadius: 1,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+              <Card elevation={3} sx={{ 
+                borderRadius: 3,
+                boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
                 border: 'none',
-                bgcolor: 'white'
+                bgcolor: 'white',
+                overflow: 'hidden'
               }}>
-                <CardContent>
+                <CardHeader
+                  title={
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: theme.palette.primary.main
+                        }}
+                      >
+                        <CreditCardIcon />
+                      </Avatar>
+                      <Typography variant="h6" fontWeight="bold">
+                        {cards.find(card => card.id === selectedCard).name}
+                      </Typography>
+                    </Stack>
+                  }
+                  action={
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      startIcon={<UploadFileIcon />}
+                      size="small"
+                      onClick={handleOpenUploadDialog}
+                      sx={{ 
+                        mr: 1,
+                        borderColor: 'rgba(255,255,255,0.5)',
+                        color: 'white',
+                        '&:hover': {
+                          borderColor: 'white',
+                          bgcolor: 'rgba(255,255,255,0.1)'
+                        }
+                      }}
+                    >
+                      Subir Resumen
+                    </Button>
+                  }
+                  sx={{
+                    p: 2.5,
+                    pb: 1.5,
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    bgcolor: theme.palette.primary.main,
+                    color: 'white',
+                    '& .MuiTypography-root': {
+                      color: 'white'
+                    },
+                    '& .MuiAvatar-root': {
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      color: 'white'
+                    }
+                  }}
+                />
+                
+                <CardContent sx={{ p: 2.5 }}>
                   {/* Información de la tarjeta */}
                   <Box mb={3}>
                     {cards.find(card => card.id === selectedCard) && (
                       <>
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Typography variant="h6" fontWeight="medium" gutterBottom>
-                            {cards.find(card => card.id === selectedCard).name}
-                          </Typography>
-                          
-                          <Button
-                            variant="outlined"
-                            color="primary"
-                            startIcon={<UploadFileIcon />}
-                            size="small"
-                            onClick={handleOpenUploadDialog}
-                          >
-                            Subir Resumen
-                          </Button>
-                        </Box>
-                        
                         <Grid container spacing={2} mt={1}>
                           <Grid item xs={12} sm={4}>
-                            <Paper variant="outlined" sx={{ 
-                              p: 2, 
-                              borderRadius: 2,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box 
-                                sx={{ 
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '4px',
-                                  height: '100%',
-                                  bgcolor: theme.palette.primary.main
-                                }}
-                              />
-                              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-                                <CalendarTodayIcon color="primary" fontSize="small" />
-                                <Typography variant="body2" color="textSecondary">
-                                  Cierre
+                            <Card 
+                              elevation={2} 
+                              sx={{ 
+                                p: 0, 
+                                borderRadius: 3,
+                                overflow: 'hidden',
+                                height: '100%',
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                }
+                              }}
+                            >
+                              <Box sx={{ 
+                                p: 2,
+                                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                                color: 'white'
+                              }}>
+                                <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                  <CalendarTodayIcon fontSize="small" />
+                                  <Typography variant="body2" fontWeight="medium">
+                                    Cierre
+                                  </Typography>
+                                </Stack>
+                              </Box>
+                              <Box sx={{ p: 2 }}>
+                                <Typography variant="h6" fontWeight="medium">
+                                  {getCardDates()?.closingDate 
+                                    ? obtenerFechaFormateada(getCardDates().closingDate)
+                                    : 'No establecido'}
                                 </Typography>
-                              </Stack>
-                              <Typography variant="h6" fontWeight="medium">
-                                {getCardDates()?.closingDate 
-                                  ? obtenerFechaFormateada(getCardDates().closingDate)
-                                  : 'No establecido'}
-                              </Typography>
-                            </Paper>
+                              </Box>
+                            </Card>
                           </Grid>
                           
                           <Grid item xs={12} sm={4}>
-                            <Paper variant="outlined" sx={{ 
-                              p: 2, 
-                              borderRadius: 2,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box 
-                                sx={{ 
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '4px',
-                                  height: '100%',
-                                  bgcolor: theme.palette.error.main
-                                }}
-                              />
-                              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-                                <PaymentIcon color="error" fontSize="small" />
-                                <Typography variant="body2" color="textSecondary">
-                                  Vencimiento
+                            <Card 
+                              elevation={2} 
+                              sx={{ 
+                                p: 0, 
+                                borderRadius: 3,
+                                overflow: 'hidden',
+                                height: '100%',
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                }
+                              }}
+                            >
+                              <Box sx={{ 
+                                p: 2,
+                                background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
+                                color: 'white'
+                              }}>
+                                <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                  <PaymentIcon fontSize="small" />
+                                  <Typography variant="body2" fontWeight="medium">
+                                    Vencimiento
+                                  </Typography>
+                                </Stack>
+                              </Box>
+                              <Box sx={{ p: 2 }}>
+                                <Typography variant="h6" fontWeight="medium">
+                                  {getCardDates()?.dueDate 
+                                    ? obtenerFechaFormateada(getCardDates().dueDate)
+                                    : 'No establecido'}
                                 </Typography>
-                              </Stack>
-                              <Typography variant="h6" fontWeight="medium">
-                                {getCardDates()?.dueDate 
-                                  ? obtenerFechaFormateada(getCardDates().dueDate)
-                                  : 'No establecido'}
-                              </Typography>
-                            </Paper>
+                              </Box>
+                            </Card>
                           </Grid>
                           
                           <Grid item xs={12} sm={4}>
-                            <Paper variant="outlined" sx={{ 
-                              p: 2, 
-                              borderRadius: 2,
-                              position: 'relative',
-                              overflow: 'hidden'
-                            }}>
-                              <Box 
-                                sx={{ 
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '4px',
-                                  height: '100%',
-                                  bgcolor: theme.palette.warning.main
-                                }}
-                              />
-                              <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-                                <ReceiptIcon color="warning" fontSize="small" />
-                                <Typography variant="body2" color="textSecondary">
-                                  Total del Mes
+                            <Card 
+                              elevation={2} 
+                              sx={{ 
+                                p: 0, 
+                                borderRadius: 3,
+                                overflow: 'hidden',
+                                height: '100%',
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                }
+                              }}
+                            >
+                              <Box sx={{ 
+                                p: 2,
+                                background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
+                                color: 'white'
+                              }}>
+                                <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                  <ReceiptIcon fontSize="small" />
+                                  <Typography variant="body2" fontWeight="medium">
+                                    Total del Mes
+                                  </Typography>
+                                </Stack>
+                              </Box>
+                              <Box sx={{ p: 2 }}>
+                                <Typography variant="h6" fontWeight="medium">
+                                  {formatAmount(getCardTotal())}
                                 </Typography>
-                              </Stack>
-                              <Typography variant="h6" fontWeight="medium">
-                                {formatAmount(getCardTotal())}
-                              </Typography>
-                            </Paper>
+                              </Box>
+                            </Card>
                           </Grid>
                         </Grid>
                         
-                        {/* Sección para mostrar el resumen de la tarjeta */}
+                        {/* Resto del código mantiene la funcionalidad pero con mejor estilo visual */}
                         <Box mt={3}>
                           <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
                             Resumen del Mes

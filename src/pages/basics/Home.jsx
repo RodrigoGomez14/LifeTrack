@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../../components/layout/Layout';
 import { 
   Grid, 
@@ -18,7 +18,19 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Avatar,
+  LinearProgress,
+  Badge,
+  Tab,
+  Tabs,
+  alpha,
+  ButtonBase,
+  Zoom,
+  Fab,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -43,16 +55,46 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PaymentIcon from '@mui/icons-material/Payment';
+import StarIcon from '@mui/icons-material/Star';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import HomeWorkIcon from '@mui/icons-material/HomeWork';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import DonutLargeIcon from '@mui/icons-material/DonutLarge';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import SpeedIcon from '@mui/icons-material/Speed';
 
 const Home = () => {
   const { userData, dollarRate } = useStore(); 
   const [chartPeriod, setChartPeriod] = useState('anual'); // 'anual' o 'mensual'
+  const [chartType, setChartType] = useState('mixed'); // 'mixed', 'bar', 'area', 'line'
+  const [viewType, setViewType] = useState(0); // 0: General, 1: Ingresos, 2: Gastos
+  const [dolarOficial, setDolarOficial] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
 
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+  const currentMonthName = getMonthName(currentMonth);
+
+  // Obtener el valor del dólar oficial
+  useEffect(() => {
+    const fetchDolarOficial = async () => {
+      try {
+        const response = await fetch('https://api.bluelytics.com.ar/v2/latest');
+        const data = await response.json();
+        setDolarOficial(data.oficial);
+      } catch (error) {
+        console.error('Error al obtener el valor del dólar oficial:', error);
+      }
+    };
+    
+    fetchDolarOficial();
+  }, []);
 
   // Funciones auxiliares para comprobar si existen los datos
   const getIncomeTotal = () => {
@@ -66,7 +108,18 @@ const Home = () => {
     if (!userData?.finances?.expenses?.[currentYear]?.months?.[currentMonth]) {
       return 0;
     }
-    return userData.finances.expenses[currentYear].months[currentMonth].total;
+    
+    // Si hay datos, pero necesitamos excluir las transacciones ocultas (pagos con tarjeta)
+    const monthData = userData.finances.expenses[currentYear].months[currentMonth];
+    
+    // Si hay transacciones, filtrar las que están marcadas como ocultas (hiddenFromList)
+    if (monthData.data && Array.isArray(monthData.data)) {
+      const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
+      return visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+    }
+    
+    // Si no hay datos detallados, usar el total
+    return monthData.total || 0;
   }
 
   const getBalance = () => {
@@ -96,6 +149,46 @@ const Home = () => {
   const expenseChange = getPercentChange(getExpenseTotal(), previousExpense);
   const balanceChange = previousBalance ? getPercentChange(getBalance(), previousBalance) : 0;
 
+  // Calcular el presupuesto restante para el mes (basado en los ingresos y gastos)
+  const getBudgetProgress = () => {
+    const income = getIncomeTotal();
+    const expense = getExpenseTotal();
+    
+    if (income <= 0) return 0;
+    
+    // Porcentaje de ingresos gastado
+    const percentSpent = Math.min((expense / income) * 100, 100);
+    
+    return percentSpent;
+  };
+
+  // Calcular las principales categorías de gastos para este mes
+  const getTopExpenseCategories = () => {
+    const monthData = userData?.finances?.expenses?.[currentYear]?.months?.[currentMonth];
+    
+    if (!monthData || !monthData.data || !Array.isArray(monthData.data)) {
+      return [];
+    }
+    
+    // Filtrar transacciones ocultas y agrupar por categoría
+    const categoryTotals = {};
+    
+    monthData.data.filter(tx => !tx.hiddenFromList).forEach(transaction => {
+      const category = transaction.category || 'Sin categoría';
+      categoryTotals[category] = (categoryTotals[category] || 0) + (transaction.amount || 0);
+    });
+    
+    // Convertir a array y ordenar
+    return Object.entries(categoryTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: (amount / getExpenseTotal()) * 100
+      }));
+  };
+
   // Generar datos para el gráfico de ingresos/gastos
   const generateChartData = () => {
     let incomes = [];
@@ -117,8 +210,8 @@ const Home = () => {
         let mesInicio = mesActual - mesesDesdeUltimoAnio;
         let anioInicio = anioActual;
         if (mesInicio < 0) {
-          mesInicio += 12;
-          anioInicio -= 1;
+            mesInicio += 12;
+            anioInicio -= 1;
         }
         const initialDate = new Date();
         initialDate.setFullYear(anioInicio, mesInicio + 1, 1);
@@ -130,7 +223,16 @@ const Home = () => {
               const auxFecha = new Date();
               auxFecha.setFullYear(year, month - 1, 1);
               if (auxFecha >= initialDate && auxFecha <= fecha) {
-                auxExpenses[month - 1] += (userData.finances.expenses[year].months[month].total);
+                // Revisar si hay datos detallados para filtrar transacciones ocultas
+                const monthData = userData.finances.expenses[year].months[month];
+                if (monthData.data && Array.isArray(monthData.data)) {
+                  // Filtrar transacciones ocultas (tarjetas de crédito)
+                  const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
+                  auxExpenses[month - 1] += visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+                } else {
+                  // Si no hay datos detallados, usar el total (aunque podría incluir ocultos)
+                  auxExpenses[month - 1] += monthData.total;
+                }
               }
             });
           });
@@ -179,11 +281,61 @@ const Home = () => {
 
   const { labels, incomes, expenses, balance } = generateChartData();
 
-  // Configuración del gráfico
+  // Función para obtener el tipo de gráfico según la vista seleccionada
+  const getChartType = () => {
+    switch (chartType) {
+      case 'bar': return 'bar';
+      case 'area': return 'area';
+      case 'line': return 'line';
+      default: return 'area'; // Tipo mixed
+    }
+  };
+
+  // Filtrar datos según la vista seleccionada
+  const getFilteredChartData = () => {
+    switch (viewType) {
+      case 1: // Solo ingresos
+        return [
+          {
+            name: 'Ingresos',
+            type: chartType === 'mixed' ? 'area' : getChartType(),
+            data: incomes
+          }
+        ];
+      case 2: // Solo gastos
+        return [
+          {
+            name: 'Gastos',
+            type: chartType === 'mixed' ? 'area' : getChartType(),
+            data: expenses
+          }
+        ];
+      default: // Vista general (ingresos, gastos y balance)
+        return [
+          {
+            name: 'Ingresos',
+            type: chartType === 'mixed' ? 'area' : getChartType(),
+            data: incomes
+          },
+          {
+            name: 'Gastos',
+            type: chartType === 'mixed' ? 'area' : getChartType(),
+            data: expenses
+          },
+          {
+            name: 'Balance',
+            type: chartType === 'mixed' ? 'column' : getChartType(),
+            data: balance
+          }
+        ];
+    }
+  };
+
+  // Configuración del gráfico con ajustes mejorados
   const chartOptions = {
     chart: {
       height: 350,
-      type: 'mixed',
+      type: getChartType(),
       toolbar: {
         show: true,
         tools: {
@@ -195,41 +347,93 @@ const Home = () => {
           pan: false,
           reset: false
         }
+      },
+      fontFamily: theme.typography.fontFamily,
+      background: 'transparent',
+      dropShadow: {
+        enabled: true,
+        top: 2,
+        left: 2,
+        blur: 4,
+        opacity: 0.15
       }
     },
     dataLabels: {
       enabled: false
-    },
-    stroke: {
+        },
+        stroke: {
       curve: 'smooth',
-      width: 3
+      width: 3,
+      lineCap: 'round',
+      dashArray: chartType === 'line' ? [0, 0, 5] : [0, 0, 0]
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.7,
+        opacityTo: 0.2,
+        stops: [0, 100]
+      }
+    },
+    markers: {
+      size: 4,
+      strokeWidth: 2,
+      hover: {
+        size: 7
+      }
     },
     xaxis: {
       categories: labels,
       labels: {
         style: {
-          colors: theme.palette.text.secondary
+          colors: theme.palette.text.secondary,
+          fontSize: '12px'
         }
+      },
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
       }
     },
     yaxis: {
       labels: {
-        formatter: val => formatAmount(val),
+                formatter: val => formatAmount(val),
         style: {
-          colors: theme.palette.text.secondary
+          colors: theme.palette.text.secondary,
+          fontSize: '12px'
         }
       }
     },
     tooltip: {
       y: {
         formatter: val => formatAmount(val)
+      },
+      theme: 'dark',
+      x: {
+        show: true
       }
     },
     grid: {
       borderColor: theme.palette.divider,
-      row: {
-        colors: ['transparent', 'transparent'],
-        opacity: 0.2
+      strokeDashArray: 5,
+      xaxis: {
+        lines: {
+          show: true
+        }
+      },
+      yaxis: {
+        lines: {
+          show: true
+        }
+      },
+      padding: {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 10
       }
     },
     legend: {
@@ -237,28 +441,38 @@ const Home = () => {
       horizontalAlign: 'right',
       labels: {
         colors: theme.palette.text.secondary
+      },
+      fontSize: '13px',
+      itemMargin: {
+        horizontal: 10
+      }
+    },
+    responsive: [
+      {
+        breakpoint: 600,
+        options: {
+          chart: {
+            height: 240
+          },
+          legend: {
+            show: false
+          }
+        }
+      }
+    ],
+    plotOptions: {
+      bar: {
+        columnWidth: '50%',
+        borderRadius: 4
       }
     },
     colors: [theme.palette.success.main, theme.palette.error.main, theme.palette.info.main]
   };
 
-  const chartSeries = [
-    {
-      name: 'Ingresos',
-      type: 'area',
-      data: incomes
-    },
-    {
-      name: 'Gastos',
-      type: 'area',
-      data: expenses
-    },
-    {
-      name: 'Balance',
-      type: 'column',
-      data: balance
-    }
-  ];
+  // Nueva función para controlar el SpeedDial
+  const [openSpeedDial, setOpenSpeedDial] = useState(false);
+  const handleOpenSpeedDial = () => setOpenSpeedDial(true);
+  const handleCloseSpeedDial = () => setOpenSpeedDial(false);
 
   // Comprobación adicional para evitar errores si userData no está completamente cargado
   if (!userData || !userData.finances || !userData.savings) {
@@ -271,444 +485,985 @@ const Home = () => {
           justifyContent="center" 
           minHeight="80vh"
           p={3}
+          sx={{
+            background: `linear-gradient(45deg, ${alpha(theme.palette.primary.dark, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.1)} 100%)`
+          }}
         >
-          <DashboardIcon 
-            color="disabled" 
-            style={{ fontSize: 64, marginBottom: 16, opacity: 0.5 }} 
-          />
-          <Typography variant="h5" color="textSecondary" align="center" gutterBottom>
-            Cargando tu dashboard financiero...
+          <Box 
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 90,
+              height: 90,
+              borderRadius: '50%',
+              bgcolor: alpha(theme.palette.primary.main, 0.1),
+              mb: 3
+            }}
+          >
+            <DashboardIcon 
+              color="primary" 
+              style={{ fontSize: 50, opacity: 0.7 }} 
+            />
+          </Box>
+          <Typography variant="h5" color="primary" align="center" gutterBottom>
+            Preparando tu dashboard financiero...
           </Typography>
-          <Typography variant="body2" color="textSecondary" align="center">
-            Por favor espera mientras obtenemos tus datos financieros.
+          <Typography variant="body2" color="textSecondary" align="center" sx={{ maxWidth: 400, mb: 3 }}>
+            Estamos cargando y analizando tus datos para brindarte la información financiera más actualizada.
+          </Typography>
+          <LinearProgress 
+            sx={{ width: '60%', maxWidth: 300, borderRadius: 1, mb: 2 }} 
+            color="primary"
+          />
+          <Typography variant="caption" color="textSecondary">
+            Esto solo tomará unos segundos
           </Typography>
         </Box>
       </Layout>
     );
   }
 
-  // Componentes para los KPI cards
-  const KpiCard = ({ title, value, icon, change, positiveIsGood = true, secondaryValue }) => {
-    const isPositive = change >= 0;
-    const isChangeGood = positiveIsGood ? isPositive : !isPositive;
-    const changeColor = isChangeGood ? theme.palette.success.main : theme.palette.error.main;
-    const IconComponent = isPositive ? ArrowUpwardIcon : ArrowDownwardIcon;
-    
-    return (
-      <Card elevation={3} sx={{ 
-        height: '100%', 
-        position: 'relative',
-        transition: 'transform 0.3s, box-shadow 0.3s',
-        '&:hover': {
-          transform: 'translateY(-5px)',
-          boxShadow: theme.shadows[6],
-        },
-        borderTop: isChangeGood ? `3px solid ${theme.palette.success.main}` : `3px solid ${theme.palette.error.main}`
-      }}>
-        <CardContent>
-          <Box sx={{ color: theme.palette.text.secondary, mb: 1, display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ 
-              mr: 1, 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: `${theme.palette.primary.main}20`,
-              borderRadius: '50%',
-              width: 36,
-              height: 36
-            }}>
-              {React.cloneElement(icon, { color: 'primary' })}
-            </Box>
-            <Typography variant="body2" fontWeight="medium">
-              {title}
-            </Typography>
-          </Box>
-          
-          <Typography variant="h5" component="div" fontWeight="bold" sx={{ mb: 1 }}>
-            {value}
-          </Typography>
-          
-          {secondaryValue && (
-            <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mb: 1 }}>
-              {secondaryValue}
-            </Typography>
-          )}
-          
-          {change !== undefined && Math.abs(change) > 0 && (
-            <Box display="flex" alignItems="center" mt={1}>
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                color: changeColor,
-                bgcolor: `${changeColor}15`,
-                borderRadius: 1,
-                px: 1,
-                py: 0.5
-              }}>
-                <IconComponent fontSize="small" sx={{ mr: 0.5 }} />
-                <Typography variant="body2" fontWeight="medium">
-                  {Math.abs(change).toFixed(1)}%
-                </Typography>
-              </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                vs. mes anterior
-              </Typography>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
+  // Calcular el presupuesto y el progreso
+  const budgetProgress = getBudgetProgress();
+  const isOverBudget = budgetProgress > 100;
+  const progressColor = isOverBudget ? theme.palette.error.main : 
+                         budgetProgress > 80 ? theme.palette.warning.main : 
+                         theme.palette.success.main;
 
-  // Componente para botones de acción rápida
-  const ActionButton = ({ to, icon, label, color = "primary" }) => {
-    return (
-      <Link to={to} style={{ textDecoration: 'none' }}>
-        <Button 
-          variant="contained" 
-          color={color}
-          startIcon={icon}
-          fullWidth
-          sx={{ 
-            py: 1.5, 
-            borderRadius: 2,
-            boxShadow: theme.shadows[2],
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            '&:hover': {
-              transform: 'translateY(-3px)',
-              boxShadow: theme.shadows[4]
-            }
-          }}
-        >
-          {label}
-        </Button>
-      </Link>
-    );
-  };
+  // Obtener las principales categorías de gastos
+  const topExpenseCategories = getTopExpenseCategories();
 
   return (
     <Layout title="Dashboard Financiero">
-      {/* Encabezado con resumen financiero */}
-      <Grid container spacing={3} sx={{ mb: 4, mt: 1 }}>
-        
-        {/* KPIs principales */}
+      {/* Cabecera con título y fecha */}
+      <Box 
+        sx={{ 
+          mb: 4, 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' }, 
+          alignItems: { xs: 'flex-start', sm: 'center' }, 
+          justifyContent: 'space-between',
+          gap: 2
+        }}
+      >
+        <Box>
+          <Typography variant="h4" component="h1" fontWeight="bold" color="text.primary" gutterBottom>
+            Panel financiero
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
+            {currentMonthName} - {currentYear} Resumen financiero
+          </Typography>
+        </Box>
+      </Box>
+      
+      {/* KPIs principales con diseño mejorado y mayor contraste */}
+      <Grid container spacing={3} sx={{ mb: 4,mt:2 }}>
         <Grid item xs={12} sm={6} md={4}>
-          <KpiCard 
-            title="Balance Mensual" 
-            value={formatAmount(getBalance())}
-            icon={<CompareArrowsIcon />}
-            change={balanceChange}
-            secondaryValue={`USD ${formatAmount(getBalance() / (dollarRate?.venta || 1))}`}
-          />
+          <Card 
+            elevation={3} 
+            sx={{ 
+              height: '100%', 
+              position: 'relative',
+              transition: 'all 0.3s ease',
+              borderRadius: 3,
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-5px)',
+                boxShadow: theme.shadows[10],
+              },
+              background: getBalance() >= 0 
+                ? `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`,
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
+                    Balance Mensual
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" sx={{ 
+                    color: 'white',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(getBalance())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    USD {formatAmount(getBalance() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                    width: 48,
+                    height: 48
+                  }}
+                >
+                  <ShowChartIcon />
+                </Avatar>
+              </Box>
+              
+              <Stack direction="row" spacing={2} alignItems="center" mt={2}>
+                <Chip
+                  size="small"
+                  icon={balanceChange >= 0 ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+                  label={`${Math.abs(balanceChange).toFixed(1)}%`}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                    fontWeight: 'medium',
+                    borderRadius: 1,
+                    '& .MuiChip-icon': {
+                      color: 'inherit'
+                    }
+                  }}
+                />
+                <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                  vs. mes anterior
+                </Typography>
+              </Stack>
+              
+              {/* Barra de progreso del presupuesto con fondo más claro */}
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                    Presupuesto gastado
+                  </Typography>
+                  <Chip 
+                    label={`${Math.round(budgetProgress)}%`}
+                    size="small"
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.7rem', 
+                      fontWeight: 'bold', 
+                      bgcolor: 'rgba(255, 255, 255, 0.3)',
+                      color: 'white'
+                    }} 
+                  />
+                </Box>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={Math.min(budgetProgress, 100)}
+                  sx={{ 
+                    height: 8, 
+                    borderRadius: 4, 
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: 'rgba(255, 255, 255, 0.85)'
+                    }
+                  }}
+                />
+                <Typography variant="caption" color="white" sx={{ display: 'block', mt: 0.5, opacity: 0.9 }}>
+                  {isOverBudget 
+                    ? `Has excedido tu presupuesto mensual en ${formatAmount(getExpenseTotal() - getIncomeTotal())}`
+                    : `Restante: ${formatAmount(getIncomeTotal() - getExpenseTotal())}`
+                  }
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
         
         <Grid item xs={12} sm={6} md={4}>
-          <KpiCard 
-            title="Ingresos Mensuales" 
-            value={formatAmount(getIncomeTotal())}
-            icon={<TrendingUpIcon />}
-            change={incomeChange}
-            secondaryValue={`USD ${formatAmount(getIncomeTotal() / (dollarRate?.venta || 1))}`}
-          />
+          <Card 
+            elevation={3} 
+            sx={{ 
+              height: '100%', 
+              position: 'relative',
+              transition: 'all 0.3s ease',
+              borderRadius: 3,
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-5px)',
+                boxShadow: theme.shadows[10],
+              },
+              background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
+                    Ingresos Mensuales
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" sx={{ 
+                    color: 'white',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(getIncomeTotal())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    USD {formatAmount(getIncomeTotal() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                    width: 48,
+                    height: 48
+                  }}
+                >
+                  <TrendingUpIcon />
+                </Avatar>
+              </Box>
+              
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" color="white" fontWeight="medium" sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+                  {incomeChange >= 0 ? (
+                    <>
+                      <ArrowUpwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(incomeChange).toFixed(1)}% más que el mes anterior
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDownwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(incomeChange).toFixed(1)}% menos que el mes anterior
+                    </>
+                  )}
+                </Typography>
+                
+                <Box sx={{ 
+                  p: 1.5, 
+                  bgcolor: 'rgba(255, 255, 255, 0.15)', 
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <Box>
+                    <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                      Mes anterior
+                    </Typography>
+                    <Typography variant="body2" fontWeight="bold" color="white">
+                      {formatAmount(previousIncome)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                      Mes actual
+                    </Typography>
+                    <Typography variant="body2" fontWeight="bold" color="white">
+                      {formatAmount(getIncomeTotal())}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </CardContent>
+                </Card>
         </Grid>
         
         <Grid item xs={12} sm={6} md={4}>
-          <KpiCard 
-            title="Gastos Mensuales" 
-            value={formatAmount(getExpenseTotal())}
-            icon={<TrendingDownIcon />}
-            change={expenseChange}
-            positiveIsGood={false}
-            secondaryValue={`USD ${formatAmount(getExpenseTotal() / (dollarRate?.venta || 1))}`}
-          />
+          <Card 
+            elevation={3} 
+            sx={{ 
+              height: '100%', 
+              position: 'relative',
+              transition: 'all 0.3s ease',
+              borderRadius: 3,
+              overflow: 'hidden',
+              '&:hover': {
+                transform: 'translateY(-5px)',
+                boxShadow: theme.shadows[10],
+              },
+              background: `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`,
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
+                    Gastos Mensuales
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" sx={{ 
+                    color: 'white',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(getExpenseTotal())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    USD {formatAmount(getExpenseTotal() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                    width: 48,
+                    height: 48
+                  }}
+                >
+                  <TrendingDownIcon />
+                </Avatar>
+              </Box>
+              
+              <Box sx={{ mt: 0.5 }}>
+                <Typography variant="subtitle2" color="white" fontWeight="medium" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  {expenseChange <= 0 ? (
+                    <>
+                      <ArrowDownwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(expenseChange).toFixed(1)}% menos que el mes anterior
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(expenseChange).toFixed(1)}% más que el mes anterior
+                    </>
+                  )}
+                </Typography>
+                
+                {/* Principales categorías de gastos con colores más claros */}
+                <Box sx={{ mt: 1.5 }}>
+                  {topExpenseCategories.slice(0, 3).map((category, index) => (
+                    <Box key={index} sx={{ mt: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.2 }}>
+                        <Typography variant="caption" color="white" noWrap sx={{ maxWidth: '70%', opacity: 0.9 }}>
+                          {category.category}
+                        </Typography>
+                        <Typography variant="caption" fontWeight="bold" color="white">
+                          {formatAmount(category.amount)}
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={Math.min(category.percentage, 100)}
+                        sx={{ 
+                          height: 5, 
+                          borderRadius: 4, 
+                          bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          '& .MuiLinearProgress-bar': {
+                            bgcolor: 'rgba(255, 255, 255, 0.85)'
+                          },
+                          mb: 1
+                        }}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
       
-      {/* Sección de Gráficos y Resumen */}
-      <Grid container spacing={3}>
-        {/* Gráfico principal */}
-        <Grid item xs={12} md={8}>
-          <Card elevation={3} sx={{ mb: 3 }}>
-            <CardHeader 
-              title={
-                <Box display="flex" alignItems="center">
-                  <Box 
-                    sx={{ 
-                      mr: 1.5, 
-                      bgcolor: `${theme.palette.primary.main}15`,
-                      p: 1,
-                      borderRadius: '50%',
-                      display: 'flex'
-                    }}
-                  >
-                    <AccountBalanceWalletIcon color="primary" />
-                  </Box>
-                  <Typography variant="h6">Evolución Financiera</Typography>
+      {/* Gráfico de evolución financiera a pantalla completa
+          Ahora sin nada a sus costados, ocupando todo el ancho */}
+      <Card 
+        elevation={3} 
+        sx={{ 
+          mb: 4, 
+          borderRadius: 3, 
+          overflow: 'hidden',
+          boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
+          width: '100%'
+        }}
+      >
+        <Box
+          sx={{
+            p: 3,
+            background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white'
+                  }}
+                >
+                  <AutoGraphIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant="h6" fontWeight="bold" color="white">
+                    Evolución Financiera
+                  </Typography>
+                  <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                    {chartPeriod === 'anual' ? 'Últimos 12 meses' : 'Mes actual por semana'}
+                  </Typography>
                 </Box>
-              }
-              action={
-                <Stack direction="row" spacing={1}>
+              </Stack>
+            </Grid>
+            
+            <Grid item xs={12} md={8}>
+              <Stack 
+                direction={{ xs: 'column', sm: 'row' }} 
+                spacing={2}
+                justifyContent="flex-end"
+                alignItems={{ xs: 'stretch', sm: 'center' }}
+              >
+                {/* Selector de tipo vista */}
+                <Tabs
+                  value={viewType}
+                  onChange={(e, newValue) => setViewType(newValue)}
+                  textColor="inherit"
+                  TabIndicatorProps={{
+                    style: {
+                      backgroundColor: 'white',
+                    }
+                  }}
+                  sx={{
+                    minHeight: 40,
+                    '& .MuiTab-root': {
+                      minHeight: 40,
+                      py: 1,
+                      color: 'white',
+                      opacity: 0.7,
+                      '&.Mui-selected': {
+                        color: 'white',
+                        opacity: 1
+                      }
+                    }
+                  }}
+                >
+                  <Tab 
+                    icon={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        <DonutLargeIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                          General
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ minWidth: { xs: 'auto', md: 100 } }}
+                  />
+                  <Tab 
+                    icon={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                          Ingresos
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ minWidth: { xs: 'auto', md: 100 } }}
+                  />
+                  <Tab 
+                    icon={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                          Gastos
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ minWidth: { xs: 'auto', md: 100 } }}
+                  />
+                </Tabs>
+                
+                {/* Selector de periodo */}
+                <Stack 
+                  direction="row" 
+                  spacing={1}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    p: 0.5,
+                    borderRadius: 2,
+                    border: `1px solid rgba(255, 255, 255, 0.2)`
+                  }}
+                >
                   <Button 
                     size="small" 
-                    variant={chartPeriod === 'anual' ? 'contained' : 'outlined'}
-                    color="primary"
+                    variant={chartPeriod === 'anual' ? 'contained' : 'text'}
+                    sx={{
+                      color: 'white',
+                      bgcolor: chartPeriod === 'anual' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: chartPeriod === 'anual' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
+                      }
+                    }}
                     onClick={() => setChartPeriod('anual')}
                   >
                     Anual
                   </Button>
                   <Button 
                     size="small" 
-                    variant={chartPeriod === 'mensual' ? 'contained' : 'outlined'}
-                    color="primary"
+                    variant={chartPeriod === 'mensual' ? 'contained' : 'text'}
+                    sx={{
+                      color: 'white',
+                      bgcolor: chartPeriod === 'mensual' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: chartPeriod === 'mensual' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
+                      }
+                    }}
                     onClick={() => setChartPeriod('mensual')}
                   >
                     Mensual
                   </Button>
                 </Stack>
-              }
-            />
-            <Divider />
-            <CardContent>
-              <ReactApexChart 
-                options={chartOptions} 
-                series={chartSeries} 
-                type="area" 
-                height={350}
-              />
-            </CardContent>
+                
+                {/* Selector de tipo de gráfico */}
+                <Stack 
+                  direction="row" 
+                  spacing={0.5}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    p: 0.5,
+                    borderRadius: 2,
+                    border: `1px solid rgba(255, 255, 255, 0.2)`
+                  }}
+                >
+                  <IconButton 
+                    size="small" 
+                    onClick={() => setChartType('mixed')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'mixed' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'mixed' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <DonutLargeIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={() => setChartType('bar')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'bar' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'bar' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <BarChartIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={() => setChartType('area')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'area' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'area' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <AutoGraphIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={() => setChartType('line')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'line' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'line' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <TimelineIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+        </Grid>
+          </Grid>
+        </Box>
+        
+        <Box sx={{ p: 3, pt: 4, bgcolor: 'background.paper' }}>
+          <ReactApexChart 
+            options={{
+              ...chartOptions,
+              colors: [theme.palette.success.main, theme.palette.error.main, theme.palette.primary.main]
+            }} 
+            series={getFilteredChartData()} 
+            type={getChartType()} 
+            height={isMobile ? 350 : 450}
+          />
+        </Box>
           </Card>
-          
-          {/* Acciones rápidas */}
-          <Card elevation={3}>
-            <CardHeader 
+
+      {/* Secciones inferiores en dos columnas */}
+      <Grid container spacing={3}>
+        {/* Columna izquierda */}
+        <Grid item xs={12} md={6}>
+          {/* Cotización del dólar */}
+          <Card 
+            elevation={3} 
+            sx={{ 
+              mb: 3, 
+              borderRadius: 3, 
+              overflow: 'hidden',
+              height: '100%',
+              boxShadow: `0 8px 32px ${alpha(theme.palette.warning.main, 0.1)}`
+            }}
+          >
+            <CardHeader
               title={
-                <Box display="flex" alignItems="center">
-                  <AddIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Acciones Rápidas</Typography>
-                </Box>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                      color: theme.palette.warning.main
+                    }}
+                  >
+                    <AttachMoneyIcon />
+                  </Avatar>
+                  <Typography variant="h6" fontWeight="bold">
+                    Cotización USD
+                  </Typography>
+                </Stack>
               }
+              sx={{
+                p: 2.5,
+                pb: 1.5,
+                bgcolor: theme.palette.warning.main,
+                color: 'white',
+                '& .MuiCardHeader-title': { m: 0 }
+              }}
             />
-            <Divider />
-            <CardContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <ActionButton
-                    to="/NuevoGasto"
-                    icon={<TrendingDownIcon />}
-                    label="Añadir Gasto"
-                    color="error"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <ActionButton
-                    to="/NuevoIngreso"
-                    icon={<TrendingUpIcon />}
-                    label="Añadir Ingreso"
-                    color="success"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <ActionButton
-                    to="/Exchange"
-                    icon={<CurrencyExchangeIcon />}
-                    label="Cambio de Divisas"
-                    color="info"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <ActionButton
-                    to="/Finanzas"
-                    icon={<DashboardIcon />}
-                    label="Panel Financiero"
-                    color="secondary"
-                  />
-                </Grid>
-              </Grid>
+            
+            <CardContent sx={{ p: 3 }}>
+              {(dollarRate || dolarOficial) && (
+                <>
+                  <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1 }}>
+                    Dólar Blue
+                  </Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          textAlign: 'center', 
+                          borderRadius: 2,
+                          bgcolor: alpha(theme.palette.success.main, 0.1),
+                          border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                          Compra
+                        </Typography>
+                        <Typography variant="h5" fontWeight="bold" color="success.dark">
+                          $ {dollarRate?.compra || "-"}
+                        </Typography>
+                      </Box>
+        </Grid>
+                    <Grid item xs={6}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          textAlign: 'center', 
+                          borderRadius: 2,
+                          bgcolor: alpha(theme.palette.error.main, 0.1),
+                          border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                          Venta
+                        </Typography>
+                        <Typography variant="h5" fontWeight="bold" color="error.dark">
+                          $ {dollarRate?.venta || "-"}
+                        </Typography>
+                      </Box>
+      </Grid>
+        </Grid>
+                  
+                  <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1 }}>
+                    Dólar Oficial
+                  </Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          textAlign: 'center', 
+                          borderRadius: 2,
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                          Compra
+                        </Typography>
+                        <Typography variant="h5" fontWeight="bold" color="info.dark">
+                          $ {dolarOficial?.value_buy || "-"}
+                        </Typography>
+                      </Box>
+        </Grid>
+                    <Grid item xs={6}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          textAlign: 'center', 
+                          borderRadius: 2,
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                          Venta
+                        </Typography>
+                        <Typography variant="h5" fontWeight="bold" color="info.dark">
+                          $ {dolarOficial?.value_sell || "-"}
+                        </Typography>
+                      </Box>
+        </Grid>
+        </Grid>
+                  
+                  <Paper 
+                    variant="outlined" 
+                    sx={{ 
+                      p: 2, 
+                      background: `linear-gradient(to bottom, ${alpha(theme.palette.background.paper, 0.5)}, ${alpha(theme.palette.background.paper, 0.8)})`,
+                      borderRadius: 2,
+                      mb: 2
+                    }}
+                  >
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: theme.palette.info.main,
+                          width: 40,
+                          height: 40
+                        }}
+                      >
+                        <CurrencyExchangeIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="body2" fontWeight="medium">
+                          Convertidor Rápido
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Tu dinero en dólares
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    
+                    <Box sx={{ mt: 2 }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary" gutterBottom>
+                            Balance en USD
+                          </Typography>
+                          <Typography variant="body1" fontWeight="bold">
+                            ${formatAmount(getBalance() / (dollarRate?.venta || 1))}
+                          </Typography>
+      </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary" gutterBottom>
+                            Ahorros en USD
+                          </Typography>
+                          <Typography variant="body1" fontWeight="bold">
+                            ${userData.savings.total ? formatAmount(userData.savings.total / (dollarRate?.venta || 1)) : 0}
+                          </Typography>
+      </Grid>
+                      </Grid>
+                    </Box>
+                  </Paper>
+                </>
+              )}
+              
+              {!dollarRate && !dolarOficial && (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No hay información disponible
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
         
-        {/* Sidebar derecha con información resumida */}
-        <Grid item xs={12} md={4}>
-          {/* Valor del dólar */}
-          <Card elevation={3} sx={{ mb: 3 }}>
-            <CardHeader 
+        {/* Columna derecha */}
+        <Grid item xs={12} md={6}>
+          {/* Resumen de ahorros */}
+          <Card 
+            elevation={3} 
+            sx={{ 
+              mb: 3, 
+              borderRadius: 3, 
+              overflow: 'hidden',
+              height: '100%',
+              boxShadow: `0 8px 32px ${alpha(theme.palette.success.main, 0.1)}`
+            }}
+          >
+            <CardHeader
               title={
-                <Box display="flex" alignItems="center">
-                  <CurrencyExchangeIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Cotización Dólar</Typography>
-                </Box>
-              } 
-              subheader="Valor actual del dólar"
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                      color: theme.palette.success.main
+                    }}
+                  >
+                    <SavingsIcon />
+                  </Avatar>
+                  <Typography variant="h6" fontWeight="bold">
+                    Resumen de Ahorros
+                  </Typography>
+                </Stack>
+              }
+              sx={{
+                p: 2.5,
+                pb: 1.5,
+                bgcolor: theme.palette.success.main,
+                color: 'white',
+                '& .MuiCardHeader-title': { m: 0 }
+              }}
             />
-            <Divider />
-            <CardContent sx={{ display: 'flex', justifyContent: 'space-around' }}>
-              <Box textAlign="center">
-                <Typography variant="body2" color="text.secondary">Compra</Typography>
-                <Typography variant="h6" fontWeight="bold" color="primary">
-                  {dollarRate && dollarRate.compra ? formatAmount(dollarRate.compra) : 'N/A'}
-                </Typography>
-              </Box>
-              <Box textAlign="center">
-                <Typography variant="body2" color="text.secondary">Venta</Typography>
-                <Typography variant="h6" fontWeight="bold" color="primary">
-                  {dollarRate && dollarRate.venta ? formatAmount(dollarRate.venta) : 'N/A'}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-          
-          {/* Resumen de Ahorros */}
-          <Card elevation={3} sx={{ mb: 3 }}>
-            <CardHeader 
-              title={
-                <Box display="flex" alignItems="center">
-                  <SavingsIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Resumen de Ahorros</Typography>
+            
+            <CardContent sx={{ p: 2.5 }}>
+              {userData?.savings && (
+                <>
+                  <Box 
+                    sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      p: 2.5,
+                      mb: 2.5,
+                      borderRadius: 2,
+                      bgcolor: alpha(theme.palette.success.main, 0.08),
+                      border: `1px solid ${alpha(theme.palette.success.main, 0.15)}`,
+                    }}
+                  >
+                    <Typography variant="subtitle1" fontWeight="medium" color="text.secondary">
+                      Total Ahorrado
+                    </Typography>
+                    <Typography variant="h4" fontWeight="bold" color="success.dark">
+                      {formatAmount(userData.savings.total || 0)}
+                    </Typography>
+                  </Box>
+                  
+                  <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1.5 }}>
+                    Distribución de ahorros
+                  </Typography>
+                  
+                  <Box sx={{ mb: 2.5 }}>
+                    {Object.entries(userData.savings.accounts || {}).map(([key, value], index) => {
+                      // Asignar un color basado en el índice
+                      const colors = [
+                        { bg: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main },
+                        { bg: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main },
+                        { bg: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.main },
+                        { bg: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main }
+                      ];
+                      const colorIndex = index % colors.length;
+                      
+                      // Calcular el porcentaje del total
+                      const percentage = userData.savings.total ? (value / userData.savings.total) * 100 : 0;
+                      
+                      return (
+                        <Box key={key} sx={{ mb: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                            <Typography variant="body2" fontWeight="medium">
+                              {key}
+                            </Typography>
+                            <Typography variant="body2" fontWeight="bold">
+                              {formatAmount(value)}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={percentage}
+                              sx={{ 
+                                height: 8, 
+                                borderRadius: 4, 
+                                flexGrow: 1,
+                                mr: 1,
+                                bgcolor: colors[colorIndex].color
+                              }}
+                            />
+                            <Typography variant="caption" fontWeight="bold" sx={{ width: 35 }}>
+                              {Math.round(percentage)}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </>
+              )}
+              
+              {!userData?.savings && (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No hay información de ahorros disponible
+                  </Typography>
                 </Box>
-              }
-              action={
-                <Tooltip title="Ver Detalles">
-                  <Link to="/Finanzas" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <IconButton size="small">
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Link>
-                </Tooltip>
-              }
-            />
-            <Divider />
-            <CardContent>
-              <List disablePadding>
-                <ListItem sx={{ px: 0, pb: 2 }}>
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <Box 
-                      sx={{ 
-                        bgcolor: `${theme.palette.success.main}15`,
-                        p: 0.75,
-                        borderRadius: '50%',
-                        display: 'flex'
-                      }}
-                    >
-                      <MonetizationOnIcon style={{ color: theme.palette.success.main }} fontSize="small" />
-                    </Box>
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Ahorros en ARS"
-                    secondary={userData.savings && userData.savings.amountARS ? formatAmount(userData.savings.amountARS) : 'N/A'}
-                    primaryTypographyProps={{ variant: 'body2', color: 'textSecondary' }}
-                    secondaryTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                  />
-                </ListItem>
-                
-                <ListItem sx={{ px: 0, py: 2 }}>
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <Box 
-                      sx={{ 
-                        bgcolor: `${theme.palette.info.main}15`,
-                        p: 0.75,
-                        borderRadius: '50%',
-                        display: 'flex'
-                      }}
-                    >
-                      <AttachMoneyIcon style={{ color: theme.palette.info.main }} fontSize="small" />
-                    </Box>
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Ahorros en USD"
-                    secondary={userData.savings && userData.savings.amountUSD ? formatAmount(userData.savings.amountUSD) : 'N/A'}
-                    primaryTypographyProps={{ variant: 'body2', color: 'textSecondary' }}
-                    secondaryTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                  />
-                </ListItem>
-                
-                <ListItem sx={{ px: 0, pt: 2 }}>
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <Box 
-                      sx={{ 
-                        bgcolor: `${theme.palette.warning.main}15`,
-                        p: 0.75,
-                        borderRadius: '50%',
-                        display: 'flex'
-                      }}
-                    >
-                      <DirectionsCarIcon style={{ color: theme.palette.warning.main }} fontSize="small" />
-                    </Box>
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Fondo Mantenimiento"
-                    secondary={userData.savings && userData.savings.carMaintenance ? formatAmount(userData.savings.carMaintenance) : 'N/A'}
-                    primaryTypographyProps={{ variant: 'body2', color: 'textSecondary' }}
-                    secondaryTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                  />
-                </ListItem>
-              </List>
-            </CardContent>
-          </Card>
-          
-          {/* Próximos Eventos o Calendario - Ahora enlaza a la sección de Hábitos */}
-          <Card elevation={3}>
-            <CardHeader 
-              title={
-                <Box display="flex" alignItems="center">
-                  <CalendarTodayIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6">Seguimiento de Hábitos</Typography>
-                </Box>
-              }
-              action={
-                <Tooltip title="Ver Hábitos">
-                  <Link to="/Habitos" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <IconButton size="small">
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Link>
-                </Tooltip>
-              }
-            />
-            <Divider />
-            <CardContent>
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  py: 2
-                }}
-              >
-                <Box 
-                  sx={{ 
-                    mb: 2,
-                    bgcolor: `${theme.palette.secondary.main}15`,
-                    p: 2,
-                    borderRadius: '50%',
-                    display: 'flex'
-                  }}
-                >
-                  <CalendarTodayIcon color="secondary" style={{ fontSize: 40 }} />
-                </Box>
-                <Typography variant="body1" align="center" gutterBottom fontWeight="medium">
-                  Seguimiento de Hábitos
-                </Typography>
-                <Typography variant="body2" align="center" color="textSecondary">
-                  Registra tus hábitos diarios y establece recordatorios para mejorar tu productividad personal.
-                </Typography>
-                <Button 
-                  component={Link}
-                  to="/Habitos"
-                  variant="contained" 
-                  color="secondary" 
-                  startIcon={<CalendarTodayIcon />}
-                  size="small" 
-                  sx={{ mt: 2 }} 
-                >
-                  Ir a Hábitos
-                </Button>
-              </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      {/* SpeedDial para acciones rápidas */}
+      <SpeedDial
+        ariaLabel="Acciones rápidas"
+        sx={{ 
+          position: 'fixed', 
+          bottom: 24, 
+          right: 24,
+          '& .MuiFab-primary': {
+            bgcolor: theme.palette.primary.main,
+            '&:hover': {
+              bgcolor: theme.palette.primary.dark
+            }
+          }
+        }}
+        icon={<SpeedDialIcon />}
+        onClose={handleCloseSpeedDial}
+        onOpen={handleOpenSpeedDial}
+        open={openSpeedDial}
+        direction="up"
+        FabProps={{
+          sx: { 
+            boxShadow: theme.shadows[8],
+          }
+        }}
+      >
+        <SpeedDialAction
+          key="nuevo-gasto"
+          icon={<TrendingDownIcon />}
+          tooltipTitle="Nuevo Gasto"
+          tooltipOpen={isMobile}
+          onClick={() => {
+            handleCloseSpeedDial();
+            window.location.href = '/NuevoGasto';
+          }}
+          FabProps={{
+            sx: { 
+              bgcolor: theme.palette.error.main, 
+              color: 'white',
+              '&:hover': {
+                bgcolor: theme.palette.error.dark
+              }
+            }
+          }}
+        />
+        <SpeedDialAction
+          key="nuevo-ingreso"
+          icon={<TrendingUpIcon />}
+          tooltipTitle="Nuevo Ingreso"
+          tooltipOpen={isMobile}
+          onClick={() => {
+            handleCloseSpeedDial();
+            window.location.href = '/NuevoIngreso';
+          }}
+          FabProps={{
+            sx: { 
+              bgcolor: theme.palette.success.main, 
+              color: 'white',
+              '&:hover': {
+                bgcolor: theme.palette.success.dark
+              }
+            }
+          }}
+        />
+      </SpeedDial>
     </Layout>
   );
 };
