@@ -148,9 +148,9 @@ const NewIncome = () => {
         Selecciona la categoría que mejor describe tu ingreso
       </Typography>
 
-      <Grid container spacing={2} sx={{ mt: 2, flex: 1, width: '100%' }}>
+      <Grid container spacing={2} sx={{ mt: 2, flex: 1}}>
         {Object.keys(subcategories).map((cat) => (
-          <Grid item xs={12} sm={6} md={4} key={cat} sx={{ width: '100%' }}>
+          <Grid item xs={12} sm={6} md={4} key={cat} >
             <Card 
               elevation={2} 
               onClick={() => handleCategorySelect(cat)}
@@ -354,7 +354,7 @@ const NewIncome = () => {
             </Card>
           </Grid>
         ))}
-      </Grid>
+        </Grid>
 
       <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
         <Button
@@ -416,7 +416,6 @@ const NewIncome = () => {
           position: 'relative',
           overflow: 'hidden',
           flex: 1,
-          width: '100%'
         }}
       >
         <Box 
@@ -565,101 +564,105 @@ const NewIncome = () => {
       <Box 
         sx={{ 
           minHeight: '100vh',
-          pt: 8, // Espacio para el AppBar
+          pt: 8,
           pb: 4,
           px: 2,
-          width: '100%'
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
-        <Container maxWidth={false} sx={{ width: '100%' }}>
-          <Box sx={{ 
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 3,
-            height: 'calc(100vh - 100px)', // Alto total menos el padding
-            alignItems: 'stretch',
-            width: '100%'
-          }}>
-            {/* Panel de progreso */}
-            <Card 
-              elevation={4} 
-              sx={{ 
-                width: { xs: '100%', md: 280 },
-                bgcolor: 'background.paper',
-                borderRadius: 3,
-                flexShrink: 0
-              }}
-            >
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>
-                  Nuevo Ingreso
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Completa los siguientes pasos para registrar tu ingreso
-                </Typography>
-                
-                <Stack spacing={2} mt={4}>
-                  {[
-                    { label: 'Categoría', icon: getCategoryIcon(category || 'default') },
-                    { label: 'Subcategoría', icon: getCategoryIcon(category || 'default') },
-                    { label: 'Detalles', icon: <AddCircleOutlineIcon /> }
-                  ].map((item, index) => (
-                    <Box 
-                      key={index}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        p: 2,
-                        borderRadius: 2,
-                        bgcolor: step === index + 1 ? 'primary.main' : 'transparent',
-                        color: step === index + 1 ? 'white' : 'text.primary',
-                        border: `1px solid ${step === index + 1 ? 'transparent' : theme.palette.divider}`,
-                        opacity: step >= index + 1 ? 1 : 0.5
-                      }}
-                    >
-                      {React.cloneElement(item.icon, { 
-                        style: { 
-                          color: step === index + 1 ? 'white' : theme.palette.text.secondary 
-                        }
-                      })}
-                      <Typography variant="body1" fontWeight={step === index + 1 ? 'bold' : 'regular'}>
-                        {item.label}
-                      </Typography>
-                      {step > index + 1 && (
-                        <CheckCircleIcon sx={{ ml: 'auto', color: theme.palette.success.main }} />
-                      )}
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            </Card>
+        <Container maxWidth={false} sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Panel de progreso */}
+          <Card 
+            elevation={4} 
+            sx={{ 
+              width: '100%',
+              bgcolor: 'background.paper',
+              borderRadius: 3
+            }}
+          >
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h5" fontWeight="bold" gutterBottom>
+                Nuevo Ingreso
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Completa los siguientes pasos para registrar tu ingreso
+              </Typography>
+              
+              <Stack direction="row" spacing={2} mt={4} sx={{ overflowX: 'auto', pb: 1 }}>
+                {[
+                  { label: 'Categoría', icon: getCategoryIcon(category || 'default') },
+                  { label: 'Subcategoría', icon: getCategoryIcon(category || 'default') },
+                  { label: 'Detalles', icon: <AddCircleOutlineIcon /> }
+                ].map((item, index) => (
+                  <Box 
+                    key={index}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: step === index + 1 ? 'primary.main' : 'transparent',
+                      color: step === index + 1 ? 'white' : 'text.primary',
+                      border: `1px solid ${step === index + 1 ? 'transparent' : theme.palette.divider}`,
+                      opacity: step >= index + 1 ? 1 : 0.5,
+                      minWidth: 'fit-content'
+                    }}
+                  >
+                    {React.cloneElement(item.icon, { 
+                      style: { 
+                        color: step === index + 1 ? 'white' : theme.palette.text.secondary 
+                      }
+                    })}
+                    <Typography variant="body1" fontWeight={step === index + 1 ? 'bold' : 'regular'}>
+                      {item.label}
+                    </Typography>
+                    {step > index + 1 && (
+                      <CheckCircleIcon sx={{ ml: 'auto', color: theme.palette.success.main }} />
+                    )}
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Card>
 
-            {/* Panel principal */}
-            <Card 
-              elevation={4} 
-              sx={{ 
-                flex: 1,
-                bgcolor: 'background.paper',
-                borderRadius: 3,
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%'
-              }}
-            >
-              <Box sx={{ 
-                p: 3,
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%'
-              }}>
-                {step === 1 && renderStep1()}
-                {step === 2 && renderStep2()}
-                {step === 3 && renderStep3()}
-              </Box>
-            </Card>
-          </Box>
+          {/* Panel principal */}
+          <Card 
+            elevation={4} 
+            sx={{ 
+              flex: 1,
+              bgcolor: 'background.paper',
+              borderRadius: 3,
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+              minHeight: 0 // Importante para que el contenido no desborde
+            }}
+          >
+            <Box sx={{ 
+              p: 3,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'auto',
+              '&::-webkit-scrollbar': {
+                width: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: 'transparent',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderRadius: '4px',
+              },
+            }}>
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+            </Box>
+          </Card>
         </Container>
       </Box>
     </Layout>

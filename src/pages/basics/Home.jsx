@@ -30,7 +30,9 @@ import {
   Fab,
   SpeedDial,
   SpeedDialAction,
-  SpeedDialIcon
+  SpeedDialIcon,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -474,6 +476,11 @@ const Home = () => {
   const handleOpenSpeedDial = () => setOpenSpeedDial(true);
   const handleCloseSpeedDial = () => setOpenSpeedDial(false);
 
+  // Añadir estos estados al inicio del componente Home
+  const [selectedRate, setSelectedRate] = useState(null);
+  const [arsAmount, setArsAmount] = useState('');
+  const [usdAmount, setUsdAmount] = useState('');
+
   // Comprobación adicional para evitar errores si userData no está completamente cargado
   if (!userData || !userData.finances || !userData.savings) {
     return (
@@ -535,30 +542,10 @@ const Home = () => {
   const topExpenseCategories = getTopExpenseCategories();
 
   return (
-    <Layout title="Dashboard Financiero">
-      {/* Cabecera con título y fecha */}
-      <Box 
-        sx={{ 
-          mb: 4, 
-          display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' }, 
-          alignItems: { xs: 'flex-start', sm: 'center' }, 
-          justifyContent: 'space-between',
-          gap: 2
-        }}
-      >
-        <Box>
-          <Typography variant="h4" component="h1" fontWeight="bold" color="text.primary" gutterBottom>
-            Panel financiero
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            {currentMonthName} - {currentYear} Resumen financiero
-          </Typography>
-        </Box>
-      </Box>
+    <Layout title="Home">
       
       {/* KPIs principales con diseño mejorado y mayor contraste */}
-      <Grid container spacing={3} sx={{ mb: 4,mt:2 }}>
+      <Grid container spacing={3} sx={{ mb: 4,mt:2 , mx: 2}}>
         <Grid item xs={12} sm={6} md={4}>
           <Card 
             elevation={3} 
@@ -860,6 +847,7 @@ const Home = () => {
         elevation={3} 
         sx={{ 
           mb: 4, 
+          mx: 2,
           borderRadius: 3, 
           overflow: 'hidden',
           boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
@@ -1085,7 +1073,7 @@ const Home = () => {
           </Card>
 
       {/* Secciones inferiores en dos columnas */}
-      <Grid container spacing={3}>
+      <Grid container spacing={3} sx={{ mx: 2}}>
         {/* Columna izquierda */}
         <Grid item xs={12} md={6}>
           {/* Cotización del dólar */}
@@ -1132,40 +1120,89 @@ const Home = () => {
                   </Typography>
                   <Grid container spacing={2} sx={{ mb: 3 }}>
                     <Grid item xs={6}>
-                      <Box 
+                      <ButtonBase 
                         sx={{ 
-                          p: 2, 
-                          textAlign: 'center', 
-                          borderRadius: 2,
-                          bgcolor: alpha(theme.palette.success.main, 0.1),
-                          border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          // Aquí se actualizará el estado para usar esta cotización
+                          setSelectedRate({
+                            type: 'Blue Compra',
+                            value: dollarRate?.compra || 0
+                          });
                         }}
                       >
-                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                          Compra
-                        </Typography>
-                        <Typography variant="h5" fontWeight="bold" color="success.dark">
-                          $ {dollarRate?.compra || "-"}
-                        </Typography>
-                      </Box>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            width: '100%',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.success.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.success.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Compra
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="success.dark">
+                            $ {dollarRate?.compra || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
         </Grid>
                     <Grid item xs={6}>
-                      <Box 
+                      <ButtonBase 
                         sx={{ 
-                          p: 2, 
-                          textAlign: 'center', 
-                          borderRadius: 2,
-                          bgcolor: alpha(theme.palette.error.main, 0.1),
-                          border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedRate({
+                            type: 'Blue Venta',
+                            value: dollarRate?.venta || 0
+                          });
                         }}
                       >
-                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                          Venta
-                        </Typography>
-                        <Typography variant="h5" fontWeight="bold" color="error.dark">
-                          $ {dollarRate?.venta || "-"}
-                        </Typography>
-                      </Box>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            width: '100%',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.error.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.error.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Venta
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="error.dark">
+                            $ {dollarRate?.venta || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
       </Grid>
         </Grid>
                   
@@ -1174,53 +1211,101 @@ const Home = () => {
                   </Typography>
                   <Grid container spacing={2} sx={{ mb: 3 }}>
                     <Grid item xs={6}>
-                      <Box 
+                      <ButtonBase 
                         sx={{ 
-                          p: 2, 
-                          textAlign: 'center', 
-                          borderRadius: 2,
-                          bgcolor: alpha(theme.palette.info.main, 0.1),
-                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedRate({
+                            type: 'Oficial Compra',
+                            value: dolarOficial?.value_buy || 0
+                          });
                         }}
                       >
-                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                          Compra
-                        </Typography>
-                        <Typography variant="h5" fontWeight="bold" color="info.dark">
-                          $ {dolarOficial?.value_buy || "-"}
-                        </Typography>
-                      </Box>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            width: '100%',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.info.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.info.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Compra
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="info.dark">
+                            $ {dolarOficial?.value_buy || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
         </Grid>
                     <Grid item xs={6}>
-                      <Box 
+                      <ButtonBase 
                         sx={{ 
-                          p: 2, 
-                          textAlign: 'center', 
-                          borderRadius: 2,
-                          bgcolor: alpha(theme.palette.info.main, 0.1),
-                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedRate({
+                            type: 'Oficial Venta',
+                            value: dolarOficial?.value_sell || 0
+                          });
                         }}
                       >
-                        <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                          Venta
-                        </Typography>
-                        <Typography variant="h5" fontWeight="bold" color="info.dark">
-                          $ {dolarOficial?.value_sell || "-"}
-                        </Typography>
-                      </Box>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            width: '100%',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.info.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.info.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Venta
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="info.dark">
+                            $ {dolarOficial?.value_sell || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
         </Grid>
         </Grid>
                   
                   <Paper 
                     variant="outlined" 
                     sx={{ 
-                      p: 2, 
+                      p: 2.5,
                       background: `linear-gradient(to bottom, ${alpha(theme.palette.background.paper, 0.5)}, ${alpha(theme.palette.background.paper, 0.8)})`,
                       borderRadius: 2,
                       mb: 2
                     }}
                   >
-                    <Stack direction="row" spacing={2} alignItems="center">
+                    <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
                       <Avatar
                         sx={{
                           bgcolor: alpha(theme.palette.info.main, 0.1),
@@ -1236,31 +1321,84 @@ const Home = () => {
                           Convertidor Rápido
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Tu dinero en dólares
+                          {selectedRate ? `Usando ${selectedRate.type} - $${selectedRate.value}` : 'Selecciona una cotización'}
                         </Typography>
                       </Box>
                     </Stack>
                     
-                    <Box sx={{ mt: 2 }}>
-                      <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary" gutterBottom>
-                            Balance en USD
-                          </Typography>
-                          <Typography variant="body1" fontWeight="bold">
-                            ${formatAmount(getBalance() / (dollarRate?.venta || 1))}
-                          </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Pesos (ARS)"
+                          value={arsAmount}
+                          onChange={(e) => {
+                            setArsAmount(e.target.value);
+                            if (selectedRate && e.target.value) {
+                              setUsdAmount((parseFloat(e.target.value) / selectedRate.value).toFixed(2));
+                            }
+                          }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                $
+                              </InputAdornment>
+                            ),
+                          }}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              bgcolor: 'background.paper'
+                            }
+                          }}
+                        />
       </Grid>
-                        <Grid item xs={6}>
-                          <Typography variant="caption" color="text.secondary" gutterBottom>
-                            Ahorros en USD
-                          </Typography>
-                          <Typography variant="body1" fontWeight="bold">
-                            ${userData.savings.total ? formatAmount(userData.savings.total / (dollarRate?.venta || 1)) : 0}
-                          </Typography>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Dólares (USD)"
+                          value={usdAmount}
+                          onChange={(e) => {
+                            setUsdAmount(e.target.value);
+                            if (selectedRate && e.target.value) {
+                              setArsAmount((parseFloat(e.target.value) * selectedRate.value).toFixed(2));
+                            }
+                          }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                USD
+                              </InputAdornment>
+                            ),
+                          }}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              bgcolor: 'background.paper'
+                            }
+                          }}
+                        />
       </Grid>
-                      </Grid>
-                    </Box>
+                    </Grid>
+                    
+                    {!selectedRate && (
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary" 
+                        sx={{ 
+                          display: 'block', 
+                          textAlign: 'center', 
+                          mt: 2,
+                          fontStyle: 'italic'
+                        }}
+                      >
+                        Haz clic en cualquier cotización para usar el convertidor
+                      </Typography>
+                    )}
                   </Paper>
                 </>
               )}

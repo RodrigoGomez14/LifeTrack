@@ -43,6 +43,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { alpha } from '@mui/material/styles';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import FlightIcon from '@mui/icons-material/Flight';
+import SchoolIcon from '@mui/icons-material/School';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 
 const NewExpense = () => {
   const { userData, dollarRate } = useStore();
@@ -165,26 +171,41 @@ const NewExpense = () => {
 
   // Define las subcategorías disponibles para cada categoría principal
   const subcategories = {
-    Auto: ['Nafta', 'Gas', 'Mantenimiento'],
-    Servicios: ['Electricidad', 'Expensas','Impuestos', 'Internet','Celular'],
-    Indoor: ['Plantas', 'Fertilizantes','Tierra', 'Herramientas'],
-    Supermercado: ['General', 'Chino', 'Verduleria','Carniceria'],
-    Transporte: ['Publico'],
-    Extras: ['Hierba', 'Otros'],
+    Supermercado: ['General', 'Verdulería', 'Carnicería', 'Almacén', 'Bebidas', 'Limpieza'],
+    Transporte: ['Colectivo', 'Subte', 'Taxi/Uber', 'Combustible', 'Mantenimiento'],
+    Auto: ['Nafta', 'Service', 'Lavado', 'Seguro', 'Patente', 'Reparaciones'],
+    Indoor: ['Plantas', 'Fertilizantes', 'Tierra', 'Macetas', 'Herramientas', 'Decoración'],
+    Porro: ['Flores', 'Prensado', 'Accesorios'],
+    Hogar: ['Alquiler', 'Expensas', 'Electricidad', 'Internet', 'Gas', 'Agua', 'Mantenimiento', 'Muebles'],
+    Entretenimiento: ['Cine', 'Streaming', 'Juegos', 'Salidas', 'Eventos', 'Deportes'],
+    Viajes: ['Pasajes', 'Hospedaje', 'Comidas', 'Actividades', 'Seguros'],
+    Educacion: ['Cursos', 'Libros', 'Material', 'Suscripciones'],
+    Salud: ['Medicamentos', 'Consultas', 'Estudios', 'Tratamientos'],
+    Extras: ['Regalos', 'Ropa', 'Donaciones', 'Otros'],
   };
 
   const getCategoryIcon = (cat) => {
     switch(cat) {
-      case 'Auto':
-        return <DirectionsCarIcon />;
-      case 'Servicios':
-        return <HomeIcon />;
-      case 'Indoor':
-        return <YardIcon />;
       case 'Supermercado':
         return <LocalGroceryStoreIcon />;
       case 'Transporte':
         return <CommuteIcon />;
+      case 'Auto':
+        return <DirectionsCarIcon />;
+      case 'Indoor':
+        return <LocalFloristIcon />;
+      case 'Porro':
+        return <LightbulbIcon />;
+      case 'Hogar':
+        return <HomeIcon />;
+      case 'Entretenimiento':
+        return <SportsEsportsIcon />;
+      case 'Viajes':
+        return <FlightIcon />;
+      case 'Educacion':
+        return <SchoolIcon />;
+      case 'Salud':
+        return <LocalHospitalIcon />;
       case 'Extras':
         return <MoreHorizIcon />;
       default:
@@ -194,18 +215,28 @@ const NewExpense = () => {
 
   const getCategoryColor = (cat) => {
     switch(cat) {
-      case 'Auto':
-        return theme.palette.warning.main;
-      case 'Servicios':
-        return theme.palette.info.main;
-      case 'Indoor':
-        return theme.palette.success.main;
       case 'Supermercado':
         return theme.palette.error.main;
       case 'Transporte':
+        return theme.palette.info.main;
+      case 'Auto':
+        return theme.palette.warning.main;
+      case 'Indoor':
+        return theme.palette.success.main;
+      case 'Porro':
         return theme.palette.secondary.main;
-      case 'Extras':
+      case 'Hogar':
         return theme.palette.primary.main;
+      case 'Entretenimiento':
+        return '#FF4081'; // pink
+      case 'Viajes':
+        return '#00BCD4'; // cyan
+      case 'Educacion':
+        return '#9C27B0'; // purple
+      case 'Salud':
+        return '#4CAF50'; // green
+      case 'Extras':
+        return theme.palette.grey[500];
       default:
         return theme.palette.grey[500];
     }
@@ -525,7 +556,6 @@ const NewExpense = () => {
           position: 'relative',
           overflow: 'hidden',
           flex: 1,
-          width: '100%'
         }}
       >
         <Box 
@@ -669,7 +699,7 @@ const NewExpense = () => {
   );
 
   const renderStep4 = () => (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%'}}>
       <Box mb={3}>
         <Typography variant="h5" fontWeight="bold" gutterBottom>
           Método de pago
@@ -717,7 +747,6 @@ const NewExpense = () => {
           position: 'relative',
           overflow: 'hidden',
           flex: 1,
-          width: '100%'
         }}
       >
         <Box 
@@ -1002,103 +1031,107 @@ const NewExpense = () => {
       <Box 
         sx={{ 
           minHeight: '100vh',
-          pt: 8, // Espacio para el AppBar
+          pt: 8,
           pb: 4,
           px: 2,
-          width: '100%'
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
-        <Container maxWidth={false} sx={{ width: '100%' }}>
-          <Box sx={{ 
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 3,
-            height: 'calc(100vh - 100px)', // Alto total menos el padding
-            alignItems: 'stretch',
-            width: '100%'
-          }}>
-            {/* Panel de progreso */}
-            <Card 
-              elevation={4} 
-              sx={{ 
-                width: { xs: '100%', md: 280 },
-                bgcolor: 'background.paper',
-                borderRadius: 3,
-                flexShrink: 0
-              }}
-            >
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h5" fontWeight="bold" gutterBottom>
-                  Nuevo Gasto
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Completa los siguientes pasos para registrar tu gasto
-                </Typography>
-                
-                <Stack spacing={2} mt={4}>
-                  {[
-                    { label: 'Categoría', icon: getCategoryIcon(category || 'default') },
-                    { label: 'Subcategoría', icon: getCategoryIcon(category || 'default') },
-                    { label: 'Detalles', icon: <AddCircleOutlineIcon /> },
-                    { label: 'Método de Pago', icon: <PaymentsIcon /> }
-                  ].map((item, index) => (
-                    <Box 
-                      key={index}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        p: 2,
-                        borderRadius: 2,
-                        bgcolor: step === index + 1 ? 'primary.main' : 'transparent',
-                        color: step === index + 1 ? 'white' : 'text.primary',
-                        border: `1px solid ${step === index + 1 ? 'transparent' : theme.palette.divider}`,
-                        opacity: step >= index + 1 ? 1 : 0.5
-                      }}
-                    >
-                      {React.cloneElement(item.icon, { 
-                        style: { 
-                          color: step === index + 1 ? 'white' : theme.palette.text.secondary 
-                        }
-                      })}
-                      <Typography variant="body1" fontWeight={step === index + 1 ? 'bold' : 'regular'}>
-                        {item.label}
-                      </Typography>
-                      {step > index + 1 && (
-                        <CheckCircleIcon sx={{ ml: 'auto', color: theme.palette.success.main }} />
-                      )}
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            </Card>
+        <Container maxWidth={false} sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Panel de progreso */}
+          <Card 
+            elevation={4} 
+            sx={{ 
+              width: '100%',
+              bgcolor: 'background.paper',
+              borderRadius: 3
+            }}
+          >
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h5" fontWeight="bold" gutterBottom>
+                Nuevo Gasto
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Completa los siguientes pasos para registrar tu gasto
+              </Typography>
+              
+              <Stack direction="row" spacing={2} mt={4} sx={{ overflowX: 'auto', pb: 1 }}>
+                {[
+                  { label: 'Categoría', icon: getCategoryIcon(category || 'default') },
+                  { label: 'Subcategoría', icon: getCategoryIcon(category || 'default') },
+                  { label: 'Detalles', icon: <AddCircleOutlineIcon /> },
+                  { label: 'Método de Pago', icon: <PaymentsIcon /> }
+                ].map((item, index) => (
+                  <Box 
+                    key={index}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: step === index + 1 ? 'primary.main' : 'transparent',
+                      color: step === index + 1 ? 'white' : 'text.primary',
+                      border: `1px solid ${step === index + 1 ? 'transparent' : theme.palette.divider}`,
+                      opacity: step >= index + 1 ? 1 : 0.5,
+                      minWidth: 'fit-content'
+                    }}
+                  >
+                    {React.cloneElement(item.icon, { 
+                      style: { 
+                        color: step === index + 1 ? 'white' : theme.palette.text.secondary 
+                      }
+                    })}
+                    <Typography variant="body1" fontWeight={step === index + 1 ? 'bold' : 'regular'}>
+                      {item.label}
+                    </Typography>
+                    {step > index + 1 && (
+                      <CheckCircleIcon sx={{ ml: 'auto', color: theme.palette.success.main }} />
+                    )}
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          </Card>
 
-            {/* Panel principal */}
-            <Card 
-              elevation={4} 
-              sx={{ 
-                flex: 1,
-                bgcolor: 'background.paper',
-                borderRadius: 3,
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%'
-              }}
-            >
-              <Box sx={{ 
-                p: 3,
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%'
-              }}>
-                {step === 1 && renderStep1()}
-                {step === 2 && renderStep2()}
-                {step === 3 && renderStep3()}
-                {step === 4 && renderStep4()}
-              </Box>
-            </Card>
-          </Box>
+          {/* Panel principal */}
+          <Card 
+            elevation={4} 
+            sx={{ 
+              flex: 1,
+              bgcolor: 'background.paper',
+              borderRadius: 3,
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+              minHeight: 0 // Importante para que el contenido no desborde
+            }}
+          >
+            <Box sx={{ 
+              p: 3,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'auto',
+              '&::-webkit-scrollbar': {
+                width: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: 'transparent',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderRadius: '4px',
+              },
+            }}>
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+              {step === 4 && renderStep4()}
+            </Box>
+          </Card>
         </Container>
       </Box>
     </Layout>
