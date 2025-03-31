@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/layout/Layout';
 import { 
   Grid, 
@@ -17,7 +17,14 @@ import {
   Stack,
   Paper,
   LinearProgress,
-  Avatar
+  Avatar,
+  Container,
+  List,
+  ListItem,
+  Checkbox,
+  Fab,
+  CircularProgress,
+  alpha
 } from '@mui/material';
 import { useStore } from '../../store';
 import { database, auth } from '../../firebase';
@@ -32,6 +39,10 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { useNavigate } from 'react-router-dom';
+import CheckIcon from '@mui/icons-material/Check';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 
 const Habits = () => {
   const { userData } = useStore();

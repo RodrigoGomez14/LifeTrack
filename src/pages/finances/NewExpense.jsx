@@ -49,6 +49,7 @@ import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import FlightIcon from '@mui/icons-material/Flight';
 import SchoolIcon from '@mui/icons-material/School';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
 
 const NewExpense = () => {
   const { userData, dollarRate } = useStore();
@@ -174,6 +175,7 @@ const NewExpense = () => {
     Supermercado: ['General', 'Verdulería', 'Carnicería', 'Almacén', 'Bebidas', 'Limpieza'],
     Transporte: ['Colectivo', 'Subte', 'Taxi/Uber', 'Combustible', 'Mantenimiento'],
     Auto: ['Nafta', 'Service', 'Lavado', 'Seguro', 'Patente', 'Reparaciones'],
+    Salidas: ['Restaurantes', 'Bares', 'Heladerías', 'Cafés', 'Delivery', 'Eventos', 'Otros'],
     Indoor: ['Plantas', 'Fertilizantes', 'Tierra', 'Macetas', 'Herramientas', 'Decoración'],
     Porro: ['Flores', 'Prensado', 'Accesorios'],
     Hogar: ['Alquiler', 'Expensas', 'Electricidad', 'Internet', 'Gas', 'Agua', 'Mantenimiento', 'Muebles'],
@@ -181,7 +183,7 @@ const NewExpense = () => {
     Viajes: ['Pasajes', 'Hospedaje', 'Comidas', 'Actividades', 'Seguros'],
     Educacion: ['Cursos', 'Libros', 'Material', 'Suscripciones'],
     Salud: ['Medicamentos', 'Consultas', 'Estudios', 'Tratamientos'],
-    Extras: ['Regalos', 'Ropa', 'Donaciones', 'Otros'],
+    Extras: ['Regalos', 'Ropa', 'Donaciones', 'Otros']
   };
 
   const getCategoryIcon = (cat) => {
@@ -208,6 +210,8 @@ const NewExpense = () => {
         return <LocalHospitalIcon />;
       case 'Extras':
         return <MoreHorizIcon />;
+      case 'Salidas':
+        return <RestaurantIcon />;
       default:
         return <MoreHorizIcon />;
     }
@@ -237,6 +241,8 @@ const NewExpense = () => {
         return '#4CAF50'; // green
       case 'Extras':
         return theme.palette.grey[500];
+      case 'Salidas':
+        return '#FF9800'; // orange
       default:
         return theme.palette.grey[500];
     }

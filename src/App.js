@@ -195,6 +195,7 @@ function App() {
           <Route path="/finanzas" element={<Finances />} />
           <Route path="/nuevoGasto" element={<NewExpense />} />
           <Route path="/nuevoIngreso" element={<NewIncome />} />
+          <Route path="/exchange" element={<Exchange />} />
           <Route path="/NuevoHabito" element={<NewHabit />} />
           <Route path="/EditarHabito/:habitId" element={<EditHabit />} />
           <Route path="/DetalleHabito/:habitId" element={<HabitDetail />} />

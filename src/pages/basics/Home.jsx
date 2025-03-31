@@ -67,6 +67,20 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import SpeedIcon from '@mui/icons-material/Speed';
+import FastfoodIcon from '@mui/icons-material/Fastfood';
+import CommuteIcon from '@mui/icons-material/Commute';
+import LocalGasStationIcon from '@mui/icons-material/LocalGasStation';
+import FlightIcon from '@mui/icons-material/Flight';
+import SchoolIcon from '@mui/icons-material/School';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import HomeIcon from '@mui/icons-material/Home';
+import ElectricalServicesIcon from '@mui/icons-material/ElectricalServices';
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import CheckroomIcon from '@mui/icons-material/Checkroom';
+import DevicesIcon from '@mui/icons-material/Devices';
+import WorkIcon from '@mui/icons-material/Work';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import CategoryIcon from '@mui/icons-material/Category';
 
 const Home = () => {
   const { userData, dollarRate } = useStore(); 
@@ -809,31 +823,76 @@ const Home = () => {
                 
                 {/* Principales categorías de gastos con colores más claros */}
                 <Box sx={{ mt: 1.5 }}>
-                  {topExpenseCategories.slice(0, 3).map((category, index) => (
-                    <Box key={index} sx={{ mt: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.2 }}>
-                        <Typography variant="caption" color="white" noWrap sx={{ maxWidth: '70%', opacity: 0.9 }}>
-                          {category.category}
-                        </Typography>
-                        <Typography variant="caption" fontWeight="bold" color="white">
-                          {formatAmount(category.amount)}
-                        </Typography>
+                  {topExpenseCategories.slice(0, 3).map((category, index) => {
+                    // Función para obtener el icono según la categoría
+                    const getCategoryIcon = (categoryName) => {
+                      const categoryMapping = {
+                        'Supermercado': <ShoppingCartIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Alimentos': <RestaurantIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Restaurante': <RestaurantIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Comida': <FastfoodIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Transporte': <CommuteIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Auto': <DirectionsCarIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Nafta': <LocalGasStationIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Viajes': <FlightIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Educación': <SchoolIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Entretenimiento': <SportsEsportsIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Hogar': <HomeIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Casa': <HomeIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Servicios': <ElectricalServicesIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Salud': <HealthAndSafetyIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Ropa': <CheckroomIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Tecnología': <DevicesIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Trabajo': <WorkIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Extras': <MoreHorizIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Ahorro': <SavingsIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Inversiones': <TrendingUpIcon sx={{ fontSize: 20, color: 'white' }} />
+                      };
+                      
+                      // Busca coincidencias parciales si no hay una coincidencia exacta
+                      if (categoryMapping[categoryName]) {
+                        return categoryMapping[categoryName];
+                      }
+                      
+                      const categoryLower = categoryName.toLowerCase();
+                      for (const [key, icon] of Object.entries(categoryMapping)) {
+                        if (categoryLower.includes(key.toLowerCase()) || key.toLowerCase().includes(categoryLower)) {
+                          return icon;
+                        }
+                      }
+                      
+                      return <CategoryIcon sx={{ fontSize: 20, color: 'white' }} />;
+                    };
+
+                    return (
+                      <Box key={index} sx={{ mt: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {getCategoryIcon(category.category)}
+                            <Typography variant="caption" color="white" noWrap sx={{ maxWidth: '70%', opacity: 0.9 }}>
+                              {category.category}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" fontWeight="bold" color="white">
+                            {formatAmount(category.amount)}
+                          </Typography>
+                        </Box>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={Math.min(category.percentage, 100)}
+                          sx={{ 
+                            height: 5, 
+                            borderRadius: 4, 
+                            bgcolor: 'rgba(255, 255, 255, 0.2)',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: 'rgba(255, 255, 255, 0.85)'
+                            },
+                            mb: 1
+                          }}
+                        />
                       </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={Math.min(category.percentage, 100)}
-                        sx={{ 
-                          height: 5, 
-                          borderRadius: 4, 
-                          bgcolor: 'rgba(255, 255, 255, 0.2)',
-                          '& .MuiLinearProgress-bar': {
-                            bgcolor: 'rgba(255, 255, 255, 0.85)'
-                          },
-                          mb: 1
-                        }}
-                      />
-                    </Box>
-                  ))}
+                    );
+                  })}
                 </Box>
               </Box>
             </CardContent>

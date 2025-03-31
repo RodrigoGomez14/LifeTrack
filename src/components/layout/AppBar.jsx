@@ -30,6 +30,11 @@ import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { formatAmount } from '../../utils';
 import { useStore } from '../../store';
+import SwapHorizontalCircleIcon from '@mui/icons-material/SwapHorizontalCircle';
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 const AppBar = ({ toggleDrawer, title }) => {
   const theme = useTheme();
@@ -56,6 +61,10 @@ const AppBar = ({ toggleDrawer, title }) => {
   const getSavingsAmount = () => {
     return userData?.savings?.amountARS || 0;
   };
+
+  const getSavingsUSD = () => {
+    return userData?.savings?.amountUSD || 0;
+  };
   
   // Función para manejar acciones rápidas
   const handleQuickAction = (action) => {
@@ -67,11 +76,8 @@ const AppBar = ({ toggleDrawer, title }) => {
       case 'new-income':
         navigate('/NuevoIngreso');
         break;
-      case 'new-card':
-        navigate('/NuevaTarjeta');
-        break;
-      case 'new-habit':
-        navigate('/NuevoHabito');
+      case 'exchange':
+        navigate('/exchange');
         break;
       default:
         break;
@@ -134,19 +140,71 @@ const AppBar = ({ toggleDrawer, title }) => {
         <Stack direction="row" spacing={1} alignItems="center">
           {/* Indicador de ahorros solo en desktop */}
           {!isMobile && userData && (
-            <Chip
-              label={`Ahorros: ${formatAmount(getSavingsAmount())}`}
+            <Box
+              onClick={() => navigate('/Finanzas')}
               sx={{
-                bgcolor: alpha('#fff', 0.15),
-                color: '#fff',
-                fontWeight: 'medium',
+                bgcolor: alpha('#fff', 0.1),
+                borderRadius: 2,
+                p: 0.75,
                 mr: 1,
-                '&:hover': { 
-                  bgcolor: alpha('#fff', 0.25)
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.3s ease',
+                maxWidth: 160,
+                '&:hover': {
+                  bgcolor: alpha('#fff', 0.2),
+                  transform: 'translateY(-2px)'
                 }
               }}
-              onClick={() => navigate('/Finanzas')}
-            />
+            >
+              <Stack spacing={0.5}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AttachMoneyIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />
+                  <Typography variant="body2" fontWeight="medium" color="white" noWrap>
+                    {formatAmount(getSavingsUSD()).replace('$', '')} USD
+                  </Typography>
+                </Stack>
+                
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <MonetizationOnIcon sx={{ fontSize: 16, color: theme.palette.primary.light }} />
+                  <Typography variant="body2" fontWeight="medium" color="white" noWrap>
+                    {formatAmount(getSavingsAmount()).replace('$', '')} ARS
+                  </Typography>
+                </Stack>
+              </Stack>
+            </Box>
+          )}
+          
+          {/* Versión mobile del indicador de ahorros */}
+          {isMobile && userData && (
+            <Tooltip title="Tus ahorros">
+              <IconButton
+                color="inherit"
+                onClick={() => navigate('/Finanzas')}
+                sx={{ 
+                  position: 'relative',
+                  '&:hover': { bgcolor: alpha('#fff', 0.15) }
+                }}
+              >
+                <Badge 
+                  badgeContent={
+                    <Typography variant="caption" 
+                      sx={{ 
+                        fontSize: '0.6rem', 
+                        fontWeight: 'bold',
+                        color: 'white'
+                      }}
+                    >
+                      $
+                    </Typography>
+                  } 
+                  color="success"
+                >
+                  <AccountBalanceWalletIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
           )}
           
           {/* Botón de acciones rápidas */}
@@ -367,75 +425,39 @@ const AppBar = ({ toggleDrawer, title }) => {
             boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
             width: 220,
             borderRadius: 2,
-            p: 1.5
+            px: 0.5,
+            py: 1
           }
         }}
       >
         <MenuItem 
           onClick={() => handleQuickAction('new-expense')}
-          sx={{ 
-            borderRadius: 2, 
-            mb: 1.5,
-            p: 1.5,
-            bgcolor: alpha(theme.palette.error.main, 0.1),
-            '&:hover': {
-              bgcolor: alpha(theme.palette.error.main, 0.2)
-            }
-          }}
+          sx={{ borderRadius: 1, my: 0.5 }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5} width="100%">
-            <Box 
-              sx={{
-                bgcolor: theme.palette.error.main,
-                width: 38,
-                height: 38,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                color: 'white',
-                boxShadow: `0 2px 8px ${alpha(theme.palette.error.main, 0.6)}`
-              }}
-            >
-              <AddCircleOutlineIcon />
-            </Box>
-            <Typography variant="body1" fontWeight="medium" sx={{ color: theme.palette.error.main }}>
-              Nuevo Gasto
-            </Typography>
-          </Stack>
+          <AddCircleOutlineIcon 
+            sx={{ mr: 2, color: theme.palette.error.main }}
+          />
+          <Typography variant="body2">Nuevo Gasto</Typography>
         </MenuItem>
         
         <MenuItem 
           onClick={() => handleQuickAction('new-income')}
-          sx={{ 
-            borderRadius: 2, 
-            p: 1.5,
-            bgcolor: alpha(theme.palette.success.main, 0.1),
-            '&:hover': {
-              bgcolor: alpha(theme.palette.success.main, 0.2)
-            }
-          }}
+          sx={{ borderRadius: 1, my: 0.5 }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5} width="100%">
-            <Box 
-              sx={{
-                bgcolor: theme.palette.success.main,
-                width: 38,
-                height: 38,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                color: 'white',
-                boxShadow: `0 2px 8px ${alpha(theme.palette.success.main, 0.6)}`
-              }}
-            >
-              <AddCircleOutlineIcon />
-            </Box>
-            <Typography variant="body1" fontWeight="medium" sx={{ color: theme.palette.success.main }}>
-              Nuevo Ingreso
-            </Typography>
-          </Stack>
+          <AddCircleOutlineIcon 
+            sx={{ mr: 2, color: theme.palette.success.main }}
+          />
+          <Typography variant="body2">Nuevo Ingreso</Typography>
+        </MenuItem>
+        
+        <MenuItem 
+          onClick={() => handleQuickAction('exchange')}
+          sx={{ borderRadius: 1, my: 0.5 }}
+        >
+          <CurrencyExchangeIcon 
+            sx={{ mr: 2, color: theme.palette.info.main }}
+          />
+          <Typography variant="body2">Cambio de Divisas</Typography>
         </MenuItem>
       </Menu>
     </MuiAppBar>
