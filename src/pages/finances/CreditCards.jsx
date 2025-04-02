@@ -900,7 +900,6 @@ const CreditCards = () => {
     <Layout title="Tarjetas de Crédito">
       <Box 
         sx={{ 
-          bgcolor: theme.palette.background.default,
           minHeight: '100vh',
           width: '100%',
           position: 'relative',
@@ -932,7 +931,7 @@ const CreditCards = () => {
               left: 0,
               right: 0,
               height: '100%',
-              backgroundColor: theme.palette.background.default, // Usar el color del tema
+              backgroundColor: theme.palette.background.paper,
               zIndex: -1
             }
           }}
@@ -1216,7 +1215,6 @@ const CreditCards = () => {
               boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
               height: '100%',
               border: 'none',
-              bgcolor: theme.palette.background.paper,
               overflow: 'hidden'
             }}>
               <CardHeader
@@ -1365,7 +1363,6 @@ const CreditCards = () => {
                 borderRadius: 3,
                 boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
                 border: 'none',
-                bgcolor: theme.palette.background.paper,
                 overflow: 'hidden'
               }}>
                 <CardHeader
@@ -1985,8 +1982,7 @@ const CreditCards = () => {
                   alignItems: 'center',
                   borderStyle: 'dashed',
                   borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`,
-                  bgcolor: theme.palette.background.paper
+                  border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`
                 }}
               >
                 <CreditCardIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, mb: 2 }} />

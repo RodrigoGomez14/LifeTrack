@@ -1772,11 +1772,17 @@ const Finances = () => {
                     label={transaction.category}
                     sx={{ 
                         height: 24,
-                        bgcolor: alpha(getCategoryColor(transaction.category), 0.1),
-                        color: getCategoryColor(transaction.category),
-                        fontWeight: 500,
+                        bgcolor: theme.palette.mode === 'dark' 
+                          ? alpha(getCategoryColor(transaction.category), 0.3) 
+                          : alpha(getCategoryColor(transaction.category), 0.1),
+                        color: theme.palette.mode === 'dark' 
+                          ? alpha(getCategoryColor(transaction.category), 1) 
+                          : getCategoryColor(transaction.category),
+                        fontWeight: 700,
                         borderRadius: 1,
-                        border: `1px solid ${alpha(getCategoryColor(transaction.category), 0.2)}`
+                        border: theme.palette.mode === 'dark' 
+                          ? `2px solid ${alpha(getCategoryColor(transaction.category), 0.7)}` 
+                          : `1px solid ${alpha(getCategoryColor(transaction.category), 0.2)}`
                       }}
                       icon={React.cloneElement(
                         getCategoryIcon(transaction.category), 
@@ -1789,8 +1795,8 @@ const Finances = () => {
                         <ChevronRightIcon 
                           sx={{ 
                             fontSize: '0.9rem', 
-                            color: 'text.secondary', 
-                            opacity: 0.8 
+                            color: theme.palette.mode === 'dark' ? theme.palette.grey[300] : 'text.secondary', 
+                            opacity: 1
                           }} 
                         />
                         <Chip
@@ -1799,7 +1805,7 @@ const Finances = () => {
                           sx={{ 
                             height: 24,
                             bgcolor: theme.palette.grey[50],
-                            color: theme.palette.text.secondary,
+                            color: theme.palette.mode === 'dark' ? '#000000' : theme.palette.text.secondary,
                             fontWeight: 400,
                             borderRadius: 1,
                             border: `1px solid ${theme.palette.divider}`

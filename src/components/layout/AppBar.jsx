@@ -101,7 +101,12 @@ const AppBar = ({ toggleDrawer, title }) => {
         boxShadow: '0 2px 10px rgba(0,0,0,0.12)'
       }}
     >
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+      <Toolbar sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between',
+        minHeight: { xs: 56, sm: 64 },
+        px: { xs: 1, sm: 2 }
+      }}>
         {/* Zona izquierda: Menú y título */}
         <Stack direction="row" spacing={1} alignItems="center">
           <IconButton
@@ -110,7 +115,7 @@ const AppBar = ({ toggleDrawer, title }) => {
             aria-label="menu"
             onClick={toggleDrawer}
             sx={{ 
-              mr: 1,
+              mr: { xs: 0.5, sm: 1 },
               '&:hover': { 
                 backgroundColor: alpha('#fff', 0.15) 
               } 
@@ -133,21 +138,21 @@ const AppBar = ({ toggleDrawer, title }) => {
               </Avatar>
             )}
             <Typography 
-              variant={isMobile ? "h6" : "h5"} 
+              variant={isMobile ? "subtitle1" : "h5"} 
               fontWeight="bold"
               sx={{ 
                 textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                letterSpacing: 0.5
+                letterSpacing: 0.5,
+                fontSize: { xs: '0.9rem', sm: '1.25rem' }
               }}
             >
-              {title ? (firstName ? `LifeTrack${title !== 'LifeTrack' ? ` | ${title}` : ` de ${firstName}`}` : `LifeTrack${title !== 'LifeTrack' ? ` | ${title}` : ''}`
-              ) : 'LifeTrack'}
+              {title || ''}
             </Typography>
           </Box>
         </Stack>
         
         {/* Zona derecha: Acciones rápidas y perfil */}
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center">
           {/* Indicador de ahorros solo en desktop */}
           {!isMobile && userData && (
             <Box
@@ -188,7 +193,7 @@ const AppBar = ({ toggleDrawer, title }) => {
           
           {/* Versión mobile del indicador de ahorros */}
           {isMobile && userData && (
-            <Tooltip title="Tus ahorros">
+            <Tooltip title={`${formatAmount(getSavingsAmount())} ARS`}>
               <IconButton
                 color="inherit"
                 onClick={() => navigate('/Finanzas')}
@@ -218,8 +223,8 @@ const AppBar = ({ toggleDrawer, title }) => {
           )}
           
           {/* Botón de acciones rápidas */}
-          <Box sx={{ flexGrow: { xs: 1, sm: 0 } }}>
-            <Stack direction="row" spacing={1} sx={{ ml: { xs: 1, sm: 2 } }}>
+          <Box sx={{ flexGrow: { xs: 0, sm: 0 } }}>
+            <Stack direction="row" spacing={1} sx={{ ml: { xs: 0, sm: 2 } }}>
               <Button
                 variant="contained"
                 color="secondary"
@@ -230,6 +235,8 @@ const AppBar = ({ toggleDrawer, title }) => {
                   borderRadius: 5,
                   boxShadow: theme.shadows[3],
                   textTransform: 'none',
+                  px: { xs: 1, sm: 2 },
+                  minWidth: { xs: 'auto', sm: 'auto' }
                 }}
               >
                 {isMobile ? 'Acción' : 'Acción rápida'}
@@ -281,7 +288,10 @@ const AppBar = ({ toggleDrawer, title }) => {
             <IconButton 
               color="inherit" 
               onClick={handleOpenNotificationsMenu}
-              sx={{ '&:hover': { bgcolor: alpha('#fff', 0.15) } }}
+              sx={{ 
+                '&:hover': { bgcolor: alpha('#fff', 0.15) },
+                p: { xs: 0.5, sm: 1 }
+              }}
             >
               <Badge badgeContent={3} color="error">
                 <NotificationsOutlinedIcon />
@@ -290,15 +300,21 @@ const AppBar = ({ toggleDrawer, title }) => {
           </Tooltip>
           
           {/* Perfil de usuario */}
-          <Box sx={{ flexGrow: 0, ml: 1 }}>
+          <Box sx={{ flexGrow: 0, ml: { xs: 0.5, sm: 1 } }}>
             <Tooltip title={firstName ? `Perfil de ${firstName}` : "Abrir menú de perfil"}>
-              <IconButton onClick={handleOpenProfileMenu} sx={{ p: 0 }}>
+              <IconButton 
+                onClick={handleOpenProfileMenu} 
+                sx={{ 
+                  p: 0,
+                  '&:hover': { bgcolor: alpha('#fff', 0.15) }
+                }}
+              >
                 <Avatar 
                   alt={auth.currentUser?.displayName || "Usuario"} 
                   src={auth.currentUser?.photoURL}
                   sx={{ 
-                    width: 40, 
-                    height: 40,
+                    width: { xs: 32, sm: 40 }, 
+                    height: { xs: 32, sm: 40 },
                     border: `2px solid ${theme.palette.primary.contrastText}` 
                   }}
                 >
@@ -376,7 +392,8 @@ const AppBar = ({ toggleDrawer, title }) => {
         PaperProps={{
           sx: {
             borderRadius: 2,
-            width: 320,
+            width: { xs: '90vw', sm: 320 },
+            maxWidth: 320,
             maxHeight: 400
           }
         }}
