@@ -30,6 +30,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { useStore } from '../../store';
@@ -54,6 +55,7 @@ const Drawer = ({ open, toggleDrawer }) => {
     { path: '/TarjetasCredito', icon: <CreditCardIcon />, text: 'Tarjetas', color: theme.palette.error.main },
     { path: '/Habitos', icon: <EmojiObjectsOutlinedIcon />, text: 'Hábitos', color: theme.palette.info.main },
     { path: '/Plantas', icon: <ForestOutlinedIcon />, text: 'Plantas', color: theme.palette.secondary.main },
+    { path: '/ayuda', icon: <HelpOutlineIcon />, text: 'Ayuda', color: theme.palette.warning.main },
   ];
 
   return (

@@ -20,8 +20,9 @@ import NewIncome from './pages/finances/NewIncome.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
 import { database, auth } from './firebase.js';
 import { useStore } from './store'; 
-import { createTheme, ThemeProvider, CssBaseline } from '@mui/material/styles';
-import { indigo, teal, blue, lightBlue, purple } from '@mui/material/colors';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { CssBaseline } from '@mui/material';
+import { indigo, teal, blue, lightBlue, purple, green, orange, red, deepPurple, amber, cyan, brown, grey, blueGrey, pink, deepOrange } from '@mui/material/colors';
 import NewHabit from './pages/habits/NewHabit';
 import EditHabit from './pages/habits/EditHabit';
 import HabitDetail from './components/habits/HabitDetail';
@@ -31,9 +32,55 @@ import EditCard from './pages/finances/EditCard';
 import UpdateCardDates from './pages/finances/UpdateCardDates.jsx';
 import { ColorModeContext } from './utils';
 import PlantCalendar from './pages/plants/PlantCalendar';
+import Configuracion from './pages/basics/Configuracion';
+import Ayuda from './pages/basics/Ayuda';
 
 function App() {
-  const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
+  const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
+
+  // Definición de temas predefinidos
+  const predefinedThemes = {
+    indigoTeal: {
+      primary: indigo,
+      secondary: teal,
+      name: 'Índigo y Verde azulado'
+    },
+    purpleGreen: {
+      primary: deepPurple,
+      secondary: green,
+      name: 'Púrpura y Verde'
+    },
+    blueAmber: {
+      primary: blue,
+      secondary: amber,
+      name: 'Azul y Ámbar'
+    },
+    cyanOrange: {
+      primary: cyan,
+      secondary: orange,
+      name: 'Cian y Naranja'
+    },
+    redLightBlue: {
+      primary: red,
+      secondary: lightBlue,
+      name: 'Rojo y Azul claro'
+    },
+    brownTeal: {
+      primary: brown,
+      secondary: teal,
+      name: 'Marrón y Verde azulado'
+    },
+    greenPink: {
+      primary: green,
+      secondary: pink,
+      name: 'Verde y Rosa'
+    },
+    orangeBlue: {
+      primary: deepOrange,
+      secondary: blue,
+      name: 'Naranja y Azul'
+    }
+  };
 
   const filterData = (data) => {
     const groupdedFinances = {incomes:{},expenses:{}};
@@ -135,22 +182,91 @@ function App() {
       savings: groupedSavings, 
       plants: groupedPlants,
       habits: groupedHabits,
-      creditCards: groupedCreditCards
+      creditCards: groupedCreditCards,
+      config: data.config || {}  // Asegurarse de incluir la configuración
     };
   };
 
-  const theme = createTheme({
-    palette: {
-      primary: {
-        main: indigo[500],
+  // Crear tema dinámico basado en la configuración del usuario
+  const theme = useMemo(() => {
+    let primaryColor = indigo[500];  // Color predeterminado
+    let secondaryColor = teal[500];  // Color predeterminado
+    let isDarkMode = false;          // Modo predeterminado
+    let selectedTheme = 'indigoTeal'; // Tema predeterminado
+
+    // Si hay datos de usuario y configuración de tema
+    if (userData && userData.config && userData.config.theme) {
+      const userTheme = userData.config.theme;
+      
+      // Si hay un tema específico seleccionado
+      if (userTheme.selectedTheme && predefinedThemes[userTheme.selectedTheme]) {
+        selectedTheme = userTheme.selectedTheme;
+        primaryColor = predefinedThemes[selectedTheme].primary[500];
+        secondaryColor = predefinedThemes[selectedTheme].secondary[500];
+      } 
+      // Si no hay tema pero hay colores seleccionados (retrocompatibilidad)
+      else if (userTheme.primaryColor) {
+        primaryColor = userTheme.primaryColor;
+        secondaryColor = userTheme.secondaryColor || teal[500];
+      }
+      
+      // Modo oscuro/claro
+      isDarkMode = userTheme.darkMode || false;
+    }
+
+    return createTheme({
+      palette: {
+        mode: isDarkMode ? 'dark' : 'light',
+        primary: {
+          main: primaryColor,
+        },
+        secondary: {
+          main: secondaryColor,
+          dark: typeof secondaryColor === 'string' 
+            ? secondaryColor 
+            : (predefinedThemes[selectedTheme]?.secondary[700] || teal[700]),
+        },
+        background: {
+          default: isDarkMode ? '#121212' : '#f5f5f5',
+          paper: isDarkMode ? '#1e1e1e' : '#ffffff',
+        },
       },
-      secondary: {
-        main: teal[500],
-        dark: teal[700],
+      typography: {
+        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+        h1: {
+          fontWeight: 500,
+        },
+        h2: {
+          fontWeight: 500,
+        },
+        h3: {
+          fontWeight: 500,
+        },
+        h4: {
+          fontWeight: 500,
+        },
+        h5: {
+          fontWeight: 500,
+        },
+        h6: {
+          fontWeight: 500,
+        },
       },
-      type:'dark'
-    },
-  });
+      shape: {
+        borderRadius: 8,
+      },
+      components: {
+        MuiButton: {
+          styleOverrides: {
+            root: {
+              textTransform: 'none',
+              borderRadius: 8,
+            },
+          },
+        },
+      },
+    });
+  }, [userData]);  // Regenerar el tema cuando cambie userData
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -189,6 +305,7 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
+      <CssBaseline />
       {userLoggedIn?
       <Router>
         <Routes>
@@ -204,8 +321,10 @@ function App() {
           <Route path="/NuevaTarjeta" element={<NewCard />} />
           <Route path="/EditarTarjeta/:cardId" element={<EditCard />} />
           <Route path="/ActualizarFechasTarjeta/:cardId" element={<UpdateCardDates />} />
+          <Route path="/Configuracion" element={<Configuracion />} />
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/ayuda" element={<Ayuda />} />
           <Route path="/register" element={<Login />} />
           <Route path="/Plantas" element={<PrivateRoute><PlantsList /></PrivateRoute>} />
           <Route path="/Planta" element={<PrivateRoute><Plant /></PrivateRoute>} />

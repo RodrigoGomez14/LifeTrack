@@ -11,66 +11,91 @@ import HelpIcon from '@mui/icons-material/Help';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 
 // Función para formatear un monto de dinero
-export const formatAmount = (amount) => {
-    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
-  };
+export const formatAmount = (amount, isUSD = false) => {
+  if (amount === null || amount === undefined) return '$0';
   
-  // Función para obtener el nombre del mes a partir de su número (1 para enero, 2 para febrero, etc.)
-  export const getMonthName = (monthNumber) => {
-    const monthNames = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    return monthNames[monthNumber - 1] || '';
-  };
+  // Si es un valor menor a 1000, mostrarlo normal
+  if (Math.abs(amount) < 1000) {
+    return new Intl.NumberFormat('es-AR', { 
+      style: 'currency', 
+      currency: isUSD ? 'USD' : 'ARS',
+      maximumFractionDigits: 0
+    }).format(amount);
+  }
   
-  // Función para convertir minutos en horas y minutos
-  export const formatMinutesToHours = (minutes) => {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  };
+  // Para valores más grandes, usar notación abreviada
+  let absValue = Math.abs(amount);
+  let sign = amount < 0 ? '-' : '';
+  let symbol = isUSD ? 'USD ' : '$';
+  
+  if (absValue >= 1000000000) {
+    // Mil millones o más (B)
+    return `${sign}${symbol}${(absValue / 1000000000).toFixed(2)}B`;
+  } else if (absValue >= 1000000) {
+    // Millones (M)
+    return `${sign}${symbol}${(absValue / 1000000).toFixed(2)}M`;
+  } else if (absValue >= 1000) {
+    // Miles (K)
+    return `${sign}${symbol}${(absValue / 1000).toFixed(1)}k`;
+  }
+};
+  
+// Función para obtener el nombre del mes a partir de su número (1 para enero, 2 para febrero, etc.)
+export const getMonthName = (monthNumber) => {
+  const monthNames = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  return monthNames[monthNumber - 1] || '';
+};
+  
+// Función para convertir minutos en horas y minutos
+export const formatMinutesToHours = (minutes) => {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+};
 
-  export const sumTransactionsByCategory = (transactions, category) => {
-    let total = 0;
-    transactions.forEach(transaction=>{
-      if (transaction.category === category) {
-        total += transaction.amount;
-      }
-    })
-    return total;
-  };
-
-  export const getCategoryIcon = (category) => {
-    switch (category) {
-      case 'Auto':
-        return <DriveEtaIcon />;
-      case 'Servicios':
-        return <WifiIcon />;
-      case 'Indoor':
-        return <HomeIcon />;
-      case 'Supermercado':
-        return <ShoppingBasketIcon />;
-      case 'Transporte':
-        return <DirectionsBusIcon />;
-      case 'Extras':
-        return <AddCircleIcon />;
-      case 'Mercadopago':
-        return '#03A9F4';
-      case 'Efectivo':
-        return '#43A047';
-      case 'Transferencia':
-        return '#E91E63';
-      case 'Sueldo':
-        return <WorkIcon />;
-      case 'Freelance':
-        return <AttachMoneyIcon />;
-      case 'Camila':
-        return <PersonIcon />;
-      default:
-        return <HelpIcon />;
+export const sumTransactionsByCategory = (transactions, category) => {
+  let total = 0;
+  transactions.forEach(transaction=>{
+    if (transaction.category === category) {
+      total += transaction.amount;
     }
-  };
+  })
+  return total;
+};
+
+export const getCategoryIcon = (category) => {
+  switch (category) {
+    case 'Auto':
+      return <DriveEtaIcon />;
+    case 'Servicios':
+      return <WifiIcon />;
+    case 'Indoor':
+      return <HomeIcon />;
+    case 'Supermercado':
+      return <ShoppingBasketIcon />;
+    case 'Transporte':
+      return <DirectionsBusIcon />;
+    case 'Extras':
+      return <AddCircleIcon />;
+    case 'Mercadopago':
+      return '#03A9F4';
+    case 'Efectivo':
+      return '#43A047';
+    case 'Transferencia':
+      return '#E91E63';
+    case 'Sueldo':
+      return <WorkIcon />;
+    case 'Freelance':
+      return <AttachMoneyIcon />;
+    case 'Camila':
+      return <PersonIcon />;
+    default:
+      return <HelpIcon />;
+  }
+};
 
 export function getPreviousMonday() {
   const currentDate = new Date();

@@ -76,7 +76,28 @@ const TransactionsTabs = ({ data, type }) => {
   let seriesPieChart = [];
   let labelsPieChart = [];
   
-  // Ordenar categorías por monto para un mejor análisis visual
+  // Importar la función getCategoryColor desde Finances.jsx
+  const getCategoryColor = (cat) => {
+    switch(cat) {
+      case 'Supermercado': return theme.palette.error.main;
+      case 'Transporte': return theme.palette.info.main;
+      case 'Auto': return theme.palette.warning.main;
+      case 'Indoor': return theme.palette.success.main;
+      case 'Porro': return theme.palette.secondary.main;
+      case 'Hogar': return theme.palette.primary.main;
+      case 'Entretenimiento': return '#FF4081'; // pink
+      case 'Viajes': return '#00BCD4'; // cyan
+      case 'Educacion': return '#9C27B0'; // purple
+      case 'Salud': return '#4CAF50'; // green
+      case 'Extras': return theme.palette.grey[600];
+      case 'Salidas': return '#FF9800'; // orange
+      default:
+        return theme.palette.primary.main;
+    }
+  };
+
+  // Preparar datos para el gráfico de torta con colores consistentes
+  const seriesColors = [];
   if (hasCurrentMonthData) {
     const categoriesWithValues = categories.map(category => {
       const total = sumTransactionsByCategory(data[currentYear].months[currentMonth].data, category);
@@ -86,6 +107,8 @@ const TransactionsTabs = ({ data, type }) => {
     
     seriesPieChart = categoriesWithValues.map(item => item.total);
     labelsPieChart = categoriesWithValues.map(item => item.category);
+    // Generar colores para cada categoría
+    seriesColors.push(...categoriesWithValues.map(item => getCategoryColor(item.category)));
   }
 
   // Preparar datos para el gráfico anual por categoría
@@ -182,61 +205,58 @@ const TransactionsTabs = ({ data, type }) => {
     }
   };
 
-  // Configuración para el gráfico de pie
+  // Actualizar la configuración del gráfico de pie para usar los colores por categoría
   const optionsPieChart = {
+    chart: {
+      type: 'donut',
+      fontFamily: theme.typography.fontFamily,
+    },
     labels: labelsPieChart,
     legend: {
       position: 'bottom',
-      fontSize: '14px',
+      horizontalAlign: 'center',
+      fontSize: '12px',
       labels: {
         colors: theme.palette.text.secondary
       }
     },
-    tooltip: {
-      y: {
-        formatter: val => formatAmount(val)
+    colors: seriesColors,
+    dataLabels: {
+      enabled: true,
+      formatter: function(val) {
+        return val.toFixed(1) + '%';
       }
     },
     plotOptions: {
       pie: {
         donut: {
-          labels: {
-            show: true,
-            total: {
-              show: true,
-              label: type === 'incomes' ? 'Ingresos' : 'Gastos',
-              formatter: function (w) {
-                const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
-                return formatAmount(sum);
-              }
-            }
-          }
+          size: '60%'
         }
       }
     },
-    chart: {
-      toolbar: {
-        show: true,
-        tools: {
-          download: true,
-          selection: false,
-          zoom: false,
-          zoomin: false,
-          zoomout: false,
-          pan: false,
-          reset: false
+    tooltip: {
+      y: {
+        formatter: function(val) {
+          return formatAmount(val);
         }
       }
     },
-    dataLabels: {
-      formatter: (val, opts) => {
-        return `${Math.round(val)}% - ${formatAmount(opts.w.globals.series[opts.seriesIndex])}`;
-      }
+    stroke: {
+      width: 2,
+      colors: ['transparent']
     },
-    colors: [
-      '#4caf50', '#2196f3', '#ff9800', '#f44336', '#9c27b0', '#3f51b5', 
-      '#009688', '#e91e63', '#673ab7', '#ffc107', '#795548', '#607d8b'
-    ]
+    responsive: [{
+      breakpoint: 480,
+      options: {
+        chart: {
+          width: 300
+        },
+        legend: {
+          position: 'bottom',
+          horizontalAlign: 'center'
+        }
+      }
+    }]
   };
 
   // Si no hay datos, mostrar un mensaje amigable

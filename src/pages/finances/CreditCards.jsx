@@ -62,6 +62,12 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import TodayIcon from '@mui/icons-material/Today';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+// Configurar worker de PDF.js
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 // Función auxiliar para formatear fechas en un formato amigable, consistente con Finances.jsx
 function obtenerFechaFormateada(dateStr) {
@@ -134,6 +140,7 @@ const CreditCards = () => {
   const [transactions, setTransactions] = useState([]);
   const [allCardTransactions, setAllCardTransactions] = useState({});
   const [paymentDisabled, setPaymentDisabled] = useState(false);
+  const [paymentStatusChecked, setPaymentStatusChecked] = useState(false);
   
   // Estado para el menú de opciones
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
@@ -150,6 +157,12 @@ const CreditCards = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
+
+  // Estados para el visualizador de PDF
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [isViewingPdf, setIsViewingPdf] = useState(false);
 
   useEffect(() => {
     if (userData?.creditCards) {
@@ -454,66 +467,64 @@ const CreditCards = () => {
       const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
       console.log('Verificando pago para:', selectedYearMonth);
       
-      // Verificar en el nodo de pagos de tarjeta
-      const paymentRef = database.ref(`${auth.currentUser.uid}/creditCardPayments/${selectedYearMonth}`);
-      const snapshot = await paymentRef.once('value');
-      
-      if (snapshot.exists()) {
-        console.log('Pago encontrado en Firebase:', snapshot.val());
+      // Verificar primero si tenemos datos en userData (memoria caché)
+      if (userData?.creditCardPayments && userData.creditCardPayments[selectedYearMonth]) {
+        console.log('Pago encontrado en userData (caché):', userData.creditCardPayments[selectedYearMonth]);
         setPaymentDisabled(true);
+        setPaymentStatusChecked(true);
         return true;
       }
       
-      console.log('No se encontró pago para este mes en Firebase');
+      // Si no tenemos datos en caché, verificar directamente en Firebase
+      if (auth.currentUser) {
+        const paymentRef = database.ref(`${auth.currentUser.uid}/creditCardPayments/${selectedYearMonth}`);
+        const snapshot = await paymentRef.once('value');
+        
+        if (snapshot.exists()) {
+          console.log('Pago encontrado en Firebase:', snapshot.val());
+          setPaymentDisabled(true);
+          setPaymentStatusChecked(true);
+          return true;
+        }
+        
+        console.log('No se encontró pago para este mes en Firebase');
+      } else {
+        console.log('Usuario no autenticado para verificar pagos');
+      }
       
       // Solo habilitar el botón si todas las tarjetas han alcanzado su fecha de cierre
-      if (!haveAllCardsReachedClosingDate()) {
+      const reachedClosingDate = haveAllCardsReachedClosingDate();
+      if (!reachedClosingDate) {
+        console.log('No todas las tarjetas han alcanzado su fecha de cierre');
         setPaymentDisabled(true);
       } else {
+        console.log('Todas las tarjetas han alcanzado su fecha de cierre, habilitando pago');
         setPaymentDisabled(false);
       }
       
+      setPaymentStatusChecked(true);
       return false;
     } catch (error) {
       console.error('Error al verificar pago:', error);
+      setPaymentStatusChecked(true);
       return false;
     }
   };
   
-  // Hook para verificar el estado del pago cuando cambia el mes o año seleccionado
+  // Verificación consolidada del estado de pago - ejecutada cuando tenemos todos los datos necesarios
   useEffect(() => {
-    checkMonthPaymentStatus();
+    if (userData && cards.length > 0) {
+      console.log('Ejecutando verificación completa de estado de pago');
+      checkMonthPaymentStatus();
+    }
+  }, [userData, cards, selectedMonth, selectedYear]);
+
+  // Restablecer el estado de verificación cuando cambia el mes o año
+  useEffect(() => {
+    console.log('Mes o año cambiado, reiniciando estado de verificación');
+    setPaymentStatusChecked(false);
+    setPaymentDisabled(true); // Bloquear el botón por defecto hasta que se verifique
   }, [selectedMonth, selectedYear]);
-
-  // Hook adicional para verificar si hay datos de pago ya cargados en userData
-  useEffect(() => {
-    if (userData?.creditCardPayments) {
-      const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      if (userData.creditCardPayments[selectedYearMonth]) {
-        console.log('Pago encontrado en userData:', userData.creditCardPayments[selectedYearMonth]);
-        setPaymentDisabled(true);
-      }
-    }
-  }, [userData?.creditCardPayments, selectedMonth, selectedYear]);
-
-  // Hook para verificar si las fechas de cierre han sido alcanzadas
-  useEffect(() => {
-    if (cards.length > 0) {
-      // Verificar si ya se ha realizado un pago
-      const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      const alreadyPaid = userData?.creditCardPayments && userData.creditCardPayments[selectedYearMonth];
-      
-      // Si no hay pago registrado, verificar fecha de cierre
-      if (!alreadyPaid) {
-        const reachedClosingDate = haveAllCardsReachedClosingDate();
-        
-        // Si no se ha alcanzado la fecha de cierre de todas las tarjetas, deshabilitar el botón
-        if (!reachedClosingDate) {
-          setPaymentDisabled(true);
-        }
-      }
-    }
-  }, [cards, selectedMonth, selectedYear, userData?.creditCardPayments]);
 
   // Manejar selección de archivo
   const handleFileChange = (event) => {
@@ -547,34 +558,111 @@ const CreditCards = () => {
     setUploading(true);
 
     try {
-      // Crear nombre único para el archivo
+      // Verificar que el usuario esté autenticado
+      if (!auth.currentUser) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      console.log("Iniciando subida de archivo:", selectedFile.name);
+      console.log("Usuario actual:", auth.currentUser.uid);
+      console.log("Tarjeta seleccionada:", selectedCard);
+
+      // Crear nombre único para el archivo - incluir mes y año para mejor organización
       const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      const fileName = `${selectedYearMonth}_${selectedFile.name}`;
+      const fileName = `${selectedYearMonth}_${selectedCard}_${selectedFile.name.replace(/\s+/g, '_')}`;
       
-      // Referencia al storage
-      const storageRef = storage.ref(`${auth.currentUser.uid}/creditCardStatements/${selectedCard}/${fileName}`);
+      // Ruta simplificada con estructura clara por usuario, tarjeta y año-mes
+      const storagePath = `statements/${auth.currentUser.uid}/${selectedCard}/${selectedYearMonth}/${fileName}`;
       
-      // Subir archivo
-      await storageRef.put(selectedFile);
+      console.log("Intentando subir archivo a:", storagePath);
       
-      // Obtener URL de descarga
+      // Referencia al storage con la ruta mejorada
+      const storageRef = storage.ref(storagePath);
+      
+      // Verificar primero si tenemos permisos para escribir
+      try {
+        // Subir en chunks pequeños con manejo de progreso
+        const uploadTask = storageRef.put(selectedFile, {
+          contentType: 'application/pdf',
+          customMetadata: {
+            userId: auth.currentUser.uid,
+            cardId: selectedCard,
+            yearMonth: selectedYearMonth,
+            month: String(selectedMonth),
+            year: String(selectedYear)
+          }
+        });
+        
+        // Opcional: monitorear progreso
+        uploadTask.on('state_changed', 
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log('Progreso de subida: ' + progress.toFixed(2) + '%');
+          }
+        );
+        
+        // Esperar a que se complete la subida
+        await uploadTask;
+        console.log("Archivo subido exitosamente");
+      } catch (uploadError) {
+        console.error("Error específico durante la subida:", uploadError);
+        throw uploadError;
+      }
+      
+      // Obtener URL de descarga con token de autenticación
       const downloadURL = await storageRef.getDownloadURL();
+      console.log("URL de descarga obtenida:", downloadURL);
       
-      // Guardar referencia en la base de datos
-      await database.ref(`${auth.currentUser.uid}/creditCardStatements/${selectedCard}/${selectedYearMonth}`).set({
+      // Crear objeto con datos completos del statement
+      const statementData = {
         fileName: selectedFile.name,
         uploadDate: new Date().toISOString(),
         downloadURL: downloadURL,
+        storagePath: storagePath,
         month: selectedMonth,
         year: selectedYear
-      });
+      };
+      
+      // Guardar referencia en la base de datos con estructura clara
+      await database.ref(`${auth.currentUser.uid}/creditCardStatements/${selectedCard}/${selectedYearMonth}`).set(statementData);
+      
+      console.log("Referencia guardada en Database correctamente");
+      
+      // Actualizar el estado local para reflejar inmediatamente el cambio sin necesidad de recargar
+      const updatedCardStatements = { ...cardStatements };
+      updatedCardStatements[selectedYearMonth] = statementData;
+      setCardStatements(updatedCardStatements);
       
       showAlert('Resumen subido correctamente', 'success');
       setUploadDialogOpen(false);
       setSelectedFile(null);
     } catch (error) {
       console.error('Error al subir el resumen:', error);
-      showAlert('Error al subir el archivo. Inténtalo de nuevo.', 'error');
+      console.error('Código de error:', error.code);
+      console.error('Mensaje de error:', error.message);
+      
+      // Mensaje de error más informativo
+      let errorMessage = 'Error al subir el archivo. ';
+      
+      if (error.code === 'storage/unauthorized') {
+        errorMessage += 'No tienes permisos para subir archivos. Es posible que necesites activar esta función en Firebase.';
+        console.error('Problema de permisos detectado. Revisa las reglas de seguridad en Firebase Storage.');
+      } else if (error.code === 'storage/canceled') {
+        errorMessage += 'La subida fue cancelada.';
+      } else if (error.code === 'storage/unknown') {
+        errorMessage += 'Ocurrió un error desconocido. Verifica tu conexión a internet.';
+      } else if (error.code === 'storage/quota-exceeded') {
+        errorMessage += 'Se ha excedido la cuota de almacenamiento permitida.';
+      } else {
+        errorMessage += error.message || 'Inténtalo de nuevo.';
+      }
+      
+      // Solución alternativa si hay problemas de permisos: mostrar instrucciones
+      if (error.code === 'storage/unauthorized') {
+        showAlert('Esta función requiere configuración adicional. Por favor, contacta al administrador.', 'warning');
+      } else {
+        showAlert(errorMessage, 'error');
+      }
     } finally {
       setUploading(false);
     }
@@ -587,8 +675,35 @@ const CreditCards = () => {
       return;
     }
     
-    // Abrir en una nueva pestaña
-    window.open(statement.downloadURL, '_blank');
+    try {
+      console.log("Intentando descargar archivo:", statement);
+      
+      // Verificar si tenemos una ruta de almacenamiento guardada
+      if (statement.storagePath) {
+        console.log("Usando ruta de almacenamiento:", statement.storagePath);
+        const storageRef = storage.ref(statement.storagePath);
+        // Obtener URL fresca con nuevo token de autenticación
+        const freshURL = await storageRef.getDownloadURL();
+        console.log("URL fresca obtenida:", freshURL);
+        window.open(freshURL, '_blank');
+      } else {
+        // Para compatibilidad con archivos antiguos que solo tienen downloadURL
+        console.log("Usando URL directa guardada en la base de datos");
+        window.open(statement.downloadURL, '_blank');
+      }
+    } catch (error) {
+      console.error('Error al descargar el archivo:', error);
+      console.error('Código de error:', error.code);
+      console.error('Mensaje de error:', error.message);
+      
+      // Intentar URL alternativa si está disponible
+      if ((error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found') && statement.downloadURL) {
+        console.log("Intentando con URL alternativa guardada");
+        window.open(statement.downloadURL, '_blank');
+      } else {
+        showAlert('Error al descargar el archivo. Intenta nuevamente más tarde.', 'error');
+      }
+    }
   };
 
   // Función para mostrar alertas
@@ -699,11 +814,93 @@ const CreditCards = () => {
       });
   };
 
+  // Función para manejar la carga exitosa del PDF
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    setPageNumber(1);
+  };
+
+  // Función para cambiar de página
+  const changePage = (offset) => {
+    setPageNumber(prevPageNumber => Math.min(Math.max(prevPageNumber + offset, 1), numPages));
+  };
+
+  // Función modificada para visualizar PDF
+  const handleViewStatement = async (statement) => {
+    if (!statement || !statement.downloadURL) {
+      showAlert('No se encuentra el archivo para descargar', 'error');
+      return;
+    }
+    
+    try {
+      console.log("Intentando visualizar archivo:", statement);
+      setIsViewingPdf(false); // Reiniciar visualización
+      
+      // Verificar que el statement corresponda al mes seleccionado
+      const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      const statementYearMonth = `${statement.year}-${String(statement.month).padStart(2, '0')}`;
+      
+      if (statementYearMonth !== selectedYearMonth) {
+        console.log(`El statement no corresponde al mes seleccionado: ${statementYearMonth} vs ${selectedYearMonth}`);
+        showAlert('El resumen no corresponde al mes seleccionado', 'warning');
+        return;
+      }
+      
+      // Establecer la URL para el visualizador según la disponibilidad
+      let pdfUrl;
+      
+      if (statement.storagePath) {
+        console.log("Usando ruta de almacenamiento para visualizar:", statement.storagePath);
+        const storageRef = storage.ref(statement.storagePath);
+        try {
+          pdfUrl = await storageRef.getDownloadURL();
+          console.log("URL de descarga obtenida exitosamente");
+        } catch (storageError) {
+          console.error("Error al obtener URL desde Storage:", storageError);
+          
+          // Si falla la obtención desde Storage, intentar con la URL guardada
+          if (statement.downloadURL) {
+            console.log("Intentando con URL guardada en la base de datos");
+            pdfUrl = statement.downloadURL;
+          } else {
+            throw storageError; // Re-lanzar el error si no hay URL alternativa
+          }
+        }
+      } else {
+        console.log("Usando URL directa para visualizar");
+        pdfUrl = statement.downloadURL;
+      }
+      
+      // Establecer la URL del PDF y activar la visualización
+      setPdfFile(pdfUrl);
+      setIsViewingPdf(true);
+      setPageNumber(1); // Resetear a la primera página
+      
+    } catch (error) {
+      console.error('Error al cargar el PDF para visualizar:', error);
+      showAlert('Error al cargar el PDF. Intenta descargar el archivo.', 'error');
+      
+      // Intentar método alternativo solo si realmente es necesario
+      if (statement.downloadURL && !pdfFile) {
+        console.log("Intentando con URL alternativa para visualizar");
+        setPdfFile(statement.downloadURL);
+        setIsViewingPdf(true);
+      }
+    }
+  };
+
+  // Agregar un efecto para cerrar el visualizador de PDF cuando cambia el mes o la tarjeta
+  useEffect(() => {
+    // Si cambia el mes, año o tarjeta, cerrar el visualizador de PDF
+    setIsViewingPdf(false);
+    setPdfFile(null);
+  }, [selectedMonth, selectedYear, selectedCard]);
+
   return (
     <Layout title="Tarjetas de Crédito">
       <Box 
         sx={{ 
-          bgcolor: '#006C68', // Restauramos el color verde original
+          bgcolor: theme.palette.background.default,
           minHeight: '100vh',
           width: '100%',
           position: 'relative',
@@ -720,7 +917,7 @@ const CreditCards = () => {
             mb: 3,
             borderRadius: '0 0 12px 12px',
             overflow: 'hidden',
-            boxShadow: `0 4px 20px rgba(0,0,0,0.15)`,
+            boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.15)}`,
             position: 'sticky',
             top: {
               xs: 56, // Altura del AppBar en móviles
@@ -735,7 +932,7 @@ const CreditCards = () => {
               left: 0,
               right: 0,
               height: '100%',
-              backgroundColor: '#006C68', // Mismo color del fondo
+              backgroundColor: theme.palette.background.default, // Usar el color del tema
               zIndex: -1
             }
           }}
@@ -756,7 +953,7 @@ const CreditCards = () => {
                   spacing={0.5} 
                   alignItems="center" 
                   sx={{ 
-                    bgcolor: 'rgba(255,255,255,0.1)',
+                    bgcolor: alpha(theme.palette.common.white, 0.1),
                     borderRadius: 2,
                     p: 0.5,
                     height: '100%'
@@ -774,8 +971,8 @@ const CreditCards = () => {
                     color="inherit"
                     size="small"
                     sx={{ 
-                      color: 'white',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
+                      color: theme.palette.primary.contrastText,
+                      '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.15) }
                     }}
                   >
                     <ChevronLeftIcon />
@@ -789,17 +986,17 @@ const CreditCards = () => {
                       justifyContent: 'center',
                       '& .MuiButton-root': {
                         borderRadius: 1.5,
-                        color: 'white',
+                        color: theme.palette.primary.contrastText,
                         px: 1,
                         mx: 0.2,
                         minWidth: 'auto',
                         fontSize: '0.8rem',
                         '&.active': {
-                          bgcolor: 'rgba(255,255,255,0.25)',
+                          bgcolor: alpha(theme.palette.common.white, 0.25),
                           fontWeight: 'bold'
                         },
                         '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.15)'
+                          bgcolor: alpha(theme.palette.common.white, 0.15)
                         }
                       }
                     }}
@@ -838,8 +1035,8 @@ const CreditCards = () => {
                     color="inherit"
                     size="small"
                     sx={{ 
-                      color: 'white',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
+                      color: theme.palette.primary.contrastText,
+                      '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.15) }
                     }}
                   >
                     <ChevronRightIcon />
@@ -867,7 +1064,7 @@ const CreditCards = () => {
                       size="small"
                       onClick={() => setSelectedYear(selectedYear - 1)}
                       sx={{ 
-                        color: 'white',
+                        color: theme.palette.primary.contrastText,
                         opacity: 0.8,
                         '&:hover': { opacity: 1 }
                       }}
@@ -878,7 +1075,7 @@ const CreditCards = () => {
                     <Paper
                       elevation={0}
                       sx={{
-                        bgcolor: 'rgba(255,255,255,0.15)',
+                        bgcolor: alpha(theme.palette.background.paper, 0.15),
                         py: 0.75,
                         px: 2,
                         borderRadius: 2,
@@ -889,7 +1086,7 @@ const CreditCards = () => {
                       <Typography
                         variant="body1"
                         fontWeight="medium"
-                        color="white"
+                        color={theme.palette.primary.contrastText}
                         sx={{ userSelect: 'none' }}
                       >
                         {selectedYear}
@@ -900,7 +1097,7 @@ const CreditCards = () => {
                       size="small"
                       onClick={() => setSelectedYear(selectedYear + 1)}
                       sx={{ 
-                        color: 'white',
+                        color: theme.palette.primary.contrastText,
                         opacity: 0.8,
                         '&:hover': { opacity: 1 }
                       }}
@@ -919,13 +1116,13 @@ const CreditCards = () => {
                     }}
                     startIcon={<TodayIcon />}
                     sx={{
-                      bgcolor: 'white',
+                      bgcolor: theme.palette.background.paper,
                       color: theme.palette.primary.dark,
                       fontWeight: 'bold',
                       '&:hover': {
                         bgcolor: alpha(theme.palette.background.paper, 0.9),
                       },
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.1)}`,
                       px: { xs: 1, sm: 2 },
                       py: 1
                     }}
@@ -947,13 +1144,14 @@ const CreditCards = () => {
                 borderRadius: 3,
                 overflow: 'hidden',
                 boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}`,
-                mx: { xs: 2, sm: 2 }
+                mx: { xs: 2, sm: 2 },
+                bgcolor: theme.palette.background.paper
               }}
             >
               <Box sx={{ 
                 p: 2.5, 
                 background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                color: 'white',
+                color: theme.palette.primary.contrastText,
               }}>
                 <Box 
                   sx={{
@@ -965,10 +1163,10 @@ const CreditCards = () => {
                   }}
                 >
                   <Box>
-                    <Typography variant="h6" fontWeight="bold" color="white">
+                    <Typography variant="h6" fontWeight="bold" color={theme.palette.primary.contrastText}>
                       Total de todas las tarjetas
                     </Typography>
-                    <Typography variant="h3" fontWeight="bold" color="white">
+                    <Typography variant="h3" fontWeight="bold" color={theme.palette.primary.contrastText}>
                       {formatAmount(getAllCardsTotal())}
                     </Typography>
                   </Box>
@@ -984,17 +1182,17 @@ const CreditCards = () => {
                       px: 3,
                       py: 1.2,
                       borderRadius: 2,
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                      bgcolor: 'white',
+                      boxShadow: `0 4px 10px ${alpha(theme.palette.common.black, 0.15)}`,
+                      bgcolor: theme.palette.background.paper,
                       color: theme.palette.primary.main,
                       '&:hover': {
-                        bgcolor: 'rgba(255,255,255,0.9)',
+                        bgcolor: alpha(theme.palette.background.paper, 0.9),
                         transform: 'translateY(-2px)',
-                        boxShadow: '0 8px 20px rgba(0,0,0,0.2)'
+                        boxShadow: `0 8px 20px ${alpha(theme.palette.common.black, 0.2)}`
                       },
                       '&.Mui-disabled': {
-                        bgcolor: 'rgba(255,255,255,0.5)',
-                        color: 'rgba(0,0,0,0.3)'
+                        bgcolor: alpha(theme.palette.background.paper, 0.5),
+                        color: alpha(theme.palette.text.primary, 0.3)
                       }
                     }}
                   >
@@ -1018,7 +1216,7 @@ const CreditCards = () => {
               boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
               height: '100%',
               border: 'none',
-              bgcolor: 'white',
+              bgcolor: theme.palette.background.paper,
               overflow: 'hidden'
             }}>
               <CardHeader
@@ -1042,13 +1240,13 @@ const CreditCards = () => {
                   pb: 1.5,
                   borderBottom: `1px solid ${theme.palette.divider}`,
                   bgcolor: theme.palette.primary.main,
-                  color: 'white',
+                  color: theme.palette.primary.contrastText,
                   '& .MuiTypography-root': {
-                    color: 'white'
+                    color: theme.palette.primary.contrastText
                   },
                   '& .MuiAvatar-root': {
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    color: 'white'
+                    bgcolor: alpha(theme.palette.common.white, 0.2),
+                    color: theme.palette.primary.contrastText
                   }
                 }}
               />
@@ -1167,7 +1365,7 @@ const CreditCards = () => {
                 borderRadius: 3,
                 boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
                 border: 'none',
-                bgcolor: 'white',
+                bgcolor: theme.palette.background.paper,
                 overflow: 'hidden'
               }}>
                 <CardHeader
@@ -1211,13 +1409,13 @@ const CreditCards = () => {
                     pb: 1.5,
                     borderBottom: `1px solid ${theme.palette.divider}`,
                     bgcolor: theme.palette.primary.main,
-                    color: 'white',
+                    color: theme.palette.primary.contrastText,
                     '& .MuiTypography-root': {
-                      color: 'white'
+                      color: theme.palette.primary.contrastText
                     },
                     '& .MuiAvatar-root': {
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white'
+                      bgcolor: alpha(theme.palette.common.white, 0.2),
+                      color: theme.palette.primary.contrastText
                     }
                   }}
                 />
@@ -1230,17 +1428,15 @@ const CreditCards = () => {
                         <Grid container spacing={2} mt={1}>
                           <Grid item xs={12} sm={4}>
                             <Card 
-                              elevation={2} 
+                              elevation={3} 
                               sx={{ 
                                 p: 0, 
                                 borderRadius: 3,
                                 overflow: 'hidden',
                                 height: '100%',
-                                transition: 'transform 0.2s',
-                                '&:hover': {
-                                  transform: 'translateY(-4px)',
-                                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                }
+                                border: 'none',
+                                bgcolor: theme.palette.background.paper,
+                                overflow: 'hidden'
                               }}
                             >
                               <Box sx={{ 
@@ -1255,7 +1451,7 @@ const CreditCards = () => {
                                   </Typography>
                                 </Stack>
                               </Box>
-                              <Box sx={{ p: 2 }}>
+                              <Box sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
                                 <Typography variant="h6" fontWeight="medium">
                                   {getCardDates()?.closingDate 
                                     ? obtenerFechaFormateada(getCardDates().closingDate)
@@ -1352,29 +1548,125 @@ const CreditCards = () => {
                                 p: 2, 
                                 borderRadius: 2, 
                                 display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
+                                flexDirection: 'column',
+                                gap: 2
                               }}
                             >
-                              <Box display="flex" alignItems="center">
-                                <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
-                                <Box>
-                                  <Typography variant="body1" fontWeight="medium">
-                                    {userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].fileName}
-                                  </Typography>
-                                  <Typography variant="body2" color="textSecondary">
-                                    Subido el {new Date(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].uploadDate).toLocaleDateString()}
-                                  </Typography>
+                              <Box display="flex" alignItems="center" justifyContent="space-between">
+                                <Box display="flex" alignItems="center">
+                                  <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
+                                  <Box>
+                                    <Typography variant="body1" fontWeight="medium">
+                                      {userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].fileName}
+                                    </Typography>
+                                    <Typography variant="body2" color="textSecondary">
+                                      Subido el {new Date(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].uploadDate).toLocaleDateString()}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                                <Box display="flex" gap={1}>
+                                  <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    startIcon={<DownloadIcon />}
+                                    onClick={() => handleDownloadStatement(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
+                                  >
+                                    Descargar
+                                  </Button>
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => handleViewStatement(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
+                                  >
+                                    Ver PDF
+                                  </Button>
                                 </Box>
                               </Box>
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<DownloadIcon />}
-                                onClick={() => handleDownloadStatement(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
-                              >
-                                Descargar
-                              </Button>
+                              
+                              {/* Visualizador de PDF */}
+                              {isViewingPdf && pdfFile && (
+                                <Box 
+                                  sx={{ 
+                                    mt: 2,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    bgcolor: 'background.paper',
+                                    borderRadius: 2,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    p: 2,
+                                    overflow: 'hidden'
+                                  }}
+                                >
+                                  <Box 
+                                    sx={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between', 
+                                      width: '100%', 
+                                      mb: 2,
+                                      p: 1,
+                                      borderRadius: 1,
+                                      bgcolor: alpha(theme.palette.primary.main, 0.05)
+                                    }}
+                                  >
+                                    <Button 
+                                      variant="outlined" 
+                                      disabled={pageNumber <= 1} 
+                                      onClick={() => changePage(-1)}
+                                      size="small"
+                                    >
+                                      Anterior
+                                    </Button>
+                                    <Typography variant="body2">
+                                      Página {pageNumber} de {numPages || '...'}
+                                    </Typography>
+                                    <Button 
+                                      variant="outlined" 
+                                      disabled={pageNumber >= numPages || !numPages} 
+                                      onClick={() => changePage(1)}
+                                      size="small"
+                                    >
+                                      Siguiente
+                                    </Button>
+                                  </Box>
+
+                                  <Box 
+                                    sx={{ 
+                                      width: '100%', 
+                                      maxHeight: '800px',
+                                      overflow: 'auto',
+                                      display: 'flex',
+                                      justifyContent: 'center',
+                                      '& .react-pdf__Document': {
+                                        maxWidth: '100%',
+                                        boxShadow: '0 3px 14px rgba(0,0,0,0.2)',
+                                        borderRadius: 1
+                                      }
+                                    }}
+                                  >
+                                    <Document
+                                      file={pdfFile}
+                                      onLoadSuccess={onDocumentLoadSuccess}
+                                      onLoadError={(error) => {
+                                        console.error('Error al cargar PDF:', error);
+                                        showAlert('Error al cargar el PDF. Intenta descargarlo.', 'error');
+                                      }}
+                                      loading={
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
+                                          <CircularProgress size={40} />
+                                        </Box>
+                                      }
+                                    >
+                                      <Page 
+                                        pageNumber={pageNumber} 
+                                        width={window.innerWidth > 800 ? 750 : window.innerWidth - 80}
+                                        renderTextLayer={true}
+                                        renderAnnotationLayer={true}
+                                      />
+                                    </Document>
+                                  </Box>
+                                </Box>
+                              )}
                             </Paper>
                           ) : (
                             <Paper 
@@ -1383,7 +1675,8 @@ const CreditCards = () => {
                                 p: 3, 
                                 borderRadius: 2, 
                                 textAlign: 'center',
-                                borderStyle: 'dashed'
+                                borderStyle: 'dashed',
+                                bgcolor: theme.palette.background.paper
                               }}
                             >
                               <InsertDriveFileIcon sx={{ fontSize: 40, color: theme.palette.text.secondary, mb: 1 }} />
@@ -1409,7 +1702,7 @@ const CreditCards = () => {
                               sx={{ 
                                 p: 2, 
                                 borderRadius: 1, 
-                                bgcolor: theme.palette.info.light + '15',
+                                bgcolor: alpha(theme.palette.info.main, 0.15),
                                 borderStyle: 'dashed',
                                 display: 'flex',
                                 flexDirection: { xs: 'column', sm: 'row' },
@@ -1445,7 +1738,7 @@ const CreditCards = () => {
                               sx={{ 
                                 p: 2, 
                                 borderRadius: 1, 
-                                bgcolor: theme.palette.success.light + '15',
+                                bgcolor: alpha(theme.palette.success.main, 0.15),
                                 borderStyle: 'dashed',
                                 display: 'flex',
                                 flexDirection: { xs: 'column', sm: 'row' },
@@ -1532,7 +1825,7 @@ const CreditCards = () => {
                             <Box 
                               sx={{ 
                                 mr: 1, 
-                                bgcolor: `${theme.palette.primary.light}20`,
+                                bgcolor: alpha(theme.palette.primary.main, 0.2),
                                 p: 0.5,
                                 borderRadius: '50%',
                                 display: 'flex'
@@ -1557,7 +1850,7 @@ const CreditCards = () => {
                             <Box 
                               sx={{ 
                                 mr: 1, 
-                                bgcolor: `${theme.palette.error.light}20`,
+                                bgcolor: alpha(theme.palette.error.main, 0.2),
                                 p: 0.5,
                                 borderRadius: '50%',
                                 display: 'flex'
@@ -1593,7 +1886,8 @@ const CreditCards = () => {
                         p: 3, 
                         textAlign: 'center',
                         borderStyle: 'dashed',
-                        borderRadius: 2
+                        borderRadius: 2,
+                        bgcolor: theme.palette.background.paper
                       }}
                     >
                       <Typography variant="body1" color="textSecondary">
@@ -1618,8 +1912,9 @@ const CreditCards = () => {
                             mb: 1.5,
                             borderRadius: 2,
                             transition: 'all 0.2s',
+                            bgcolor: theme.palette.background.paper,
                             '&:hover': {
-                              bgcolor: theme.palette.grey[50],
+                              bgcolor: alpha(theme.palette.primary.main, 0.05),
                               transform: 'translateY(-1px)',
                               boxShadow: 1
                             }
@@ -1681,7 +1976,7 @@ const CreditCards = () => {
                 elevation={0} 
                 variant="outlined" 
                 sx={{ 
-                  p: 4, 
+                  p: 3, 
                   textAlign: 'center',
                   height: '100%',
                   display: 'flex',
@@ -1690,8 +1985,8 @@ const CreditCards = () => {
                   alignItems: 'center',
                   borderStyle: 'dashed',
                   borderRadius: 1,
-                  border: `1px solid rgba(0,0,0,0.12)`,
-                  bgcolor: 'white'
+                  border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`,
+                  bgcolor: theme.palette.background.paper
                 }}
               >
                 <CreditCardIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, mb: 2 }} />
@@ -1761,7 +2056,7 @@ const CreditCards = () => {
             </label>
             
             {selectedFile && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
+              <Box sx={{ mt: 2, p: 2, bgcolor: theme.palette.background.paper, borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
                 <Typography variant="subtitle2" gutterBottom>
                   Archivo seleccionado:
                 </Typography>

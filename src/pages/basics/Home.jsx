@@ -1514,82 +1514,339 @@ const Home = () => {
             <CardContent sx={{ p: 2.5 }}>
               {userData?.savings && (
                 <>
-                  <Box 
-                    sx={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      p: 2.5,
-                      mb: 2.5,
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.success.main, 0.08),
-                      border: `1px solid ${alpha(theme.palette.success.main, 0.15)}`,
-                    }}
-                  >
-                    <Typography variant="subtitle1" fontWeight="medium" color="text.secondary">
-                      Total Ahorrado
-                    </Typography>
-                    <Typography variant="h4" fontWeight="bold" color="success.dark">
-                      {formatAmount(userData.savings.total || 0)}
-                    </Typography>
-                  </Box>
-                  
-                  <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1.5 }}>
-                    Distribución de ahorros
-                  </Typography>
-                  
-                  <Box sx={{ mb: 2.5 }}>
-                    {Object.entries(userData.savings.accounts || {}).map(([key, value], index) => {
-                      // Asignar un color basado en el índice
-                      const colors = [
-                        { bg: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main },
-                        { bg: alpha(theme.palette.info.main, 0.1), color: theme.palette.info.main },
-                        { bg: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.main },
-                        { bg: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main }
-                      ];
-                      const colorIndex = index % colors.length;
-                      
-                      // Calcular el porcentaje del total
-                      const percentage = userData.savings.total ? (value / userData.savings.total) * 100 : 0;
-                      
-                      return (
-                        <Box key={key} sx={{ mb: 2 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                            <Typography variant="body2" fontWeight="medium">
-                              {key}
-                            </Typography>
-                            <Typography variant="body2" fontWeight="bold">
-                              {formatAmount(value)}
-                            </Typography>
+                  {/* Grid de métricas clave */}
+                  <Grid container spacing={5} sx={{ mb: 3 }}>
+                    {/* Total Patrimonio */}
+                    <Grid item xs={12} sm={6}>
+                      <Paper elevation={4} sx={{ 
+                        p: 2,
+                        borderRadius: 2, 
+                        border: `1px solid ${theme.palette.divider}`,
+                        height: '100%',
+                        bgcolor: theme.palette.success.light + '10',
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Stack spacing={1} alignItems="flex-start">
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            bgcolor: theme.palette.success.light + '30',
+                            color: theme.palette.success.dark
+                          }}>
+                            <SavingsIcon fontSize="small" />
                           </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={percentage}
-                              sx={{ 
-                                height: 8, 
-                                borderRadius: 4, 
-                                flexGrow: 1,
-                                mr: 1,
-                                bgcolor: colors[colorIndex].color
-                              }}
-                            />
-                            <Typography variant="caption" fontWeight="bold" sx={{ width: 35 }}>
-                              {Math.round(percentage)}%
-                            </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Total Patrimonio
+                          </Typography>
+                          <Typography variant="h5" sx={{ color: theme.palette.success.dark }} fontWeight="bold">
+                            {formatAmount(userData.savings.total || 0)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            USD {formatAmount((userData.savings.total || 0) / (dollarRate?.venta || 1))}
+                          </Typography>
+                        </Stack>
+                      </Paper>
+                    </Grid>
+                    
+                    {/* Ahorros en ARS */}
+                    <Grid item xs={12} sm={6}>
+                      <Paper elevation={4} sx={{ 
+                        p: 2, 
+                        borderRadius: 2, 
+                        border: `1px solid ${theme.palette.divider}`,
+                        height: '100%',
+                        bgcolor: theme.palette.primary.light + '10',
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Stack spacing={1} alignItems="flex-start">
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            bgcolor: theme.palette.primary.light + '30',
+                            color: theme.palette.primary.dark
+                          }}>
+                            <MonetizationOnIcon fontSize="small" />
                           </Box>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Ahorros en ARS
+                          </Typography>
+                          <Typography variant="h5" color="primary.dark" fontWeight="bold">
+                            {formatAmount(userData.savings.amountARS || 0)}
+                          </Typography>
+                          <Chip 
+                            size="small" 
+                            label={userData.savings.amountARS ? `${Math.round((userData.savings.amountARS / userData.savings.total) * 100)}% del total` : "0%"} 
+                            sx={{ 
+                              bgcolor: theme.palette.primary.light + '20',
+                              color: theme.palette.primary.dark,
+                              fontSize: '0.7rem',
+                              fontWeight: 'medium'
+                            }} 
+                          />
+                        </Stack>
+                      </Paper>
+                    </Grid>
+                    
+                    {/* Ahorros en USD */}
+                    <Grid item xs={12} sm={6}>
+                      <Paper elevation={4} sx={{ 
+                        p: 2, 
+                        borderRadius: 2, 
+                        border: `1px solid ${theme.palette.divider}`,
+                        height: '100%',
+                        bgcolor: theme.palette.info.light + '10',
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Stack spacing={1} alignItems="flex-start">
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            bgcolor: theme.palette.info.light + '30',
+                            color: theme.palette.info.dark
+                          }}>
+                            <AttachMoneyIcon fontSize="small" />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Ahorros en USD
+                          </Typography>
+                          <Typography variant="h5" color="info.dark" fontWeight="bold">
+                            {formatAmount(userData.savings.amountUSD || 0, true)}
+                          </Typography>
+                          <Chip 
+                            size="small" 
+                            label={userData.savings.amountUSD ? `Valor ARS: ${formatAmount(userData.savings.amountUSD * dollarRate?.venta || 0)}` : "Sin datos"} 
+                            sx={{ 
+                              bgcolor: theme.palette.info.light + '20',
+                              color: theme.palette.info.dark,
+                              fontSize: '0.7rem',
+                              fontWeight: 'medium'
+                            }} 
+                          />
+                        </Stack>
+                      </Paper>
+                    </Grid>
+                    
+                    {/* Fondo Mantenimiento Auto */}
+                    <Grid item xs={12} sm={6}>
+                      <Paper elevation={4} sx={{ 
+                        p: 2, 
+                        borderRadius: 2, 
+                        border: `1px solid ${theme.palette.divider}`,
+                        height: '100%',
+                        bgcolor: theme.palette.warning.light + '10',
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                        }
+                      }}>
+                        <Stack spacing={1} alignItems="flex-start">
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            bgcolor: theme.palette.warning.light + '30',
+                            color: theme.palette.warning.dark
+                          }}>
+                            <DirectionsCarIcon fontSize="small" />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Fondo Mantenimiento
+                          </Typography>
+                          <Typography variant="h5" color="warning.dark" fontWeight="bold">
+                            {formatAmount(userData.savings.carMaintenance || 0)}
+                          </Typography>
+                          <Chip 
+                            size="small" 
+                            label={userData.savings.carMaintenancePercentage ? `${(userData.savings.carMaintenancePercentage * 100).toFixed(1)}% de gastos` : "Sin datos"} 
+                            sx={{ 
+                              bgcolor: theme.palette.warning.light + '20',
+                              color: theme.palette.warning.dark,
+                              fontSize: '0.7rem',
+                              fontWeight: 'medium'
+                            }} 
+                          />
+                        </Stack>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                  
+                  {/* Gráfico histórico de evolución */}
+                  {userData.savings && (
+                    <Paper 
+                      elevation={4} 
+                      sx={{ 
+                        p: 2, 
+                        border: `1px solid ${theme.palette.divider}`, 
+                        borderRadius: 2,
+                        mt: 6
+                      }}
+                    >
+                      <Typography variant="subtitle2" fontWeight="medium" gutterBottom>
+                        Evolución Histórica de Ahorros
+                      </Typography>
+                      
+                      <ReactApexChart
+                        options={{
+                          chart: {
+                            type: 'area',
+                            toolbar: {
+                              show: false
+                            },
+                            fontFamily: theme.typography.fontFamily,
+                            animations: {
+                              enabled: true,
+                              easing: 'linear',
+                              dynamicAnimation: {
+                                speed: 1000
+                              }
+                            }
+                          },
+                          dataLabels: {
+                            enabled: false
+                          },
+                          stroke: {
+                            curve: 'smooth',
+                            width: 3
+                          },
+                          xaxis: {
+                            type: 'datetime',
+                            labels: {
+                              style: {
+                                colors: theme.palette.text.secondary
+                              },
+                              datetimeFormatter: {
+                                year: 'yyyy',
+                                month: "MMM 'yy",
+                                day: 'dd MMM',
+                                hour: 'HH:mm'
+                              }
+                            }
+                          },
+                          yaxis: {
+                            labels: {
+                              formatter: (value) => formatAmount(value),
+                              style: {
+                                colors: theme.palette.text.secondary
+                              }
+                            }
+                          },
+                          tooltip: {
+                            x: {
+                              format: 'dd MMM yyyy'
+                            },
+                            y: {
+                              formatter: (value) => formatAmount(value)
+                            }
+                          },
+                          grid: {
+                            borderColor: theme.palette.divider
+                          },
+                          colors: [theme.palette.primary.main],
+                          fill: {
+                            type: 'gradient',
+                            gradient: {
+                              shadeIntensity: 1,
+                              opacityFrom: 0.7,
+                              opacityTo: 0.2,
+                              stops: [0, 100]
+                            }
+                          },
+                          markers: {
+                            size: 4,
+                            colors: [theme.palette.primary.main],
+                            strokeWidth: 0
+                          }
+                        }}
+                        series={[{
+                          name: 'Saldo en ARS',
+                          data: (() => {
+                            // Crear un objeto para almacenar los saldos por fecha
+                            const dailyBalances = {};
+                            
+                            // Función auxiliar para validar y formatear fecha
+                            const getValidDateKey = (dateString) => {
+                              try {
+                                const date = new Date(dateString);
+                                if (isNaN(date.getTime())) return null;
+                                return date.toISOString().split('T')[0];
+                              } catch (error) {
+                                console.warn('Fecha inválida:', dateString);
+                                return null;
+                              }
+                            };
+                            
+                            // Procesar solo el historial de ahorros
+                            if (userData.savings?.amountARSHistory) {
+                              Object.values(userData.savings.amountARSHistory).forEach(entry => {
+                                if (entry.date) {
+                                  const dateKey = getValidDateKey(entry.date);
+                                  if (dateKey) {
+                                    dailyBalances[dateKey] = entry.newTotal || 0;
+                                  }
+                                }
+                              });
+                            }
+                            
+                            // Convertir a array y ordenar por fecha
+                            const sortedData = Object.entries(dailyBalances)
+                              .sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB))
+                              .map(([date, amount]) => ({
+                                x: new Date(date).getTime(),
+                                y: amount
+                              }));
+                            
+                            return sortedData;
+                          })()
+                        }]}
+                        type="area"
+                        height={isMobile ? 250 : 300}
+                      />
+                    </Paper>
+                  )}
                 </>
               )}
               
               {!userData?.savings && (
-                <Box sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No hay información de ahorros disponible
+                <Box sx={{ 
+                  p: 4, 
+                  textAlign: 'center', 
+                  bgcolor: theme.palette.grey[50],
+                  borderRadius: 2
+                }}>
+                  <SavingsIcon sx={{ fontSize: 60, color: theme.palette.grey[400], mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No hay datos de ahorros disponibles
                   </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Cuando registres ahorros, podrás visualizar aquí la evolución y análisis detallado de tu patrimonio.
+                  </Typography>
+                  <Button 
+                    variant="outlined" 
+                    color="primary" 
+                    startIcon={<SavingsIcon />}
+                  >
+                    Gestionar Ahorros
+                  </Button>
                 </Box>
               )}
             </CardContent>

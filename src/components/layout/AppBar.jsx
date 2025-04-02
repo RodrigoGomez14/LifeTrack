@@ -15,7 +15,9 @@ import {
   Button,
   Tooltip,
   Divider,
-  useMediaQuery
+  useMediaQuery,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -35,12 +37,19 @@ import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import SpeedIcon from '@mui/icons-material/Speed';
 
 const AppBar = ({ toggleDrawer, title }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { userData } = useStore();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  // Obtener el nombre de usuario para personalizar la interfaz
+  const displayName = auth.currentUser?.displayName || '';
+  const firstName = displayName ? displayName.split(' ')[0] : '';
   
   // Estados para menús
   const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
@@ -131,7 +140,8 @@ const AppBar = ({ toggleDrawer, title }) => {
                 letterSpacing: 0.5
               }}
             >
-              {title}
+              {title ? (firstName ? `LifeTrack${title !== 'LifeTrack' ? ` | ${title}` : ` de ${firstName}`}` : `LifeTrack${title !== 'LifeTrack' ? ` | ${title}` : ''}`
+              ) : 'LifeTrack'}
             </Typography>
           </Box>
         </Stack>
@@ -208,39 +218,63 @@ const AppBar = ({ toggleDrawer, title }) => {
           )}
           
           {/* Botón de acciones rápidas */}
-          <Tooltip title="Acciones rápidas">
-            <Button
-              color="inherit"
-              onClick={handleOpenQuickActionMenu}
-              endIcon={<KeyboardArrowDownIcon />}
-              startIcon={<AddCircleOutlineIcon />}
-              sx={{ 
-                bgcolor: alpha('#fff', 0.1),
-                '&:hover': { 
-                  bgcolor: alpha('#fff', 0.2) 
-                },
-                borderRadius: 2,
-                px: 1.5,
-                display: { xs: 'none', sm: 'flex' }
+          <Box sx={{ flexGrow: { xs: 1, sm: 0 } }}>
+            <Stack direction="row" spacing={1} sx={{ ml: { xs: 1, sm: 2 } }}>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<SpeedIcon />}
+                onClick={handleOpenQuickActionMenu}
+                size={isMobile ? "small" : "medium"}
+                sx={{
+                  borderRadius: 5,
+                  boxShadow: theme.shadows[3],
+                  textTransform: 'none',
+                }}
+              >
+                {isMobile ? 'Acción' : 'Acción rápida'}
+              </Button>
+            </Stack>
+            
+            <Menu
+              anchorEl={quickActionMenuAnchor}
+              open={Boolean(quickActionMenuAnchor)}
+              onClose={handleCloseQuickActionMenu}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              PaperProps={{
+                sx: {
+                  borderRadius: 2,
+                  minWidth: 200
+                }
               }}
             >
-              Crear
-            </Button>
-          </Tooltip>
-          
-          {/* Botón de acciones rápidas (versión móvil) */}
-          <IconButton 
-            color="inherit" 
-            onClick={handleOpenQuickActionMenu}
-            sx={{ 
-              display: { xs: 'flex', sm: 'none' },
-              '&:hover': { 
-                bgcolor: alpha('#fff', 0.15) 
-              }
-            }}
-          >
-            <AddCircleOutlineIcon />
-          </IconButton>
+              <Box sx={{ p: 1 }}>
+                <Typography variant="subtitle1" sx={{ p: 1 }}>
+                  {firstName ? `${firstName}, ¿qué quieres hacer?` : '¿Qué quieres hacer?'}
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+                <MenuItem onClick={() => handleQuickAction('new-expense')}>
+                  <ListItemIcon>
+                    <RemoveCircleIcon color="error" />
+                  </ListItemIcon>
+                  <ListItemText primary="Nuevo gasto" />
+                </MenuItem>
+                <MenuItem onClick={() => handleQuickAction('new-income')}>
+                  <ListItemIcon>
+                    <AddCircleIcon color="success" />
+                  </ListItemIcon>
+                  <ListItemText primary="Nuevo ingreso" />
+                </MenuItem>
+                <MenuItem onClick={() => handleQuickAction('exchange')}>
+                  <ListItemIcon>
+                    <CurrencyExchangeIcon color="info" />
+                  </ListItemIcon>
+                  <ListItemText primary="Conversión de moneda" />
+                </MenuItem>
+              </Box>
+            </Menu>
+          </Box>
           
           {/* Notificaciones */}
           <Tooltip title="Notificaciones">
@@ -256,90 +290,81 @@ const AppBar = ({ toggleDrawer, title }) => {
           </Tooltip>
           
           {/* Perfil de usuario */}
-          <Tooltip title="Mi perfil">
-            <IconButton 
-              onClick={handleOpenProfileMenu} 
-              sx={{ 
-                ml: { xs: 0, sm: 1 },
-                '&:hover': { 
-                  bgcolor: alpha('#fff', 0.15) 
-                } 
+          <Box sx={{ flexGrow: 0, ml: 1 }}>
+            <Tooltip title={firstName ? `Perfil de ${firstName}` : "Abrir menú de perfil"}>
+              <IconButton onClick={handleOpenProfileMenu} sx={{ p: 0 }}>
+                <Avatar 
+                  alt={auth.currentUser?.displayName || "Usuario"} 
+                  src={auth.currentUser?.photoURL}
+                  sx={{ 
+                    width: 40, 
+                    height: 40,
+                    border: `2px solid ${theme.palette.primary.contrastText}` 
+                  }}
+                >
+                  {!auth.currentUser?.photoURL && auth.currentUser?.displayName 
+                    ? auth.currentUser.displayName.charAt(0).toUpperCase() 
+                    : "U"}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+            <Menu
+              sx={{ mt: '45px' }}
+              id="menu-appbar"
+              anchorEl={profileMenuAnchor}
+              anchorOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              keepMounted
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              open={Boolean(profileMenuAnchor)}
+              onClose={handleCloseProfileMenu}
+              PaperProps={{
+                sx: {
+                  borderRadius: 2,
+                  minWidth: 220
+                }
               }}
             >
-              <Avatar 
-                sx={{ 
-                  width: 32, 
-                  height: 32,
-                  bgcolor: alpha('#fff', 0.25),
-                  border: '2px solid rgba(255,255,255,0.5)',
-                  fontWeight: 'bold'
+              <Box sx={{ px: 3, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                <Typography variant="subtitle1" fontWeight="medium" sx={{ mb: 0.5 }}>
+                  {firstName ? `Hola, ${firstName}` : 'Bienvenido'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {auth.currentUser?.email}
+                </Typography>
+              </Box>
+              <Divider sx={{ mb: 1 }} />
+              <MenuItem onClick={() => { handleCloseProfileMenu(); navigate('/Perfil'); }}>
+                <AccountCircleOutlinedIcon sx={{ mr: 2, fontSize: 20, color: theme.palette.primary.main }} />
+                <Typography variant="body2">Mi Perfil</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { handleCloseProfileMenu(); navigate('/Configuracion'); }}>
+                <SettingsOutlinedIcon sx={{ mr: 2, fontSize: 20, color: theme.palette.info.main }} />
+                <Typography variant="body2">Configuración</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { handleCloseProfileMenu(); navigate('/Ayuda'); }}>
+                <HelpOutlineIcon sx={{ mr: 2, fontSize: 20, color: theme.palette.success.main }} />
+                <Typography variant="body2">Ayuda</Typography>
+              </MenuItem>
+              <Divider sx={{ my: 1 }} />
+              <MenuItem 
+                onClick={async () => { 
+                  handleCloseProfileMenu(); 
+                  await auth.signOut(); 
                 }}
+                sx={{ color: theme.palette.error.main }}
               >
-                {auth.currentUser?.email ? auth.currentUser.email.charAt(0).toUpperCase() : 'U'}
-              </Avatar>
-            </IconButton>
-          </Tooltip>
+                <Typography variant="body2" fontWeight="medium">Cerrar Sesión</Typography>
+              </MenuItem>
+            </Menu>
+          </Box>
         </Stack>
       </Toolbar>
-      
-      {/* Menú de perfil */}
-      <Menu
-        anchorEl={profileMenuAnchor}
-        open={Boolean(profileMenuAnchor)}
-        onClose={handleCloseProfileMenu}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        PaperProps={{
-          sx: { 
-            mt: 1.5, 
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            width: 220,
-            borderRadius: 2,
-            px: 0.5,
-            py: 1
-          }
-        }}
-      >
-        {auth.currentUser && (
-          <Box sx={{ px: 2, py: 1, mb: 1 }}>
-            <Typography variant="subtitle2" fontWeight="bold">
-              {auth.currentUser.email.split('@')[0]}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {auth.currentUser.email}
-            </Typography>
-          </Box>
-        )}
-        
-        <Divider sx={{ mb: 1 }} />
-        
-        <MenuItem onClick={() => { handleCloseProfileMenu(); navigate('/Perfil'); }}>
-          <AccountCircleOutlinedIcon sx={{ mr: 2, fontSize: 20, color: theme.palette.primary.main }} />
-          <Typography variant="body2">Mi Perfil</Typography>
-        </MenuItem>
-        
-        <MenuItem onClick={() => { handleCloseProfileMenu(); navigate('/Configuracion'); }}>
-          <SettingsOutlinedIcon sx={{ mr: 2, fontSize: 20, color: theme.palette.info.main }} />
-          <Typography variant="body2">Configuración</Typography>
-        </MenuItem>
-        
-        <MenuItem onClick={() => { handleCloseProfileMenu(); navigate('/Ayuda'); }}>
-          <HelpOutlineIcon sx={{ mr: 2, fontSize: 20, color: theme.palette.success.main }} />
-          <Typography variant="body2">Ayuda</Typography>
-        </MenuItem>
-        
-        <Divider sx={{ my: 1 }} />
-        
-        <MenuItem 
-          onClick={async () => { 
-            handleCloseProfileMenu(); 
-            await auth.signOut(); 
-          }}
-          sx={{ color: theme.palette.error.main }}
-        >
-          <Typography variant="body2" fontWeight="medium">Cerrar Sesión</Typography>
-        </MenuItem>
-      </Menu>
       
       {/* Menú de notificaciones */}
       <Menu
@@ -349,22 +374,19 @@ const AppBar = ({ toggleDrawer, title }) => {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         PaperProps={{
-          sx: { 
-            mt: 1.5, 
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            width: 280,
+          sx: {
             borderRadius: 2,
-            p: 1
+            width: 320,
+            maxHeight: 400
           }
         }}
       >
-        <Box sx={{ px: 1, pb: 1 }}>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Notificaciones
+        <Box sx={{ p: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold">
+            {firstName ? `Notificaciones de ${firstName}` : 'Notificaciones'}
           </Typography>
         </Box>
-        
-        <Divider sx={{ mb: 1 }} />
+        <Divider />
         
         <MenuItem sx={{ borderRadius: 1, mb: 0.5 }}>
           <Box>
@@ -410,55 +432,6 @@ const AppBar = ({ toggleDrawer, title }) => {
             Ver todas
           </Button>
         </Box>
-      </Menu>
-      
-      {/* Menú de acciones rápidas */}
-      <Menu
-        anchorEl={quickActionMenuAnchor}
-        open={Boolean(quickActionMenuAnchor)}
-        onClose={handleCloseQuickActionMenu}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        PaperProps={{
-          sx: { 
-            mt: 1.5, 
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            width: 220,
-            borderRadius: 2,
-            px: 0.5,
-            py: 1
-          }
-        }}
-      >
-        <MenuItem 
-          onClick={() => handleQuickAction('new-expense')}
-          sx={{ borderRadius: 1, my: 0.5 }}
-        >
-          <AddCircleOutlineIcon 
-            sx={{ mr: 2, color: theme.palette.error.main }}
-          />
-          <Typography variant="body2">Nuevo Gasto</Typography>
-        </MenuItem>
-        
-        <MenuItem 
-          onClick={() => handleQuickAction('new-income')}
-          sx={{ borderRadius: 1, my: 0.5 }}
-        >
-          <AddCircleOutlineIcon 
-            sx={{ mr: 2, color: theme.palette.success.main }}
-          />
-          <Typography variant="body2">Nuevo Ingreso</Typography>
-        </MenuItem>
-        
-        <MenuItem 
-          onClick={() => handleQuickAction('exchange')}
-          sx={{ borderRadius: 1, my: 0.5 }}
-        >
-          <CurrencyExchangeIcon 
-            sx={{ mr: 2, color: theme.palette.info.main }}
-          />
-          <Typography variant="body2">Cambio de Divisas</Typography>
-        </MenuItem>
       </Menu>
     </MuiAppBar>
   );
