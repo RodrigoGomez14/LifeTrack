@@ -617,7 +617,7 @@ const Auth = () => {
                   </Typography>
                   <Typography variant={isMobile ? "body2" : "body1"} color="text.secondary">
                     {activeTab === 0 ? 'Inicia sesión en tu cuenta' : 'Crea una nueva cuenta'}
-                  </Typography>
+          </Typography>
                 </Box>
                 
                 {/* Pestañas para alternar entre login y registro */}
@@ -682,9 +682,9 @@ const Auth = () => {
                   }}
                 >
                   <form onSubmit={handleLogin}>
-                    <TextField
-                      label="Email"
-                      type="email"
+            <TextField
+              label="Email"
+              type="email"
                       fullWidth
                       margin="normal"
                       variant="outlined"
@@ -836,7 +836,7 @@ const Auth = () => {
                       label="Nombre completo"
                       fullWidth
                       margin="normal"
-                      variant="outlined"
+              variant="outlined"
                       value={registerName}
                       onChange={(e) => setRegisterName(e.target.value)}
                       error={!!registerNameError}
@@ -855,7 +855,7 @@ const Auth = () => {
                     <TextField
                       label="Email"
                       type="email"
-                      fullWidth
+              fullWidth
                       margin="normal"
                       variant="outlined"
                       value={registerEmail}
@@ -873,12 +873,12 @@ const Auth = () => {
                       }}
                     />
                     
-                    <TextField
+            <TextField
                       label="Contraseña"
                       type={showRegisterPassword ? 'text' : 'password'}
                       fullWidth
                       margin="normal"
-                      variant="outlined"
+              variant="outlined"
                       value={registerPassword}
                       onChange={handleRegisterPasswordChange}
                       error={!!registerPasswordError}
@@ -938,7 +938,7 @@ const Auth = () => {
                     <TextField
                       label="Confirmar contraseña"
                       type={showConfirmPassword ? 'text' : 'password'}
-                      fullWidth
+              fullWidth
                       margin="normal"
                       variant="outlined"
                       value={confirmPassword}
@@ -1040,8 +1040,8 @@ const Auth = () => {
                       sx={{ mb: 2 }}
                     >
                       Registrarse con Google
-                    </Button>
-                  </form>
+            </Button>
+          </form>
                 </Box>
                 
                 {/* Pie de página */}
@@ -1079,10 +1079,10 @@ const Auth = () => {
                   </Typography>
                 </Box>
               </Paper>
-            </Grid>
-          </Grid>
+        </Grid>
+      </Grid>
         </Box>
-      </Container>
+    </Container>
     </Box>
   );
 };

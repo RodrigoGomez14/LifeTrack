@@ -21,7 +21,9 @@ import {
   Tooltip,
   Paper,
   InputAdornment,
-  Snackbar
+  Snackbar,
+  AlertTitle,
+  Slide
 } from '@mui/material';
 import { database, auth } from '../../firebase';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -43,6 +45,8 @@ import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
+import { alpha } from '@mui/material/styles';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Configurar dayjs para usar español globalmente
 dayjs.locale('es');
@@ -377,8 +381,26 @@ const UpdateCardDates = () => {
     return (
       <Layout title="Actualizar Fechas">
         <Container maxWidth="md" sx={{ py: 4 }}>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-            <CircularProgress />
+          <Box 
+            sx={{ 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              bgcolor: alpha(theme.palette.background.paper, 0.7),
+              zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(4px)'
+            }}
+          >
+            <CircularProgress size={60} thickness={4} sx={{ mb: 3 }} />
+            <Typography variant="h6" color="primary" fontWeight="medium">
+              Cargando información de tarjeta...
+            </Typography>
           </Box>
         </Container>
       </Layout>
@@ -422,163 +444,213 @@ const UpdateCardDates = () => {
           <CardContent sx={{ p: 3 }}>
             {card && (
               <>
-                <Paper 
-                  elevation={1} 
-                  sx={{ 
-                    p: 2, 
-                    mb: 4, 
-                    display: 'flex',
-                    alignItems: 'center',
-                    borderRadius: 2,
-                    bgcolor: theme.palette.primary.light + '10',
-                    border: `1px solid ${theme.palette.divider}`
-                  }}
-                >
-                  <Box 
-                    sx={{ 
-                      bgcolor: theme.palette.primary.main,
-                      color: 'white',
-                      width: 48,
-                      height: 48,
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mr: 2
-                    }}
-                  >
-                    {getCardIcon(card.type)}
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight="medium">
-                      {card.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      **** **** **** {card.lastFourDigits}
-                    </Typography>
-                  </Box>
-                </Paper>
-                
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    mb: 4, 
-                    bgcolor: theme.palette.info.light + '15',
-                    '& .MuiAlert-icon': {
-                      color: theme.palette.info.main
-                    }
-                  }}
-                >
-                  <Typography variant="subtitle2" fontWeight="medium" paragraph>
-                    ¿Por qué es importante configurar estas fechas?
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    La fecha de cierre es cuando la tarjeta finaliza el período de facturación del mes actual.
-                    La fecha de vencimiento (generalmente en el mes siguiente) es el último día para realizar el pago.
-                    Configurar estas fechas correctamente te ayudará a controlar mejor tus gastos con tarjeta.
-                  </Typography>
-                </Alert>
-                
                 <Grid container spacing={3}>
                   <Grid item xs={12}>
-                    <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
-                      Selecciona el período
-                    </Typography>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 3,
+                        mb: 2, 
+                        borderRadius: 3,
+                        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.2)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2
+                      }}
+                    >
+                      <Box 
+                        sx={{ 
+                          bgcolor: theme.palette.primary.main,
+                          p: 2,
+                          borderRadius: 2,
+                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+                        }}
+                      >
+                        {getCardIcon(card.type)}
+                      </Box>
+                      <Box>
+                        <Typography variant="h5" fontWeight="bold">
+                          {card.name}
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
+                          **** {card.lastFourDigits}
+                        </Typography>
+                      </Box>
+                    </Paper>
                   </Grid>
                   
-                  <Grid item xs={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Mes</InputLabel>
-                      <Select
-                        value={selectedMonth}
-                        label="Mes"
-                        onChange={(e) => setSelectedMonth(e.target.value)}
+                  <Grid item xs={12}>
+                    <Box 
+                      sx={{ 
+                        display: 'flex', 
+                        flexDirection: { xs: 'column', sm: 'row' }, 
+                        gap: 2,
+                        mb: 3,
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: alpha(theme.palette.background.paper, 0.7),
+                        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                      }}
+                    >
+                      <Typography 
+                        variant="subtitle1" 
+                        fontWeight="medium" 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          minWidth: 180,
+                          gap: 1 
+                        }}
                       >
-                        {months.map(month => (
-                          <MenuItem key={month.value} value={month.value}>
-                            {month.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid item xs={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Año</InputLabel>
-                      <Select
-                        value={selectedYear}
-                        label="Año"
-                        onChange={(e) => setSelectedYear(e.target.value)}
+                        <EventIcon color="primary" /> Configura para:
+                      </Typography>
+                      
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          gap: 2, 
+                          flexGrow: 1, 
+                          flexWrap: 'wrap' 
+                        }}
                       >
-                        {availableYears.map(year => (
-                          <MenuItem key={year} value={year}>
-                            {year}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                        <FormControl sx={{ minWidth: 150 }}>
+                          <InputLabel id="month-select-label">Mes</InputLabel>
+                          <Select
+                            labelId="month-select-label"
+                            value={selectedMonth}
+                            label="Mes"
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            sx={{ borderRadius: 2 }}
+                            MenuProps={{
+                              PaperProps: {
+                                sx: { maxHeight: 300, borderRadius: 2 }
+                              }
+                            }}
+                          >
+                            {months.map(month => (
+                              <MenuItem key={month.value} value={month.value}>
+                                {month.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        
+                        <FormControl sx={{ minWidth: 120 }}>
+                          <InputLabel id="year-select-label">Año</InputLabel>
+                          <Select
+                            labelId="year-select-label"
+                            value={selectedYear}
+                            label="Año"
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            sx={{ borderRadius: 2 }}
+                          >
+                            {availableYears.map(year => (
+                              <MenuItem key={year} value={year}>
+                                {year}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Box>
+                    </Box>
                   </Grid>
                   
                   <Grid item xs={12}>
                     <Divider sx={{ my: 2 }} />
                   </Grid>
                   
-                  <Grid item xs={12} sm={6}>
-                    <Paper 
-                      elevation={0} 
-                      variant="outlined" 
-                      sx={{ p: 2, borderRadius: 2, height: '100%' }}
-                    >
-                      <Typography variant="subtitle2" color="primary" gutterBottom>
-                        Fecha de Cierre
-                      </Typography>
-                      
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        Es el último día del período de facturación actual.
-                      </Typography>
-                      
-                      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-                        <DatePicker
-                          label="Fecha de Cierre"
-                          value={closingDate ? dayjs(closingDate) : null}
-                          onChange={handleClosingDateChange}
-                          views={['year', 'month', 'day']}
-                          format="DD/MM/YYYY"
-                          slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              required: true,
-                              error: !closingDate,
-                              helperText: !closingDate ? 'Selecciona una fecha válida' : '',
-                              InputProps: {
-                                startAdornment: (
-                                  <InputAdornment position="start">
-                                    <CalendarTodayIcon fontSize="small" color="primary" />
-                                  </InputAdornment>
-                                ),
-                              }
-                            },
-                          }}
-                        />
-                      </LocalizationProvider>
-                      
-                      {closingDate && (
-                        <Box 
-                          sx={{ 
-                            mt: 2, 
-                            p: 1.5, 
-                            bgcolor: theme.palette.primary.light + '15',
-                            borderRadius: 1,
-                            border: `1px solid ${theme.palette.primary.light + '30'}`
-                          }}
-                        >
-                          <Typography variant="body2">
-                            <strong>Fecha seleccionada:</strong> {dayjs(closingDate).locale('es').format('DD [de] MMMM [de] YYYY')}
+                  <Grid container spacing={3} sx={{ mb: 2 }}>
+                    <Grid item xs={12} sm={6}>
+                      <Paper 
+                        elevation={3} 
+                        sx={{ 
+                          p: 3, 
+                          borderRadius: 3, 
+                          height: '100%',
+                          transition: 'transform 0.2s ease, box-shadow 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.15)}`
+                          }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+                          <CalendarTodayIcon color="primary" fontSize="small" />
+                          <Typography variant="h6" color="primary" fontWeight="bold">
+                            Fecha de Cierre
                           </Typography>
                         </Box>
-                      )}
-                    </Paper>
+                        
+                        <Box sx={{ 
+                          mb: 3, 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.primary.light, 0.07),
+                          border: `1px solid ${alpha(theme.palette.primary.light, 0.1)}`
+                        }}>
+                          <Typography variant="body2" color="text.secondary">
+                            La fecha de cierre es cuando finaliza el período de facturación. 
+                            Todas las compras posteriores se incluirán en el próximo mes.
+                          </Typography>
+                        </Box>
+                        
+                        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+                          <DatePicker
+                            label="Seleccionar fecha de cierre"
+                            value={closingDate ? dayjs(closingDate) : null}
+                            onChange={handleClosingDateChange}
+                            views={['year', 'month', 'day']}
+                            format="DD/MM/YYYY"
+                            slotProps={{
+                              textField: {
+                                fullWidth: true,
+                                required: true,
+                                error: !closingDate,
+                                helperText: !closingDate ? 'Fecha requerida para continuar' : '',
+                                margin: "normal",
+                                sx: { mt: 1, mb: 2 },
+                                InputProps: {
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <CalendarTodayIcon fontSize="small" color="primary" />
+                                    </InputAdornment>
+                                  ),
+                                }
+                              },
+                              day: {
+                                sx: { 
+                                  '&.Mui-selected': {
+                                    bgcolor: theme.palette.primary.main,
+                                    '&:hover': { bgcolor: theme.palette.primary.dark }
+                                  }
+                                }
+                              }
+                            }}
+                          />
+                        </LocalizationProvider>
+                        
+                        {closingDate && (
+                          <Box 
+                            sx={{ 
+                              mt: 3, 
+                              p: 2, 
+                              borderRadius: 2,
+                              bgcolor: theme.palette.primary.main + '15',
+                              border: `1px solid ${theme.palette.primary.main + '30'}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                            <CheckCircleIcon color="primary" fontSize="small" />
+                            <Typography variant="body2" fontWeight="medium">
+                              {dayjs(closingDate).locale('es').format('DD [de] MMMM [de] YYYY')}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Paper>
+                    </Grid>
                   </Grid>
                   
                   <Grid item xs={12} sm={6}>
@@ -639,14 +711,49 @@ const UpdateCardDates = () => {
                   </Grid>
                 </Grid>
                 
-                <Box mt={4} display="flex" justifyContent="flex-end">
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  mt: 4, 
+                  pt: 3,
+                  borderTop: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                  gap: 2
+                }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleBack}
+                    sx={{ 
+                      borderRadius: 2,
+                      px: 3,
+                      py: 1.2,
+                      textTransform: 'none',
+                      fontWeight: 'medium',
+                      borderWidth: 1.5
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  
                   <Button
                     variant="contained"
                     color="primary"
                     onClick={handleSubmit}
                     disabled={saving || !closingDate || !dueDate}
-                    startIcon={<SaveIcon />}
-                    size="large"
+                    startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                    sx={{ 
+                      borderRadius: 2,
+                      px: 4,
+                      py: 1.2,
+                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`,
+                      textTransform: 'none',
+                      fontWeight: 'bold',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.6)}`
+                      },
+                      transition: 'transform 0.2s ease, box-shadow 0.3s ease'
+                    }}
                   >
                     {saving ? 'Guardando...' : 'Guardar Fechas'}
                   </Button>
@@ -661,9 +768,23 @@ const UpdateCardDates = () => {
           autoHideDuration={3000}
           onClose={() => setSuccess(false)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          TransitionComponent={Slide}
         >
-          <Alert severity="success" variant="filled">
-            ¡Fechas actualizadas con éxito!
+          <Alert 
+            severity="success" 
+            variant="filled"
+            icon={<CheckCircleIcon />}
+            sx={{ 
+              minWidth: 280,
+              boxShadow: `0 4px 20px ${alpha(theme.palette.success.main, 0.4)}`,
+              '& .MuiAlert-icon': {
+                fontSize: 28,
+                opacity: 0.9
+              }
+            }}
+          >
+            <AlertTitle sx={{ fontWeight: 'bold' }}>¡Cambios guardados!</AlertTitle>
+            Fechas de tarjeta actualizadas correctamente
           </Alert>
         </Snackbar>
       </Container>

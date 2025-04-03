@@ -30,7 +30,9 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  AlertTitle,
+  Checkbox
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useStore } from '../../store';
@@ -55,7 +57,13 @@ import BackupIcon from '@mui/icons-material/Backup';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RestoreIcon from '@mui/icons-material/Restore';
+import ShieldIcon from '@mui/icons-material/Shield';
+import WarningIcon from '@mui/icons-material/Warning';
+import LockIcon from '@mui/icons-material/Lock';
+import KeyIcon from '@mui/icons-material/Key';
 import { red, pink, purple, deepPurple, indigo, blue, lightBlue, cyan, teal, green, lightGreen, lime, yellow, amber, orange, deepOrange, brown, grey, blueGrey } from '@mui/material/colors';
+import MenuIcon from '@mui/icons-material/Menu';
+import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 
 function Configuracion() {
   const theme = useTheme();
@@ -73,6 +81,7 @@ function Configuracion() {
   const [email, setEmail] = useState('');
   const [photoURL, setPhotoURL] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [editingName, setEditingName] = useState(false);
   
   // Estados para configuración de tema
   const [primaryColor, setPrimaryColor] = useState(indigo[500]);
@@ -98,6 +107,10 @@ function Configuracion() {
   const [lastBackupDate, setLastBackupDate] = useState(null);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [backupsList, setBackupsList] = useState([]);
+  
+  // Estados para seguridad
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   
   // Definición de temas predefinidos (mismos que en App.js)
   const predefinedThemes = {
@@ -230,11 +243,80 @@ function Configuracion() {
   };
   
   // Función para aplicar el tema seleccionado
-  const handleThemeSelect = (themeKey) => {
+  const handleThemeSelect = async (themeKey) => {
     setSelectedTheme(themeKey);
     const theme = predefinedThemes[themeKey];
     setPrimaryColor(theme.primary[500]);
     setSecondaryColor(theme.secondary[500]);
+    
+    // Guardar cambios de tema inmediatamente
+    try {
+      // Configuración a guardar en la base de datos
+      const themeConfig = {
+        primaryColor: theme.primary[500],
+        secondaryColor: theme.secondary[500],
+        selectedTheme: themeKey,
+        darkMode
+      };
+      
+      // Guardar en Firebase Database
+      await database.ref(`${auth.currentUser.uid}/config/theme`).update(themeConfig);
+      
+      // Actualizar estado local
+      if (userData && userData.config) {
+        setUserData({
+          ...userData,
+          config: {
+            ...userData.config,
+            theme: themeConfig
+          }
+        });
+      }
+      
+      // Mostrar mensaje de éxito
+      showSnackbar('Tema actualizado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al guardar el tema:', error);
+      showSnackbar('Error al actualizar el tema', 'error');
+    }
+  };
+  
+  // Función para guardar solo el nombre de usuario
+  const handleSaveDisplayName = async () => {
+    if (!displayName.trim()) {
+      showSnackbar('El nombre de usuario no puede estar vacío', 'error');
+      return;
+    }
+    
+    setSaving(true);
+    
+    try {
+      // Actualizar perfil en Firebase Auth
+      if (auth.currentUser) {
+        await auth.currentUser.updateProfile({
+          displayName: displayName
+        });
+      }
+      
+      // Guardar displayName en Firebase Database para asegurar consistencia
+      await database.ref(`${auth.currentUser.uid}/displayName`).set(displayName);
+      
+      // Actualizar estado local
+      if (userData) {
+        setUserData({
+          ...userData,
+          displayName: displayName
+        });
+      }
+      
+      setEditingName(false); // Desactivar modo edición
+      setSaving(false);
+      showSnackbar('Nombre de usuario actualizado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al actualizar el nombre de usuario:', error);
+      setSaving(false);
+      showSnackbar('Error al actualizar el nombre de usuario', 'error');
+    }
   };
   
   // Guardar configuraciones generales
@@ -280,16 +362,20 @@ function Configuracion() {
       // Guardar en Firebase Database
       await database.ref(`${auth.currentUser.uid}/config`).update(configToSave);
       
+      // Guardar displayName en Firebase Database para asegurar consistencia
+      await database.ref(`${auth.currentUser.uid}/displayName`).set(displayName);
+      
       // Actualizar estado local (si ya hay configuración, solo actualizamos, sino, la creamos)
-      if (userData.config) {
+      if (userData) {
         setUserData({
           ...userData,
-          config: { ...userData.config, ...configToSave }
+          config: userData.config ? { ...userData.config, ...configToSave } : configToSave,
+          displayName: displayName // Actualizar también el displayName en el userData
         });
       } else {
         setUserData({
-          ...userData,
-          config: configToSave
+          config: configToSave,
+          displayName: displayName
         });
       }
       
@@ -399,14 +485,39 @@ function Configuracion() {
                 <Grid item xs={12} md={9}>
                   <Grid container spacing={3}>
                     <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Nombre de usuario"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        variant="outlined"
-                        helperText="Tu nombre aparecerá en toda la aplicación"
-                      />
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <TextField
+                          fullWidth
+                          label="Nombre de usuario"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          variant="outlined"
+                          helperText="Tu nombre aparecerá en toda la aplicación"
+                          disabled={!editingName}
+                        />
+                        <Button
+                          variant="contained"
+                          color={editingName ? "success" : "primary"}
+                          onClick={editingName ? handleSaveDisplayName : () => setEditingName(true)}
+                          disabled={saving}
+                          sx={{ 
+                            minWidth: '120px',
+                            mt:-2.5,
+                            height: '56px',
+                            alignSelf: 'center'
+                          }}
+                        >
+                          {editingName ? (
+                            saving ? (
+                              <CircularProgress size={24} color="inherit" />
+                            ) : (
+                              "Guardar"
+                            )
+                          ) : (
+                            "Editar"
+                          )}
+                        </Button>
+                      </Box>
                     </Grid>
                     <Grid item xs={12}>
                       <TextField
@@ -431,26 +542,6 @@ function Configuracion() {
                 </Grid>
               </Grid>
             </Paper>
-            
-            <Typography variant="h6" gutterBottom>
-              Cuenta
-            </Typography>
-            <Paper sx={{ p: 3 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                  >
-                    Eliminar cuenta
-                  </Button>
-                  <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
-                    Esta acción no se puede deshacer. Se eliminarán todos tus datos.
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
           </Box>
         );
         
@@ -461,169 +552,235 @@ function Configuracion() {
               Personalización de tema
             </Typography>
             <Paper sx={{ p: 3, mb: 3 }}>
-              <Typography variant="body1" paragraph>
-                {displayName ? `¡Hola ${displayName}! Personaliza la apariencia de tu aplicación con estos temas predefinidos:` : 'Personaliza la apariencia de tu aplicación con estos temas predefinidos:'}
+              {/* Mensaje de bienvenida personalizado */}
+              <Typography 
+                variant="body1" 
+                paragraph 
+                sx={{ 
+                  fontSize: '1.1rem', 
+                  fontWeight: 'medium',
+                  color: alpha(theme.palette.text.primary, 0.9),
+                  mb: 3
+                }}
+              >
+                {displayName ? `¡Hola ${displayName}! ` : ''}Personaliza la apariencia de tu aplicación seleccionando un tema que refleje tu estilo.
               </Typography>
               
-              <Grid container spacing={2} sx={{ mb: 4 }}>
+              {/* Toggle para modo claro/oscuro */}
+              <Paper 
+                elevation={2} 
+                sx={{ 
+                  p: 2, 
+                  mb: 4, 
+                  background: darkMode 
+                    ? `linear-gradient(145deg, ${alpha('#121212', 0.8)} 0%, ${alpha('#272727', 0.9)} 100%)` 
+                    : `linear-gradient(145deg, ${alpha('#f5f5f5', 0.8)} 0%, ${alpha('#ffffff', 0.9)} 100%)`,
+                  borderRadius: 2,
+                  transition: 'all 0.3s ease',
+                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+                }}
+              >
+                <Stack 
+                  direction={{ xs: 'column', sm: 'row' }} 
+                  spacing={2} 
+                  alignItems="center" 
+                  justifyContent="space-between"
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {darkMode ? (
+                      <DarkModeIcon fontSize="large" sx={{ mr: 2, color: alpha('#fff', 0.7) }} />
+                    ) : (
+                      <LightModeIcon fontSize="large" sx={{ mr: 2, color: alpha('#000', 0.7) }} />
+                    )}
+                    <Box>
+                      <Typography variant="h6" sx={{ color: darkMode ? '#fff' : theme.palette.text.primary }}>
+                        {darkMode ? 'Modo Oscuro' : 'Modo Claro'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: darkMode ? alpha('#fff', 0.7) : theme.palette.text.secondary }}>
+                        {darkMode ? 'Ideal para uso nocturno y menor fatiga visual' : 'Máxima legibilidad en entornos brillantes'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Switch
+                    checked={darkMode}
+                    onChange={(e) => setDarkMode(e.target.checked)}
+                    color="primary"
+                    sx={{ 
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#fff',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: darkMode ? '#90caf9' : '#4dabf5',
+                      },
+                      transform: 'scale(1.2)'
+                    }}
+                  />
+                </Stack>
+              </Paper>
+              
+              {/* Selector de temas mejorado */}
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  mb: 2, 
+                  mt: 4, 
+                  display: 'flex', 
+                  alignItems: 'center'
+                }}
+              >
+                <PaletteIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                Selecciona un tema
+              </Typography>
+              
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr', lg: '1fr 1fr 1fr 1fr' },
+                  gap: 2.5,
+                  mb: 4
+                }}
+              >
                 {Object.keys(predefinedThemes).map((themeKey) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={themeKey}>
-                    <Paper
-                      elevation={selectedTheme === themeKey ? 8 : 1}
-                      sx={{
-                        p: 2,
-                        cursor: 'pointer',
-                        border: selectedTheme === themeKey ? `2px solid ${theme.palette.primary.main}` : 'none',
-                        transition: 'all 0.2s ease-in-out',
-                        transform: selectedTheme === themeKey ? 'scale(1.03)' : 'scale(1)',
-                        '&:hover': {
-                          transform: 'scale(1.05)',
-                          boxShadow: theme.shadows[4],
-                        }
-                      }}
-                      onClick={() => handleThemeSelect(themeKey)}
-                    >
-                      <Box sx={{ mb: 1.5 }}>
-                        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-                          <Box sx={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: '50%',
-                            bgcolor: predefinedThemes[themeKey].primary[500],
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                          }} />
-                          <Box sx={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: '50%',
-                            bgcolor: predefinedThemes[themeKey].secondary[500],
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                          }} />
-                        </Box>
-                        <Typography variant="subtitle1" fontWeight={selectedTheme === themeKey ? 'bold' : 'normal'}>
-                          {predefinedThemes[themeKey].name}
-                        </Typography>
-                      </Box>
+                  <Paper
+                    key={themeKey}
+                    elevation={selectedTheme === themeKey ? 8 : 1}
+                    sx={{
+                      overflow: 'hidden',
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      border: selectedTheme === themeKey ? `2px solid ${theme.palette.primary.main}` : '1px solid transparent',
+                      transition: 'all 0.2s ease-in-out',
+                      transform: selectedTheme === themeKey ? 'scale(1.03)' : 'scale(1)',
+                      position: 'relative',
+                      '&:hover': {
+                        transform: 'scale(1.05)',
+                        boxShadow: theme.shadows[4],
+                      }
+                    }}
+                    onClick={() => handleThemeSelect(themeKey)}
+                  >
+                    {/* Cabecera del tema con color primario */}
+                    <Box sx={{
+                      height: 80,
+                      bgcolor: predefinedThemes[themeKey].primary[darkMode ? 800 : 500],
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'flex-end',
+                      p: 1.5,
+                      position: 'relative'
+                    }}>
+                      {/* Círculo con color secundario */}
+                      <Box sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: 20,
+                        left: 20,
+                        bgcolor: predefinedThemes[themeKey].secondary[darkMode ? 700 : 400],
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                        border: '2px solid rgba(255,255,255,0.4)'
+                      }} />
+                      
+                      {/* Indicador de seleccionado */}
+                      {selectedTheme === themeKey && (
+                        <Chip 
+                          label="Activo" 
+                          size="small" 
+                          color="secondary"
+                          sx={{ 
+                            fontWeight: 'bold',
+                            bgcolor: 'rgba(255,255,255,0.85)',
+                            color: predefinedThemes[themeKey].primary[700],
+                            '& .MuiChip-label': { px: 1 },
+                            position: 'absolute',
+                            top: 10,
+                            right: 10
+                          }}
+                        />
+                      )}
+                    </Box>
+                    
+                    {/* Información del tema */}
+                    <Box sx={{ p: 2 }}>
+                      <Typography variant="subtitle1" fontWeight={selectedTheme === themeKey ? 'bold' : 'medium'}>
+                        {predefinedThemes[themeKey].name}
+                      </Typography>
                       
                       {/* Vista previa del tema */}
                       <Box sx={{
+                        mt: 1.5,
                         p: 1.5,
                         borderRadius: 1,
-                        bgcolor: alpha(predefinedThemes[themeKey].primary[100], 0.3),
-                        border: `1px solid ${predefinedThemes[themeKey].primary[200]}`
+                        bgcolor: darkMode ? alpha('#000', 0.15) : alpha('#f5f5f5', 0.7),
+                        border: `1px solid ${darkMode ? alpha('#fff', 0.05) : alpha('#000', 0.05)}`
                       }}>
                         <Box sx={{
-                          height: 10,
+                          height: 8,
                           width: '70%',
                           mb: 1,
-                          bgcolor: predefinedThemes[themeKey].primary[500],
+                          bgcolor: predefinedThemes[themeKey].primary[darkMode ? 400 : 500],
                           borderRadius: 5
                         }} />
                         <Box sx={{
                           height: 6,
                           width: '100%',
                           mb: 1,
-                          bgcolor: predefinedThemes[themeKey].secondary[300],
+                          bgcolor: predefinedThemes[themeKey].secondary[darkMode ? 500 : 300],
                           borderRadius: 3
                         }} />
                         <Box sx={{
                           height: 6,
                           width: '40%',
-                          bgcolor: predefinedThemes[themeKey].primary[300],
+                          bgcolor: predefinedThemes[themeKey].primary[darkMode ? 300 : 300],
                           borderRadius: 3
                         }} />
                       </Box>
-                    </Paper>
-                  </Grid>
+                    </Box>
+                    
+                    {/* Botón de selección en la parte inferior */}
+                    <Box sx={{
+                      p: 1,
+                      borderTop: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                      bgcolor: darkMode ? alpha('#000', 0.1) : alpha('#f5f5f5', 0.3),
+                      textAlign: 'center'
+                    }}>
+                      <Button 
+                        variant={selectedTheme === themeKey ? 'contained' : 'text'}
+                        size="small"
+                        color={selectedTheme === themeKey ? 'primary' : 'inherit'}
+                        sx={{ 
+                          px: 2,
+                          minWidth: 120,
+                          ...(selectedTheme === themeKey ? {
+                            bgcolor: predefinedThemes[themeKey].primary[darkMode ? 700 : 500]
+                          } : {})
+                        }}
+                        onClick={() => handleThemeSelect(themeKey)}
+                      >
+                        {selectedTheme === themeKey ? 'Seleccionado' : 'Seleccionar'}
+                      </Button>
+                    </Box>
+                  </Paper>
                 ))}
-              </Grid>
+              </Box>
               
-              <Divider sx={{ mb: 3 }} />
-              
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={darkMode}
-                    onChange={(e) => setDarkMode(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label={
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    {darkMode ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
-                    <Typography>{darkMode ? "Modo oscuro" : "Modo claro"}</Typography>
-                  </Stack>
-                }
-              />
-              
-              <Box mt={2}>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    {displayName ? `${displayName}, tus cambios de tema se aplicarán inmediatamente al guardar la configuración.` : 'Tus cambios de tema se aplicarán inmediatamente al guardar la configuración.'}
-                  </Typography>
-                </Alert>
-                
-                <Typography variant="subtitle2" gutterBottom>
-                  Vista previa:
-                </Typography>
-                <Paper 
-                  elevation={3}
-                  sx={{
-                    p: 2,
-                    bgcolor: darkMode ? '#121212' : '#ffffff',
-                    color: darkMode ? '#ffffff' : '#000000',
-                    border: `1px solid ${alpha(darkMode ? '#ffffff' : '#000000', 0.1)}`
+              <Box mt={4}>
+                <Alert 
+                  severity="info" 
+                  sx={{ 
+                    mb: 2,
+                    borderRadius: 2,
+                    '& .MuiAlert-icon': {
+                      alignItems: 'center'
+                    }
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        bgcolor: primaryColor,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        mr: 2
-                      }}
-                    >
-                      <SettingsIcon fontSize="small" />
-                    </Box>
-                    <Typography variant="h6" sx={{ color: darkMode ? '#ffffff' : '#000000' }}>
-                      {displayName ? `${displayName}, así se verá tu aplicación` : 'Vista previa'}
-                    </Typography>
-                  </Box>
-                  
-                  <Divider sx={{ mb: 2 }} />
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      sx={{ bgcolor: primaryColor, mr: 1, mb: 1 }}
-                    >
-                      Botón primario
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      sx={{ color: primaryColor, borderColor: primaryColor, mr: 1, mb: 1 }}
-                    >
-                      Botón secundario
-                    </Button>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                    <Chip label="Chip 1" size="small" sx={{ bgcolor: primaryColor, color: '#fff' }} />
-                    <Chip label="Chip 2" size="small" variant="outlined" sx={{ borderColor: secondaryColor, color: secondaryColor }} />
-                  </Box>
-                  
-                  <Box sx={{ width: '100%', height: 6, bgcolor: alpha(primaryColor, 0.2), borderRadius: 3, mb: 1 }}>
-                    <Box sx={{ width: '60%', height: 6, bgcolor: primaryColor, borderRadius: 3 }} />
-                  </Box>
-                </Paper>
+                  <Typography variant="body2">
+                    Los cambios de tema se aplican inmediatamente al seleccionar un tema. 
+                    Los demás ajustes de configuración requieren guardar usando el botón al final de la página.
+                  </Typography>
+                </Alert>
               </Box>
             </Paper>
           </Box>
@@ -923,21 +1080,86 @@ function Configuracion() {
                 </Box>
               )}
             </Paper>
-            
+          </Box>
+        );
+        
+      case 5: // Seguridad (Nueva sección)
+        return (
+          <Box>
             <Typography variant="h6" gutterBottom>
-              Seguridad
+              Seguridad de la cuenta
             </Typography>
-            <Paper sx={{ p: 3 }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => auth.sendPasswordResetEmail(auth.currentUser.email)}
-              >
-                Cambiar contraseña
-              </Button>
-              <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
-                Se enviará un correo electrónico para cambiar tu contraseña.
-              </Typography>
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
+                  <KeyIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  Cambio de contraseña
+                </Typography>
+                <Typography variant="body2" paragraph color="text.secondary">
+                  Te enviaremos un correo electrónico con instrucciones para cambiar tu contraseña.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<LockIcon />}
+                  onClick={() => auth.sendPasswordResetEmail(auth.currentUser.email)}
+                >
+                  Cambiar contraseña
+                </Button>
+              </Box>
+              
+              <Divider sx={{ my: 4 }} />
+              
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', display: 'flex', alignItems: 'center', color: theme.palette.error.main }}>
+                  <WarningIcon sx={{ mr: 1, color: theme.palette.error.main }} />
+                  Zona de peligro
+                </Typography>
+                
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                  <AlertTitle>Advertencia</AlertTitle>
+                  Eliminar tu cuenta es una acción permanente. Todos tus datos, configuraciones y registros se eliminarán de forma definitiva.
+                </Alert>
+                
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={confirmDeleteAccount}
+                      onChange={(e) => setConfirmDeleteAccount(e.target.checked)}
+                      color="error"
+                    />
+                  }
+                  label="Confirmo que quiero eliminar mi cuenta permanentemente"
+                  sx={{ mb: 2, display: 'block' }}
+                />
+                
+                {confirmDeleteAccount && (
+                  <Box sx={{ mb: 3 }}>
+                    <TextField
+                      fullWidth
+                      label="Escribe tu correo electrónico para confirmar"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      variant="outlined"
+                      color="error"
+                      helperText={`Escribe "${email}" para confirmar`}
+                      size="small"
+                      sx={{ mb: 2 }}
+                    />
+                    
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== email || saving}
+                      fullWidth
+                    >
+                      {saving ? <CircularProgress size={24} color="inherit" /> : "Eliminar mi cuenta permanentemente"}
+                    </Button>
+                  </Box>
+                )}
+              </Box>
             </Paper>
           </Box>
         );
@@ -1146,6 +1368,46 @@ function Configuracion() {
     }
   };
   
+  // Función para eliminar la cuenta de usuario
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== email) {
+      showSnackbar('Por favor, escribe tu correo electrónico correctamente para confirmar', 'error');
+      return;
+    }
+    
+    try {
+      if (window.confirm('¿Estás seguro que deseas eliminar tu cuenta? Esta acción no se puede deshacer y perderás todos tus datos.')) {
+        setSaving(true);
+        
+        // Eliminamos los datos del usuario en la base de datos
+        await database.ref(auth.currentUser.uid).remove();
+        
+        // Eliminamos la cuenta de Firebase Auth
+        await auth.currentUser.delete();
+        
+        showSnackbar('Tu cuenta ha sido eliminada correctamente', 'success');
+        
+        // Redirigir al login después de un breve retraso
+        setTimeout(() => {
+          navigate('/');
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error al eliminar la cuenta:', error);
+      
+      if (error.code === 'auth/requires-recent-login') {
+        showSnackbar('Por seguridad, debes volver a iniciar sesión antes de eliminar tu cuenta', 'error');
+        setTimeout(() => {
+          auth.signOut().then(() => navigate('/'));
+        }, 2000);
+      } else {
+        showSnackbar('Error al eliminar la cuenta: ' + error.message, 'error');
+      }
+      
+      setSaving(false);
+    }
+  };
+  
   return (
     <Layout title="Configuración">
       <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -1240,8 +1502,17 @@ function Configuracion() {
                 <Tab 
                   icon={
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <SecurityIcon sx={{ mr: 2 }} />
+                      <VisibilityIcon sx={{ mr: 2 }} />
                       <Typography>Privacidad</Typography>
+                    </Box>
+                  }
+                  sx={{ justifyContent: 'flex-start' }}
+                />
+                <Tab 
+                  icon={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <ShieldIcon sx={{ mr: 2 }} />
+                      <Typography>Seguridad</Typography>
                     </Box>
                   }
                   sx={{ justifyContent: 'flex-start' }}

@@ -416,20 +416,38 @@ const Home = () => {
     },
     yaxis: {
       labels: {
-                formatter: val => formatAmount(val),
+        formatter: (value) => formatAmount(value),
         style: {
-          colors: theme.palette.text.secondary,
-          fontSize: '12px'
+          colors: theme.palette.text.secondary
         }
       }
     },
     tooltip: {
+      shared: true,
+      intersect: false,
+      x: {
+        show: true,
+        formatter: function(timestamp, opts) {
+          // Obtener los datos ordenados para acceder al punto correcto
+          if (!timestamp) return '';
+          
+          const date = new Date(timestamp);
+          if (isNaN(date.getTime())) return '';
+          
+          // Formatear fecha al formato español DD/MM/YYYY
+          const day = date.getDate().toString().padStart(2, '0');
+          const month = (date.getMonth() + 1).toString().padStart(2, '0');
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+      },
       y: {
         formatter: val => formatAmount(val)
       },
-      theme: 'dark',
-      x: {
-        show: true
+      theme: theme.palette.mode === 'dark' ? 'dark' : 'light',
+      style: {
+        fontSize: '12px',
+        fontFamily: theme.typography.fontFamily
       }
     },
     grid: {
@@ -575,571 +593,571 @@ const Home = () => {
           }}
         >
           <Grid item xs={12} sm={6} md={4} lg={4}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
+          <Card 
+            elevation={3} 
+            sx={{ 
+              height: '100%', 
+              position: 'relative',
+              transition: 'all 0.3s ease',
                 borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
+              overflow: 'hidden',
+              '&:hover': {
                   transform: { xs: 'none', sm: 'translateY(-5px)' },
                   boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-                background: getBalance() >= 0 
-                  ? `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`
-                  : `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`,
-              }}
-            >
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
-                      Balance Mensual
-                    </Typography>
-                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
-                      color: 'white',
-                      letterSpacing: '-0.5px'
-                    }}>
-                      {formatAmount(getBalance())}
-                    </Typography>
-                    
-                    <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
-                      USD {formatAmount(getBalance() / (dollarRate?.venta || 1))}
-                    </Typography>
-                  </Box>
-                  
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.3)',
-                      color: 'white',
-                      width: { xs: 40, sm: 48 },
-                      height: { xs: 40, sm: 48 }
-                    }}
-                  >
-                    <ShowChartIcon />
-                  </Avatar>
-                </Box>
-                
-                <Stack direction="row" spacing={2} alignItems="center" mt={2}>
-                  <Chip
-                    size="small"
-                    icon={balanceChange >= 0 ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
-                    label={`${Math.abs(balanceChange).toFixed(1)}%`}
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.3)',
-                      color: 'white',
-                      fontWeight: 'medium',
-                      borderRadius: 1,
-                      '& .MuiChip-icon': {
-                        color: 'inherit'
-                      }
-                    }}
-                  />
-                  <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
-                    vs. mes anterior
-                  </Typography>
-                </Stack>
-                
-                {/* Barra de progreso del presupuesto con fondo más claro */}
-                <Box sx={{ mt: 2 }}>
-                  <Box sx={{ mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
-                      Presupuesto gastado
-                    </Typography>
-                    <Chip 
-                      label={`${Math.round(budgetProgress)}%`}
-                      size="small"
-                      sx={{ 
-                        height: 20, 
-                        fontSize: '0.7rem', 
-                        fontWeight: 'bold', 
-                        bgcolor: 'rgba(255, 255, 255, 0.3)',
-                        color: 'white'
-                      }} 
-                    />
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={Math.min(budgetProgress, 100)}
-                    sx={{ 
-                      height: 8, 
-                      borderRadius: 4, 
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                      '& .MuiLinearProgress-bar': {
-                        bgcolor: 'rgba(255, 255, 255, 0.85)'
-                      }
-                    }}
-                  />
-                  <Typography variant="caption" color="white" sx={{ display: 'block', mt: 0.5, opacity: 0.9 }}>
-                    {isOverBudget 
-                      ? `Has excedido tu presupuesto mensual en ${formatAmount(getExpenseTotal() - getIncomeTotal())}`
-                      : `Restante: ${formatAmount(getIncomeTotal() - getExpenseTotal())}`
-                    }
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
-                borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
-                  transform: { xs: 'none', sm: 'translateY(-5px)' },
-                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-                background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
-              }}
-            >
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
-                      Ingresos Mensuales
-                    </Typography>
-                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
-                      color: 'white',
-                      letterSpacing: '-0.5px'
-                    }}>
-                      {formatAmount(getIncomeTotal())}
-                    </Typography>
-                    
-                    <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
-                      USD {formatAmount(getIncomeTotal() / (dollarRate?.venta || 1))}
-                    </Typography>
-                  </Box>
-                  
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.3)',
-                      color: 'white',
-                      width: { xs: 40, sm: 48 },
-                      height: { xs: 40, sm: 48 }
-                    }}
-                  >
-                    <TrendingUpIcon />
-                  </Avatar>
-                </Box>
-                
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" color="white" fontWeight="medium" sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
-                    {incomeChange >= 0 ? (
-                      <>
-                        <ArrowUpwardIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        {Math.abs(incomeChange).toFixed(1)}% más que el mes anterior
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDownwardIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        {Math.abs(incomeChange).toFixed(1)}% menos que el mes anterior
-                      </>
-                    )}
-                  </Typography>
-                  
-                  <Box sx={{ 
-                    p: 1.5, 
-                    bgcolor: 'rgba(255, 255, 255, 0.15)', 
-                    borderRadius: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}>
-                    <Box>
-                      <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
-                        Mes anterior
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold" color="white">
-                        {formatAmount(previousIncome)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
-                        Mes actual
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold" color="white">
-                        {formatAmount(getIncomeTotal())}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
-                borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
-                  transform: { xs: 'none', sm: 'translateY(-5px)' },
-                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-                background: `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`,
-              }}
-            >
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
-                      Gastos Mensuales
-                    </Typography>
-                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
-                      color: 'white',
-                      letterSpacing: '-0.5px'
-                    }}>
-                      {formatAmount(getExpenseTotal())}
-                    </Typography>
-                    
-                    <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
-                      USD {formatAmount(getExpenseTotal() / (dollarRate?.venta || 1))}
-                    </Typography>
-                  </Box>
-                  
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.3)',
-                      color: 'white',
-                      width: { xs: 40, sm: 48 },
-                      height: { xs: 40, sm: 48 }
-                    }}
-                  >
-                    <TrendingDownIcon />
-                  </Avatar>
-                </Box>
-                
-                <Box sx={{ mt: 0.5 }}>
-                  <Typography variant="subtitle2" color="white" fontWeight="medium" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                    {expenseChange <= 0 ? (
-                      <>
-                        <ArrowDownwardIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        {Math.abs(expenseChange).toFixed(1)}% menos que el mes anterior
-                      </>
-                    ) : (
-                      <>
-                        <ArrowUpwardIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        {Math.abs(expenseChange).toFixed(1)}% más que el mes anterior
-                      </>
-                    )}
-                  </Typography>
-                  
-                  {/* Principales categorías de gastos con colores más claros */}
-                  <Box sx={{ mt: 1.5 }}>
-                    {topExpenseCategories.slice(0, 3).map((category, index) => {
-                      // Función para obtener el icono según la categoría
-                      const getCategoryIcon = (categoryName) => {
-                        const categoryMapping = {
-                          'Supermercado': <ShoppingCartIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Alimentos': <RestaurantIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Restaurante': <RestaurantIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Comida': <FastfoodIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Transporte': <CommuteIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Auto': <DirectionsCarIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Nafta': <LocalGasStationIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Viajes': <FlightIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Educación': <SchoolIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Entretenimiento': <SportsEsportsIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Hogar': <HomeIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Casa': <HomeIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Servicios': <ElectricalServicesIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Salud': <HealthAndSafetyIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Ropa': <CheckroomIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Tecnología': <DevicesIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Trabajo': <WorkIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Extras': <MoreHorizIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Ahorro': <SavingsIcon sx={{ fontSize: 20, color: 'white' }} />,
-                          'Inversiones': <TrendingUpIcon sx={{ fontSize: 20, color: 'white' }} />
-                        };
-                        
-                        // Busca coincidencias parciales si no hay una coincidencia exacta
-                        if (categoryMapping[categoryName]) {
-                          return categoryMapping[categoryName];
-                        }
-                        
-                        const categoryLower = categoryName.toLowerCase();
-                        for (const [key, icon] of Object.entries(categoryMapping)) {
-                          if (categoryLower.includes(key.toLowerCase()) || key.toLowerCase().includes(categoryLower)) {
-                            return icon;
-                          }
-                        }
-                        
-                        return <CategoryIcon sx={{ fontSize: 20, color: 'white' }} />;
-                      };
-
-                      return (
-                        <Box key={index} sx={{ mt: 1 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              {getCategoryIcon(category.category)}
-                              <Typography variant="caption" color="white" noWrap sx={{ maxWidth: '70%', opacity: 0.9 }}>
-                                {category.category}
-                              </Typography>
-                            </Box>
-                            <Typography variant="caption" fontWeight="bold" color="white">
-                              {formatAmount(category.amount)}
-                            </Typography>
-                          </Box>
-                          <LinearProgress 
-                            variant="determinate" 
-                            value={Math.min(category.percentage, 100)}
-                            sx={{ 
-                              height: 5, 
-                              borderRadius: 4, 
-                              bgcolor: 'rgba(255, 255, 255, 0.2)',
-                              '& .MuiLinearProgress-bar': {
-                                bgcolor: 'rgba(255, 255, 255, 0.85)'
-                              },
-                              mb: 1
-                            }}
-                          />
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Gráfico de evolución financiera */}
-        <Card 
-          elevation={3} 
-          sx={{ 
-            mb: { xs: 2, sm: 4 },
-            borderRadius: { xs: 2, sm: 3 }, 
-            overflow: 'hidden',
-            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`
-          }}
-        >
-          <Box
-            sx={{
-              p: { xs: 2, sm: 3 },
-              background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              borderBottom: `1px solid ${theme.palette.divider}`
+              },
+              background: getBalance() >= 0 
+                ? `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`,
             }}
           >
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar
-                    sx={{
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
+                    Balance Mensual
+                  </Typography>
+                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                    color: 'white',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(getBalance())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    USD {formatAmount(getBalance() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                      width: { xs: 40, sm: 48 },
+                      height: { xs: 40, sm: 48 }
+                  }}
+                >
+                  <ShowChartIcon />
+                </Avatar>
+              </Box>
+              
+              <Stack direction="row" spacing={2} alignItems="center" mt={2}>
+                <Chip
+                  size="small"
+                  icon={balanceChange >= 0 ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+                  label={`${Math.abs(balanceChange).toFixed(1)}%`}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                    fontWeight: 'medium',
+                    borderRadius: 1,
+                    '& .MuiChip-icon': {
+                      color: 'inherit'
+                    }
+                  }}
+                />
+                <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                  vs. mes anterior
+                </Typography>
+              </Stack>
+              
+              {/* Barra de progreso del presupuesto con fondo más claro */}
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                    Presupuesto gastado
+                  </Typography>
+                  <Chip 
+                    label={`${Math.round(budgetProgress)}%`}
+                    size="small"
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.7rem', 
+                      fontWeight: 'bold', 
+                      bgcolor: 'rgba(255, 255, 255, 0.3)',
+                      color: 'white'
+                    }} 
+                  />
+                </Box>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={Math.min(budgetProgress, 100)}
+                  sx={{ 
+                    height: 8, 
+                    borderRadius: 4, 
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: 'rgba(255, 255, 255, 0.85)'
+                    }
+                  }}
+                />
+                <Typography variant="caption" color="white" sx={{ display: 'block', mt: 0.5, opacity: 0.9 }}>
+                  {isOverBudget 
+                    ? `Has excedido tu presupuesto mensual en ${formatAmount(getExpenseTotal() - getIncomeTotal())}`
+                    : `Restante: ${formatAmount(getIncomeTotal() - getExpenseTotal())}`
+                  }
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              height: '100%', 
+              position: 'relative',
+              transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+              overflow: 'hidden',
+              '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+              },
+              background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
+            }}
+          >
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
+                    Ingresos Mensuales
+                  </Typography>
+                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                    color: 'white',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(getIncomeTotal())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    USD {formatAmount(getIncomeTotal() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                      width: { xs: 40, sm: 48 },
+                      height: { xs: 40, sm: 48 }
+                  }}
+                >
+                  <TrendingUpIcon />
+                </Avatar>
+              </Box>
+              
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" color="white" fontWeight="medium" sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+                  {incomeChange >= 0 ? (
+                    <>
+                      <ArrowUpwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(incomeChange).toFixed(1)}% más que el mes anterior
+                    </>
+                  ) : (
+                    <>
+                      <ArrowDownwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(incomeChange).toFixed(1)}% menos que el mes anterior
+                    </>
+                  )}
+                </Typography>
+                
+                <Box sx={{ 
+                  p: 1.5, 
+                  bgcolor: 'rgba(255, 255, 255, 0.15)', 
+                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <Box>
+                    <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                      Mes anterior
+                    </Typography>
+                    <Typography variant="body2" fontWeight="bold" color="white">
+                      {formatAmount(previousIncome)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="white" sx={{ opacity: 0.9 }}>
+                      Mes actual
+                    </Typography>
+                    <Typography variant="body2" fontWeight="bold" color="white">
+                      {formatAmount(getIncomeTotal())}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </CardContent>
+                </Card>
+        </Grid>
+        
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              height: '100%', 
+              position: 'relative',
+              transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+              overflow: 'hidden',
+              '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+              },
+              background: `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`,
+            }}
+          >
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5, fontWeight: 500, opacity: 0.9 }}>
+                    Gastos Mensuales
+                  </Typography>
+                    <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                    color: 'white',
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(getExpenseTotal())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="white" fontWeight="medium" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    USD {formatAmount(getExpenseTotal() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white',
+                      width: { xs: 40, sm: 48 },
+                      height: { xs: 40, sm: 48 }
+                  }}
+                >
+                  <TrendingDownIcon />
+                </Avatar>
+              </Box>
+              
+              <Box sx={{ mt: 0.5 }}>
+                <Typography variant="subtitle2" color="white" fontWeight="medium" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                  {expenseChange <= 0 ? (
+                    <>
+                      <ArrowDownwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(expenseChange).toFixed(1)}% menos que el mes anterior
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpwardIcon fontSize="small" sx={{ mr: 0.5 }} />
+                      {Math.abs(expenseChange).toFixed(1)}% más que el mes anterior
+                    </>
+                  )}
+                </Typography>
+                
+                {/* Principales categorías de gastos con colores más claros */}
+                <Box sx={{ mt: 1.5 }}>
+                  {topExpenseCategories.slice(0, 3).map((category, index) => {
+                    // Función para obtener el icono según la categoría
+                    const getCategoryIcon = (categoryName) => {
+                      const categoryMapping = {
+                        'Supermercado': <ShoppingCartIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Alimentos': <RestaurantIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Restaurante': <RestaurantIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Comida': <FastfoodIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Transporte': <CommuteIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Auto': <DirectionsCarIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Nafta': <LocalGasStationIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Viajes': <FlightIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Educación': <SchoolIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Entretenimiento': <SportsEsportsIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Hogar': <HomeIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Casa': <HomeIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Servicios': <ElectricalServicesIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Salud': <HealthAndSafetyIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Ropa': <CheckroomIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Tecnología': <DevicesIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Trabajo': <WorkIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Extras': <MoreHorizIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Ahorro': <SavingsIcon sx={{ fontSize: 20, color: 'white' }} />,
+                        'Inversiones': <TrendingUpIcon sx={{ fontSize: 20, color: 'white' }} />
+                      };
+                      
+                      // Busca coincidencias parciales si no hay una coincidencia exacta
+                      if (categoryMapping[categoryName]) {
+                        return categoryMapping[categoryName];
+                      }
+                      
+                      const categoryLower = categoryName.toLowerCase();
+                      for (const [key, icon] of Object.entries(categoryMapping)) {
+                        if (categoryLower.includes(key.toLowerCase()) || key.toLowerCase().includes(categoryLower)) {
+                          return icon;
+                        }
+                      }
+                      
+                      return <CategoryIcon sx={{ fontSize: 20, color: 'white' }} />;
+                    };
+
+                    return (
+                      <Box key={index} sx={{ mt: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {getCategoryIcon(category.category)}
+                            <Typography variant="caption" color="white" noWrap sx={{ maxWidth: '70%', opacity: 0.9 }}>
+                              {category.category}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" fontWeight="bold" color="white">
+                            {formatAmount(category.amount)}
+                          </Typography>
+                        </Box>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={Math.min(category.percentage, 100)}
+                          sx={{ 
+                            height: 5, 
+                            borderRadius: 4, 
+                            bgcolor: 'rgba(255, 255, 255, 0.2)',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: 'rgba(255, 255, 255, 0.85)'
+                            },
+                            mb: 1
+                          }}
+                        />
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+      
+        {/* Gráfico de evolución financiera */}
+      <Card 
+        elevation={3} 
+        sx={{ 
+            mb: { xs: 2, sm: 4 },
+            borderRadius: { xs: 2, sm: 3 }, 
+          overflow: 'hidden',
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`
+        }}
+      >
+        <Box
+          sx={{
+              p: { xs: 2, sm: 3 },
+            background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
                       color: 'white',
                       width: { xs: 36, sm: 40 },
                       height: { xs: 36, sm: 40 }
-                    }}
-                  >
-                    <AutoGraphIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
-                      Evolución Financiera
-                    </Typography>
-                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                      {chartPeriod === 'anual' ? 'Últimos 12 meses' : 'Mes actual por semana'}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Grid>
-              
-              <Grid item xs={12} md={8}>
-                <Stack 
-                  direction={{ xs: 'column', sm: 'row' }} 
-                  spacing={2}
-                  justifyContent="flex-end"
-                  alignItems={{ xs: 'stretch', sm: 'center' }}
+                  }}
                 >
-                  {/* Selector de tipo vista */}
-                  <Tabs
-                    value={viewType}
-                    onChange={(e, newValue) => setViewType(newValue)}
-                    textColor="inherit"
-                    TabIndicatorProps={{
-                      style: {
-                        backgroundColor: 'white',
-                      }
-                    }}
-                    sx={{
+                  <AutoGraphIcon />
+                </Avatar>
+                <Box>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                    Evolución Financiera
+                  </Typography>
+                  <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                    {chartPeriod === 'anual' ? 'Últimos 12 meses' : 'Mes actual por semana'}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Grid>
+            
+            <Grid item xs={12} md={8}>
+              <Stack 
+                direction={{ xs: 'column', sm: 'row' }} 
+                spacing={2}
+                justifyContent="flex-end"
+                alignItems={{ xs: 'stretch', sm: 'center' }}
+              >
+                {/* Selector de tipo vista */}
+                <Tabs
+                  value={viewType}
+                  onChange={(e, newValue) => setViewType(newValue)}
+                  textColor="inherit"
+                  TabIndicatorProps={{
+                    style: {
+                      backgroundColor: 'white',
+                    }
+                  }}
+                  sx={{
+                    minHeight: 40,
+                    '& .MuiTab-root': {
                       minHeight: 40,
-                      '& .MuiTab-root': {
-                        minHeight: 40,
-                        py: 1,
+                      py: 1,
+                      color: 'white',
+                      opacity: 0.7,
+                      '&.Mui-selected': {
                         color: 'white',
-                        opacity: 0.7,
-                        '&.Mui-selected': {
-                          color: 'white',
-                          opacity: 1
-                        }
+                        opacity: 1
                       }
-                    }}
-                  >
-                    <Tab 
-                      icon={
-                        <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                          <DonutLargeIcon fontSize="small" sx={{ mr: 0.5 }} />
-                          <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
-                            General
-                          </Typography>
-                        </Box>
-                      }
-                      sx={{ minWidth: { xs: 'auto', md: 100 } }}
-                    />
-                    <Tab 
-                      icon={
-                        <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                          <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
-                          <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
-                            Ingresos
-                          </Typography>
-                        </Box>
-                      }
-                      sx={{ minWidth: { xs: 'auto', md: 100 } }}
-                    />
-                    <Tab 
-                      icon={
-                        <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                          <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
-                          <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
-                            Gastos
-                          </Typography>
-                        </Box>
-                      }
-                      sx={{ minWidth: { xs: 'auto', md: 100 } }}
-                    />
-                  </Tabs>
-                  
-                  {/* Selector de periodo */}
-                  <Stack 
-                    direction="row" 
-                    spacing={1}
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      p: 0.5,
-                      borderRadius: 2,
+                    }
+                  }}
+                >
+                  <Tab 
+                    icon={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        <DonutLargeIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                          General
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ minWidth: { xs: 'auto', md: 100 } }}
+                  />
+                  <Tab 
+                    icon={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        <TrendingUpIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                          Ingresos
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ minWidth: { xs: 'auto', md: 100 } }}
+                  />
+                  <Tab 
+                    icon={
+                      <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                        <TrendingDownIcon fontSize="small" sx={{ mr: 0.5 }} />
+                        <Typography variant="body2" component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                          Gastos
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ minWidth: { xs: 'auto', md: 100 } }}
+                  />
+                </Tabs>
+                
+                {/* Selector de periodo */}
+                <Stack 
+                  direction="row" 
+                  spacing={1}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    p: 0.5,
+                    borderRadius: 2,
                       border: `1px solid rgba(255, 255, 255, 0.2)`,
                       width: { xs: '100%', sm: 'auto' },
                       justifyContent: { xs: 'space-between', sm: 'flex-start' }
+                  }}
+                >
+                  <Button 
+                    size="small" 
+                    variant={chartPeriod === 'anual' ? 'contained' : 'text'}
+                    sx={{
+                      color: 'white',
+                      bgcolor: chartPeriod === 'anual' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: chartPeriod === 'anual' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
+                        },
+                        flex: { xs: 1, sm: 'none' }
                     }}
+                    onClick={() => setChartPeriod('anual')}
                   >
-                    <Button 
-                      size="small" 
-                      variant={chartPeriod === 'anual' ? 'contained' : 'text'}
-                      sx={{
-                        color: 'white',
-                        bgcolor: chartPeriod === 'anual' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                        '&:hover': {
-                          bgcolor: chartPeriod === 'anual' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
+                    Anual
+                  </Button>
+                  <Button 
+                    size="small" 
+                    variant={chartPeriod === 'mensual' ? 'contained' : 'text'}
+                    sx={{
+                      color: 'white',
+                      bgcolor: chartPeriod === 'mensual' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: chartPeriod === 'mensual' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
                         },
                         flex: { xs: 1, sm: 'none' }
-                      }}
-                      onClick={() => setChartPeriod('anual')}
-                    >
-                      Anual
-                    </Button>
-                    <Button 
-                      size="small" 
-                      variant={chartPeriod === 'mensual' ? 'contained' : 'text'}
-                      sx={{
-                        color: 'white',
-                        bgcolor: chartPeriod === 'mensual' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                        '&:hover': {
-                          bgcolor: chartPeriod === 'mensual' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'
-                        },
-                        flex: { xs: 1, sm: 'none' }
-                      }}
-                      onClick={() => setChartPeriod('mensual')}
-                    >
-                      Mensual
-                    </Button>
-                  </Stack>
-                  
-                  {/* Selector de tipo de gráfico */}
-                  <Stack 
-                    direction="row" 
-                    spacing={0.5}
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                      p: 0.5,
-                      borderRadius: 2,
+                    }}
+                    onClick={() => setChartPeriod('mensual')}
+                  >
+                    Mensual
+                  </Button>
+                </Stack>
+                
+                {/* Selector de tipo de gráfico */}
+                <Stack 
+                  direction="row" 
+                  spacing={0.5}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    p: 0.5,
+                    borderRadius: 2,
                       border: `1px solid rgba(255, 255, 255, 0.2)`,
                       display: { xs: 'none', sm: 'flex' }
+                  }}
+                >
+                  <IconButton 
+                    size="small" 
+                    onClick={() => setChartType('mixed')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'mixed' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'mixed' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
                     }}
                   >
-                    <IconButton 
-                      size="small" 
-                      onClick={() => setChartType('mixed')}
-                      sx={{ 
-                        color: 'white',
-                        bgcolor: chartType === 'mixed' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                        '&:hover': { 
-                          bgcolor: chartType === 'mixed' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
-                        }
-                      }}
-                    >
-                      <DonutLargeIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton 
-                      size="small"
-                      onClick={() => setChartType('bar')}
-                      sx={{ 
-                        color: 'white',
-                        bgcolor: chartType === 'bar' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                        '&:hover': { 
-                          bgcolor: chartType === 'bar' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
-                        }
-                      }}
-                    >
-                      <BarChartIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton 
-                      size="small"
-                      onClick={() => setChartType('area')}
-                      sx={{ 
-                        color: 'white',
-                        bgcolor: chartType === 'area' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                        '&:hover': { 
-                          bgcolor: chartType === 'area' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
-                        }
-                      }}
-                    >
-                      <AutoGraphIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton 
-                      size="small"
-                      onClick={() => setChartType('line')}
-                      sx={{ 
-                        color: 'white',
-                        bgcolor: chartType === 'line' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                        '&:hover': { 
-                          bgcolor: chartType === 'line' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
-                        }
-                      }}
-                    >
-                      <TimelineIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
+                    <DonutLargeIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={() => setChartType('bar')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'bar' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'bar' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <BarChartIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={() => setChartType('area')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'area' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'area' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <AutoGraphIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton 
+                    size="small"
+                    onClick={() => setChartType('line')}
+                    sx={{ 
+                      color: 'white',
+                      bgcolor: chartType === 'line' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                      '&:hover': { 
+                        bgcolor: chartType === 'line' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)' 
+                      }
+                    }}
+                  >
+                    <TimelineIcon fontSize="small" />
+                  </IconButton>
                 </Stack>
-              </Grid>
-            </Grid>
-          </Box>
-          
+              </Stack>
+        </Grid>
+          </Grid>
+        </Box>
+        
           <Box sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 3, sm: 4 }, bgcolor: 'background.paper' }}>
-            <ReactApexChart 
-              options={{
-                ...chartOptions,
+          <ReactApexChart 
+            options={{
+              ...chartOptions,
                 colors: [theme.palette.success.main, theme.palette.error.main, theme.palette.primary.main],
                 chart: {
                   ...chartOptions.chart,
@@ -1168,15 +1186,15 @@ const Home = () => {
                     horizontal: 10
                   }
                 }
-              }} 
-              series={getFilteredChartData()} 
-              type={getChartType()} 
+            }} 
+            series={getFilteredChartData()} 
+            type={getChartType()} 
               height={isMobile ? 300 : 450}
-            />
-          </Box>
-        </Card>
+          />
+        </Box>
+          </Card>
 
-        {/* Secciones inferiores en dos columnas */}
+      {/* Secciones inferiores en dos columnas */}
         <Grid 
           container 
           spacing={{ xs: 2, sm: 3, md: 4 }} 
@@ -1185,391 +1203,391 @@ const Home = () => {
             mb: { xs: 2, sm: 4 }
           }}
         >
-          {/* Columna izquierda */}
+        {/* Columna izquierda */}
           <Grid item xs={12} md={6} lg={6}>
-            {/* Cotización del dólar */}
-            <Card 
-              elevation={3} 
-              sx={{ 
+          {/* Cotización del dólar */}
+          <Card 
+            elevation={3} 
+            sx={{ 
                 mb: { xs: 2, sm: 3 }, 
                 borderRadius: { xs: 2, sm: 3 }, 
-                overflow: 'hidden',
-                height: '100%',
-                boxShadow: `0 8px 32px ${alpha(theme.palette.warning.main, 0.1)}`
-              }}
-            >
-              <CardHeader
-                title={
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar
-                      sx={{
-                        bgcolor: alpha(theme.palette.warning.main, 0.1),
+              overflow: 'hidden',
+              height: '100%',
+              boxShadow: `0 8px 32px ${alpha(theme.palette.warning.main, 0.1)}`
+            }}
+          >
+            <CardHeader
+              title={
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
                         color: theme.palette.warning.main,
                         width: { xs: 32, sm: 40 },
                         height: { xs: 32, sm: 40 }
-                      }}
-                    >
-                      <AttachMoneyIcon />
-                    </Avatar>
+                    }}
+                  >
+                    <AttachMoneyIcon />
+                  </Avatar>
                     <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold">
-                      Cotización USD
-                    </Typography>
-                  </Stack>
-                }
-                sx={{
+                    Cotización USD
+                  </Typography>
+                </Stack>
+              }
+              sx={{
                   p: { xs: 2, sm: 2.5 },
                   pb: { xs: 1, sm: 1.5 },
-                  bgcolor: theme.palette.warning.main,
-                  color: 'white',
-                  '& .MuiCardHeader-title': { m: 0 }
-                }}
-              />
-              
+                bgcolor: theme.palette.warning.main,
+                color: 'white',
+                '& .MuiCardHeader-title': { m: 0 }
+              }}
+            />
+            
               <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                {(dollarRate || dolarOficial) && (
-                  <>
-                    <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1 }}>
-                      Dólar Blue
-                    </Typography>
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
-                      <Grid item xs={6}>
-                        <ButtonBase 
+              {(dollarRate || dolarOficial) && (
+                <>
+                  <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1 }}>
+                    Dólar Blue
+                  </Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6}>
+                      <ButtonBase 
+                        sx={{ 
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          // Aquí se actualizará el estado para usar esta cotización
+                          setSelectedRate({
+                            type: 'Blue Compra',
+                            value: dollarRate?.compra || 0
+                          });
+                        }}
+                      >
+                        <Box 
                           sx={{ 
+                            p: 2, 
                             width: '100%',
-                            textAlign: 'center',
-                            transition: 'all 0.3s ease',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.success.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
                             '&:hover': {
-                              transform: 'scale(1.02)'
+                              bgcolor: alpha(theme.palette.success.main, 0.15),
+                              transform: 'translateY(-2px)'
                             }
                           }}
-                          onClick={() => {
-                            // Aquí se actualizará el estado para usar esta cotización
-                            setSelectedRate({
-                              type: 'Blue Compra',
-                              value: dollarRate?.compra || 0
-                            });
-                          }}
                         >
-                          <Box 
-                            sx={{ 
-                              p: 2, 
-                              width: '100%',
-                              textAlign: 'center', 
-                              borderRadius: 2,
-                              bgcolor: alpha(theme.palette.success.main, 0.1),
-                              border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.success.main, 0.15),
-                                transform: 'translateY(-2px)'
-                              }
-                            }}
-                          >
-                            <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                              Compra
-                            </Typography>
-                            <Typography variant="h5" fontWeight="bold" color="success.dark">
-                              $ {dollarRate?.compra || "-"}
-                            </Typography>
-                          </Box>
-                        </ButtonBase>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <ButtonBase 
-                          sx={{ 
-                            width: '100%',
-                            textAlign: 'center',
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'scale(1.02)'
-                            }
-                          }}
-                          onClick={() => {
-                            setSelectedRate({
-                              type: 'Blue Venta',
-                              value: dollarRate?.venta || 0
-                            });
-                          }}
-                        >
-                          <Box 
-                            sx={{ 
-                              p: 2, 
-                              width: '100%',
-                              textAlign: 'center', 
-                              borderRadius: 2,
-                              bgcolor: alpha(theme.palette.error.main, 0.1),
-                              border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.error.main, 0.15),
-                                transform: 'translateY(-2px)'
-                              }
-                            }}
-                          >
-                            <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                              Venta
-                            </Typography>
-                            <Typography variant="h5" fontWeight="bold" color="error.dark">
-                              $ {dollarRate?.venta || "-"}
-                            </Typography>
-                          </Box>
-                        </ButtonBase>
-                      </Grid>
-                    </Grid>
-                    
-                    <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1 }}>
-                      Dólar Oficial
-                    </Typography>
-                    <Grid container spacing={2} sx={{ mb: 3 }}>
-                      <Grid item xs={6}>
-                        <ButtonBase 
-                          sx={{ 
-                            width: '100%',
-                            textAlign: 'center',
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'scale(1.02)'
-                            }
-                          }}
-                          onClick={() => {
-                            setSelectedRate({
-                              type: 'Oficial Compra',
-                              value: dolarOficial?.value_buy || 0
-                            });
-                          }}
-                        >
-                          <Box 
-                            sx={{ 
-                              p: 2, 
-                              width: '100%',
-                              textAlign: 'center', 
-                              borderRadius: 2,
-                              bgcolor: alpha(theme.palette.info.main, 0.1),
-                              border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.info.main, 0.15),
-                                transform: 'translateY(-2px)'
-                              }
-                            }}
-                          >
-                            <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                              Compra
-                            </Typography>
-                            <Typography variant="h5" fontWeight="bold" color="info.dark">
-                              $ {dolarOficial?.value_buy || "-"}
-                            </Typography>
-                          </Box>
-                        </ButtonBase>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <ButtonBase 
-                          sx={{ 
-                            width: '100%',
-                            textAlign: 'center',
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'scale(1.02)'
-                            }
-                          }}
-                          onClick={() => {
-                            setSelectedRate({
-                              type: 'Oficial Venta',
-                              value: dolarOficial?.value_sell || 0
-                            });
-                          }}
-                        >
-                          <Box 
-                            sx={{ 
-                              p: 2, 
-                              width: '100%',
-                              textAlign: 'center', 
-                              borderRadius: 2,
-                              bgcolor: alpha(theme.palette.info.main, 0.1),
-                              border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                bgcolor: alpha(theme.palette.info.main, 0.15),
-                                transform: 'translateY(-2px)'
-                              }
-                            }}
-                          >
-                            <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                              Venta
-                            </Typography>
-                            <Typography variant="h5" fontWeight="bold" color="info.dark">
-                              $ {dolarOficial?.value_sell || "-"}
-                            </Typography>
-                          </Box>
-                        </ButtonBase>
-                      </Grid>
-                    </Grid>
-                    
-                    <Paper 
-                      variant="outlined" 
-                      sx={{ 
-                        p: 2.5,
-                        background: `linear-gradient(to bottom, ${alpha(theme.palette.background.paper, 0.5)}, ${alpha(theme.palette.background.paper, 0.8)})`,
-                        borderRadius: 2,
-                        mb: 2
-                      }}
-                    >
-                      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                        <Avatar
-                          sx={{
-                            bgcolor: alpha(theme.palette.info.main, 0.1),
-                            color: theme.palette.info.main,
-                            width: 40,
-                            height: 40
-                          }}
-                        >
-                          <CurrencyExchangeIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" fontWeight="medium">
-                            Convertidor Rápido
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Compra
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {selectedRate ? `Usando ${selectedRate.type} - $${selectedRate.value}` : 'Selecciona una cotización'}
+                          <Typography variant="h5" fontWeight="bold" color="success.dark">
+                            $ {dollarRate?.compra || "-"}
                           </Typography>
                         </Box>
-                      </Stack>
-                      
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Pesos (ARS)"
-                            value={arsAmount}
-                            onChange={(e) => {
-                              setArsAmount(e.target.value);
-                              if (selectedRate && e.target.value) {
-                                setUsdAmount((parseFloat(e.target.value) / selectedRate.value).toFixed(2));
-                              }
-                            }}
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  $
-                                </InputAdornment>
-                              ),
-                            }}
-                            variant="outlined"
-                            size="small"
-                            sx={{
-                              '& .MuiOutlinedInput-root': {
-                                borderRadius: 2,
-                                bgcolor: 'background.paper'
-                              }
-                            }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="Dólares (USD)"
-                            value={usdAmount}
-                            onChange={(e) => {
-                              setUsdAmount(e.target.value);
-                              if (selectedRate && e.target.value) {
-                                setArsAmount((parseFloat(e.target.value) * selectedRate.value).toFixed(2));
-                              }
-                            }}
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  USD
-                                </InputAdornment>
-                              ),
-                            }}
-                            variant="outlined"
-                            size="small"
-                            sx={{
-                              '& .MuiOutlinedInput-root': {
-                                borderRadius: 2,
-                                bgcolor: 'background.paper'
-                              }
-                            }}
-                          />
-                        </Grid>
-                      </Grid>
-                      
-                      {!selectedRate && (
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary" 
+                      </ButtonBase>
+        </Grid>
+                    <Grid item xs={6}>
+                      <ButtonBase 
+                        sx={{ 
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedRate({
+                            type: 'Blue Venta',
+                            value: dollarRate?.venta || 0
+                          });
+                        }}
+                      >
+                        <Box 
                           sx={{ 
-                            display: 'block', 
+                            p: 2, 
+                            width: '100%',
                             textAlign: 'center', 
-                            mt: 2,
-                            fontStyle: 'italic'
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.error.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.error.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
                           }}
                         >
-                          Haz clic en cualquier cotización para usar el convertidor
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Venta
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="error.dark">
+                            $ {dollarRate?.venta || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
+      </Grid>
+        </Grid>
+                  
+                  <Typography variant="subtitle2" fontWeight="medium" color="text.secondary" sx={{ mb: 1 }}>
+                    Dólar Oficial
+                  </Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6}>
+                      <ButtonBase 
+                        sx={{ 
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedRate({
+                            type: 'Oficial Compra',
+                            value: dolarOficial?.value_buy || 0
+                          });
+                        }}
+                      >
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            width: '100%',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.info.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.info.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Compra
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="info.dark">
+                            $ {dolarOficial?.value_buy || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
+        </Grid>
+                    <Grid item xs={6}>
+                      <ButtonBase 
+                        sx={{ 
+                          width: '100%',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'scale(1.02)'
+                          }
+                        }}
+                        onClick={() => {
+                          setSelectedRate({
+                            type: 'Oficial Venta',
+                            value: dolarOficial?.value_sell || 0
+                          });
+                        }}
+                      >
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            width: '100%',
+                            textAlign: 'center', 
+                            borderRadius: 2,
+                            bgcolor: alpha(theme.palette.info.main, 0.1),
+                            border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.info.main, 0.15),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+                            Venta
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold" color="info.dark">
+                            $ {dolarOficial?.value_sell || "-"}
+                          </Typography>
+                        </Box>
+                      </ButtonBase>
+        </Grid>
+        </Grid>
+                  
+                  <Paper 
+                    variant="outlined" 
+                    sx={{ 
+                      p: 2.5,
+                      background: `linear-gradient(to bottom, ${alpha(theme.palette.background.paper, 0.5)}, ${alpha(theme.palette.background.paper, 0.8)})`,
+                      borderRadius: 2,
+                      mb: 2
+                    }}
+                  >
+                    <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                      <Avatar
+                        sx={{
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: theme.palette.info.main,
+                          width: 40,
+                          height: 40
+                        }}
+                      >
+                        <CurrencyExchangeIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="body2" fontWeight="medium">
+                          Convertidor Rápido
                         </Typography>
-                      )}
-                    </Paper>
-                  </>
-                )}
-                
-                {!dollarRate && !dolarOficial && (
-                  <Box sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No hay información disponible
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          {/* Columna derecha */}
+                        <Typography variant="caption" color="text.secondary">
+                          {selectedRate ? `Usando ${selectedRate.type} - $${selectedRate.value}` : 'Selecciona una cotización'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Pesos (ARS)"
+                          value={arsAmount}
+                          onChange={(e) => {
+                            setArsAmount(e.target.value);
+                            if (selectedRate && e.target.value) {
+                              setUsdAmount((parseFloat(e.target.value) / selectedRate.value).toFixed(2));
+                            }
+                          }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                $
+                              </InputAdornment>
+                            ),
+                          }}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              bgcolor: 'background.paper'
+                            }
+                          }}
+                        />
+      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Dólares (USD)"
+                          value={usdAmount}
+                          onChange={(e) => {
+                            setUsdAmount(e.target.value);
+                            if (selectedRate && e.target.value) {
+                              setArsAmount((parseFloat(e.target.value) * selectedRate.value).toFixed(2));
+                            }
+                          }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                USD
+                              </InputAdornment>
+                            ),
+                          }}
+                          variant="outlined"
+                          size="small"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              bgcolor: 'background.paper'
+                            }
+                          }}
+                        />
+      </Grid>
+                    </Grid>
+                    
+                    {!selectedRate && (
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary" 
+                        sx={{ 
+                          display: 'block', 
+                          textAlign: 'center', 
+                          mt: 2,
+                          fontStyle: 'italic'
+                        }}
+                      >
+                        Haz clic en cualquier cotización para usar el convertidor
+                      </Typography>
+                    )}
+                  </Paper>
+                </>
+              )}
+              
+              {!dollarRate && !dolarOficial && (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No hay información disponible
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Columna derecha */}
           <Grid item xs={12} md={6} lg={6}>
-            {/* Resumen de ahorros */}
-            <Card 
-              elevation={3} 
-              sx={{ 
+          {/* Resumen de ahorros */}
+          <Card 
+            elevation={3} 
+            sx={{ 
                 mb: { xs: 2, sm: 3 }, 
                 borderRadius: { xs: 2, sm: 3 }, 
-                overflow: 'hidden',
-                height: '100%',
-                boxShadow: `0 8px 32px ${alpha(theme.palette.success.main, 0.1)}`
-              }}
-            >
-              <CardHeader
-                title={
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar
-                      sx={{
-                        bgcolor: alpha(theme.palette.success.main, 0.1),
+              overflow: 'hidden',
+              height: '100%',
+              boxShadow: `0 8px 32px ${alpha(theme.palette.success.main, 0.1)}`
+            }}
+          >
+            <CardHeader
+              title={
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
                         color: theme.palette.success.main,
                         width: { xs: 32, sm: 40 },
                         height: { xs: 32, sm: 40 }
-                      }}
-                    >
-                      <SavingsIcon />
-                    </Avatar>
+                    }}
+                  >
+                    <SavingsIcon />
+                  </Avatar>
                     <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold">
-                      Resumen de Ahorros
-                    </Typography>
-                  </Stack>
-                }
-                sx={{
+                    Resumen de Ahorros
+                  </Typography>
+                </Stack>
+              }
+              sx={{
                   p: { xs: 2, sm: 2.5 },
                   pb: { xs: 1, sm: 1.5 },
-                  bgcolor: theme.palette.success.main,
-                  color: 'white',
-                  '& .MuiCardHeader-title': { m: 0 }
-                }}
-              />
-              
+                bgcolor: theme.palette.success.main,
+                color: 'white',
+                '& .MuiCardHeader-title': { m: 0 }
+              }}
+            />
+            
               <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                {userData?.savings && (
-                  <>
+              {userData?.savings && (
+                <>
                     {/* Grid de métricas clave */}
                     <Grid container spacing={5} sx={{ mb: 3 }}>
                       {/* Total Patrimonio */}
@@ -1586,8 +1604,8 @@ const Home = () => {
                         }}>
                           <Stack spacing={1} alignItems="flex-start">
                             <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
+                      display: 'flex',
+                      alignItems: 'center',
                               justifyContent: 'center',
                               width: 36,
                               height: 36,
@@ -1599,13 +1617,13 @@ const Home = () => {
                             </Box>
                             <Typography variant="body2" color="text.secondary">
                               Total Patrimonio
-                            </Typography>
+                    </Typography>
                             <Typography variant="h5" sx={{ color: theme.palette.success.dark }} fontWeight="bold">
-                              {formatAmount(userData.savings.total || 0)}
-                            </Typography>
+                      {formatAmount(userData.savings.total || 0)}
+                    </Typography>
                             <Typography variant="caption" color="text.secondary">
                               USD {formatAmount((userData.savings.total || 0) / (dollarRate?.venta || 1))}
-                            </Typography>
+                  </Typography>
                           </Stack>
                         </Paper>
                       </Grid>
@@ -1680,9 +1698,9 @@ const Home = () => {
                             }}>
                               <AttachMoneyIcon fontSize="small" />
                             </Box>
-                            <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary">
                               Ahorros en USD
-                            </Typography>
+                  </Typography>
                             <Typography variant="h5" color="info.dark" fontWeight="bold">
                               {formatAmount(userData.savings.amountUSD || 0, true)}
                             </Typography>
@@ -1724,7 +1742,7 @@ const Home = () => {
                               color: theme.palette.warning.dark
                             }}>
                               <DirectionsCarIcon fontSize="small" />
-                            </Box>
+                </Box>
                             <Typography variant="body2" color="text.secondary">
                               Fondo Mantenimiento
                             </Typography>
@@ -1743,14 +1761,14 @@ const Home = () => {
                             />
                           </Stack>
                         </Paper>
-                      </Grid>
-                    </Grid>
-                    
+        </Grid>
+      </Grid>
+
                     {/* Gráfico histórico de evolución */}
                     {userData.savings && (
                       <Paper 
                         elevation={4} 
-                        sx={{ 
+        sx={{ 
                           p: 2, 
                           border: `1px solid ${theme.palette.divider}`, 
                           borderRadius: 2,
@@ -1807,11 +1825,31 @@ const Home = () => {
                               }
                             },
                             tooltip: {
+                              shared: true,
+                              intersect: false,
                               x: {
-                                format: 'dd MMM yyyy'
+                                show: true,
+                                formatter: function(timestamp, opts) {
+                                  // Obtener los datos ordenados para acceder al punto correcto
+                                  if (!timestamp) return '';
+                                  
+                                  const date = new Date(timestamp);
+                                  if (isNaN(date.getTime())) return '';
+                                  
+                                  // Formatear fecha al formato español DD/MM/YYYY
+                                  const day = date.getDate().toString().padStart(2, '0');
+                                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                                  const year = date.getFullYear();
+                                  return `${day}/${month}/${year}`;
+                                }
                               },
                               y: {
-                                formatter: (value) => formatAmount(value)
+                                formatter: val => formatAmount(val)
+                              },
+                              theme: theme.palette.mode === 'dark' ? 'dark' : 'light',
+                              style: {
+                                fontSize: '12px',
+                                fontFamily: theme.typography.fontFamily
                               }
                             },
                             grid: {
@@ -1836,12 +1874,17 @@ const Home = () => {
                           series={[{
                             name: 'Saldo en ARS',
                             data: (() => {
-                              // Crear un objeto para almacenar los saldos por fecha
                               const dailyBalances = {};
                               
-                              // Función auxiliar para validar y formatear fecha
                               const getValidDateKey = (dateString) => {
                                 try {
+                                  if (typeof dateString === 'string' && dateString.includes('/')) {
+                                    const [day, month, year] = dateString.split('/').map(Number);
+                                    const date = new Date(year, month - 1, day);
+                                    if (isNaN(date.getTime())) return null;
+                                    return date.toISOString().split('T')[0];
+                                  }
+                                  
                                   const date = new Date(dateString);
                                   if (isNaN(date.getTime())) return null;
                                   return date.toISOString().split('T')[0];
@@ -1851,7 +1894,6 @@ const Home = () => {
                                 }
                               };
                               
-                              // Procesar solo el historial de ahorros
                               if (userData.savings?.amountARSHistory) {
                                 Object.values(userData.savings.amountARSHistory).forEach(entry => {
                                   if (entry.date) {
@@ -1863,7 +1905,6 @@ const Home = () => {
                                 });
                               }
                               
-                              // Convertir a array y ordenar por fecha
                               const sortedData = Object.entries(dailyBalances)
                                 .sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB))
                                 .map(([date, amount]) => ({

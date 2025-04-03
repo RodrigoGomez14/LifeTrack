@@ -34,6 +34,7 @@ import { ColorModeContext } from './utils';
 import PlantCalendar from './pages/plants/PlantCalendar';
 import Configuracion from './pages/basics/Configuracion';
 import Ayuda from './pages/basics/Ayuda';
+import Perfil from './pages/basics/Perfil';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
@@ -322,6 +323,7 @@ function App() {
           <Route path="/EditarTarjeta/:cardId" element={<EditCard />} />
           <Route path="/ActualizarFechasTarjeta/:cardId" element={<UpdateCardDates />} />
           <Route path="/Configuracion" element={<Configuracion />} />
+          <Route path="/Perfil" element={<Perfil />} />
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/ayuda" element={<Ayuda />} />

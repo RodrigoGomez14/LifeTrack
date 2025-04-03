@@ -62,12 +62,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import TodayIcon from '@mui/icons-material/Today';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // Configurar worker de PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 // Función auxiliar para formatear fechas en un formato amigable, consistente con Finances.jsx
 function obtenerFechaFormateada(dateStr) {
@@ -127,6 +123,16 @@ function obtenerFechaFormateada(dateStr) {
   }
 }
 
+// Función para calcular si una fecha está a más de N meses en el futuro
+function isBeyondFutureLimit(year, month, limitMonths = 6) {
+  const today = new Date();
+  const futureLimit = new Date(today);
+  futureLimit.setMonth(today.getMonth() + limitMonths);
+  
+  const dateToCheck = new Date(year, month - 1, 1);
+  return dateToCheck > futureLimit;
+}
+
 const CreditCards = () => {
   const { userData } = useStore();
   const navigate = useNavigate();
@@ -157,12 +163,6 @@ const CreditCards = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
-
-  // Estados para el visualizador de PDF
-  const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [pdfFile, setPdfFile] = useState(null);
-  const [isViewingPdf, setIsViewingPdf] = useState(false);
 
   useEffect(() => {
     if (userData?.creditCards) {
@@ -452,11 +452,16 @@ const CreditCards = () => {
   useEffect(() => {
     if (userData?.creditCards && selectedCard) {
       // Verificar si hay resúmenes para esta tarjeta
-      const statementsPath = `creditCardStatements/${selectedCard}`;
-      if (userData[statementsPath]) {
-        setCardStatements(userData[statementsPath]);
+      if (userData.creditCards[selectedCard]?.statements) {
+        setCardStatements(userData.creditCards[selectedCard].statements);
       } else {
-        setCardStatements({});
+        // Para compatibilidad con la estructura anterior
+        const statementsPath = `creditCardStatements/${selectedCard}`;
+        if (userData[statementsPath]) {
+          setCardStatements(userData[statementsPath]);
+        } else {
+          setCardStatements({});
+        }
       }
     }
   }, [userData, selectedCard]);
@@ -541,6 +546,12 @@ const CreditCards = () => {
 
   // Abrir diálogo de subida
   const handleOpenUploadDialog = () => {
+    // Verificar que haya una tarjeta seleccionada antes de abrir el diálogo
+    if (!selectedCard || !cards.find(card => card.id === selectedCard)) {
+      showAlert('Por favor, selecciona una tarjeta primero', 'warning');
+      return;
+    }
+    
     setUploadDialogOpen(true);
     setSelectedFile(null);
   };
@@ -624,7 +635,7 @@ const CreditCards = () => {
       };
       
       // Guardar referencia en la base de datos con estructura clara
-      await database.ref(`${auth.currentUser.uid}/creditCardStatements/${selectedCard}/${selectedYearMonth}`).set(statementData);
+      await database.ref(`${auth.currentUser.uid}/creditCards/${selectedCard}/statements/${selectedYearMonth}`).set(statementData);
       
       console.log("Referencia guardada en Database correctamente");
       
@@ -814,88 +825,6 @@ const CreditCards = () => {
       });
   };
 
-  // Función para manejar la carga exitosa del PDF
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-    setPageNumber(1);
-  };
-
-  // Función para cambiar de página
-  const changePage = (offset) => {
-    setPageNumber(prevPageNumber => Math.min(Math.max(prevPageNumber + offset, 1), numPages));
-  };
-
-  // Función modificada para visualizar PDF
-  const handleViewStatement = async (statement) => {
-    if (!statement || !statement.downloadURL) {
-      showAlert('No se encuentra el archivo para descargar', 'error');
-      return;
-    }
-    
-    try {
-      console.log("Intentando visualizar archivo:", statement);
-      setIsViewingPdf(false); // Reiniciar visualización
-      
-      // Verificar que el statement corresponda al mes seleccionado
-      const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      const statementYearMonth = `${statement.year}-${String(statement.month).padStart(2, '0')}`;
-      
-      if (statementYearMonth !== selectedYearMonth) {
-        console.log(`El statement no corresponde al mes seleccionado: ${statementYearMonth} vs ${selectedYearMonth}`);
-        showAlert('El resumen no corresponde al mes seleccionado', 'warning');
-        return;
-      }
-      
-      // Establecer la URL para el visualizador según la disponibilidad
-      let pdfUrl;
-      
-      if (statement.storagePath) {
-        console.log("Usando ruta de almacenamiento para visualizar:", statement.storagePath);
-        const storageRef = storage.ref(statement.storagePath);
-        try {
-          pdfUrl = await storageRef.getDownloadURL();
-          console.log("URL de descarga obtenida exitosamente");
-        } catch (storageError) {
-          console.error("Error al obtener URL desde Storage:", storageError);
-          
-          // Si falla la obtención desde Storage, intentar con la URL guardada
-          if (statement.downloadURL) {
-            console.log("Intentando con URL guardada en la base de datos");
-            pdfUrl = statement.downloadURL;
-          } else {
-            throw storageError; // Re-lanzar el error si no hay URL alternativa
-          }
-        }
-      } else {
-        console.log("Usando URL directa para visualizar");
-        pdfUrl = statement.downloadURL;
-      }
-      
-      // Establecer la URL del PDF y activar la visualización
-      setPdfFile(pdfUrl);
-      setIsViewingPdf(true);
-      setPageNumber(1); // Resetear a la primera página
-      
-    } catch (error) {
-      console.error('Error al cargar el PDF para visualizar:', error);
-      showAlert('Error al cargar el PDF. Intenta descargar el archivo.', 'error');
-      
-      // Intentar método alternativo solo si realmente es necesario
-      if (statement.downloadURL && !pdfFile) {
-        console.log("Intentando con URL alternativa para visualizar");
-        setPdfFile(statement.downloadURL);
-        setIsViewingPdf(true);
-      }
-    }
-  };
-
-  // Agregar un efecto para cerrar el visualizador de PDF cuando cambia el mes o la tarjeta
-  useEffect(() => {
-    // Si cambia el mes, año o tarjeta, cerrar el visualizador de PDF
-    setIsViewingPdf(false);
-    setPdfFile(null);
-  }, [selectedMonth, selectedYear, selectedCard]);
-
   return (
     <Layout title="Tarjetas de Crédito">
       <Box 
@@ -909,56 +838,154 @@ const CreditCards = () => {
           maxWidth: 'none'
         }}
       >
-        {/* Barra de navegación mensual con borde, similar a Finances */}
+        {/* Navegador mensual optimizado para UX/UI */}
         <Paper
           elevation={3}
           sx={{
             mb: 3,
-            borderRadius: '0 0 12px 12px',
+            borderRadius: { xs: '0 0 16px 16px', sm: '0 0 20px 20px' },
             overflow: 'hidden',
-            boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.15)}`,
+            boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.18)}`,
             position: 'sticky',
             top: {
               xs: 56, // Altura del AppBar en móviles
               sm: 64  // Altura del AppBar en escritorio
             },
             zIndex: 10,
-            border: 'none', // Eliminar cualquier borde que pueda existir
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '100%',
-              backgroundColor: theme.palette.background.paper,
-              zIndex: -1
+            border: 'none',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.25)}`
             }
           }}
         >
-          {/* Navegador mensual rediseñado */}
-          <Box 
+          {/* Barra principal con información del contexto actual */}
+          <Box
             sx={{
-              background: `linear-gradient(90deg, ${alpha(theme.palette.primary.dark, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.9)} 100%)`,
+              background: `linear-gradient(90deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
               py: 1.5,
-              px: { xs: 1, sm: 2 }
+              px: { xs: 1.5, sm: 2.5 },
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1
             }}
           >
-            <Grid container alignItems="center" spacing={2}>
-              {/* Navegación de meses */}
-              <Grid item xs={12} md={9}>
-                <Stack 
-                  direction="row" 
-                  spacing={0.5} 
-                  alignItems="center" 
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.common.white, 0.1),
-                    borderRadius: 2,
-                    p: 0.5,
-                    height: '100%'
+            {/* Fila 1: Navegación principal */}
+            <Box 
+              sx={{
+                display: 'flex', 
+                flexDirection: { xs: 'column', md: 'row' },
+                justifyContent: 'space-between',
+                alignItems: { xs: 'center', md: 'center' },
+                gap: { xs: 2, md: 0 },
+                width: '100%'
+              }}
+            >
+              {/* Indicador contextual del período seleccionado */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(theme.palette.background.paper, 0.2),
+                    color: theme.palette.common.white,
+                    width: 40,
+                    height: 40
                   }}
                 >
-                  <IconButton 
+                  <CalendarTodayIcon />
+                </Avatar>
+                <Box>
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    color="white"
+                    sx={{ 
+                      lineHeight: 1.2,
+                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {getMonthName(selectedMonth)} {selectedYear}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: alpha(theme.palette.common.white, 0.85),
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontWeight: 500
+                    }}
+                  >
+                    <PaymentIcon fontSize="inherit" /> 
+                    {cards.length} {cards.length === 1 ? 'tarjeta' : 'tarjetas'} • Total: {formatAmount(getAllCardsTotal())}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Controles de navegación rápida */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<TodayIcon />}
+                  onClick={() => {
+                    const now = new Date();
+                    setSelectedMonth(now.getMonth() + 1);
+                    setSelectedYear(now.getFullYear());
+                  }}
+                  sx={{
+                    bgcolor: alpha(theme.palette.background.paper, 0.25),
+                    color: theme.palette.common.white,
+                    backdropFilter: 'blur(4px)',
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 'medium',
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.background.paper, 0.35),
+                    }
+                  }}
+                >
+                  Mes actual
+                </Button>
+                <Tooltip title="Exportar datos" arrow>
+                  <IconButton
+                    size="small"
+                    sx={{
+                      bgcolor: alpha(theme.palette.background.paper, 0.15),
+                      color: theme.palette.common.white,
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.background.paper, 0.25),
+                      }
+                    }}
+                  >
+                    <DownloadIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+
+            {/* Fila 2: Selección detallada de mes y año */}
+            <Box
+              sx={{
+                mt: { xs: 1, md: 2 },
+                bgcolor: alpha(theme.palette.background.paper, 0.12),
+                borderRadius: 3,
+                p: 0.75,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backdropFilter: 'blur(5px)'
+              }}
+            >
+              {/* Selector de mes táctil y accesible */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                width: '100%',
+                position: 'relative' 
+              }}>
+                <Tooltip title="Mes anterior" arrow placement="top">
+                  <IconButton
                     onClick={() => {
                       if (selectedMonth === 1) {
                         setSelectedMonth(12);
@@ -966,171 +993,261 @@ const CreditCards = () => {
                       } else {
                         setSelectedMonth(selectedMonth - 1);
                       }
-                    }} 
+                    }}
                     color="inherit"
                     size="small"
-                    sx={{ 
-                      color: theme.palette.primary.contrastText,
-                      '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.15) }
+                    aria-label="Mes anterior"
+                    sx={{
+                      color: theme.palette.common.white,
+                      '&:hover': { 
+                        bgcolor: alpha(theme.palette.background.paper, 0.25),
+                        transform: 'scale(1.1)'
+                      },
+                      transition: 'all 0.2s ease'
                     }}
                   >
                     <ChevronLeftIcon />
                   </IconButton>
-                  
-                  <ButtonGroup
-                    variant="text"
-                    sx={{
-                      flex: 1,
-                      display: 'flex',
-                      justifyContent: 'center',
-                      '& .MuiButton-root': {
-                        borderRadius: 1.5,
-                        color: theme.palette.primary.contrastText,
-                        px: 1,
-                        mx: 0.2,
-                        minWidth: 'auto',
-                        fontSize: '0.8rem',
-                        '&.active': {
-                          bgcolor: alpha(theme.palette.common.white, 0.25),
-                          fontWeight: 'bold'
-                        },
-                        '&:hover': {
-                          bgcolor: alpha(theme.palette.common.white, 0.15)
-                        }
-                      }
-                    }}
-                  >
-                    {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((month, idx) => (
-                      <Button
-                        key={idx}
-                        className={selectedMonth === idx + 1 ? 'active' : ''}
-                        onClick={() => setSelectedMonth(idx + 1)}
-                        sx={{
-                          display: {
-                            xs: (
-                              idx === selectedMonth - 2 || 
-                              idx === selectedMonth - 1 || 
-                              idx === selectedMonth || 
-                              idx === selectedMonth - 1 + 1
-                            ) ? 'inline-flex' : 'none',
-                            sm: 'inline-flex'
-                          }
-                        }}
-                      >
-                        {month}
-                      </Button>
-                    ))}
-                  </ButtonGroup>
-                  
-                  <IconButton 
-                    onClick={() => {
-                      if (selectedMonth === 12) {
-                        setSelectedMonth(1);
-                        setSelectedYear(selectedYear + 1);
-                      } else {
-                        setSelectedMonth(selectedMonth + 1);
-                      }
-                    }} 
-                    color="inherit"
-                    size="small"
-                    sx={{ 
-                      color: theme.palette.primary.contrastText,
-                      '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.15) }
-                    }}
-                  >
-                    <ChevronRightIcon />
-                  </IconButton>
-                </Stack>
-              </Grid>
-              
-              {/* Año y botón de mes actual */}
-              <Grid item xs={12} md={3}>
-                <Stack 
-                  direction="row" 
-                  spacing={2} 
-                  alignItems="center" 
-                  justifyContent={{ xs: 'center', md: 'flex-end' }}
+                </Tooltip>
+
+                <Box
+                  sx={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    mx: 1,
+                    display: 'flex',
+                    justifyContent: 'center'
+                  }}
                 >
-                  {/* Selector de año creativo */}
-                  <Box 
-                    sx={{ 
-                      position: 'relative',
-                      display: 'flex',
-                      alignItems: 'center'
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    sx={{
+                      px: 1,
+                      transition: 'transform 0.3s ease-in-out',
+                      '& > *': {
+                        minWidth: { xs: 'auto', sm: 40 }
+                      }
                     }}
                   >
+                    {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((month, idx) => {
+                      const isActive = selectedMonth === idx + 1;
+                      const isVisible = 
+                        idx === selectedMonth - 3 ||
+                        idx === selectedMonth - 2 ||
+                        idx === selectedMonth - 1 ||
+                        idx === selectedMonth - 1 + 1 ||
+                        idx === selectedMonth - 1 + 2;
+                      
+                      // Verificar si este mes está más allá del límite de 6 meses
+                      const isBeyondLimit = isBeyondFutureLimit(
+                        selectedYear + (idx + 1 < selectedMonth ? 1 : 0), 
+                        idx + 1
+                      );
+                      
+                      return (
+                        <Button
+                          key={idx}
+                          onClick={() => setSelectedMonth(idx + 1)}
+                          aria-label={`Mes de ${month}`}
+                          aria-current={isActive ? 'date' : undefined}
+                          disabled={isBeyondLimit}
+                          sx={{
+                            py: 0.75,
+                            px: { xs: 1, sm: 1.5 },
+                            minWidth: { xs: 32, sm: 36 },
+                            color: isActive ? theme.palette.primary.dark : alpha(theme.palette.common.white, 0.85),
+                            bgcolor: isActive ? alpha(theme.palette.common.white, 0.9) : 'transparent',
+                            fontWeight: isActive ? 'bold' : 'medium',
+                            borderRadius: 1.5,
+                            fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                            transition: 'all 0.2s ease',
+                            opacity: isVisible ? (isBeyondLimit ? 0.5 : 1) : { xs: 0, sm: 0.5 },
+                            display: { xs: isVisible ? 'flex' : 'none', sm: 'flex' },
+                            '&:hover': {
+                              bgcolor: isActive 
+                                ? alpha(theme.palette.common.white, 0.9)
+                                : alpha(theme.palette.common.white, 0.15),
+                              transform: isBeyondLimit ? 'none' : 'translateY(-2px)'
+                            },
+                            pointerEvents: isVisible && !isBeyondLimit ? 'auto' : { xs: 'none', sm: 'auto' },
+                            textTransform: 'none',
+                            '&.Mui-disabled': {
+                              color: alpha(theme.palette.common.white, 0.4),
+                              pointerEvents: 'none'
+                            }
+                          }}
+                        >
+                          {month}
+                          {isActive && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: 4,
+                                height: 4,
+                                borderRadius: '50%',
+                                bgcolor: theme.palette.primary.dark,
+                                mt: 0.5
+                              }}
+                            />
+                          )}
+                        </Button>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+
+                <Tooltip title="Mes siguiente" arrow placement="top">
+                  <span>
                     <IconButton
+                      onClick={() => {
+                        // Verificar si el próximo mes estaría más allá del límite de 6 meses
+                        const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+                        const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+                        
+                        if (!isBeyondFutureLimit(nextYear, nextMonth)) {
+                          if (selectedMonth === 12) {
+                            setSelectedMonth(1);
+                            setSelectedYear(selectedYear + 1);
+                          } else {
+                            setSelectedMonth(selectedMonth + 1);
+                          }
+                        }
+                      }}
+                      color="inherit"
                       size="small"
-                      onClick={() => setSelectedYear(selectedYear - 1)}
-                      sx={{ 
-                        color: theme.palette.primary.contrastText,
-                        opacity: 0.8,
-                        '&:hover': { opacity: 1 }
+                      aria-label="Mes siguiente"
+                      disabled={isBeyondFutureLimit(
+                        selectedMonth === 12 ? selectedYear + 1 : selectedYear,
+                        selectedMonth === 12 ? 1 : selectedMonth + 1
+                      )}
+                      sx={{
+                        color: theme.palette.common.white,
+                        '&:hover': { 
+                          bgcolor: alpha(theme.palette.background.paper, 0.25),
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease',
+                        '&.Mui-disabled': {
+                          color: alpha(theme.palette.common.white, 0.4),
+                          opacity: 0.5
+                        }
                       }}
                     >
-                      <KeyboardArrowLeftIcon fontSize="small" />
+                      <ChevronRightIcon />
                     </IconButton>
-                    
-                    <Paper
-                      elevation={0}
+                  </span>
+                </Tooltip>
+                
+                {/* Selector de año intuitivo */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderLeft: `1px solid ${alpha(theme.palette.common.white, 0.2)}`,
+                    ml: 1.5,
+                    pl: 1.5
+                  }}
+                >
+                  <IconButton
+                    size="small"
+                    onClick={() => setSelectedYear(selectedYear - 1)}
+                    aria-label="Año anterior"
+                    sx={{ 
+                      color: theme.palette.common.white,
+                      '&:hover': { 
+                        bgcolor: alpha(theme.palette.background.paper, 0.25)
+                      }
+                    }}
+                  >
+                    <KeyboardArrowLeftIcon fontSize="small" />
+                  </IconButton>
+                  
+                  <Tooltip title="Seleccionar año" arrow>
+                    <Box
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Año ${selectedYear}`}
+                      onClick={() => {
+                        // Aquí podría abrirse un selector de año más avanzado
+                        const currentYear = new Date().getFullYear();
+                        setSelectedYear(currentYear);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const currentYear = new Date().getFullYear();
+                          setSelectedYear(currentYear);
+                        }
+                      }}
                       sx={{
-                        bgcolor: alpha(theme.palette.background.paper, 0.15),
-                        py: 0.75,
-                        px: 2,
+                        bgcolor: alpha(theme.palette.common.white, 0.15),
+                        py: 0.5,
+                        px: 1.5,
                         borderRadius: 2,
-                        minWidth: 76,
-                        textAlign: 'center'
+                        minWidth: 60,
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        userSelect: 'none',
+                        mx: 0.5,
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.common.white, 0.25),
+                          transform: 'translateY(-2px)'
+                        },
+                        '&:focus-visible': {
+                          outline: `2px solid ${alpha(theme.palette.common.white, 0.5)}`,
+                          outlineOffset: 2
+                        }
                       }}
                     >
                       <Typography
-                        variant="body1"
-                        fontWeight="medium"
-                        color={theme.palette.primary.contrastText}
-                        sx={{ userSelect: 'none' }}
+                        variant="body2"
+                        fontWeight="bold"
+                        color={theme.palette.common.white}
                       >
                         {selectedYear}
                       </Typography>
-                    </Paper>
-                    
-                    <IconButton
-                      size="small"
-                      onClick={() => setSelectedYear(selectedYear + 1)}
-                      sx={{ 
-                        color: theme.palette.primary.contrastText,
-                        opacity: 0.8,
-                        '&:hover': { opacity: 1 }
-                      }}
-                    >
-                      <KeyboardArrowRightIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
+                    </Box>
+                  </Tooltip>
                   
-                  {/* Botón de mes actual */}
-                  <Button
-                    variant="contained"
-                    onClick={() => {
-                      const now = new Date();
-                      setSelectedMonth(now.getMonth() + 1);
-                      setSelectedYear(now.getFullYear());
-                    }}
-                    startIcon={<TodayIcon />}
-                    sx={{
-                      bgcolor: theme.palette.background.paper,
-                      color: theme.palette.primary.dark,
-                      fontWeight: 'bold',
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.background.paper, 0.9),
-                      },
-                      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.1)}`,
-                      px: { xs: 1, sm: 2 },
-                      py: 1
-                    }}
-                  >
-                    Mes Actual
-                  </Button>
-                </Stack>
-              </Grid>
-            </Grid>
+                  <Tooltip title="Año siguiente" arrow>
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          // Verificar si el siguiente año excedería el límite
+                          const nextYear = selectedYear + 1;
+                          const futureLimit = new Date();
+                          futureLimit.setMonth(futureLimit.getMonth() + 6);
+                          const limitYear = futureLimit.getFullYear();
+                          
+                          if (nextYear <= limitYear) {
+                            setSelectedYear(nextYear);
+                          }
+                        }}
+                        aria-label="Año siguiente"
+                        disabled={isBeyondFutureLimit(selectedYear + 1, selectedMonth)}
+                        sx={{ 
+                          color: theme.palette.common.white,
+                          '&:hover': { 
+                            bgcolor: alpha(theme.palette.background.paper, 0.25)
+                          },
+                          '&.Mui-disabled': {
+                            color: alpha(theme.palette.common.white, 0.4),
+                            opacity: 0.5
+                          }
+                        }}
+                      >
+                        <KeyboardArrowRightIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </Box>
           </Box>
         </Paper>
           
@@ -1203,6 +1320,55 @@ const CreditCards = () => {
                   </Button>
                 </Box>
               </Box>
+              
+              {/* Añadir resumen visual de tarjetas */}
+              {cards.length > 1 && (
+                <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                  <Grid container spacing={2}>
+                    {cards.map(card => (
+                      <Grid item xs={12} sm={6} md={4} key={card.id}>
+                        <Box 
+                          onClick={() => handleCardSelect(card.id)} 
+                          sx={{ 
+                            cursor: 'pointer',
+                            p: 1.5, 
+                            borderRadius: 2,
+                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                            bgcolor: selectedCard === card.id ? alpha(theme.palette.primary.light, 0.1) : 'transparent',
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.primary.light, 0.05),
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Box display="flex" alignItems="center">
+                              <Avatar 
+                                sx={{ 
+                                  width: 32, 
+                                  height: 32, 
+                                  mr: 1,
+                                  bgcolor: alpha(theme.palette.primary.main, 0.2),
+                                  color: theme.palette.primary.main
+                                }}
+                              >
+                                <CreditCardIcon fontSize="small" />
+                              </Avatar>
+                              <Typography variant="body2" fontWeight="medium" noWrap>
+                                {card.name}
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" fontWeight="bold" color="error.main">
+                              {formatAmount(getCardTotal(card.id))}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
             </Card>
           </Grid>
         )}
@@ -1377,7 +1543,7 @@ const CreditCards = () => {
                         <CreditCardIcon />
                       </Avatar>
                       <Typography variant="h6" fontWeight="bold">
-                        {cards.find(card => card.id === selectedCard).name}
+                        {selectedCard && cards.find(card => card.id === selectedCard)?.name || 'Selecciona una tarjeta'}
                       </Typography>
                     </Stack>
                   }
@@ -1433,27 +1599,50 @@ const CreditCards = () => {
                                 height: '100%',
                                 border: 'none',
                                 bgcolor: theme.palette.background.paper,
-                                overflow: 'hidden'
+                                transition: 'transform 0.3s ease',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                }
                               }}
                             >
                               <Box sx={{ 
                                 p: 2,
                                 background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                                color: 'white'
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
                               }}>
-                                <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                <Stack direction="row" spacing={1} alignItems="center">
                                   <CalendarTodayIcon fontSize="small" />
                                   <Typography variant="body2" fontWeight="medium">
                                     Cierre
                                   </Typography>
                                 </Stack>
+                                <Tooltip title="Fecha en que la tarjeta cierra el período actual" arrow>
+                                  <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
+                                    <DateRangeIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                               </Box>
-                              <Box sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
+                              <Box sx={{ 
+                                p: 2, 
+                                bgcolor: theme.palette.background.paper,
+                                borderLeft: `4px solid ${theme.palette.primary.main}`
+                              }}>
                                 <Typography variant="h6" fontWeight="medium">
                                   {getCardDates()?.closingDate 
                                     ? obtenerFechaFormateada(getCardDates().closingDate)
                                     : 'No establecido'}
                                 </Typography>
+                                {getCardDates()?.closingDate && (
+                                  <Typography variant="caption" color="textSecondary">
+                                    {new Date() > new Date(getCardDates().closingDate) 
+                                      ? 'Período cerrado' 
+                                      : 'Período activo'}
+                                  </Typography>
+                                )}
                               </Box>
                             </Card>
                           </Grid>
@@ -1466,7 +1655,7 @@ const CreditCards = () => {
                                 borderRadius: 3,
                                 overflow: 'hidden',
                                 height: '100%',
-                                transition: 'transform 0.2s',
+                                transition: 'transform 0.3s ease',
                                 '&:hover': {
                                   transform: 'translateY(-4px)',
                                   boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
@@ -1476,21 +1665,47 @@ const CreditCards = () => {
                               <Box sx={{ 
                                 p: 2,
                                 background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
-                                color: 'white'
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
                               }}>
-                                <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                <Stack direction="row" spacing={1} alignItems="center">
                                   <PaymentIcon fontSize="small" />
                                   <Typography variant="body2" fontWeight="medium">
                                     Vencimiento
                                   </Typography>
                                 </Stack>
+                                <Tooltip title="Fecha límite para pagar la tarjeta sin intereses" arrow>
+                                  <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
+                                    <DateRangeIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                               </Box>
-                              <Box sx={{ p: 2 }}>
+                              <Box sx={{ 
+                                p: 2,
+                                borderLeft: `4px solid ${theme.palette.error.main}`
+                              }}>
                                 <Typography variant="h6" fontWeight="medium">
                                   {getCardDates()?.dueDate 
                                     ? obtenerFechaFormateada(getCardDates().dueDate)
                                     : 'No establecido'}
                                 </Typography>
+                                {getCardDates()?.dueDate && (
+                                  <Typography variant="caption" color="textSecondary" 
+                                    sx={{ 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center',
+                                      color: new Date() > new Date(getCardDates().dueDate) 
+                                        ? theme.palette.error.main 
+                                        : theme.palette.success.main
+                                    }}
+                                  >
+                                    {new Date() > new Date(getCardDates().dueDate) 
+                                      ? '¡Atención! Fecha vencida' 
+                                      : 'En plazo para pago'}
+                                  </Typography>
+                                )}
                               </Box>
                             </Card>
                           </Grid>
@@ -1503,7 +1718,7 @@ const CreditCards = () => {
                                 borderRadius: 3,
                                 overflow: 'hidden',
                                 height: '100%',
-                                transition: 'transform 0.2s',
+                                transition: 'transform 0.3s ease',
                                 '&:hover': {
                                   transform: 'translateY(-4px)',
                                   boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
@@ -1513,19 +1728,63 @@ const CreditCards = () => {
                               <Box sx={{ 
                                 p: 2,
                                 background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
-                                color: 'white'
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
                               }}>
-                                <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+                                <Stack direction="row" spacing={1} alignItems="center">
                                   <ReceiptIcon fontSize="small" />
                                   <Typography variant="body2" fontWeight="medium">
                                     Total del Mes
                                   </Typography>
                                 </Stack>
+                                <Tooltip title="Monto total a pagar de esta tarjeta" arrow>
+                                  <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
+                                    <PaymentIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                               </Box>
-                              <Box sx={{ p: 2 }}>
+                              <Box sx={{ 
+                                p: 2,
+                                borderLeft: `4px solid ${theme.palette.warning.main}`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 0.5
+                              }}>
                                 <Typography variant="h6" fontWeight="medium">
                                   {formatAmount(getCardTotal())}
                                 </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  {getCardTotal() > 0 ? (
+                                    paymentDisabled ? (
+                                      <Chip 
+                                        label="Pagado" 
+                                        size="small" 
+                                        color="success" 
+                                        variant="outlined" 
+                                        icon={<CheckCircleIcon sx={{ fontSize: '0.8rem' }} />}
+                                        sx={{ height: 24 }}
+                                      />
+                                    ) : (
+                                      <Chip 
+                                        label="Pendiente" 
+                                        size="small" 
+                                        color="warning" 
+                                        variant="outlined" 
+                                        sx={{ height: 24 }}
+                                      />
+                                    )
+                                  ) : (
+                                    <Chip 
+                                      label="Sin gastos" 
+                                      size="small" 
+                                      color="info" 
+                                      variant="outlined"
+                                      sx={{ height: 24 }}
+                                    />
+                                  )}
+                                </Box>
                               </Box>
                             </Card>
                           </Grid>
@@ -1538,7 +1797,7 @@ const CreditCards = () => {
                           </Typography>
                           
                           {/* Mostrar PDF si existe */}
-                          {userData?.creditCardStatements?.[selectedCard]?.[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`] ? (
+                          {userData?.creditCards?.[selectedCard]?.statements?.[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`] ? (
                             <Paper 
                               variant="outlined" 
                               sx={{ 
@@ -1554,116 +1813,93 @@ const CreditCards = () => {
                                   <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
                                   <Box>
                                     <Typography variant="body1" fontWeight="medium">
-                                      {userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].fileName}
+                                      {userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].fileName}
                                     </Typography>
                                     <Typography variant="body2" color="textSecondary">
-                                      Subido el {new Date(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].uploadDate).toLocaleDateString()}
+                                      Subido el {new Date(userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].uploadDate).toLocaleDateString()}
                                     </Typography>
                                   </Box>
                                 </Box>
                                 <Box display="flex" gap={1}>
                                   <Button
-                                    variant="outlined"
-                                    color="primary"
-                                    startIcon={<DownloadIcon />}
-                                    onClick={() => handleDownloadStatement(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
-                                  >
-                                    Descargar
-                                  </Button>
-                                  <Button
                                     variant="contained"
                                     color="primary"
-                                    onClick={() => handleViewStatement(userData.creditCardStatements[selectedCard][`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
+                                    startIcon={<DownloadIcon />}
+                                    onClick={() => handleDownloadStatement(userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
+                                    sx={{
+                                      px: 3,
+                                      py: 1.2,
+                                      borderRadius: 2,
+                                      boxShadow: `0 4px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
+                                      '&:hover': {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: `0 6px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+                                      }
+                                    }}
                                   >
-                                    Ver PDF
+                                    Descargar PDF
                                   </Button>
+                                  
+                                  {/* Link directo al PDF usando la URL almacenada */}
+                                  <Link
+                                    href={userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].downloadURL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ textDecoration: 'none' }}
+                                  >
+                                    <Button
+                                      variant="outlined"
+                                      color="primary"
+                                      endIcon={<ArrowRightAltIcon />}
+                                      sx={{
+                                        px: 3,
+                                        py: 1.2,
+                                        borderRadius: 2,
+                                        '&:hover': {
+                                          bgcolor: alpha(theme.palette.primary.main, 0.05)
+                                        }
+                                      }}
+                                    >
+                                      Ver en navegador
+                                    </Button>
+                                  </Link>
                                 </Box>
                               </Box>
                               
-                              {/* Visualizador de PDF */}
-                              {isViewingPdf && pdfFile && (
-                                <Box 
-                                  sx={{ 
-                                    mt: 2,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    bgcolor: 'background.paper',
-                                    borderRadius: 2,
-                                    border: `1px solid ${theme.palette.divider}`,
-                                    p: 2,
-                                    overflow: 'hidden'
-                                  }}
-                                >
-                                  <Box 
-                                    sx={{ 
-                                      display: 'flex', 
-                                      justifyContent: 'space-between', 
-                                      width: '100%', 
-                                      mb: 2,
-                                      p: 1,
-                                      borderRadius: 1,
-                                      bgcolor: alpha(theme.palette.primary.main, 0.05)
-                                    }}
-                                  >
-                                    <Button 
-                                      variant="outlined" 
-                                      disabled={pageNumber <= 1} 
-                                      onClick={() => changePage(-1)}
-                                      size="small"
-                                    >
-                                      Anterior
-                                    </Button>
-                                    <Typography variant="body2">
-                                      Página {pageNumber} de {numPages || '...'}
-                                    </Typography>
-                                    <Button 
-                                      variant="outlined" 
-                                      disabled={pageNumber >= numPages || !numPages} 
-                                      onClick={() => changePage(1)}
-                                      size="small"
-                                    >
-                                      Siguiente
-                                    </Button>
-                                  </Box>
-
-                                  <Box 
-                                    sx={{ 
-                                      width: '100%', 
-                                      maxHeight: '800px',
-                                      overflow: 'auto',
-                                      display: 'flex',
-                                      justifyContent: 'center',
-                                      '& .react-pdf__Document': {
-                                        maxWidth: '100%',
-                                        boxShadow: '0 3px 14px rgba(0,0,0,0.2)',
-                                        borderRadius: 1
-                                      }
-                                    }}
-                                  >
-                                    <Document
-                                      file={pdfFile}
-                                      onLoadSuccess={onDocumentLoadSuccess}
-                                      onLoadError={(error) => {
-                                        console.error('Error al cargar PDF:', error);
-                                        showAlert('Error al cargar el PDF. Intenta descargarlo.', 'error');
-                                      }}
-                                      loading={
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
-                                          <CircularProgress size={40} />
-                                        </Box>
-                                      }
-                                    >
-                                      <Page 
-                                        pageNumber={pageNumber} 
-                                        width={window.innerWidth > 800 ? 750 : window.innerWidth - 80}
-                                        renderTextLayer={true}
-                                        renderAnnotationLayer={true}
-                                      />
-                                    </Document>
-                                  </Box>
+                              {/* Reemplazar visualizador de PDF con tarjeta informativa */}
+                              <Paper
+                                elevation={0}
+                                sx={{
+                                  mt: 2,
+                                  p: 3,
+                                  borderRadius: 2,
+                                  bgcolor: alpha(theme.palette.info.main, 0.05),
+                                  border: `1px dashed ${alpha(theme.palette.info.main, 0.3)}`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 2
+                                }}
+                              >
+                                <Box sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  bgcolor: alpha(theme.palette.info.main, 0.1),
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: '50%'
+                                }}>
+                                  <InsertDriveFileIcon color="info" />
                                 </Box>
-                              )}
+                                <Box>
+                                  <Typography variant="subtitle1" color="info.main" gutterBottom>
+                                    Resumen disponible para descargar
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Puedes descargar el PDF o abrirlo directamente en tu navegador para visualizarlo.
+                                  </Typography>
+                                </Box>
+                              </Paper>
                             </Paper>
                           ) : (
                             <Paper 
@@ -1809,163 +2045,198 @@ const CreditCards = () => {
                   
                   {/* Lista de transacciones */}
                   <Box mb={2}>
-                    <Typography variant="h6" fontWeight="medium" gutterBottom>
-                      Resumen del Período
+                    <Typography variant="h6" fontWeight="medium" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ReceiptIcon fontSize="small" color="primary" />
+                      Transacciones
                     </Typography>
-                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                      <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                        Mostrando transacciones:
-                      </Typography>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <Box display="flex" alignItems="center">
-                            <Box 
-                              sx={{ 
-                                mr: 1, 
-                                bgcolor: alpha(theme.palette.primary.main, 0.2),
-                                p: 0.5,
-                                borderRadius: '50%',
-                                display: 'flex'
-                              }}
-                            >
-                              <CalendarTodayIcon fontSize="small" color="primary" />
-                            </Box>
-                            <Box>
-                              <Typography variant="body2" color="textSecondary">
-                                Desde:
-                              </Typography>
-                              <Typography variant="body1" fontWeight="medium">
-                                {getCardDates() && getCardDates().prevClosingDate 
-                                  ? obtenerFechaFormateada(getCardDates().prevClosingDate) 
-                                  : "Inicio del mes anterior"}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Box display="flex" alignItems="center">
-                            <Box 
-                              sx={{ 
-                                mr: 1, 
-                                bgcolor: alpha(theme.palette.error.main, 0.2),
-                                p: 0.5,
-                                borderRadius: '50%',
-                                display: 'flex'
-                              }}
-                            >
-                              <CalendarTodayIcon fontSize="small" color="error" />
-                            </Box>
-                            <Box>
-                              <Typography variant="body2" color="textSecondary">
-                                Hasta:
-                              </Typography>
-                              <Typography variant="body1" fontWeight="medium">
-                                {getCardDates() && getCardDates().closingDate 
-                                  ? obtenerFechaFormateada(getCardDates().closingDate) 
-                                  : "Fin del mes actual"}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  </Box>
-                  
-                  <Typography variant="h6" fontWeight="medium" gutterBottom>
-                    Transacciones
-                  </Typography>
-                  
-                  {transactions.length === 0 ? (
-                    <Paper 
-                      elevation={0} 
-                      variant="outlined" 
-                      sx={{ 
-                        p: 3, 
-                        textAlign: 'center',
-                        borderStyle: 'dashed',
-                        borderRadius: 2,
-                        bgcolor: theme.palette.background.paper
-                      }}
-                    >
-                      <Typography variant="body1" color="textSecondary">
-                        No hay transacciones para este mes
-                      </Typography>
-                      <Button
-                        variant="text"
-                        color="primary"
-                        onClick={() => navigate('/NuevoGasto')}
-                        sx={{ mt: 1 }}
+
+                    {transactions.length === 0 ? (
+                      <Paper 
+                        elevation={0} 
+                        variant="outlined" 
+                        sx={{ 
+                          p: 3, 
+                          textAlign: 'center',
+                          borderStyle: 'dashed',
+                          borderRadius: 2,
+                          bgcolor: theme.palette.background.paper
+                        }}
                       >
-                        Registrar un gasto
-                      </Button>
-                    </Paper>
-                  ) : (
-                    <List>
-                      {transactions.map((transaction) => (
-                        <Paper
-                          key={transaction.id}
-                          variant="outlined"
-                          sx={{
-                            mb: 1.5,
+                        <Typography variant="body1" color="textSecondary">
+                          No hay transacciones para este mes
+                        </Typography>
+                        <Button
+                          variant="text"
+                          color="primary"
+                          onClick={() => navigate('/NuevoGasto')}
+                          sx={{ mt: 1 }}
+                        >
+                          Registrar un gasto
+                        </Button>
+                      </Paper>
+                    ) : (
+                      <>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="body2" color="textSecondary">
+                            {transactions.length} transacciones encontradas
+                          </Typography>
+                          <Chip 
+                            label={`Total: ${formatAmount(getCardTotal())}`} 
+                            color="error" 
+                            variant="outlined"
+                            sx={{ 
+                              fontWeight: 'bold',
+                              border: 2
+                            }}
+                          />
+                        </Box>
+                        
+                        <Paper 
+                          variant="outlined" 
+                          sx={{ 
                             borderRadius: 2,
-                            transition: 'all 0.2s',
-                            bgcolor: theme.palette.background.paper,
-                            '&:hover': {
-                              bgcolor: alpha(theme.palette.primary.main, 0.05),
-                              transform: 'translateY(-1px)',
-                              boxShadow: 1
-                            }
+                            overflow: 'hidden',
+                            mb: 2
                           }}
                         >
-                          <ListItem>
-                            <Box 
-                              sx={{ 
-                                mr: 2, 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                width: 40,
-                                height: 40,
-                                borderRadius: '50%',
-                                bgcolor: theme.palette.grey[100]
-                              }}
-                            >
-                              <CreditCardIcon color="primary" />
-                            </Box>
-                            <ListItemText
-                              primary={
-                                <Typography variant="body1" fontWeight="medium">
-                                  {transaction.description}
-                                </Typography>
+                          <List sx={{ 
+                            p: 0,
+                            '& .MuiListItem-root': {
+                              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+                              '&:last-child': {
+                                borderBottom: 'none'
                               }
-                              secondary={
-                                <Box>
-                                  <Typography variant="body2" color="textSecondary">
-                                    {transaction.category} - {transaction.subcategory}
-                                  </Typography>
-                                  <Typography variant="caption" color="textSecondary">
-                                    {obtenerFechaFormateada(transaction.date)}
-                                  </Typography>
-                                  {transaction.installments > 1 && (
-                                    <Chip 
-                                      size="small" 
-                                      label={`Cuota ${transaction.currentInstallment}/${transaction.installments}`}
-                                      sx={{ ml: 1, height: 20 }}
-                                    />
+                            }
+                          }}>
+                            {transactions.map((transaction, index) => {
+                              // Agrupar transacciones por fecha
+                              const transactionDate = new Date(transaction.date);
+                              const showDateHeader = index === 0 || 
+                                transactionDate.toDateString() !== new Date(transactions[index-1]?.date || transaction.date).toDateString();
+                                
+                              return (
+                                <React.Fragment key={transaction.id}>
+                                  {showDateHeader && (
+                                    <Box sx={{ 
+                                      px: 2, 
+                                      py: 1, 
+                                      bgcolor: alpha(theme.palette.primary.main, 0.05),
+                                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                                    }}>
+                                      <Typography variant="caption" fontWeight="medium" color="text.secondary">
+                                        {obtenerFechaFormateada(transaction.date)}
+                                      </Typography>
+                                    </Box>
                                   )}
-                                </Box>
-                              }
-                            />
-                            <ListItemSecondaryAction>
-                              <Typography variant="body1" fontWeight="medium" color="error.main">
-                                {formatAmount(transaction.amount)}
-                              </Typography>
-                            </ListItemSecondaryAction>
-                          </ListItem>
+                                  <ListItem 
+                                    sx={{
+                                      transition: 'all 0.2s',
+                                      position: 'relative',
+                                      '&:hover': {
+                                        bgcolor: alpha(theme.palette.primary.main, 0.05),
+                                      },
+                                      '&::after': {
+                                        content: '""',
+                                        position: 'absolute',
+                                        top: 0,
+                                        bottom: 0,
+                                        left: 0,
+                                        width: 3,
+                                        bgcolor: transaction.installments > 1 ? theme.palette.warning.main : theme.palette.primary.main,
+                                        opacity: transaction.installments > 1 ? 1 : 0.5,
+                                        display: 'block'
+                                      }
+                                    }}
+                                  >
+                                    <Box 
+                                      sx={{ 
+                                        mr: 2, 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: '50%',
+                                        bgcolor: transaction.installments > 1 
+                                          ? alpha(theme.palette.warning.main, 0.1)
+                                          : alpha(theme.palette.primary.main, 0.1)
+                                      }}
+                                    >
+                                      {transaction.installments > 1 ? (
+                                        <PaymentIcon color="warning" />
+                                      ) : (
+                                        <CreditCardIcon color="primary" />
+                                      )}
+                                    </Box>
+                                    <ListItemText
+                                      primary={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Typography variant="body1" fontWeight="medium">
+                                            {transaction.description}
+                                          </Typography>
+                                          {transaction.installments > 1 && (
+                                            <Chip 
+                                              size="small" 
+                                              color="warning"
+                                              label={`${transaction.currentInstallment}/${transaction.installments}`}
+                                              sx={{ 
+                                                height: 20, 
+                                                fontSize: '0.7rem',
+                                                fontWeight: 'bold'
+                                              }}
+                                            />
+                                          )}
+                                        </Box>
+                                      }
+                                      secondary={
+                                        <Box sx={{ mt: 0.5 }}>
+                                          <Chip
+                                            size="small"
+                                            label={transaction.category}
+                                            color="default"
+                                            variant="outlined"
+                                            sx={{ 
+                                              mr: 1, 
+                                              height: 20, 
+                                              fontSize: '0.7rem'
+                                            }}
+                                          />
+                                          <Chip
+                                            size="small"
+                                            label={transaction.subcategory}
+                                            color="default"
+                                            variant="outlined"
+                                            sx={{ 
+                                              height: 20, 
+                                              fontSize: '0.7rem'
+                                            }}
+                                          />
+                                        </Box>
+                                      }
+                                    />
+                                    <ListItemSecondaryAction>
+                                      <Typography 
+                                        variant="body1" 
+                                        fontWeight="bold" 
+                                        color="error.main"
+                                        sx={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'flex-end'
+                                        }}
+                                      >
+                                        {formatAmount(transaction.amount)}
+                                      </Typography>
+                                    </ListItemSecondaryAction>
+                                  </ListItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          </List>
                         </Paper>
-                      ))}
-                    </List>
-                  )}
+                      </>
+                    )}
+                  </Box>
                 </CardContent>
               </Card>
             ) : (
@@ -2023,51 +2294,152 @@ const CreditCards = () => {
       </Menu>
 
       {/* Diálogo para subir resumen */}
-      <Dialog open={uploadDialogOpen} onClose={handleCloseUploadDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
+      <Dialog 
+        open={uploadDialogOpen} 
+        onClose={uploading ? null : handleCloseUploadDialog} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          elevation: 4,
+          sx: {
+            borderRadius: 2,
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          bgcolor: theme.palette.primary.main, 
+          color: theme.palette.primary.contrastText,
+          p: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5
+        }}>
+          <UploadFileIcon />
           Subir resumen de tarjeta
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ py: 2 }}>
-            <Typography variant="body1" paragraph>
-              Sube el resumen en formato PDF para {getMonthName(selectedMonth)} {selectedYear}
+        
+        <DialogContent sx={{ py: 3, px: 3 }}>
+          <Box>
+            <Typography variant="subtitle1" paragraph mb={3} fontWeight="medium">
+              Sube el resumen en formato PDF para {getMonthName(selectedMonth)} {selectedYear} {selectedCard && cards.find(card => card.id === selectedCard) ? `- ${cards.find(card => card.id === selectedCard).name}` : ''}
             </Typography>
             
-            <input
-              type="file"
-              accept="application/pdf"
-              style={{ display: 'none' }}
-              id="pdf-file-input"
-              onChange={handleFileChange}
-            />
-            <label htmlFor="pdf-file-input">
-              <Button
-                variant="outlined"
-                component="span"
-                startIcon={<UploadFileIcon />}
-                sx={{ mb: 2 }}
-              >
-                Seleccionar archivo
-              </Button>
-            </label>
-            
-            {selectedFile && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: theme.palette.background.paper, borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Archivo seleccionado:
-                </Typography>
-                <Box display="flex" alignItems="center">
-                  <PictureAsPdfIcon color="error" sx={{ mr: 1 }} />
-                  <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                    {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                borderStyle: uploading ? 'solid' : 'dashed',
+                bgcolor: uploading ? alpha(theme.palette.primary.main, 0.05) : theme.palette.background.paper,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                position: 'relative',
+                height: 180
+              }}
+            >
+              {uploading ? (
+                // Estado de carga
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" color="textSecondary">
+                    Subiendo archivo...
                   </Typography>
                 </Box>
-              </Box>
-            )}
+              ) : selectedFile ? (
+                // Archivo seleccionado
+                <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    width: 50,
+                    height: 50,
+                    borderRadius: '50%',
+                    bgcolor: alpha(theme.palette.error.main, 0.1),
+                    mb: 1
+                  }}>
+                    <PictureAsPdfIcon sx={{ fontSize: 28, color: theme.palette.error.main }} />
+                  </Box>
+                  <Typography variant="subtitle2" align="center" sx={{ wordBreak: 'break-all' }}>
+                    {selectedFile.name}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {(selectedFile.size / 1024).toFixed(2)} KB
+                  </Typography>
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    onClick={() => setSelectedFile(null)}
+                  >
+                    Cambiar archivo
+                  </Button>
+                </Box>
+              ) : (
+                // Seleccionar archivo
+                <>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    style={{ display: 'none' }}
+                    id="pdf-file-input"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                  />
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: 2
+                  }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      width: 60,
+                      height: 60,
+                      borderRadius: '50%',
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      mb: 1
+                    }}>
+                      <UploadFileIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+                    </Box>
+                    <Typography variant="body1" align="center" color="textSecondary">
+                      Arrastra tu archivo PDF aquí o
+                    </Typography>
+                    <label htmlFor="pdf-file-input">
+                      <Button
+                        variant="contained"
+                        component="span"
+                        color="primary"
+                        startIcon={<UploadFileIcon />}
+                        disabled={uploading}
+                      >
+                        Seleccionar archivo
+                      </Button>
+                    </label>
+                  </Box>
+                </>
+              )}
+            </Paper>
+            
+            <Typography variant="caption" color="textSecondary">
+              * Sólo se aceptan archivos PDF. Tamaño máximo recomendado: 10MB.
+            </Typography>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseUploadDialog} disabled={uploading}>
+        
+        <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}` }}>
+          <Button 
+            onClick={handleCloseUploadDialog} 
+            disabled={uploading}
+            variant="outlined"
+          >
             Cancelar
           </Button>
           <Button 
@@ -2098,3 +2470,4 @@ const CreditCards = () => {
 };
 
 export default CreditCards; 
+

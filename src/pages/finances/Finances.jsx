@@ -103,6 +103,10 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import { alpha } from '@mui/material/styles';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import TodayIcon from '@mui/icons-material/Today';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 
 const Finances = () => {
   const { userData, dollarRate } = useStore();
@@ -628,258 +632,477 @@ const Finances = () => {
     );
   };
 
-  // Navegador de tiempo (Año/Mes)
+  // Navegador de tiempo (Año/Mes) con UX/UI mejorada
   const TimeNavigator = () => {
-    // Obtener el mes y año actuales para resaltarlos
     const isCurrentMonth = selectedMonth === (new Date().getMonth() + 1) && selectedYear === new Date().getFullYear();
+    
+    // Limitar la navegación al mes actual
+    const isAtCurrentLimit = isCurrentMonth || 
+      (selectedYear > new Date().getFullYear()) || 
+      (selectedYear === new Date().getFullYear() && selectedMonth > new Date().getMonth() + 1);
+    
+    // Función para manejar la navegación al mes siguiente teniendo en cuenta el límite
+    const handleNextMonthWithLimit = () => {
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentYear = currentDate.getFullYear();
+      
+      // Solo permitir avanzar hasta el mes actual
+      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+        if (selectedMonth === 12) {
+          setSelectedMonth(1);
+          setSelectedYear(selectedYear + 1);
+        } else {
+          setSelectedMonth(selectedMonth + 1);
+        }
+      }
+    };
     
     return (
       <Card 
         elevation={3} 
         sx={{ 
           mb: 3, 
-          borderRadius: 2,
+          borderRadius: { xs: '0 0 16px 16px', sm: '0 0 20px 20px' },
           overflow: 'hidden',
-          position: 'relative',
-          zIndex: 5, // Asegurar que esté por encima de otros elementos
-          bgcolor: theme.palette.background.paper,
-          border: `1px solid ${theme.palette.divider}`
+          position: 'sticky',
+          top: {
+            xs: 56, // Altura del AppBar en móviles
+            sm: 64  // Altura del AppBar en escritorio
+          },
+          zIndex: 10,
+          boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.18)}`,
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.25)}`
+          }
         }}
       >
-        <Box sx={{
-          background: `linear-gradient(90deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-          py: 1.5,
-          px: 2
-        }}>
-          <Grid container spacing={2} alignItems="center">
-            {/* Tipo de datos (Gastos/Ingresos) */}
-            <Grid item xs={12} sm={4} md={3} lg={2}>
+        <Box
+          sx={{
+            background: `linear-gradient(90deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+            py: 1.5,
+            px: { xs: 1.5, sm: 2.5 },
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1
+          }}
+        >
+          {/* Fila 1: Información contextual y tipo de datos */}
+          <Box 
+            sx={{
+              display: 'flex', 
+              flexDirection: { xs: 'column', md: 'row' },
+              justifyContent: 'space-between',
+              alignItems: { xs: 'center', md: 'center' },
+              gap: { xs: 2, md: 0 },
+              width: '100%'
+            }}
+          >
+            {/* Indicador contextual del período seleccionado */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Avatar
+                sx={{
+                  bgcolor: alpha(theme.palette.background.paper, 0.2),
+                  color: theme.palette.common.white,
+                  width: 40,
+                  height: 40
+                }}
+              >
+                <CalendarTodayIcon />
+              </Avatar>
+              <Box>
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  color="white"
+                  sx={{ 
+                    lineHeight: 1.2,
+                    textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  {getMonthName(selectedMonth)} {selectedYear}
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: alpha(theme.palette.common.white, 0.85),
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    fontWeight: 500
+                  }}
+                >
+                  {dataType === 'expenses' ? 
+                    <TrendingDownIcon fontSize="inherit" /> : 
+                    <TrendingUpIcon fontSize="inherit" />
+                  } 
+                  {dataType === 'expenses' ? 'Gastos' : 'Ingresos'} • 
+                  {monthlyData ? ` Total: ${monthlyData.formattedTotal}` : ' Sin datos'}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Controles - Tipo de datos (Gastos/Ingresos) y botón de Mes actual */}
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
               <ButtonGroup 
                 variant="contained" 
-                fullWidth
                 size={isMobile ? "small" : "medium"}
                 sx={{
+                  bgcolor: alpha(theme.palette.background.paper, 0.12),
+                  borderRadius: 2,
+                  padding: 0.5,
                   '& .MuiButton-root': {
-                    bgcolor: 'rgba(255,255,255,0.15)',
+                    bgcolor: 'transparent',
                     color: 'white',
-                    borderColor: 'rgba(255,255,255,0.3)',
+                    borderColor: alpha(theme.palette.common.white, 0.2),
+                    textTransform: 'none',
+                    fontWeight: 'medium',
+                    px: { xs: 1.5, sm: 2 },
+                    py: 0.75,
                     '&.Mui-disabled': {
-                      bgcolor: 'rgba(255,255,255,0.3)',
+                      bgcolor: 'transparent',
                       color: 'white',
-                      fontWeight: 'bold'
+                      opacity: 1
                     },
                     '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.25)'
-                    }
+                      bgcolor: alpha(theme.palette.common.white, 0.15)
+                    },
+                    transition: 'all 0.2s ease'
                   }
                 }}
               >
                 <Button 
-                  startIcon={<TrendingDownIcon />}
+                  startIcon={
+                    <Avatar
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        bgcolor: dataType === 'expenses' ? theme.palette.error.main : alpha(theme.palette.common.white, 0.2),
+                        color: 'white'
+                      }}
+                    >
+                      <TrendingDownIcon fontSize="small" />
+                    </Avatar>
+                  }
                   onClick={() => setDataType('expenses')}
                   disabled={dataType === 'expenses'}
+                  aria-label="Ver gastos"
+                  aria-pressed={dataType === 'expenses'}
                   sx={{
-                    bgcolor: dataType === 'expenses' ? theme.palette.error.main : 'rgba(255,255,255,0.15)',
+                    boxShadow: dataType === 'expenses' ? `0 0 0 1px ${alpha(theme.palette.common.white, 0.5)}` : 'none',
                     '&.Mui-disabled': {
-                      bgcolor: theme.palette.error.main,
+                      fontWeight: 'bold',
+                      bgcolor: alpha(theme.palette.common.white, 0.15),
                     }
                   }}
                 >
                   Gastos
                 </Button>
                 <Button 
-                  startIcon={<TrendingUpIcon />}
+                  startIcon={
+                    <Avatar
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        bgcolor: dataType === 'incomes' ? theme.palette.success.main : alpha(theme.palette.common.white, 0.2),
+                        color: 'white'
+                      }}
+                    >
+                      <TrendingUpIcon fontSize="small" />
+                    </Avatar>
+                  }
                   onClick={() => setDataType('incomes')}
                   disabled={dataType === 'incomes'}
+                  aria-label="Ver ingresos"
+                  aria-pressed={dataType === 'incomes'}
                   sx={{
-                    bgcolor: dataType === 'incomes' ? theme.palette.success.main : 'rgba(255,255,255,0.15)',
+                    boxShadow: dataType === 'incomes' ? `0 0 0 1px ${alpha(theme.palette.common.white, 0.5)}` : 'none',
                     '&.Mui-disabled': {
-                      bgcolor: theme.palette.success.main,
+                      fontWeight: 'bold',
+                      bgcolor: alpha(theme.palette.common.white, 0.15),
                     }
                   }}
                 >
                   Ingresos
                 </Button>
               </ButtonGroup>
-            </Grid>
-            
-            {/* Navegación meses */}
-            <Grid item xs={12} sm={8} md={9} lg={10}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={7}>
-                  <Stack 
-                    direction="row" 
-                    spacing={0.5} 
-                    alignItems="center" 
-                    sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      borderRadius: 2,
-                      p: 0.5,
-                      height: '100%'
-                    }}
-                  >
-                    <IconButton 
-                      onClick={handlePreviousMonth} 
-                      color="inherit"
-                      size="small"
-                      sx={{ 
-                        color: 'white',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
-                      }}
-                    >
-                      <ChevronLeftIcon />
-                    </IconButton>
+
+              {/* Botón de mes actual */}
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<TodayIcon />}
+                onClick={() => {
+                  const now = new Date();
+                  setSelectedMonth(now.getMonth() + 1);
+                  setSelectedYear(now.getFullYear());
+                }}
+                sx={{
+                  bgcolor: alpha(theme.palette.background.paper, 0.25),
+                  color: theme.palette.common.white,
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 'medium',
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.background.paper, 0.35),
+                  }
+                }}
+              >
+                Mes actual
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Fila 2: Selección detallada de mes y año */}
+          <Box
+            sx={{
+              mt: { xs: 1, md: 2 },
+              bgcolor: alpha(theme.palette.background.paper, 0.12),
+              borderRadius: 3,
+              p: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backdropFilter: 'blur(5px)'
+            }}
+          >
+            {/* Selector de mes táctil y accesible */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              width: '100%',
+              position: 'relative' 
+            }}>
+              <Tooltip title="Mes anterior" arrow placement="top">
+                <IconButton
+                  onClick={handlePreviousMonth}
+                  color="inherit"
+                  size="small"
+                  aria-label="Mes anterior"
+                  sx={{
+                    color: theme.palette.common.white,
+                    '&:hover': { 
+                      bgcolor: alpha(theme.palette.background.paper, 0.25),
+                      transform: 'scale(1.1)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <ChevronLeftIcon />
+                </IconButton>
+              </Tooltip>
+
+              <Box
+                sx={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  mx: 1,
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  sx={{
+                    px: 1,
+                    transition: 'transform 0.3s ease-in-out',
+                    '& > *': {
+                      minWidth: { xs: 'auto', sm: 40 }
+                    }
+                  }}
+                >
+                  {months.map((month) => {
+                    const isActive = selectedMonth === month.value;
+                    const isVisible = 
+                      Math.abs(month.value - selectedMonth) <= 2 ||
+                      (!isMobile && !isTablet);
                     
-                    <ButtonGroup
-                      variant="text"
-                      sx={{
-                        flex: 1,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        '& .MuiButton-root': {
+                    // Determinar si este mes es futuro
+                    const isFutureMonth = 
+                      (month.value > new Date().getMonth() + 1 && selectedYear === new Date().getFullYear()) || 
+                      (selectedYear > new Date().getFullYear());
+                    
+                    return (
+                      <Button
+                        key={month.value}
+                        onClick={() => setSelectedMonth(month.value)}
+                        aria-label={`Mes de ${month.label}`}
+                        aria-current={isActive ? 'date' : undefined}
+                        disabled={isFutureMonth}
+                        sx={{
+                          py: 0.75,
+                          px: { xs: 1, sm: 1.5 },
+                          minWidth: { xs: 32, sm: 36 },
+                          color: isActive ? theme.palette.primary.dark : alpha(theme.palette.common.white, 0.85),
+                          bgcolor: isActive ? alpha(theme.palette.common.white, 0.9) : 'transparent',
+                          fontWeight: isActive ? 'bold' : 'medium',
                           borderRadius: 1.5,
-                          color: 'white',
-                          px: 1,
-                          mx: 0.2,
-                          minWidth: 'auto',
-                          fontSize: '0.8rem',
-                          '&.active': {
-                            bgcolor: 'rgba(255,255,255,0.25)',
-                            fontWeight: 'bold'
-                          },
+                          fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                          transition: 'all 0.2s ease',
+                          opacity: isVisible ? (isFutureMonth ? 0.5 : 1) : { xs: 0, sm: 0.5 },
+                          display: { xs: isVisible ? 'flex' : 'none', sm: 'flex' },
                           '&:hover': {
-                            bgcolor: 'rgba(255,255,255,0.15)'
+                            bgcolor: isActive 
+                              ? alpha(theme.palette.common.white, 0.9)
+                              : alpha(theme.palette.common.white, 0.15),
+                            transform: isFutureMonth ? 'none' : 'translateY(-2px)'
+                          },
+                          pointerEvents: isVisible && !isFutureMonth ? 'auto' : { xs: 'none', sm: 'auto' },
+                          textTransform: 'none',
+                          '&.Mui-disabled': {
+                            color: alpha(theme.palette.common.white, 0.4),
+                            pointerEvents: 'none'
                           }
-                        }
-                      }}
-                    >
-                      {months.map((month) => (
-                        <Button
-                          key={month.value}
-                          className={selectedMonth === month.value ? 'active' : ''}
-                          onClick={() => setSelectedMonth(month.value)}
-                          sx={{
-                            display: isMobile ? (
-                              month.value === selectedMonth - 1 || 
-                              month.value === selectedMonth || 
-                              month.value === selectedMonth + 1 ? 'block' : 'none'
-                            ) : (
-                              isTablet ? (
-                                Math.abs(month.value - selectedMonth) <= 2 ? 'block' : 'none'
-                              ) : 'block'
-                            )
-                          }}
-                        >
-                          {month.label.substring(0, 3)}
-                        </Button>
-                      ))}
-                    </ButtonGroup>
-                    
-                    <IconButton 
-                      onClick={handleNextMonth} 
-                      color="inherit"
-                      size="small"
-                      sx={{ 
-                        color: 'white',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' }
-                      }}
-                    >
-                      <ChevronRightIcon />
-                    </IconButton>
-                  </Stack>
-                </Grid>
-                
-                <Grid item xs={6} md={2.5}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Box 
-                      sx={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        bgcolor: 'rgba(255,255,255,0.15)'
-                      }}
-                    >
-                      <CalendarTodayIcon sx={{ color: 'white', fontSize: '1rem' }} />
-                    </Box>
-                    <Select
-                      value={selectedYear}
-                      onChange={handleYearChange}
-                      displayEmpty
-                      size="small"
-                      sx={{
-                        width: '100%',
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        color: 'white',
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255,255,255,0.3)'
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255,255,255,0.5)'
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'white'
-                        },
-                        '& .MuiSelect-select': {
-                          fontWeight: 'bold'
-                        }
-                      }}
-                      MenuProps={{
-                        PaperProps: {
-                          sx: {
-                            bgcolor: theme.palette.primary.main,
-                            '& .MuiMenuItem-root': {
-                              color: 'white',
-                              '&.Mui-selected': {
-                                bgcolor: 'rgba(255,255,255,0.15)',
-                                '&:hover': {
-                                  bgcolor: 'rgba(255,255,255,0.25)'
-                                }
-                              },
-                              '&:hover': {
-                                bgcolor: 'rgba(255,255,255,0.1)'
-                              }
-                            }
-                          }
-                        }
-                      }}
-                    >
-                      {availableYears.map(year => (
-                        <MenuItem key={year} value={year}>{year}</MenuItem>
-                      ))}
-                    </Select>
-                  </Stack>
-                </Grid>
-                
-                <Grid item xs={6} md={2.5}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
+                        }}
+                      >
+                        {month.label.substring(0, 3)}
+                        {isActive && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              width: 4,
+                              height: 4,
+                              borderRadius: '50%',
+                              bgcolor: theme.palette.primary.dark,
+                              mt: 0.5
+                            }}
+                          />
+                        )}
+                      </Button>
+                    );
+                  })}
+                </Stack>
+              </Box>
+
+              <Tooltip title={isAtCurrentLimit ? "No se puede avanzar a meses futuros" : "Mes siguiente"} arrow placement="top">
+                <span>
+                  <IconButton
+                    onClick={handleNextMonthWithLimit}
+                    color="inherit"
                     size="small"
-                    startIcon={<CalendarTodayIcon />}
-                    onClick={() => {
-                      setSelectedMonth(new Date().getMonth() + 1);
-                      setSelectedYear(new Date().getFullYear());
-                    }}
+                    aria-label="Mes siguiente"
+                    disabled={isAtCurrentLimit}
                     sx={{
-                      height: '100%',
-                      color: 'white',
-                      borderColor: isCurrentMonth ? 'white' : 'rgba(255,255,255,0.5)',
-                      bgcolor: isCurrentMonth ? 'rgba(255,255,255,0.15)' : 'transparent',
-                      '&:hover': {
-                        borderColor: 'white',
-                        bgcolor: 'rgba(255,255,255,0.1)'
+                      color: theme.palette.common.white,
+                      opacity: isAtCurrentLimit ? 0.5 : 1,
+                      '&:hover': { 
+                        bgcolor: isAtCurrentLimit ? 'transparent' : alpha(theme.palette.background.paper, 0.25),
+                        transform: isAtCurrentLimit ? 'none' : 'scale(1.1)'
+                      },
+                      transition: 'all 0.2s ease',
+                      '&.Mui-disabled': {
+                        color: alpha(theme.palette.common.white, 0.4)
                       }
                     }}
                   >
-                    Mes Actual
-                  </Button>
-                </Grid>
-              </Grid>
-            </Grid>
-          </Grid>
+                    <ChevronRightIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              
+              {/* Selector de año intuitivo con flechas */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderLeft: `1px solid ${alpha(theme.palette.common.white, 0.2)}`,
+                  ml: 1.5,
+                  pl: 1.5
+                }}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => setSelectedYear(selectedYear - 1)}
+                  aria-label="Año anterior"
+                  sx={{ 
+                    color: theme.palette.common.white,
+                    '&:hover': { 
+                      bgcolor: alpha(theme.palette.background.paper, 0.25)
+                    }
+                  }}
+                >
+                  <KeyboardArrowLeftIcon fontSize="small" />
+                </IconButton>
+                
+                <Tooltip title="Seleccionar año" arrow>
+                  <Box
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Año ${selectedYear}`}
+                    onClick={() => {
+                      // Aquí podría abrirse un selector de año más avanzado
+                      const currentYear = new Date().getFullYear();
+                      setSelectedYear(currentYear);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const currentYear = new Date().getFullYear();
+                        setSelectedYear(currentYear);
+                      }
+                    }}
+                    sx={{
+                      bgcolor: alpha(theme.palette.common.white, 0.15),
+                      py: 0.5,
+                      px: 1.5,
+                      borderRadius: 2,
+                      minWidth: 60,
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      userSelect: 'none',
+                      mx: 0.5,
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.common.white, 0.25),
+                        transform: 'translateY(-2px)'
+                      },
+                      '&:focus-visible': {
+                        outline: `2px solid ${alpha(theme.palette.common.white, 0.5)}`,
+                        outlineOffset: 2
+                      }
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      fontWeight="bold"
+                      color={theme.palette.common.white}
+                    >
+                      {selectedYear}
+                    </Typography>
+                  </Box>
+                </Tooltip>
+                
+                <Tooltip title={selectedYear >= new Date().getFullYear() ? "No se puede avanzar a años futuros" : "Año siguiente"} arrow>
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => selectedYear < new Date().getFullYear() && setSelectedYear(selectedYear + 1)}
+                      aria-label="Año siguiente"
+                      disabled={selectedYear >= new Date().getFullYear()}
+                      sx={{ 
+                        color: theme.palette.common.white,
+                        opacity: selectedYear >= new Date().getFullYear() ? 0.5 : 1,
+                        '&:hover': { 
+                          bgcolor: selectedYear >= new Date().getFullYear() ? 'transparent' : alpha(theme.palette.background.paper, 0.25)
+                        },
+                        '&.Mui-disabled': {
+                          color: alpha(theme.palette.common.white, 0.4)
+                        }
+                      }}
+                    >
+                      <KeyboardArrowRightIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+            </Box>
+          </Box>
         </Box>
       </Card>
     );
@@ -1079,7 +1302,7 @@ const Finances = () => {
                   </Typography>
                 </Box>
                 
-                <Paper elevation={2} sx={{ 
+                <Paper elevation={5} sx={{ 
                   p: 3, 
                   borderRadius: 2, 
                   mt: 1,
@@ -1132,7 +1355,7 @@ const Finances = () => {
                   pt: { xs: 2, md: 0 } // Padding-top en móviles
                 }}>
                   <Card 
-                    elevation={2} 
+                    elevation={5} 
                     sx={{ 
                       p: 2, 
                       bgcolor: theme.palette.background.paper,
@@ -1453,7 +1676,7 @@ const Finances = () => {
           <Box sx={{ 
             p: 2, 
             borderBottom: `1px solid ${theme.palette.divider}`,
-            background: `linear-gradient(90deg, ${theme.palette.grey[50]} 0%, ${theme.palette.background.paper} 100%)`,
+            bgcolor:theme.palette.primary.main,
             display: 'flex',
             alignItems: 'center',
             gap: 1
@@ -1477,7 +1700,6 @@ const Finances = () => {
                 maxWidth: 400, 
                 textAlign: 'center',
                 p: 3,
-                bgcolor: theme.palette.grey[50],
                 borderRadius: 2
               }}
             >
@@ -1684,7 +1906,7 @@ const Finances = () => {
       
       return (
         <Paper 
-          elevation={0} 
+          elevation={10} 
           sx={{ 
             p: 2, 
             mb: 1.5, 
@@ -1804,9 +2026,9 @@ const Finances = () => {
                           label={transaction.subcategory}
                           sx={{ 
                             height: 24,
-                            bgcolor: theme.palette.grey[50],
-                            color: theme.palette.mode === 'dark' ? '#000000' : theme.palette.text.secondary,
-                            fontWeight: 400,
+                            bgcolor: alpha(theme.palette.background.paper, 0.9),
+                            color: theme.palette.text.primary,
+                            fontWeight: 500,
                             borderRadius: 1,
                             border: `1px solid ${theme.palette.divider}`
                           }}
@@ -1878,12 +2100,11 @@ const Finances = () => {
       
       return (
         <Card 
-          elevation={1} 
+          elevation={5} 
           sx={{ 
             mb: 3, 
             borderRadius: 2,
             overflow: 'hidden',
-            bgcolor: theme.palette.background.paper,
             transition: 'transform 0.2s',
             '&:hover': {
               boxShadow: `0 6px 20px ${alpha(theme.palette.common.black, 0.08)}`
@@ -1895,7 +2116,6 @@ const Finances = () => {
             onClick={() => handleToggleDate(date)}
             sx={{ 
               p: 2,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
               borderBottom: isExpanded ? `1px solid ${theme.palette.divider}` : 'none',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
@@ -1996,7 +2216,7 @@ const Finances = () => {
         {/* Panel de búsqueda mejorado (quitar el panel de totales) */}
         <Box sx={{ 
           p: 2,
-          bgcolor: alpha(theme.palette.background.paper, 0.8),
+          bgcolor: alpha(theme.palette.primary.main, 0.8),
           borderBottom: `1px solid ${theme.palette.divider}`
         }}>
           <Grid container spacing={2} alignItems="center">
@@ -2024,7 +2244,6 @@ const Finances = () => {
                 )}
               </FormControl>
             </Grid>
-            {/* Eliminar el panel de totales que estaba aquí */}
           </Grid>
         </Box>
         
@@ -2033,7 +2252,6 @@ const Finances = () => {
           flexGrow: 1, 
           overflow: 'auto',
           p: 2,
-          bgcolor: theme.palette.background.default,
           height: '460px' // Dejar espacio para la barra de búsqueda y otros elementos
         }}>
           {sortedDates.length === 0 ? (
@@ -2090,11 +2308,21 @@ const Finances = () => {
   // El return principal del componente Finances
   return (
     <Layout title="Análisis Financiero">
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Box 
+        sx={{ 
+          minHeight: '100vh',
+          width: '100%',
+          position: 'relative',
+          pt: 0,
+          pb: 4,
+          margin: 0,
+          maxWidth: 'none'
+        }}
+      >
         {/* Navegador de tiempo/fecha */}
-            <TimeNavigator />
+        <TimeNavigator />
         
-        <Grid container spacing={3}>
+        <Grid container spacing={3} sx={{ px: { xs: 2, sm: 2 }, mt: 0 }}>
           {/* Columna izquierda */}
           <Grid item xs={12} md={6}>
             {/* Panel superior - Resumen de gastos (ahora como panel fijo) */}
@@ -2105,7 +2333,6 @@ const Finances = () => {
           {/* Panel superior derecho - Lista de transacciones */}
           <Grid item xs={12} md={6}>
             <TransactionsListPanel />
-            
           </Grid>
           
           {/* Nuevo panel - Análisis por categoría (ahora a tamaño completo) */}
@@ -2147,15 +2374,13 @@ const Finances = () => {
                   {/* Contenido del panel de análisis por categoría */}
               <Grid container spacing={3}>
                     <Grid item xs={12} md={5}>
-                      
                       {/* Gráfico de torta para las categorías principales */}
                       <Box sx={{ mb: 3, mt: 2 }}>
-                        <Paper elevation={0} sx={{ 
+                        <Paper elevation={5} sx={{ 
                           p: 2, 
                           border: `1px solid ${theme.palette.divider}`, 
                           borderRadius: 2,
                           height: '100%',
-                          bgcolor: theme.palette.background.paper,
                           '&:hover': {
                             boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                           }
@@ -2265,12 +2490,11 @@ const Finances = () => {
                         <Grid container spacing={2}>
                           {/* Top 3 categorías */}
                           <Grid item xs={12}>
-                            <Paper elevation={0} sx={{ 
+                            <Paper elevation={5} sx={{ 
                               p: 2, 
                               border: `1px solid ${theme.palette.divider}`, 
                               borderRadius: 2,
                               height: '100%',
-                              bgcolor: theme.palette.background.paper,
                               '&:hover': {
                                 boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                               }
@@ -2291,7 +2515,7 @@ const Finances = () => {
                                     sx={{ 
                                       mt: 1,
                                       p: 1,
-                                      bgcolor: `${categoryColor}15`,
+                                      bgcolor: `${categoryColor}35`,
                                       borderRadius: 1,
                                       border: `1px solid ${categoryColor}30`
                                     }}
@@ -2344,14 +2568,12 @@ const Finances = () => {
                         </Grid>
                       </Box>
                     </Grid>
-                    
                     <Grid item xs={12} md={7}>
                       {/* Tabla de categorías detallada */}
                       <Box>
                         {/* Título de sección */}
                         <Box sx={{ 
                           py: 2, 
-                          bgcolor: theme.palette.grey[50],
                           borderRadius: '4px 4px 0 0',
                           borderBottom: `1px solid ${theme.palette.divider}`
                         }}>
@@ -2367,7 +2589,7 @@ const Finances = () => {
                         <TableContainer>
                           <Table size="small">
                             <TableHead>
-                              <TableRow sx={{ bgcolor: theme.palette.grey[50] }}>
+                              <TableRow>
                                 <TableCell width="40%">Categoría</TableCell>
                                 <TableCell align="center">Cantidad</TableCell>
                                 <TableCell align="center">Promedio</TableCell>
@@ -2394,7 +2616,7 @@ const Finances = () => {
                                   <TableRow 
                                     key={index}
                                     sx={{ 
-                                      bgcolor: index % 2 === 0 ? 'transparent' : theme.palette.grey[50],
+                                      bgcolor: index % 2 === 0 ? 'transparent' : theme.palette.background.paper,
                                       transition: 'background-color 0.2s',
                                       '&:hover': {
                                         bgcolor: `${categoryColor}15`
@@ -2606,12 +2828,11 @@ const Finances = () => {
                           {/* Nuevas secciones - Distribución y Promedio */}
                           <Grid container spacing={3} sx={{ mt: 3, mb:3 }}>
                             <Grid item xs={12} md={6}>
-                              <Paper elevation={0} sx={{ 
+                              <Paper elevation={5} sx={{ 
                                 p: 2, 
                                 border: `1px solid ${theme.palette.divider}`, 
                                 borderRadius: 2,
                                 height: '100%',
-                                bgcolor: theme.palette.background.paper,
                                 '&:hover': {
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                                 }
@@ -2683,12 +2904,11 @@ const Finances = () => {
           </Grid>
           
                             <Grid item xs={12} md={6}>
-                              <Paper elevation={0} sx={{ 
+                              <Paper elevation={5} sx={{ 
                                 p: 2, 
                                 border: `1px solid ${theme.palette.divider}`, 
                                 borderRadius: 2,
                       height: '100%',
-                                bgcolor: theme.palette.background.paper,
                       '&:hover': {
                                   boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                                 }
@@ -2847,7 +3067,7 @@ const Finances = () => {
                       {/* Métricas adicionales */}
                       <Grid container spacing={2} sx={{ mt: 2 }}>
                         <Grid item xs={4}>
-                          <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
+                          <Paper elevation={5} sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
                             <Typography variant="body2" color="text.secondary">Total Gastos</Typography>
                             <Typography variant="h6" color="error.main" fontWeight="bold">
                               {formatAmount(annualExpenses)}
@@ -2855,7 +3075,7 @@ const Finances = () => {
                   </Paper>
                 </Grid>
                         <Grid item xs={4}>
-                          <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
+                          <Paper elevation={5} sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
                             <Typography variant="body2" color="text.secondary">Total Ingresos</Typography>
                             <Typography variant="h6" color="success.main" fontWeight="bold">
                               {formatAmount(annualIncomes)}
@@ -2863,7 +3083,7 @@ const Finances = () => {
                           </Paper>
               </Grid>
                         <Grid item xs={4}>
-                          <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
+                          <Paper elevation={5} sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
                             <Typography variant="body2" color="text.secondary">Balance Anual</Typography>
                             <Typography variant="h6" color={annualBalance >= 0 ? "success.main" : "error.main"} fontWeight="bold">
                               {formatAmount(annualBalance)}
@@ -2920,7 +3140,7 @@ const Finances = () => {
                       <Grid container spacing={3}>
                         {/* Total Patrimonio */}
                         <Grid item xs={12} sm={6} md={3}>
-                          <Paper elevation={0} sx={{ 
+                          <Paper elevation={5} sx={{ 
                             p: 2.5, 
                             borderRadius: 2, 
                             border: `1px solid ${theme.palette.divider}`,
@@ -2958,7 +3178,7 @@ const Finances = () => {
                 
                         {/* Ahorros en ARS */}
                         <Grid item xs={12} sm={6} md={3}>
-                          <Paper elevation={0} sx={{ 
+                          <Paper elevation={5} sx={{ 
                             p: 2.5, 
                             borderRadius: 2, 
                             border: `1px solid ${theme.palette.divider}`,
@@ -3003,7 +3223,7 @@ const Finances = () => {
                 
                         {/* Ahorros en USD */}
                         <Grid item xs={12} sm={6} md={3}>
-                          <Paper elevation={0} sx={{ 
+                          <Paper elevation={5} sx={{ 
                             p: 2.5, 
                             borderRadius: 2, 
                             border: `1px solid ${theme.palette.divider}`,
@@ -3048,7 +3268,7 @@ const Finances = () => {
           
                         {/* Fondo Mantenimiento Auto */}
                         <Grid item xs={12} sm={6} md={3}>
-                          <Paper elevation={0} sx={{ 
+                            <Paper elevation={5} sx={{ 
                             p: 2.5, 
                             borderRadius: 2, 
                             border: `1px solid ${theme.palette.divider}`,
@@ -3096,7 +3316,7 @@ const Finances = () => {
                     {/* Segunda fila - Gráficos históricos */}
                     <Grid item xs={12}>
                       <Paper 
-                        elevation={0} 
+                        elevation={5} 
                         sx={{ 
                           p: 2, 
                           border: `1px solid ${theme.palette.divider}`, 
@@ -3144,9 +3364,18 @@ const Finances = () => {
                                 },
                                 xaxis: {
                                   type: 'category',
-                                  categories: Object.keys(userData.savings.amountARSHistory).map(key => 
-                                    userData.savings.amountARSHistory[key].date
-                                  ),
+                                  categories: Object.keys(userData.savings.amountARSHistory).map(key => {
+                                    // Obtener la fecha en formato DD/MM/YYYY
+                                    const dateStr = userData.savings.amountARSHistory[key].date;
+                                    
+                                    // Convertir la fecha al formato correcto
+                                    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+                                      const [day, month, year] = dateStr.split('/').map(Number);
+                                      // Formatear como DD/MM para la visualización
+                                      return `${day}/${month}`;
+                                    }
+                                    return dateStr;
+                                  }),
                                   labels: {
                                     style: {
                                       colors: theme.palette.text.secondary
@@ -3164,6 +3393,38 @@ const Finances = () => {
                                 tooltip: {
                                   y: {
                                     formatter: (value) => formatAmount(value)
+                                  },
+                                  x: {
+                                    formatter: (value, { dataPointIndex }) => {
+                                      // Obtener todas las entradas y ordenarlas por fecha
+                                      const sortedEntries = Object.entries(userData.savings.amountARSHistory)
+                                        .sort((a, b) => {
+                                          const dateA = a[1].date;
+                                          const dateB = b[1].date;
+                                          
+                                          if (dateA.includes('/') && dateB.includes('/')) {
+                                            const [dayA, monthA, yearA] = dateA.split('/').map(Number);
+                                            const [dayB, monthB, yearB] = dateB.split('/').map(Number);
+                                            
+                                            // Comparar año, luego mes, luego día
+                                            if (yearA !== yearB) return yearA - yearB;
+                                            if (monthA !== monthB) return monthA - monthB;
+                                            return dayA - dayB;
+                                          }
+                                          
+                                          // Fallback a comparación de strings
+                                          return dateA.localeCompare(dateB);
+                                        });
+                                      
+                                      // Obtener la fecha correspondiente al índice actual
+                                      const entry = sortedEntries[dataPointIndex]?.[1];
+                                      return entry ? entry.date : value;
+                                    }
+                                  },
+                                  theme: theme.palette.mode === 'dark' ? 'dark' : 'light',
+                                  style: {
+                                    fontSize: '12px',
+                                    fontFamily: theme.typography.fontFamily
                                   }
                                 },
                                 grid: {
@@ -3273,7 +3534,7 @@ const Finances = () => {
         />
       </SpeedDial>
 
-      </Container>
+      </Box>
     </Layout>
   );
 };
