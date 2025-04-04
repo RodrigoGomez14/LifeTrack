@@ -204,6 +204,9 @@ const Finances = () => {
   // Función para actualizar datos del mes seleccionado
   const updateMonthlyData = () => {
     const monthData = userData.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizar a las 00:00:00
+
     if (monthData) {
       // Preparar datos de categorías para el mes seleccionado
       const categoryData = {};
@@ -222,8 +225,27 @@ const Finances = () => {
             };
           }
           
-          // Si no está oculta de la lista, sumamos al total
-          if (!transaction.hiddenFromList) {
+          // Verificar si la transacción tiene fecha futura
+          let isFutureTransaction = false;
+          
+          if (transaction.date) {
+            let transactionDate;
+            // Convertir la fecha de la transacción al formato Date
+            if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
+              const [day, month, year] = transaction.date.split('/').map(Number);
+              transactionDate = new Date(year, month - 1, day);
+            } else {
+              transactionDate = new Date(transaction.date);
+            }
+            
+            // Si la fecha es válida y es posterior a hoy, es una transacción futura
+            if (!isNaN(transactionDate.getTime()) && transactionDate > today) {
+              isFutureTransaction = true;
+            }
+          }
+          
+          // Si no está oculta de la lista y no es una transacción futura, sumamos al total
+          if (!transaction.hiddenFromList && !isFutureTransaction) {
             categoryData[category].total += transaction.amount || 0;
             
             // Agregar subcategoría si existe
@@ -362,16 +384,40 @@ const Finances = () => {
     const expenseData = Array(12).fill(0);
     const incomeData = Array(12).fill(0);
     const balanceData = Array(12).fill(0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizar a las 00:00:00
     
-    // Llenar los datos de gastos e ingresos por mes, excluyendo transacciones ocultas
+    // Llenar los datos de gastos e ingresos por mes, excluyendo transacciones ocultas y futuras
     if (userData.finances?.expenses?.[selectedYear]?.months) {
       Object.keys(userData.finances.expenses[selectedYear].months).forEach(month => {
         const monthIndex = parseInt(month) - 1;
         const monthData = userData.finances.expenses[selectedYear].months[month];
         
-        // Si hay datos detallados, calcular el total excluyendo transacciones ocultas
+        // Si hay datos detallados, calcular el total excluyendo transacciones ocultas y futuras
         if (monthData.data && Array.isArray(monthData.data)) {
-          const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
+          // Filtrar para excluir transacciones ocultas
+          const visibleData = monthData.data.filter(transaction => {
+            // Comprobar si es una transacción futura
+            if (transaction.date) {
+              let transactionDate;
+              // Convertir la fecha de la transacción al formato Date
+              if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
+                const [day, month, year] = transaction.date.split('/').map(Number);
+                transactionDate = new Date(year, month - 1, day);
+              } else {
+                transactionDate = new Date(transaction.date);
+              }
+              
+              // Si la fecha es válida y es posterior a hoy, excluir esta transacción
+              if (!isNaN(transactionDate.getTime()) && transactionDate > today) {
+                return false;
+              }
+            }
+            
+            // Incluir solo si no está oculta
+            return !transaction.hiddenFromList;
+          });
+          
           expenseData[monthIndex] = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
         } else {
           // Si no hay datos detallados, usar el total (que puede incluir transacciones ocultas)
@@ -380,10 +426,42 @@ const Finances = () => {
       });
     }
     
+    // Hacer lo mismo para los ingresos
     if (userData.finances?.incomes?.[selectedYear]?.months) {
       Object.keys(userData.finances.incomes[selectedYear].months).forEach(month => {
         const monthIndex = parseInt(month) - 1;
-        incomeData[monthIndex] = userData.finances.incomes[selectedYear].months[month].total || 0;
+        const monthData = userData.finances.incomes[selectedYear].months[month];
+        
+        // Si hay datos detallados, calcular el total excluyendo transacciones ocultas y futuras
+        if (monthData.data && Array.isArray(monthData.data)) {
+          // Filtrar para excluir transacciones ocultas
+          const visibleData = monthData.data.filter(transaction => {
+            // Comprobar si es una transacción futura
+            if (transaction.date) {
+              let transactionDate;
+              // Convertir la fecha de la transacción al formato Date
+              if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
+                const [day, month, year] = transaction.date.split('/').map(Number);
+                transactionDate = new Date(year, month - 1, day);
+              } else {
+                transactionDate = new Date(transaction.date);
+              }
+              
+              // Si la fecha es válida y es posterior a hoy, excluir esta transacción
+              if (!isNaN(transactionDate.getTime()) && transactionDate > today) {
+                return false;
+              }
+            }
+            
+            // Incluir solo si no está oculta
+            return !transaction.hiddenFromList;
+          });
+          
+          incomeData[monthIndex] = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+        } else {
+          // Si no hay datos detallados, usar el total
+          incomeData[monthIndex] = monthData.total || 0;
+        }
       });
     }
     
@@ -1664,6 +1742,8 @@ const Finances = () => {
     // Obtener todas las transacciones, incluyendo las ocultas y las de tarjeta de crédito
     const getAllTransactions = () => {
       const allTransactions = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalizar el día actual a las 00:00:00
       
       // Obtener datos del mes actual directamente de userData, sin filtrar
       try {
@@ -1684,12 +1764,40 @@ const Finances = () => {
               transaction.creditCardTransaction = true;
             }
             
-            // Añadimos todas las transacciones sin filtrar
-            allTransactions.push({...transaction});
+            // Comprobar si la fecha de la transacción es futura
+            let transactionDate;
+            if (transaction.date) {
+              // Convertir la fecha de la transacción al formato Date
+              if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
+                const [day, month, year] = transaction.date.split('/').map(Number);
+                transactionDate = new Date(year, month - 1, day);
+              } else {
+                transactionDate = new Date(transaction.date);
+              }
+              
+              // Si la fecha es inválida, asumimos que no es futura
+              if (isNaN(transactionDate.getTime())) {
+                transactionDate = today;
+              }
+            } else {
+              // Si no hay fecha, asumimos que no es futura
+              transactionDate = today;
+            }
+            
+            // Solo incluimos la transacción si su fecha no es posterior a hoy
+            // o si está marcada como hiddenFromList (para mantener consistencia con datos existentes)
+            if (transactionDate <= today || transaction.hiddenFromList) {
+              // Añadimos la transacción sin modificar hiddenFromList
+              allTransactions.push({...transaction});
+            } else {
+              // Es una transacción futura, la añadimos pero marcada como oculta
+              allTransactions.push({...transaction, hiddenFromList: true, isFutureTransaction: true});
+            }
           });
           
-          console.log('Transacciones recuperadas:', allTransactions.length, 'incluyendo tarjetas:', 
-            allTransactions.filter(t => t.creditCardTransaction || t.paymentMethod === 'creditCard').length);
+          console.log('Transacciones recuperadas:', allTransactions.length, 
+            'incluyendo tarjetas:', allTransactions.filter(t => t.creditCardTransaction || t.paymentMethod === 'creditCard').length,
+            'ocultando futuras:', allTransactions.filter(t => t.isFutureTransaction).length);
         }
       } catch (error) {
         console.error('Error al cargar transacciones:', error);
@@ -1780,7 +1888,32 @@ const Finances = () => {
     
     // Filtrar transacciones según texto de búsqueda
     const getFilteredTransactions = () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalizar a las 00:00:00
+      
       return allTransactions.filter(transaction => {
+        // Excluir transacciones con fecha futura
+        if (transaction.isFutureTransaction || transaction.hiddenFromList) {
+          return false;
+        }
+        
+        // Verificar si la fecha es futura (doble verificación por seguridad)
+        if (transaction.date) {
+          let transactionDate;
+          // Convertir la fecha de la transacción al formato Date
+          if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
+            const [day, month, year] = transaction.date.split('/').map(Number);
+            transactionDate = new Date(year, month - 1, day);
+          } else {
+            transactionDate = new Date(transaction.date);
+          }
+          
+          // Si la fecha es válida y es posterior a hoy, excluir la transacción
+          if (!isNaN(transactionDate.getTime()) && transactionDate > today) {
+            return false;
+          }
+        }
+        
         // Filtrar por texto de búsqueda
         if (searchText) {
           const searchLower = searchText.toLowerCase();

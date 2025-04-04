@@ -34,7 +34,8 @@ import {
   ButtonGroup,
   FormControl,
   Select,
-  InputAdornment
+  InputAdornment,
+  InputLabel
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -202,6 +203,13 @@ const CreditCards = () => {
   const [saving, setSaving] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState(false);
+
+  // Estado para el diálogo de pago de tarjetas
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [numberOfPayments, setNumberOfPayments] = useState(1);
+  const [roundedAmount, setRoundedAmount] = useState(0);
+  const [paymentDates, setPaymentDates] = useState([]);
+  const [paymentAmounts, setPaymentAmounts] = useState([]); // Nuevo estado para los montos individuales
 
   useEffect(() => {
     if (userData?.creditCards) {
@@ -908,12 +916,110 @@ const CreditCards = () => {
     setSnackbarOpen(false);
   };
 
-  // Función para manejar el pago de todas las tarjetas
-  const handlePayCreditCard = () => {
+  // Calcular los próximos viernes
+  const calculateNextFridays = (count) => {
+    const fridays = [];
+    const today = new Date();
+    let nextFriday = new Date(today);
+    
+    // Avanzar hasta el próximo viernes (día 5)
+    while (nextFriday.getDay() !== 5) {
+      nextFriday.setDate(nextFriday.getDate() + 1);
+    }
+    
+    // Añadir el primer viernes
+    fridays.push(new Date(nextFriday));
+    
+    // Añadir los siguientes viernes si es necesario
+    for (let i = 1; i < count; i++) {
+      const newFriday = new Date(fridays[i-1]);
+      newFriday.setDate(newFriday.getDate() + 7);
+      fridays.push(newFriday);
+    }
+    
+    return fridays;
+  };
+
+  // Función para actualizar el número de pagos
+  const handlePaymentCountChange = (event) => {
+    const count = parseInt(event.target.value, 10);
+    setNumberOfPayments(count);
+    const newDates = calculateNextFridays(count);
+    setPaymentDates(newDates);
+    
+    // Inicializar los montos divididos equitativamente
+    const equalAmount = roundedAmount / count;
+    const newAmounts = Array(count).fill(equalAmount);
+    setPaymentAmounts(newAmounts);
+  };
+
+  // Nueva función para actualizar el monto de una cuota específica
+  const handlePaymentAmountChange = (index, value) => {
+    const newValue = parseFloat(value) || 0;
+    const newAmounts = [...paymentAmounts];
+    newAmounts[index] = newValue;
+    
+    // Actualizar los montos restantes
+    if (index === paymentAmounts.length - 1) {
+      // Si es el último pago, ajustamos el monto total
+      const newTotal = newAmounts.reduce((sum, amount) => sum + amount, 0);
+      setRoundedAmount(newTotal);
+    } else {
+      // Si no es el último pago, ajustamos el último pago para mantener el total
+      const totalWithoutLast = newAmounts.slice(0, -1).reduce((sum, amount) => sum + amount, 0);
+      newAmounts[newAmounts.length - 1] = roundedAmount - totalWithoutLast;
+    }
+    
+    setPaymentAmounts(newAmounts);
+  };
+
+  // Función para abrir el diálogo de pago
+  const handleOpenPaymentDialog = () => {
     const totalAmount = getAllCardsTotal();
     
     if (totalAmount <= 0) {
       showAlert("No hay gastos para pagar en ninguna tarjeta", "warning");
+      return;
+    }
+
+    // Inicializar con valores predeterminados
+    const initialRoundedAmount = Math.ceil(totalAmount / 100) * 100; // Redondeo a 100
+    setRoundedAmount(initialRoundedAmount);
+    setNumberOfPayments(1);
+    const newDates = calculateNextFridays(1);
+    setPaymentDates(newDates);
+    
+    // Inicializar el arreglo de montos
+    setPaymentAmounts([initialRoundedAmount]);
+    
+    // Abrir el diálogo
+    setPaymentDialogOpen(true);
+  };
+
+  // Función para cerrar el diálogo de pago
+  const handleClosePaymentDialog = () => {
+    setPaymentDialogOpen(false);
+  };
+
+  // Función para manejar el pago de todas las tarjetas
+  const handlePayCreditCard = () => {
+    // Abrir el diálogo de configuración de pago en lugar de procesar el pago directamente
+    handleOpenPaymentDialog();
+  };
+
+  // Función para procesar el pago después de configurarlo
+  const processCardPayment = () => {
+    const totalAmount = getAllCardsTotal();
+    
+    if (totalAmount <= 0) {
+      showAlert("No hay gastos para pagar en ninguna tarjeta", "warning");
+      return;
+    }
+
+    // Verificar que la suma de los pagos sea igual al monto redondeado
+    const totalPayments = paymentAmounts.reduce((sum, amount) => sum + amount, 0);
+    if (Math.abs(totalPayments - roundedAmount) > 0.01) {
+      showAlert("La suma de los pagos no coincide con el monto total", "error");
       return;
     }
 
@@ -923,80 +1029,82 @@ const CreditCards = () => {
     // Obtener el saldo actual de ahorros o usar 0 como valor predeterminado
     const currentSavings = userData?.savings?.amountARS || 0;
     
-    // Obtener la fecha actual en formato DD/MM/YYYY para registrar el pago
-    const today = new Date();
-    const formattedDate = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
-    
     // Crear el formato de mes seleccionado para paymentMonth
     const selectedPaymentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     
-    // Datos para el gasto
-    const expenseData = {
-      amount: totalAmount,
-      amountUSD: totalAmount / dollarRateVenta,
-      category: "Servicios",
-      subcategory: "Tarjetas de Crédito",
-      date: formattedDate,
-      description: `Pago total de tarjetas de crédito - ${getMonthName(selectedMonth)} ${selectedYear}`,
-      valorUSD: dollarRateVenta,
-      paymentMethod: 'cash',
-      creditCardPayment: true,
-      paymentMonth: selectedPaymentMonth // Usar el mes seleccionado, no el mes actual
-    };
+    // Antes de continuar, mostrar un mensaje de carga
+    setSnackbarMessage("Procesando pago...");
+    setSnackbarSeverity("info");
+    setSnackbarOpen(true);
 
-    // Datos del pago para el nuevo nodo específico de pagos de tarjetas
-    const paymentData = {
-      amount: totalAmount,
-      date: formattedDate,
+    // Cerrar el diálogo
+    setPaymentDialogOpen(false);
+    
+    // Operaciones de base de datos en paralelo
+    const updates = {};
+    
+    // Registrar en creditCardPayments (nodo global para compatibilidad)
+    updates[`${auth.currentUser.uid}/creditCardPayments/${selectedPaymentMonth}`] = {
+      amount: roundedAmount,
+      date: `${paymentDates[0].getDate()}/${paymentDates[0].getMonth() + 1}/${paymentDates[0].getFullYear()}`,
       description: `Pago total de tarjetas - ${getMonthName(selectedMonth)} ${selectedYear}`,
       paymentDate: new Date().toISOString(),
+      numberOfPayments: numberOfPayments,
+      paymentAmounts: paymentAmounts, // Guardar los montos individuales
       cardDetails: cards.map(card => ({
         id: card.id,
         name: card.name,
         amount: getCardTotal(card.id)
       }))
     };
-
-    // Antes de continuar, mostrar un mensaje de carga
-    setSnackbarMessage("Procesando pago...");
-    setSnackbarSeverity("info");
-    setSnackbarOpen(true);
     
-    // Ya no necesitamos manipular paymentDisabled directamente
-    // Deshabilitar inmediatamente el botón para evitar doble clic
-    // setPaymentDisabled(true);
-
-    // Operaciones de base de datos en paralelo
-    const updates = {};
-    
-    // 1. Registrar en expenses
-    const newExpenseKey = database.ref().child(`${auth.currentUser.uid}/expenses`).push().key;
-    updates[`${auth.currentUser.uid}/expenses/${newExpenseKey}`] = expenseData;
-    
-    // 2. Registrar en creditCardPayments (nodo global para compatibilidad)
-    updates[`${auth.currentUser.uid}/creditCardPayments/${selectedPaymentMonth}`] = paymentData;
-    
-    // 3. Registrar pagos individuales por cada tarjeta
+    // Registrar pagos individuales por cada tarjeta
     cards.forEach(card => {
       const cardAmount = getCardTotal(card.id);
       if (cardAmount > 0) {
         updates[`${auth.currentUser.uid}/creditCards/${card.id}/payments/${selectedPaymentMonth}`] = {
           amount: cardAmount,
-          date: formattedDate,
-          paymentDate: new Date().toISOString()
+          date: `${paymentDates[0].getDate()}/${paymentDates[0].getMonth() + 1}/${paymentDates[0].getFullYear()}`,
+          paymentDate: new Date().toISOString(),
+          numberOfPayments: numberOfPayments,
+          paymentAmounts: paymentAmounts // Guardar los montos individuales
         };
       }
     });
     
-    // 4. Actualizar savings
-    updates[`${auth.currentUser.uid}/savings/amountARS`] = currentSavings - totalAmount;
+    // Crear múltiples gastos para los pagos
+    for (let i = 0; i < numberOfPayments; i++) {
+      const paymentDate = paymentDates[i];
+      const formattedDate = `${paymentDate.getDate()}/${paymentDate.getMonth() + 1}/${paymentDate.getFullYear()}`;
+      
+      // Datos para el gasto, usando el monto individual
+      const expenseData = {
+        amount: paymentAmounts[i],
+        amountUSD: paymentAmounts[i] / dollarRateVenta,
+        category: "Servicios",
+        subcategory: "Tarjetas de Crédito",
+        date: formattedDate,
+        description: `Pago ${i+1}/${numberOfPayments} tarjetas - ${getMonthName(selectedMonth)} ${selectedYear}`,
+        valorUSD: dollarRateVenta,
+        paymentMethod: 'cash',
+        creditCardPayment: true,
+        paymentMonth: selectedPaymentMonth
+      };
+      
+      // Registrar gasto
+      const newExpenseKey = database.ref().child(`${auth.currentUser.uid}/expenses`).push().key;
+      updates[`${auth.currentUser.uid}/expenses/${newExpenseKey}`] = expenseData;
+    }
     
-    // 5. Registrar en historial de savings
+    // Actualizar savings (reducir por el monto total)
+    updates[`${auth.currentUser.uid}/savings/amountARS`] = currentSavings - roundedAmount;
+    
+    // Registrar en historial de savings
     const newHistoryKey = database.ref().child(`${auth.currentUser.uid}/savings/amountARSHistory`).push().key;
     updates[`${auth.currentUser.uid}/savings/amountARSHistory/${newHistoryKey}`] = {
-      date: formattedDate,
-      amount: -totalAmount,
-      newTotal: (currentSavings - totalAmount),
+      date: `${paymentDates[0].getDate()}/${paymentDates[0].getMonth() + 1}/${paymentDates[0].getFullYear()}`,
+      amount: -roundedAmount,
+      newTotal: (currentSavings - roundedAmount),
     };
     
     // Ejecutar todas las actualizaciones como una transacción
@@ -1005,18 +1113,11 @@ const CreditCards = () => {
         // Confirmar que se completó la actualización correctamente
         checkMonthPaymentStatus();
         
-        showAlert(`Pago de $${formatAmount(totalAmount)} registrado correctamente para ${getMonthName(selectedMonth)} ${selectedYear}`, "success");
-        
-        // Ya no necesitamos manipular paymentDisabled directamente
-        // Asegurarse de que el botón quede desactivado
-        // setPaymentDisabled(true);
+        showAlert(`Pago de $${formatAmount(roundedAmount)} registrado en ${numberOfPayments} cuota(s) para ${getMonthName(selectedMonth)} ${selectedYear}`, "success");
       })
       .catch(error => {
         console.error("Error al registrar el pago:", error);
         showAlert("Error al procesar el pago", "error");
-        // Ya no necesitamos manipular paymentDisabled directamente
-        // Reactivar el botón en caso de error
-        // setPaymentDisabled(false);
       });
   };
 
@@ -3352,6 +3453,120 @@ const CreditCards = () => {
             }}
           >
             {saving ? 'Guardando...' : 'Guardar Fechas'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Diálogo para configurar pagos de tarjetas */}
+      <Dialog
+        open={paymentDialogOpen}
+        onClose={handleClosePaymentDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Configurar Pago de Tarjetas</DialogTitle>
+        <DialogContent>
+          <Box sx={{ my: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Total de tarjetas: {formatAmount(getAllCardsTotal())}
+            </Typography>
+            
+            <TextField
+              label="Monto redondeado"
+              type="number"
+              value={roundedAmount}
+              onChange={(e) => {
+                const newValue = Number(e.target.value);
+                setRoundedAmount(newValue);
+                // Actualizar los montos individuales proporcionalmente
+                if (paymentAmounts.length > 0) {
+                  const equalAmount = newValue / paymentAmounts.length;
+                  setPaymentAmounts(Array(paymentAmounts.length).fill(equalAmount));
+                }
+              }}
+              fullWidth
+              margin="normal"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              }}
+            />
+            
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Número de pagos</InputLabel>
+              <Select
+                value={numberOfPayments}
+                onChange={handlePaymentCountChange}
+                label="Número de pagos"
+              >
+                <MenuItem value={1}>1 pago</MenuItem>
+                <MenuItem value={2}>2 pagos</MenuItem>
+                <MenuItem value={3}>3 pagos</MenuItem>
+              </Select>
+            </FormControl>
+            
+            <Box sx={{ mt: 3, mb: 1 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Detalle de pagos:
+              </Typography>
+              <List>
+                {paymentDates.map((date, index) => (
+                  <ListItem key={index} sx={{ py: 1, bgcolor: index % 2 === 0 ? 'rgba(0,0,0,0.03)' : 'transparent', borderRadius: 1 }}>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={8}>
+                        <ListItemText
+                          primary={`Pago ${index + 1}`}
+                          secondary={`Viernes, ${date.getDate()} de ${getMonthName(date.getMonth() + 1).toLowerCase()} de ${date.getFullYear()}`}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          label="Monto"
+                          type="number"
+                          value={paymentAmounts[index] || 0}
+                          onChange={(e) => handlePaymentAmountChange(index, e.target.value)}
+                          fullWidth
+                          size="small"
+                          InputProps={{
+                            startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </ListItem>
+                ))}
+              </List>
+              
+              {/* Mostrar el total de los pagos */}
+              {numberOfPayments > 1 && (
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="subtitle2">
+                    Total de pagos:
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {formatAmount(paymentAmounts.reduce((sum, amount) => sum + amount, 0))}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+            
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" color="text.secondary">
+                Los pagos se realizarán en los viernes indicados, y las tarjetas se marcarán como pagadas después de completar todos los pagos.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePaymentDialog} color="inherit">
+            Cancelar
+          </Button>
+          <Button 
+            onClick={processCardPayment} 
+            variant="contained" 
+            color="primary"
+            startIcon={<PaymentIcon />}
+          >
+            Procesar Pagos
           </Button>
         </DialogActions>
       </Dialog>

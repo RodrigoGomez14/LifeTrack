@@ -89,94 +89,135 @@ function App() {
     let groupedPlants = {};
     let groupedHabits = {};
 
+    // Procesar ingresos
     if (data.incomes) {
       Object.keys(data.incomes).forEach((transactionId) => {
         const transaction = data.incomes[transactionId];
-        const [, month, year] = transaction.date.split('/').map(Number);
-        if (!groupdedFinances.incomes[year]) {
-          groupdedFinances.incomes[year] = {
-            total: 0,
-            totalUSD: 0,
-            months: {
-              1: { total: 0, totalUSD: 0, data: [] },
-              2: { total: 0, totalUSD: 0, data: [] },
-              3: { total: 0, totalUSD: 0, data: [] },
-              4: { total: 0, totalUSD: 0, data: [] },
-              5: { total: 0, totalUSD: 0, data: [] },
-              6: { total: 0, totalUSD: 0, data: [] },
-              7: { total: 0, totalUSD: 0, data: [] },
-              8: { total: 0, totalUSD: 0, data: [] },
-              9: { total: 0, totalUSD: 0, data: [] },
-              10: { total: 0, totalUSD: 0, data: [] },
-              11: { total: 0, totalUSD: 0, data: [] },
-              12: { total: 0, totalUSD: 0, data: [] },
-            },
-          };
-        }
+        if (transaction && transaction.date) {
+          const [, month, year] = transaction.date.split('/').map(Number);
+          if (!groupdedFinances.incomes[year]) {
+            groupdedFinances.incomes[year] = {
+              total: 0,
+              totalUSD: 0,
+              months: {
+                1: { total: 0, totalUSD: 0, data: [] },
+                2: { total: 0, totalUSD: 0, data: [] },
+                3: { total: 0, totalUSD: 0, data: [] },
+                4: { total: 0, totalUSD: 0, data: [] },
+                5: { total: 0, totalUSD: 0, data: [] },
+                6: { total: 0, totalUSD: 0, data: [] },
+                7: { total: 0, totalUSD: 0, data: [] },
+                8: { total: 0, totalUSD: 0, data: [] },
+                9: { total: 0, totalUSD: 0, data: [] },
+                10: { total: 0, totalUSD: 0, data: [] },
+                11: { total: 0, totalUSD: 0, data: [] },
+                12: { total: 0, totalUSD: 0, data: [] },
+              },
+            };
+          }
 
-        groupdedFinances.incomes[year].months[month].data.push(transaction);
-        groupdedFinances.incomes[year].months[month].total += transaction.amount;
-        groupdedFinances.incomes[year].months[month].totalUSD += transaction.amountUSD;
-        groupdedFinances.incomes[year].total += transaction.amount;
-        groupdedFinances.incomes[year].totalUSD += transaction.amountUSD;
+          groupdedFinances.incomes[year].months[month].data.push(transaction);
+          groupdedFinances.incomes[year].months[month].total += transaction.amount;
+          groupdedFinances.incomes[year].months[month].totalUSD += transaction.amountUSD;
+          groupdedFinances.incomes[year].total += transaction.amount;
+          groupdedFinances.incomes[year].totalUSD += transaction.amountUSD;
+        } else {
+          console.warn(`Transacción de ingreso ${transactionId} sin fecha válida:`, transaction);
+        }
       });
     }
 
+    // Procesar gastos
     if (data.expenses) {
       Object.keys(data.expenses).forEach((transactionId) => {
         const transaction = data.expenses[transactionId];
-        const [, month, year] = transaction.date.split('/').map(Number);
-        if (!groupdedFinances.expenses[year]) {
-          groupdedFinances.expenses[year] = {
-            total: 0,
-            totalUSD: 0,
-            months: {
-              1: { total: 0, totalUSD: 0, data: [] },
-              2: { total: 0, totalUSD: 0, data: [] },
-              3: { total: 0, totalUSD: 0, data: [] },
-              4: { total: 0, totalUSD: 0, data: [] },
-              5: { total: 0, totalUSD: 0, data: [] },
-              6: { total: 0, totalUSD: 0, data: [] },
-              7: { total: 0, totalUSD: 0, data: [] },
-              8: { total: 0, totalUSD: 0, data: [] },
-              9: { total: 0, totalUSD: 0, data: [] },
-              10: { total: 0, totalUSD: 0, data: [] },
-              11: { total: 0, totalUSD: 0, data: [] },
-              12: { total: 0, totalUSD: 0, data: [] },
-            },
-          };
+        if (transaction && transaction.date) {
+          const [, month, year] = transaction.date.split('/').map(Number);
+          if (!groupdedFinances.expenses[year]) {
+            groupdedFinances.expenses[year] = {
+              total: 0,
+              totalUSD: 0,
+              months: {
+                1: { total: 0, totalUSD: 0, data: [] },
+                2: { total: 0, totalUSD: 0, data: [] },
+                3: { total: 0, totalUSD: 0, data: [] },
+                4: { total: 0, totalUSD: 0, data: [] },
+                5: { total: 0, totalUSD: 0, data: [] },
+                6: { total: 0, totalUSD: 0, data: [] },
+                7: { total: 0, totalUSD: 0, data: [] },
+                8: { total: 0, totalUSD: 0, data: [] },
+                9: { total: 0, totalUSD: 0, data: [] },
+                10: { total: 0, totalUSD: 0, data: [] },
+                11: { total: 0, totalUSD: 0, data: [] },
+                12: { total: 0, totalUSD: 0, data: [] },
+              },
+            };
+          }
+          
+          groupdedFinances.expenses[year].months[month].data.push(transaction);
+          groupdedFinances.expenses[year].months[month].total += transaction.amount;
+          groupdedFinances.expenses[year].months[month].totalUSD += transaction.amountUSD;
+          groupdedFinances.expenses[year].total += transaction.amount;
+          groupdedFinances.expenses[year].totalUSD += transaction.amountUSD;
+        } else {
+          console.warn(`Transacción de gasto ${transactionId} sin fecha válida:`, transaction);
         }
-        
-        groupdedFinances.expenses[year].months[month].data.push(transaction);
-        groupdedFinances.expenses[year].months[month].total += transaction.amount;
-        groupdedFinances.expenses[year].months[month].totalUSD += transaction.amountUSD;
-        groupdedFinances.expenses[year].total += transaction.amount;
-        groupdedFinances.expenses[year].totalUSD += transaction.amountUSD;
       });
     }
     
+    // Procesar ahorros
     if (data.savings) {
-      groupedSavings = data.savings
-    }
-    if(data.plants){
-      groupedPlants['active'] = data.plants.active
-      let aditives = {fertilizantes:{},insecticidas:{}}
-      Object.keys(data.plants.aditives).forEach((aditiveId) => {
-        if(data.plants.aditives[aditiveId].type==='Fertilizante'){
-          aditives.fertilizantes[aditiveId]=data.plants.aditives[aditiveId]
-        }
-        else{
-          aditives.insecticidas[aditiveId]=data.plants.aditives[aditiveId]
-        }
-      });
-      groupedPlants['aditives']=aditives
+      groupedSavings = data.savings;
     }
 
+    // Procesar plantas
+    if(data.plants){
+      groupedPlants['active'] = data.plants.active;
+      let aditives = {fertilizantes:{},insecticidas:{}};
+      Object.keys(data.plants.aditives).forEach((aditiveId) => {
+        if(data.plants.aditives[aditiveId].type==='Fertilizante'){
+          aditives.fertilizantes[aditiveId]=data.plants.aditives[aditiveId];
+        }
+        else{
+          aditives.insecticidas[aditiveId]=data.plants.aditives[aditiveId];
+        }
+      });
+      groupedPlants['aditives']=aditives;
+    }
+
+    // Procesar hábitos
     if(data.habits) {
       groupedHabits = data.habits;
     }
 
-    let groupedCreditCards = data.creditCards || {};
+    // Procesar tarjetas de crédito y asegurarse de que los pagos tengan estructura correcta
+    let groupedCreditCards = {};
+    if(data.creditCards) {
+      // Hacer una copia de tarjetas de crédito
+      groupedCreditCards = JSON.parse(JSON.stringify(data.creditCards));
+      
+      // Procesar cada tarjeta
+      Object.keys(groupedCreditCards).forEach(cardId => {
+        // Si es el nodo de transactions, saltar
+        if (cardId === 'transactions') return;
+        
+        // Si la tarjeta tiene pagos, asegurarse de que cada pago tenga un formato válido
+        if (groupedCreditCards[cardId]?.payments) {
+          // Iterar sobre cada mes de pago
+          Object.keys(groupedCreditCards[cardId].payments).forEach(paymentMonth => {
+            // Asegurarse de que el objeto de pago tenga las propiedades esperadas
+            const payment = groupedCreditCards[cardId].payments[paymentMonth];
+            if (payment && typeof payment === 'object') {
+              // Si no tiene fecha, agregar una por defecto
+              if (!payment.date) {
+                console.warn(`Pago de tarjeta ${cardId} para ${paymentMonth} sin fecha, agregando una fecha por defecto`);
+                payment.date = '1/1/2023'; // Fecha por defecto
+              }
+            }
+          });
+        }
+      });
+    }
 
     return { 
       finances: groupdedFinances, 
