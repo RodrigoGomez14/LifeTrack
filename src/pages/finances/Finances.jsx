@@ -637,9 +637,29 @@ const Finances = () => {
     const isCurrentMonth = selectedMonth === (new Date().getMonth() + 1) && selectedYear === new Date().getFullYear();
     
     // Limitar la navegación al mes actual
-    const isAtCurrentLimit = isCurrentMonth || 
-      (selectedYear > new Date().getFullYear()) || 
-      (selectedYear === new Date().getFullYear() && selectedMonth > new Date().getMonth() + 1);
+    const isAtCurrentLimit = (() => {
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1; // 1-12
+      const currentYear = today.getFullYear();
+      
+      // Calcular cuál sería el mes y año siguiente
+      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+      
+      // Permitir navegación normal en años pasados, excepto si navegamos al año actual
+      // a un mes más allá del límite permitido
+      if (selectedYear < currentYear && nextYear < currentYear) {
+        return false;
+      }
+      
+      // Si navegaríamos al año actual, verificar el límite de meses
+      if (nextYear === currentYear && nextMonth <= currentMonth) {
+        return false;
+      }
+      
+      // En cualquier otro caso, deshabilitar
+      return true;
+    })();
     
     // Función para manejar la navegación al mes siguiente teniendo en cuenta el límite
     const handleNextMonthWithLimit = () => {
@@ -647,8 +667,22 @@ const Finances = () => {
       const currentMonth = currentDate.getMonth() + 1;
       const currentYear = currentDate.getFullYear();
       
-      // Solo permitir avanzar hasta el mes actual
-      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      // Calcular cuál sería el mes y año siguiente
+      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+      
+      // Verificar si estamos intentando ir a un mes futuro más allá del límite
+      const isFutureLimitExceeded = 
+        (nextYear > currentYear) || 
+        (nextYear === currentYear && nextMonth > currentMonth);
+      
+      // Si excede el límite y estamos en un año anterior, ir al mes actual del año actual
+      if (isFutureLimitExceeded && selectedYear < currentYear) {
+        setSelectedMonth(currentMonth);
+        setSelectedYear(currentYear);
+      } 
+      // Si no excede el límite o estamos navegando normalmente, avanzar un mes
+      else if (!isFutureLimitExceeded) {
         if (selectedMonth === 12) {
           setSelectedMonth(1);
           setSelectedYear(selectedYear + 1);
@@ -656,6 +690,7 @@ const Finances = () => {
           setSelectedMonth(selectedMonth + 1);
         }
       }
+      // Si excede el límite y estamos en el año actual, no hacer nada (botón debería estar deshabilitado)
     };
     
     return (
@@ -1082,7 +1117,23 @@ const Finances = () => {
                   <span>
                     <IconButton
                       size="small"
-                      onClick={() => selectedYear < new Date().getFullYear() && setSelectedYear(selectedYear + 1)}
+                      onClick={() => {
+                        const nextYear = selectedYear + 1;
+                        const today = new Date();
+                        const currentMonth = today.getMonth() + 1; // 1-12
+                        const currentYear = today.getFullYear();
+                        
+                        // Si el año al que vamos es el actual Y el mes seleccionado
+                        // está más allá del mes actual, ajustamos al mes actual
+                        if (nextYear === currentYear && selectedMonth > currentMonth) {
+                          setSelectedMonth(currentMonth);
+                        }
+                        
+                        // Solo avanzar si no estamos ya en el año actual o futuro
+                        if (selectedYear < currentYear) {
+                          setSelectedYear(nextYear);
+                        }
+                      }}
                       aria-label="Año siguiente"
                       disabled={selectedYear >= new Date().getFullYear()}
                       sx={{ 
