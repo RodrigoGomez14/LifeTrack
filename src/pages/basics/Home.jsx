@@ -112,30 +112,70 @@ const Home = () => {
     fetchDolarOficial();
   }, []);
 
+  // Función auxiliar para parsear fechas con flexibilidad
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    
+    try {
+      // Intentar formato DD/MM/YYYY
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/').map(Number);
+        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+          const date = new Date(year, month - 1, day);
+          // Resetear la hora para comparar solo la fecha
+          date.setHours(0, 0, 0, 0);
+          if (!isNaN(date.getTime())) return date;
+        }
+      }
+      
+      // Intentar otros formatos estándar
+      const date = new Date(dateStr);
+      // Resetear la hora para comparar solo la fecha
+      date.setHours(0, 0, 0, 0);
+      if (!isNaN(date.getTime())) return date;
+
+    } catch (e) {
+      console.warn(`Error parsing date: ${dateStr}`, e);
+    }
+    
+    return null; // Devolver null si no se pudo parsear
+  };
+
   // Funciones auxiliares para comprobar si existen los datos
   const getIncomeTotal = () => {
-    if (!userData?.finances?.incomes?.[currentYear]?.months?.[currentMonth]) {
+    const monthData = userData?.finances?.incomes?.[currentYear]?.months?.[currentMonth];
+    if (!monthData || !monthData.data || !Array.isArray(monthData.data)) {
       return 0;
     }
-    return userData.finances.incomes[currentYear].months[currentMonth].total;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Asegurar comparación solo por fecha
+
+    return monthData.data
+      .filter(transaction => {
+        const transactionDate = parseDate(transaction.date);
+        return transactionDate && transactionDate <= today;
+      })
+      .reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
   }
 
   const getExpenseTotal = () => {
-    if (!userData?.finances?.expenses?.[currentYear]?.months?.[currentMonth]) {
+    const monthData = userData?.finances?.expenses?.[currentYear]?.months?.[currentMonth];
+    if (!monthData || !monthData.data || !Array.isArray(monthData.data)) {
       return 0;
     }
     
-    // Si hay datos, pero necesitamos excluir las transacciones ocultas (pagos con tarjeta)
-    const monthData = userData.finances.expenses[currentYear].months[currentMonth];
-    
-    // Si hay transacciones, filtrar las que están marcadas como ocultas (hiddenFromList)
-    if (monthData.data && Array.isArray(monthData.data)) {
-      const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
-      return visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
-    }
-    
-    // Si no hay datos detallados, usar el total
-    return monthData.total || 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Asegurar comparación solo por fecha
+
+    return monthData.data
+      .filter(transaction => {
+        if (transaction.hiddenFromList) return false; // Excluir transacciones ocultas
+        const transactionDate = parseDate(transaction.date);
+        return transactionDate && transactionDate <= today;
+      })
+      .reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
   }
 
   const getBalance = () => {
@@ -186,13 +226,23 @@ const Home = () => {
       return [];
     }
     
-    // Filtrar transacciones ocultas y agrupar por categoría
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Asegurar comparación solo por fecha
+
+    // Filtrar transacciones ocultas, por fecha y agrupar por categoría
     const categoryTotals = {};
+    const currentExpenseTotal = getExpenseTotal(); // Usar el total ya filtrado por fecha
     
-    monthData.data.filter(tx => !tx.hiddenFromList).forEach(transaction => {
-      const category = transaction.category || 'Sin categoría';
-      categoryTotals[category] = (categoryTotals[category] || 0) + (transaction.amount || 0);
-    });
+    monthData.data
+      .filter(tx => {
+        if (tx.hiddenFromList) return false;
+        const transactionDate = parseDate(tx.date);
+        return transactionDate && transactionDate <= today;
+      })
+      .forEach(transaction => {
+        const category = transaction.category || 'Sin categoría';
+        categoryTotals[category] = (categoryTotals[category] || 0) + (transaction.amount || 0);
+      });
     
     // Convertir a array y ordenar
     return Object.entries(categoryTotals)
@@ -201,7 +251,7 @@ const Home = () => {
       .map(([category, amount]) => ({
         category,
         amount,
-        percentage: (amount / getExpenseTotal()) * 100
+        percentage: currentExpenseTotal > 0 ? (amount / currentExpenseTotal) * 100 : 0 // Evitar división por cero
       }));
   };
 
@@ -236,19 +286,28 @@ const Home = () => {
         if (userData?.finances?.expenses) {
           Object.keys(userData.finances.expenses).forEach(year => {
             Object.keys(userData.finances.expenses[year].months || {}).forEach(month => {
-              const auxFecha = new Date();
-              auxFecha.setFullYear(year, month - 1, 1);
-              if (auxFecha >= initialDate && auxFecha <= fecha) {
-                // Revisar si hay datos detallados para filtrar transacciones ocultas
-                const monthData = userData.finances.expenses[year].months[month];
-                if (monthData.data && Array.isArray(monthData.data)) {
-                  // Filtrar transacciones ocultas (tarjetas de crédito)
-                  const visibleData = monthData.data.filter(transaction => !transaction.hiddenFromList);
-                  auxExpenses[month - 1] += visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
-                } else {
-                  // Si no hay datos detallados, usar el total (aunque podría incluir ocultos)
-                  auxExpenses[month - 1] += monthData.total;
-                }
+              const monthData = userData.finances.expenses[year].months[month];
+              const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+              monthDate.setHours(0,0,0,0); // Normalizar fecha del mes
+              fecha.setHours(0,0,0,0); // Normalizar fecha actual
+              initialDate.setHours(0,0,0,0); // Normalizar fecha inicial
+
+              if (monthData.data && Array.isArray(monthData.data) && monthDate >= initialDate && monthDate <= fecha) {
+                  const monthTotal = monthData.data
+                    .filter(transaction => {
+                      if (transaction.hiddenFromList) return false;
+                      const transactionDate = parseDate(transaction.date);
+                      // Incluir solo transacciones hasta la fecha actual si es el mes y año actual
+                      if (parseInt(year) === currentYear && parseInt(month) === currentMonth) {
+                        return transactionDate && transactionDate <= currentDate;
+                      } 
+                      return true; // Incluir todas las transacciones para meses anteriores
+                    })
+                    .reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+                  auxExpenses[parseInt(month) - 1] = monthTotal; // Usar el total filtrado por fecha para el mes actual
+              } else if (monthData.total && monthDate >= initialDate && monthDate <= fecha && !(parseInt(year) === currentYear && parseInt(month) === currentMonth)) {
+                // Para meses anteriores sin datos detallados, usar el total (puede ser impreciso si hay ocultos)
+                auxExpenses[parseInt(month) - 1] = monthData.total;
               }
             });
           });
@@ -258,10 +317,27 @@ const Home = () => {
         if (userData?.finances?.incomes) {
           Object.keys(userData.finances.incomes).forEach(year => {
             Object.keys(userData.finances.incomes[year].months || {}).forEach(month => {
-              const auxFecha = new Date();
-              auxFecha.setFullYear(year, month - 1, 1);
-              if (auxFecha >= initialDate && auxFecha <= fecha) {
-                auxIncomes[month - 1] += (userData.finances.incomes[year].months[month].total);
+              const monthData = userData.finances.incomes[year].months[month];
+              const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+              monthDate.setHours(0,0,0,0); // Normalizar fecha del mes
+              fecha.setHours(0,0,0,0); // Normalizar fecha actual
+              initialDate.setHours(0,0,0,0); // Normalizar fecha inicial
+              
+              if (monthData.data && Array.isArray(monthData.data) && monthDate >= initialDate && monthDate <= fecha) {
+                  const monthTotal = monthData.data
+                    .filter(transaction => {
+                      const transactionDate = parseDate(transaction.date);
+                      // Incluir solo transacciones hasta la fecha actual si es el mes y año actual
+                      if (parseInt(year) === currentYear && parseInt(month) === currentMonth) {
+                        return transactionDate && transactionDate <= currentDate;
+                      }
+                      return true; // Incluir todas las transacciones para meses anteriores
+                    })
+                    .reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+                  auxIncomes[parseInt(month) - 1] = monthTotal; // Usar el total filtrado por fecha para el mes actual
+              } else if (monthData.total && monthDate >= initialDate && monthDate <= fecha && !(parseInt(year) === currentYear && parseInt(month) === currentMonth)) {
+                // Para meses anteriores sin datos detallados, usar el total
+                auxIncomes[parseInt(month) - 1] = monthData.total;
               }
             });
           });

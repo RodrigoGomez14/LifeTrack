@@ -1,83 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import Layout from '../../components/layout/Layout';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button, 
-  Grid, 
-  Container,
-  Paper,
-  Avatar,
-  Stack,
-  Chip,
-  IconButton,
-  Divider,
-  TextField,
-  Tabs,
-  Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Tooltip,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
-  Link,
-  CardHeader,
-  ButtonGroup,
-  FormControl,
-  Select,
-  InputAdornment,
-  InputLabel
-} from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { useStore } from '../../store';
-import MonthNavigator from '../../components/finances/MonthNavigator';
-import { getMonthlySummary, formatAmount, getMonthName, getDate } from '../../utils';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { alpha } from '@mui/material/styles';
 import {
-  Add as AddIcon,
-  DeleteOutline as DeleteIcon,
-  EditOutlined as EditIcon,
-  FileUploadOutlined as UploadIcon,
-  FileDownloadOutlined as DownloadIcon,
-  Payment as PaymentIcon,
-  CalendarToday as CalendarTodayIcon, 
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon,
-  Receipt as ReceiptIcon,
-  CreditCard as CreditCardIcon,
-  // ... existing icons ...
-} from '@mui/icons-material';
+  Box, Card, Grid, Typography, MenuItem, Select, FormControl, InputLabel, Button, Dialog,
+  DialogTitle, DialogContent, DialogActions, TextField, IconButton, Tooltip, CircularProgress,
+  Chip, Paper, Divider, FormHelperText, List, ListItem, ListItemText
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import SearchIcon from '@mui/icons-material/Search';
+import SortIcon from '@mui/icons-material/Sort';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import LocalMallIcon from '@mui/icons-material/LocalMall';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import HomeIcon from '@mui/icons-material/Home';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import PaymentIcon from '@mui/icons-material/Payment';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DateRangeIcon from '@mui/icons-material/DateRange';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DownloadIcon from '@mui/icons-material/Download';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useTheme } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
 import { database, auth, storage } from '../../firebase';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import TodayIcon from '@mui/icons-material/Today';
 import EventIcon from '@mui/icons-material/Event';
+import InfoIcon from '@mui/icons-material/Info';
 import SaveIcon from '@mui/icons-material/Save';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
-import CreditCardMovements from './CreditCardMovements';
+// Imports: Agregar los imports necesarios para nuestro nuevo componente
+import SearchIcon from '@mui/icons-material/Search';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import LocalMallIcon from '@mui/icons-material/LocalMall';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import HomeIcon from '@mui/icons-material/Home';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import SortIcon from '@mui/icons-material/Sort';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import Skeleton from '@mui/material/Skeleton';
+import InputBase from '@mui/material/InputBase';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 // Configurar dayjs para usar español globalmente
 dayjs.locale('es');
@@ -215,7 +198,6 @@ const CreditCards = () => {
   const [roundedAmount, setRoundedAmount] = useState(0);
   const [paymentDates, setPaymentDates] = useState([]);
   const [paymentAmounts, setPaymentAmounts] = useState([]); // Nuevo estado para los montos individuales
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   useEffect(() => {
     if (userData?.creditCards) {
@@ -334,12 +316,7 @@ const CreditCards = () => {
   // Actualizar transacciones para la tarjeta seleccionada
   useEffect(() => {
     if (selectedCard && allCardTransactions[selectedCard]) {
-      setIsLoadingTransactions(true);
-      // Simular un pequeño retraso para una mejor experiencia de usuario
-      setTimeout(() => {
-        setTransactions(allCardTransactions[selectedCard]);
-        setIsLoadingTransactions(false);
-      }, 300);
+      setTransactions(allCardTransactions[selectedCard]);
     } else {
       setTransactions([]);
     }
@@ -1435,6 +1412,362 @@ const CreditCards = () => {
     }
   };
 
+  // Función para obtener el ícono de categoría adecuado
+  const getCategoryIcon = (category) => {
+    const categoryLower = (category || '').toLowerCase();
+    
+    if (categoryLower.includes('comida') || categoryLower.includes('restaurant')) {
+      return <RestaurantIcon />;
+    } else if (categoryLower.includes('compra') || categoryLower.includes('super')) {
+      return <ShoppingCartIcon />;
+    } else if (categoryLower.includes('ropa') || categoryLower.includes('moda')) {
+      return <LocalMallIcon />;
+    } else if (categoryLower.includes('auto') || categoryLower.includes('combustible')) {
+      return <DirectionsCarIcon />;
+    } else if (categoryLower.includes('casa') || categoryLower.includes('hogar')) {
+      return <HomeIcon />;
+    } else if (categoryLower.includes('pago') || categoryLower.includes('servicio')) {
+      return <AttachMoneyIcon />;
+    } else {
+      return <ShoppingCartIcon />;
+    }
+  };
+  
+  // Obtener el color para una categoría específica
+  const getCategoryColor = (category) => {
+    const categoryLower = (category || '').toLowerCase();
+    
+    if (categoryLower.includes('comida') || categoryLower.includes('restaurant')) {
+      return theme.palette.error.main;
+    } else if (categoryLower.includes('compra') || categoryLower.includes('super')) {
+      return theme.palette.primary.main;
+    } else if (categoryLower.includes('ropa') || categoryLower.includes('moda')) {
+      return theme.palette.secondary.main;
+    } else if (categoryLower.includes('auto') || categoryLower.includes('combustible')) {
+      return theme.palette.warning.main;
+    } else if (categoryLower.includes('casa') || categoryLower.includes('hogar')) {
+      return theme.palette.success.main;
+    } else if (categoryLower.includes('pago') || categoryLower.includes('servicio')) {
+      return theme.palette.info.main;
+    } else {
+      return theme.palette.grey[700];
+    }
+  };
+  
+  // Componente de lista de transacciones
+  const TransactionsList = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortOrder, setSortOrder] = useState('date-desc');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [expandedGroups, setExpandedGroups] = useState({});
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    
+    // Si no hay transacciones o tarjeta seleccionada, mostrar mensaje
+    if (!selectedCard || transactions.length === 0) {
+      return (
+        <Card sx={{ p: 4, borderRadius: 3, textAlign: 'center', mt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <CreditCardIcon sx={{ fontSize: 48, color: theme.palette.grey[400] }} />
+            <Typography variant="h6" color="textSecondary">
+              {!selectedCard ? 'Selecciona una tarjeta para ver transacciones' : 'No hay transacciones para este período'}
+            </Typography>
+          </Box>
+        </Card>
+      );
+    }
+    
+    // Agrupar transacciones por fecha
+    const groupTransactionsByDate = () => {
+      const groups = {};
+      const filteredTransactions = transactions.filter(transaction => {
+        const matchesSearch = searchTerm === '' || 
+          transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          transaction.category?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCategory = filterCategory === '' || 
+          transaction.category?.toLowerCase().includes(filterCategory.toLowerCase());
+        
+        return matchesSearch && matchesCategory;
+      });
+      
+      // Ordenar transacciones
+      const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+        if (sortOrder === 'date-desc') {
+          return new Date(b.date) - new Date(a.date);
+        } else if (sortOrder === 'date-asc') {
+          return new Date(a.date) - new Date(b.date);
+        } else if (sortOrder === 'amount-desc') {
+          return b.amount - a.amount;
+        } else if (sortOrder === 'amount-asc') {
+          return a.amount - b.amount;
+        }
+        return 0;
+      });
+      
+      // Agrupar por fecha
+      sortedTransactions.forEach(transaction => {
+        const dateObj = new Date(transaction.date);
+        const dateStr = dateObj.toISOString().split('T')[0];
+        
+        if (!groups[dateStr]) {
+          groups[dateStr] = {
+            date: dateStr,
+            formattedDate: obtenerFechaFormateada(transaction.date),
+            transactions: [],
+            total: 0
+          };
+          // Inicializar el grupo como expandido por defecto
+          if (expandedGroups[dateStr] === undefined) {
+            setExpandedGroups(prev => ({ ...prev, [dateStr]: true }));
+          }
+        }
+        
+        groups[dateStr].transactions.push(transaction);
+        groups[dateStr].total += transaction.amount;
+      });
+      
+      return groups;
+    };
+    
+    const transactionGroups = groupTransactionsByDate();
+    const groupDates = Object.keys(transactionGroups).sort((a, b) => new Date(b) - new Date(a));
+    
+    const toggleGroup = (dateStr) => {
+      setExpandedGroups(prev => ({
+        ...prev,
+        [dateStr]: !prev[dateStr]
+      }));
+    };
+    
+    // Función para aplicar filtros rápidos de categoría
+    const setQuickFilter = (category) => {
+      setFilterCategory(filterCategory === category ? '' : category);
+    };
+    
+    return (
+      <Card sx={{ borderRadius: 3, overflow: 'hidden', mt: 4 }}>
+        <Box sx={{ 
+          p: 2, 
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: 2
+        }}>
+          <Typography variant="h6" fontWeight="bold">
+            Transacciones de la Tarjeta
+          </Typography>
+          
+          {/* Barra de búsqueda */}
+          <Box sx={{ 
+            flexGrow: 1, 
+            display: 'flex',
+            px: 2,
+            py: 1,
+            bgcolor: alpha(theme.palette.primary.main, 0.08),
+            borderRadius: 2
+          }}>
+            <InputBase
+              placeholder="Buscar transacciones..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ flexGrow: 1, ml: 1 }}
+              inputProps={{ 'aria-label': 'buscar transacciones' }}
+            />
+            <IconButton type="button" aria-label="search">
+              <SearchIcon />
+            </IconButton>
+          </Box>
+          
+          {/* Botones de ordenación y filtrado */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Ordenar" arrow>
+              <IconButton 
+                onClick={(e) => {
+                  const nextOrder = {
+                    'date-desc': 'date-asc',
+                    'date-asc': 'amount-desc',
+                    'amount-desc': 'amount-asc',
+                    'amount-asc': 'date-desc'
+                  }[sortOrder];
+                  setSortOrder(nextOrder);
+                }}
+                color={sortOrder !== 'date-desc' ? 'primary' : 'default'}
+              >
+                <SortIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Filtrar" arrow>
+              <IconButton 
+                color={filterCategory ? 'primary' : 'default'}
+                onClick={() => setFilterCategory('')}
+              >
+                <FilterListIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+        
+        {/* Chips de filtrado rápido por categoría */}
+        <Box sx={{ px: 2, py: 1.5, display: 'flex', flexWrap: 'wrap', gap: 1, borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Chip 
+            icon={<RestaurantIcon />} 
+            label="Comida" 
+            variant={filterCategory === 'comida' ? 'filled' : 'outlined'}
+            color={filterCategory === 'comida' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('comida')}
+            clickable
+          />
+          <Chip 
+            icon={<ShoppingCartIcon />} 
+            label="Compras" 
+            variant={filterCategory === 'compra' ? 'filled' : 'outlined'}
+            color={filterCategory === 'compra' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('compra')}
+            clickable
+          />
+          <Chip 
+            icon={<LocalMallIcon />} 
+            label="Ropa" 
+            variant={filterCategory === 'ropa' ? 'filled' : 'outlined'}
+            color={filterCategory === 'ropa' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('ropa')}
+            clickable
+          />
+          <Chip 
+            icon={<DirectionsCarIcon />} 
+            label="Auto" 
+            variant={filterCategory === 'auto' ? 'filled' : 'outlined'}
+            color={filterCategory === 'auto' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('auto')}
+            clickable
+          />
+          <Chip 
+            icon={<HomeIcon />} 
+            label="Hogar" 
+            variant={filterCategory === 'hogar' ? 'filled' : 'outlined'}
+            color={filterCategory === 'hogar' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('hogar')}
+            clickable
+          />
+        </Box>
+          
+        {/* Lista de transacciones agrupadas por fecha */}
+        <List sx={{ py: 0 }}>
+          {groupDates.length > 0 ? (
+            groupDates.map(dateStr => (
+              <React.Fragment key={dateStr}>
+                {/* Cabecera del grupo de fecha */}
+                <ListItem 
+                  button 
+                  onClick={() => toggleGroup(dateStr)}
+                  sx={{ 
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                    py: 1.5,
+                    bgcolor: alpha(theme.palette.primary.main, 0.03)
+                  }}
+                >
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="subtitle1" fontWeight="medium">
+                          {transactionGroups[dateStr].formattedDate}
+                        </Typography>
+                        <Typography variant="subtitle1" fontWeight="bold" color="error.main">
+                          {formatAmount(transactionGroups[dateStr].total)}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={`${transactionGroups[dateStr].transactions.length} transacciones`}
+                  />
+                  <ChevronRightIcon 
+                    sx={{ 
+                      transform: expandedGroups[dateStr] ? 'rotate(90deg)' : 'none',
+                      transition: 'transform 0.3s'
+                    }} 
+                  />
+                </ListItem>
+                
+                {/* Transacciones del grupo */}
+                {expandedGroups[dateStr] && transactionGroups[dateStr].transactions.map((transaction, idx) => (
+                  <ListItem 
+                    key={transaction.id || idx}
+                    sx={{ 
+                      py: 1.5,
+                      px: 2,
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+                      backgroundColor: idx % 2 === 0 ? alpha(theme.palette.background.default, 0.4) : 'transparent'
+                    }}
+                  >
+                    <Box sx={{ 
+                      mr: 2, 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      bgcolor: alpha(getCategoryColor(transaction.category), 0.1),
+                      color: getCategoryColor(transaction.category)
+                    }}>
+                      {getCategoryIcon(transaction.category)}
+                    </Box>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body1" fontWeight="medium" noWrap>
+                          {transaction.description || 'Sin descripción'}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box sx={{ display: 'flex', flexDirection: 'column', mt: 0.5 }}>
+                          <Typography variant="caption" noWrap sx={{ color: theme.palette.text.secondary }}>
+                            {transaction.category || 'Sin categoría'}
+                            {transaction.subcategory && ` • ${transaction.subcategory}`}
+                          </Typography>
+                          {transaction.installments > 1 && (
+                            <Chip 
+                              label={`Cuota ${transaction.currentInstallment || 1}/${transaction.installments}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{ mt: 0.5, height: 20, maxWidth: 'fit-content' }}
+                            />
+                          )}
+                        </Box>
+                      }
+                      primaryTypographyProps={{ variant: 'body2' }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'flex-end',
+                      minWidth: 80
+                    }}>
+                      <Typography variant="body1" fontWeight="bold" color="error">
+                        {formatAmount(transaction.amount)}
+                      </Typography>
+                      {transaction.amountUSD && (
+                        <Typography variant="caption" color="text.secondary">
+                          USD {formatAmount(transaction.amountUSD)}
+                        </Typography>
+                      )}
+                    </Box>
+                  </ListItem>
+                ))}
+              </React.Fragment>
+            ))
+          ) : (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body1" color="textSecondary">
+                No se encontraron transacciones con los filtros aplicados
+              </Typography>
+            </Box>
+          )}
+        </List>
+      </Card>
+    );
+  };
+
   return (
     <Layout title="Tarjetas de Crédito">
       <Box 
@@ -1946,27 +2279,30 @@ const CreditCards = () => {
                     startIcon={<PaymentIcon />}
                     onClick={handlePayCreditCard}
                     disabled={(() => {
-                      // Deshabilitar si es un mes futuro
-                      if (isFutureMonth()) return true;
-                      
-                      // Deshabilitar si ya está pagado
+                      // Primero verificar si está pagado
                       if (areCardsActuallyPaid()) return true;
                       
-                      // Deshabilitar si no hay gastos
+                      // Luego verificar si no hay gastos
                       if (getAllCardsTotal() <= 0) return true;
 
-                      // Lógica existente para mes anterior y vencimiento
+                      // Verificar si estamos en el mes anterior al actual
                       const today = new Date();
                       const currentMonth = today.getMonth() + 1;
                       const currentYear = today.getFullYear();
+                      
+                      // Calcular el mes anterior
                       let prevMonth = currentMonth - 1;
                       let prevYear = currentYear;
                       if (prevMonth === 0) {
                         prevMonth = 12;
                         prevYear = currentYear - 1;
                       }
+                      
+                      // Si es el mes anterior, verificar si hay tarjetas vencidas
                       if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                        // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
                         let anyCardPastDueDate = false;
+                        
                         for (const card of cards) {
                           const cardDates = getCardDates(card.id);
                           if (cardDates && cardDates.dueDate) {
@@ -1977,10 +2313,12 @@ const CreditCards = () => {
                             }
                           }
                         }
-                        return !anyCardPastDueDate; // Habilitar solo si hay vencidas
+                        
+                        // Habilitar el botón si hay tarjetas vencidas, deshabilitarlo si no
+                        return !anyCardPastDueDate;
                       }
                       
-                      // Deshabilitar en cualquier otro caso (mes actual, meses pasados no vencidos)
+                      // En cualquier otro caso, deshabilitarlo
                       return true;
                     })()}
                     sx={{ 
@@ -2003,33 +2341,34 @@ const CreditCards = () => {
                     }}
                   >
                     {(() => {
-                      // Texto para mes futuro
-                      if (isFutureMonth()) {
-                        return 'Mes Futuro';
-                      }
-
-                      // Texto si ya está pagado
+                      // Primero verificar si está pagado
                       if (areCardsActuallyPaid()) {
                         return 'Tarjeta Pagada';
                       }
                       
-                      // Texto si no hay gastos
+                      // Luego verificar si no hay gastos
                       if (getAllCardsTotal() <= 0) {
-                        return 'Sin Gastos';
+                        return 'No hay gastos para pagar';
                       }
 
-                      // Lógica existente para mes anterior y vencimiento
+                      // Verificar si estamos en el mes anterior al actual
                       const today = new Date();
                       const currentMonth = today.getMonth() + 1;
                       const currentYear = today.getFullYear();
+                      
+                      // Calcular el mes anterior
                       let prevMonth = currentMonth - 1;
                       let prevYear = currentYear;
                       if (prevMonth === 0) {
                         prevMonth = 12;
                         prevYear = currentYear - 1;
                       }
+                      
+                      // Si es el mes anterior y se permite el pago
                       if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                        // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
                         let anyCardPastDueDate = false;
+                        
                         for (const card of cards) {
                           const cardDates = getCardDates(card.id);
                           if (cardDates && cardDates.dueDate) {
@@ -2040,15 +2379,16 @@ const CreditCards = () => {
                             }
                           }
                         }
+                        
                         if (anyCardPastDueDate) {
                           return 'Pagar Tarjetas Vencidas';
                         } else {
-                          return 'Esperar Vencimiento'; // Texto cuando aún no vence
+                          return 'Espera al vencimiento';
                         }
                       }
                       
-                      // Texto por defecto para otros casos (mes actual, meses pasados no vencidos)
-                      return 'Pago No Disponible';
+                      // En cualquier otro caso
+                      return 'No Disponible';
                     })()}
                   </Button>
                 </Box>
@@ -2417,7 +2757,7 @@ const CreditCards = () => {
                               </Grid>
                             </Grid>
                             
-                            {/* Bloque "Resumen del Mes" movido aquí */}
+                            {/* Resto del código mantiene la funcionalidad pero con mejor estilo visual */}
                             <Box mt={3}>
                               <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
                                 Resumen del Mes
@@ -2641,68 +2981,291 @@ const CreditCards = () => {
                               )}
                             </Box>
                             
-                            {/* Bloque "Movimientos del periodo" ahora viene después */}
-                            <Grid container spacing={2} mt={3}> {/* Ajustado mt a 3 para consistencia */}
-                              <Grid item xs={12}>
-                                <Card 
-                                  elevation={2} 
+                            <Box mt={2}>
+                              {(() => {
+                                // Solo mostrar el mensaje para configurar fechas si:
+                                // 1. No están configuradas las fechas
+                                // 2. Es el mes actual o el próximo mes, o el mes anterior
+                                const today = new Date();
+                                const currentMonth = today.getMonth() + 1;
+                                const currentYear = today.getFullYear();
+                                
+                                // Calcular el mes anterior
+                                let prevMonth = currentMonth - 1;
+                                let prevYear = currentYear;
+                                if (prevMonth === 0) {
+                                  prevMonth = 12;
+                                  prevYear = currentYear - 1;
+                                }
+
+                                // Determinar si mostrar el mensaje de configuración de fechas
+                                const shouldShowDatesConfig = !areDatesConfigured() && (
+                                  // Es el mes actual
+                                  (selectedYear === currentYear && selectedMonth === currentMonth) ||
+                                  // Es el mes siguiente
+                                  (selectedYear === currentYear && selectedMonth === currentMonth + 1) ||
+                                  // Es diciembre del año actual y el mes siguiente es enero del próximo año
+                                  (currentMonth === 12 && selectedMonth === 1 && selectedYear === currentYear + 1) ||
+                                  // Es el mes anterior
+                                  (selectedYear === prevYear && selectedMonth === prevMonth)
+                                );
+
+                                if (shouldShowDatesConfig) {
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
                                       sx={{ 
-                                    p: 0, 
-                                    borderRadius: 3,
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                      transform: 'translateY(-4px)',
-                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    }
-                                  }}
-                                >
-                                  <Box sx={{ 
-                                    p: 2,
-                                    background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.info.dark} 100%)`,
-                                    color: 'white',
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.info.main, 0.15),
+                                        borderStyle: 'dashed',
                                         display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2,
+                                        mb: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                                          Configura las fechas para {getMonthName(selectedMonth)} {selectedYear}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Las fechas pueden variar cada mes. Mantén actualizada esta información.
+                                        </Typography>
+                                      </Box>
+                                      <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<DateRangeIcon />}
+                                        onClick={() => handleOpenUpdateDatesDialog(selectedCard)}
+                                        sx={{ whiteSpace: 'nowrap' }}
+                                      >
+                                        Actualizar Fechas
+                                      </Button>
+                                    </Paper>
+                                  );
+                                }
+                                
+                                return null;
+                              })()}
+                              
+                              {(() => {
+                                // Si no hay gastos, mostrar un mensaje adecuado
+                                if (getAllCardsTotal() <= 0) {
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: theme.palette.info.light + '15',
+                                        display: 'flex',
+                                        flexDirection: 'row',
                                         alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                  }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <CreditCardIcon fontSize="small" />
-                                      <Typography variant="body2" fontWeight="medium">
-                                        Movimientos del Periodo
+                                        gap: 1
+                                      }}
+                                    >
+                                      <PaymentIcon color="info" />
+                                      <Box>
+                                        <Typography variant="body1" fontWeight="medium" color="info.main">
+                                          No hay gastos para pagar
                                         </Typography>
-                                    </Stack>
-                                    <Tooltip title="Detalle de transacciones de este periodo" arrow>
-                                      <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
-                                        <ReceiptIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
+                                        <Typography variant="body2" color="text.secondary">
+                                          No hay gastos registrados para este mes
+                                        </Typography>
                                       </Box>
-                                  <Box sx={{ 
-                                    p: 2,
-                                    borderLeft: `4px solid ${theme.palette.info.main}`,
+                                    </Paper>
+                                  );
+                                }
+                                
+                                // Si ya está pagado, mostrar mensaje correspondiente
+                                if (areCardsActuallyPaid()) {
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.success.main, 0.15),
+                                        borderStyle: 'dashed',
                                         display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 0.5,
-                                    maxHeight: '600px', // Limit height to show approx 5-6 days
-                                    overflow: 'auto'
-                                  }}>
-                                    {transactions.length > 0 ? (
-                                      <CreditCardMovements 
-                                        transactions={allCardTransactions[selectedCard] || []} 
-                                        loading={false}
-                                      />
-                                    ) : (
-                                      <Box sx={{ textAlign: 'center', py: 2 }}>
-                                        <Typography variant="body2" color="textSecondary">
-                                          No hay movimientos registrados en este periodo
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="success.main">
+                                          Tarjeta Pagada
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Todas las tarjetas de este mes ya han sido pagadas
                                         </Typography>
                                       </Box>
-                                    )}
+                                    </Paper>
+                                  );
+                                }
+                                
+                                // Verificar si estamos en el mes anterior al mes actual
+                                const today = new Date();
+                                const currentMonth = today.getMonth() + 1;
+                                const currentYear = today.getFullYear();
+                                
+                                // Calcular el mes anterior
+                                let prevMonth = currentMonth - 1;
+                                let prevYear = currentYear;
+                                if (prevMonth === 0) {
+                                  prevMonth = 12;
+                                  prevYear = currentYear - 1;
+                                }
+                                
+                                // Solo mostrar mensajes para el mes actual, el siguiente o el anterior
+                                // Para meses más antiguos no mostrar nada
+                                const isRelevantMonth = 
+                                  // Es el mes actual
+                                  (selectedYear === currentYear && selectedMonth === currentMonth) ||
+                                  // Es un mes futuro del año actual
+                                  (selectedYear === currentYear && selectedMonth > currentMonth) ||
+                                  // Es un año futuro
+                                  (selectedYear > currentYear) ||
+                                  // Es el mes anterior
+                                  (selectedYear === prevYear && selectedMonth === prevMonth);
+                                
+                                if (!isRelevantMonth) {
+                                  // No mostrar mensajes para meses antiguos excepto el anterior
+                                  return null;
+                                }
+                                
+                                // Si es el mes anterior y se permite el pago
+                                if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                                  // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
+                                  let anyCardPastDueDate = false;
+                                  
+                                  for (const card of cards) {
+                                    const cardDates = getCardDates(card.id);
+                                    if (cardDates && cardDates.dueDate) {
+                                      const dueDate = new Date(cardDates.dueDate);
+                                      if (today > dueDate) {
+                                        anyCardPastDueDate = true;
+                                        break;
+                                      }
+                                    }
+                                  }
+                                  
+                                  if (anyCardPastDueDate) {
+                                    return (
+                                      <Paper 
+                                        variant="outlined" 
+                                        sx={{ 
+                                          p: 2, 
+                                          borderRadius: 1, 
+                                          bgcolor: alpha(theme.palette.warning.main, 0.15),
+                                          borderStyle: 'dashed',
+                                          display: 'flex',
+                                          flexDirection: { xs: 'column', sm: 'row' },
+                                          alignItems: { xs: 'flex-start', sm: 'center' },
+                                          justifyContent: 'space-between',
+                                          gap: 2
+                                        }}
+                                      >
+                                        <Box>
+                                          <Typography variant="subtitle2" fontWeight="medium" color="warning.main">
+                                            Pago disponible para mes vencido
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            Las tarjetas del mes anterior están vencidas y disponibles para pago.
+                                          </Typography>
                                         </Box>
-                                </Card>
-                              </Grid>
-                            </Grid>
+                                      </Paper>
+                                    );
+                                  } else {
+                                    // Si ninguna tarjeta ha vencido todavía, mostrar que debe esperar
+                                    return (
+                                      <Paper 
+                                        variant="outlined" 
+                                        sx={{ 
+                                          p: 2, 
+                                          borderRadius: 1, 
+                                          bgcolor: alpha(theme.palette.info.main, 0.15),
+                                          borderStyle: 'dashed',
+                                          display: 'flex',
+                                          flexDirection: { xs: 'column', sm: 'row' },
+                                          alignItems: { xs: 'flex-start', sm: 'center' },
+                                          justifyContent: 'space-between',
+                                          gap: 2
+                                        }}
+                                      >
+                                        <Box>
+                                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                                            Espera al vencimiento
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            Las tarjetas aún no han llegado a su fecha de vencimiento.
+                                          </Typography>
+                                        </Box>
+                                      </Paper>
+                                    );
+                                  }
+                                } else if (isFutureMonth()) {
+                                  // Si es un mes futuro
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.info.main, 0.15),
+                                        borderStyle: 'dashed',
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                                          Mes futuro
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Este mes aún no está disponible para pagos.
+                                        </Typography>
+                                      </Box>
+                                    </Paper>
+                                  );
+                                } else {
+                                  // Para el mes actual
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.primary.main, 0.15),
+                                        borderStyle: 'dashed',
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="primary.main">
+                                          Mes en curso
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Las tarjetas se podrán pagar el próximo mes cuando venzan.
+                                        </Typography>
+                                      </Box>
+                                    </Paper>
+                                  );
+                                }
+                              })()}
+                            </Box>
                           </>
                         )}
                       </Box>
@@ -3377,64 +3940,95 @@ const CreditCards = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Mensaje si no hay tarjeta seleccionada */}
-      {!selectedCard && cards.length > 0 && (
-        <Card
-          sx={{ 
-            mt: 3, 
-            p: 0,
-            borderRadius: 2,
-            bgcolor: theme.palette.mode === 'dark' ? '#2d2d2d' : 'white',
-            boxShadow: theme.shadows[4],
-            width: '100%',
-            maxWidth: '100%',
-            overflow: 'hidden'
-          }}
-        >
-          <CardContent sx={{ p: 0 }}>
-            <Box sx={{ 
-              p: 2, 
-              backgroundColor: theme.palette.primary.main,
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <ReceiptIcon sx={{ mr: 1 }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  Movimientos del Período
-                </Typography>
-              </Box>
-            </Box>
-            
-            <Box 
-              sx={{ 
-                p: 6, 
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center'
-              }}
-            >
-              <CreditCardIcon sx={{ 
-                fontSize: 80, 
-                color: theme.palette.primary.main, 
-                opacity: 0.7, 
-                mb: 3 
-              }} />
-              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 'medium' }}>
-                Selecciona una tarjeta
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400 }}>
-                Haz clic en una de las tarjetas arriba para ver sus movimientos en este período
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
+
+      {/* Lista de transacciones de la tarjeta */}
+      {selectedCard && <TransactionsList />}
+
+      {/* Diálogo para marcar como pagadas */}
+      <Dialog
+        open={markAsPaidDialogOpen}
+        onClose={handleCloseMarkAsPaidDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Marcar tarjetas como pagadas
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            ¿Estás seguro de que deseas marcar las siguientes tarjetas como pagadas para el mes de {getMonthName(selectedMonth)} {selectedYear}?
+          </Typography>
+          
+          {/* Lista de tarjetas */}
+          <List sx={{ mt: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+            {getUnpaidCards().map((card) => (
+              <ListItem key={card.id} sx={{ py: 1.5, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}` }}>
+                <ListItemText
+                  primary={card.name}
+                  secondary={`Total: ${formatAmount(calculateCardTotal(card.id))}`}
+                />
+              </ListItem>
+            ))}
+          </List>
+
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <TextField
+              label="Número de referencia (opcional)"
+              fullWidth
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+              margin="normal"
+              helperText="Número de transacción o referencia de pago"
+            />
+          </Box>
+          
+          <Box sx={{ mt: 2, p: 2, bgcolor: alpha(theme.palette.success.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.success.main, 0.2)}` }}>
+            <Typography variant="body2" color="success.main">
+              Las tarjetas se marcarán como pagadas y se creará un registro de pago para {getMonthName(selectedMonth)} {selectedYear}.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            variant="outlined" 
+            onClick={handleCloseMarkAsPaidDialog}
+            sx={{ 
+              borderRadius: 1,
+              px: 3,
+              py: 1,
+              mr: 1,
+              color: 'text.secondary',
+              borderColor: 'divider',
+              '&:hover': {
+                borderColor: 'text.primary',
+                bgcolor: 'background.paper'
+              }
+            }}
+          >
+            Cancelar
+          </Button>
+          
+          <Button 
+            variant="contained" 
+            color="success"
+            onClick={handleMarkAsPaid}
+            startIcon={<CheckCircleIcon />}
+            disabled={markingAsPaid}
+            sx={{ 
+              borderRadius: 1,
+              px: 3,
+              py: 1,
+              textTransform: 'none',
+              fontWeight: 'bold',
+              '&.Mui-disabled': {
+                bgcolor: alpha(theme.palette.success.main, 0.5)
+              }
+            }}
+          >
+            {markingAsPaid ? 'Procesando...' : 'Confirmar Pago'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Layout>
   );
 };

@@ -1,92 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import Layout from '../../components/layout/Layout';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button, 
-  Grid, 
-  Container,
-  Paper,
-  Avatar,
-  Stack,
-  Chip,
-  IconButton,
-  Divider,
-  TextField,
-  Tabs,
-  Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Tooltip,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
-  Link,
-  CardHeader,
-  ButtonGroup,
-  FormControl,
-  Select,
-  InputAdornment,
-  InputLabel
-} from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { useStore } from '../../store';
-import MonthNavigator from '../../components/finances/MonthNavigator';
-import { getMonthlySummary, formatAmount, getMonthName, getDate } from '../../utils';
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { alpha } from '@mui/material/styles';
 import {
-  Add as AddIcon,
-  DeleteOutline as DeleteIcon,
-  EditOutlined as EditIcon,
-  FileUploadOutlined as UploadIcon,
-  FileDownloadOutlined as DownloadIcon,
-  Payment as PaymentIcon,
-  CalendarToday as CalendarTodayIcon, 
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon,
-  Receipt as ReceiptIcon,
-  CreditCard as CreditCardIcon,
-  // ... existing icons ...
-} from '@mui/icons-material';
+  Box, Card, Grid, Typography, MenuItem, Select, FormControl, InputLabel, Button, Dialog,
+  DialogTitle, DialogContent, DialogActions, TextField, IconButton, Tooltip, CircularProgress,
+  Chip, Paper, Divider, FormHelperText, List, ListItem, ListItemText
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import SearchIcon from '@mui/icons-material/Search';
+import SortIcon from '@mui/icons-material/Sort';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import LocalMallIcon from '@mui/icons-material/LocalMall';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import HomeIcon from '@mui/icons-material/Home';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import PaymentIcon from '@mui/icons-material/Payment';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DateRangeIcon from '@mui/icons-material/DateRange';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DownloadIcon from '@mui/icons-material/Download';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useTheme } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
 import { database, auth, storage } from '../../firebase';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import TodayIcon from '@mui/icons-material/Today';
 import EventIcon from '@mui/icons-material/Event';
+import InfoIcon from '@mui/icons-material/Info';
 import SaveIcon from '@mui/icons-material/Save';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
-import CreditCardMovements from './CreditCardMovements';
-
-// Configurar dayjs para usar español globalmente
+// Imports adicionales para el componente TransactionList\nimpport Skeleton from '@mui/material/Skeleton';\nimport InputBase from '@mui/material/InputBase';\nimport useMediaQuery from '@mui/material/useMediaQuery';\nimport MoreHorizIcon from '@mui/icons-material/MoreHoriz';\n\n// Configurar dayjs para usar espaÃ±ol globalmente
 dayjs.locale('es');
 
 // Configurar worker de PDF.js
 
-// Función auxiliar para formatear fechas en un formato amigable, consistente con Finances.jsx
+// FunciÃ³n auxiliar para formatear fechas en un formato amigable, consistente con Finances.jsx
 function obtenerFechaFormateada(dateStr) {
-  // Si la fecha no existe o es inválida, mostrar un valor genérico
+  // Si la fecha no existe o es invÃ¡lida, mostrar un valor genÃ©rico
   if (!dateStr || dateStr === 'Invalid Date') {
     return 'Sin fecha';
   }
@@ -97,7 +64,7 @@ function obtenerFechaFormateada(dateStr) {
       // Dividir la fecha en componentes
       const [year, month, day] = dateStr.split('-').map(num => parseInt(num, 10));
       
-      // Array de nombres de meses en español
+      // Array de nombres de meses en espaÃ±ol
       const meses = [
         'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
@@ -114,7 +81,7 @@ function obtenerFechaFormateada(dateStr) {
         const month = dateStr.getMonth(); // 0-11
         const year = dateStr.getFullYear();
         
-        // Array de nombres de meses en español
+        // Array de nombres de meses en espaÃ±ol
         const meses = [
           'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
           'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
@@ -134,25 +101,25 @@ function obtenerFechaFormateada(dateStr) {
       }).format(date);
     }
     
-    // Si no es una fecha válida, devolvemos el texto original
+    // Si no es una fecha vÃ¡lida, devolvemos el texto original
     return dateStr;
   } catch (e) {
     console.error('Error al formatear fecha:', dateStr, e);
-    return 'Fecha inválida';
+    return 'Fecha invÃ¡lida';
   }
 }
 
-// Función para calcular si una fecha está a más de N meses en el futuro
+// FunciÃ³n para calcular si una fecha estÃ¡ a mÃ¡s de N meses en el futuro
 function isBeyondFutureLimit(year, month, limitMonths = 1) {
   const today = new Date();
   const currentMonth = today.getMonth() + 1; // Mes actual (1-12)
   const currentYear = today.getFullYear();
   
-  // Calcular el mes límite (puede ser en el año siguiente)
+  // Calcular el mes lÃ­mite (puede ser en el aÃ±o siguiente)
   let limitMonth = currentMonth + limitMonths;
   let limitYear = currentYear;
   
-  // Ajustar si el mes límite se extiende al año siguiente
+  // Ajustar si el mes lÃ­mite se extiende al aÃ±o siguiente
   if (limitMonth > 12) {
     limitYear += Math.floor(limitMonth / 12);
     limitMonth = limitMonth % 12;
@@ -162,11 +129,11 @@ function isBeyondFutureLimit(year, month, limitMonths = 1) {
     }
   }
   
-  // Comparar años primero
+  // Comparar aÃ±os primero
   if (year > limitYear) return true;
   if (year < limitYear) return false;
   
-  // Si estamos en el mismo año, comparar meses
+  // Si estamos en el mismo aÃ±o, comparar meses
   return month > limitMonth;
 }
 
@@ -175,7 +142,7 @@ const CreditCards = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   
-  // Estados para navegación y tarjetas
+  // Estados para navegaciÃ³n y tarjetas
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [cards, setCards] = useState([]);
@@ -184,7 +151,7 @@ const CreditCards = () => {
   const [allCardTransactions, setAllCardTransactions] = useState({});
   const [paymentStatusChecked, setPaymentStatusChecked] = useState(false);
   
-  // Estado para el menú de opciones
+  // Estado para el menÃº de opciones
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [activeCardId, setActiveCardId] = useState(null);
 
@@ -193,13 +160,13 @@ const CreditCards = () => {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
-  // Estado para resúmenes PDF
+  // Estado para resÃºmenes PDF
   const [cardStatements, setCardStatements] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
 
-  // Estados para el diálogo de actualización de fechas
+  // Estados para el diÃ¡logo de actualizaciÃ³n de fechas
   const [updateDatesDialogOpen, setUpdateDatesDialogOpen] = useState(false);
   const [updateCardId, setUpdateCardId] = useState(null);
   const [updateCardData, setUpdateCardData] = useState(null);
@@ -209,17 +176,16 @@ const CreditCards = () => {
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState(false);
 
-  // Estado para el diálogo de pago de tarjetas
+  // Estado para el diÃ¡logo de pago de tarjetas
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [numberOfPayments, setNumberOfPayments] = useState(1);
   const [roundedAmount, setRoundedAmount] = useState(0);
   const [paymentDates, setPaymentDates] = useState([]);
   const [paymentAmounts, setPaymentAmounts] = useState([]); // Nuevo estado para los montos individuales
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   useEffect(() => {
     if (userData?.creditCards) {
-      // Procesar tarjetas de crédito
+      // Procesar tarjetas de crÃ©dito
       const cardsData = Object.keys(userData.creditCards)
         .filter(key => key !== 'transactions') // Excluir el nodo de transacciones
         .map(id => ({
@@ -246,7 +212,7 @@ const CreditCards = () => {
         if (userData.creditCards.transactions && userData.creditCards.transactions[card.id]) {
           const cardTransactions = [];
           
-          // Obtener fechas de cierre para determinar el período
+          // Obtener fechas de cierre para determinar el perÃ­odo
           const currentMonthDates = getCardDates(card.id);
           let prevMonthClosingDate = null;
           
@@ -275,7 +241,7 @@ const CreditCards = () => {
             }
           }
           
-          // Si no se pudo determinar la fecha de cierre anterior, usar el primer día del mes anterior
+          // Si no se pudo determinar la fecha de cierre anterior, usar el primer dÃ­a del mes anterior
           if (!prevMonthClosingDate) {
             prevMonthClosingDate = new Date(selectedYear, selectedMonth - 2, 1);
           }
@@ -289,7 +255,7 @@ const CreditCards = () => {
           Object.keys(userData.creditCards.transactions[card.id]).forEach(key => {
             const transaction = userData.creditCards.transactions[card.id][key];
             
-            // Convertir la fecha de la transacción
+            // Convertir la fecha de la transacciÃ³n
             let transactionDate = null;
             
             if (typeof transaction.date === 'string') {
@@ -307,7 +273,7 @@ const CreditCards = () => {
               transactionDate = new Date();
             }
             
-            // Filtrar por período de facturación
+            // Filtrar por perÃ­odo de facturaciÃ³n
             if (transactionDate > prevMonthClosingDate && transactionDate <= currentClosingDate) {
               cardTransactions.push({
                 id: key,
@@ -334,12 +300,7 @@ const CreditCards = () => {
   // Actualizar transacciones para la tarjeta seleccionada
   useEffect(() => {
     if (selectedCard && allCardTransactions[selectedCard]) {
-      setIsLoadingTransactions(true);
-      // Simular un pequeño retraso para una mejor experiencia de usuario
-      setTimeout(() => {
-        setTransactions(allCardTransactions[selectedCard]);
-        setIsLoadingTransactions(false);
-      }, 300);
+      setTransactions(allCardTransactions[selectedCard]);
     } else {
       setTransactions([]);
     }
@@ -368,8 +329,8 @@ const CreditCards = () => {
         handleOpenUpdateDatesDialog(activeCardId);
         break;
       case 'delete':
-        // Aquí iría la lógica para eliminar la tarjeta
-        // Implementar confirmación antes de eliminar
+        // AquÃ­ irÃ­a la lÃ³gica para eliminar la tarjeta
+        // Implementar confirmaciÃ³n antes de eliminar
         break;
       default:
         break;
@@ -402,7 +363,7 @@ const CreditCards = () => {
     // Para la fecha de cierre del mes anterior
     let prevMonthClosingDate = null;
     
-    // Calcular mes y año anteriores
+    // Calcular mes y aÃ±o anteriores
     let prevMonth = selectedMonth - 1;
     let prevYear = selectedYear;
     if (prevMonth === 0) {
@@ -416,7 +377,7 @@ const CreditCards = () => {
     if (card.dates && card.dates[prevMonthKey] && card.dates[prevMonthKey].closingDate) {
       prevMonthClosingDate = card.dates[prevMonthKey].closingDate;
     } else if (card.defaultClosingDay) {
-      // Si no hay fecha específica para el mes anterior, construirla con el día de cierre predeterminado
+      // Si no hay fecha especÃ­fica para el mes anterior, construirla con el dÃ­a de cierre predeterminado
       prevMonthClosingDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(card.defaultClosingDay).padStart(2, '0')}`;
     }
     
@@ -428,16 +389,16 @@ const CreditCards = () => {
       };
     }
     
-    // Si no hay fechas específicas para el mes seleccionado, devolver fechas en formato compatible
+    // Si no hay fechas especÃ­ficas para el mes seleccionado, devolver fechas en formato compatible
     if (card.defaultClosingDay && card.defaultDueDay) {
-      // Crear fechas con el año y mes seleccionados, pero usando los días por defecto
+      // Crear fechas con el aÃ±o y mes seleccionados, pero usando los dÃ­as por defecto
       const closingDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(card.defaultClosingDay).padStart(2, '0')}`;
       
       // Para la fecha de vencimiento, que generalmente cae en el mes siguiente
       let dueYear = selectedYear;
       let dueMonth = selectedMonth;
       
-      // Si es diciembre, la fecha de vencimiento es en enero del siguiente año
+      // Si es diciembre, la fecha de vencimiento es en enero del siguiente aÃ±o
       if (selectedMonth === 12) {
         dueMonth = 1;
         dueYear = selectedYear + 1;
@@ -466,7 +427,7 @@ const CreditCards = () => {
     return total;
   };
 
-  // Función para verificar si las fechas de cierre y vencimiento ya están configuradas para el mes seleccionado
+  // FunciÃ³n para verificar si las fechas de cierre y vencimiento ya estÃ¡n configuradas para el mes seleccionado
   const areDatesConfigured = (cardId = null) => {
     const card_id = cardId || selectedCard;
     if (!card_id || !userData?.creditCards?.[card_id]) return false;
@@ -474,7 +435,7 @@ const CreditCards = () => {
     const card = userData.creditCards[card_id];
     const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     
-    // Verificar si existen fechas específicas configuradas para el mes seleccionado
+    // Verificar si existen fechas especÃ­ficas configuradas para el mes seleccionado
     if (card.dates && card.dates[currentMonth] && card.dates[currentMonth].closingDate && card.dates[currentMonth].dueDate) {
       return true;
     }
@@ -482,7 +443,7 @@ const CreditCards = () => {
     return false;
   };
 
-  // Función para verificar si ya se ha alcanzado la fecha de cierre de todas las tarjetas
+  // FunciÃ³n para verificar si ya se ha alcanzado la fecha de cierre de todas las tarjetas
   const haveAllCardsReachedClosingDate = () => {
     if (cards.length === 0) return false;
     
@@ -495,7 +456,7 @@ const CreditCards = () => {
       if (cardDates && cardDates.closingDate) {
         const closingDate = new Date(cardDates.closingDate);
         
-        // Si alguna tarjeta aún no ha llegado a su fecha de cierre, el botón debe estar deshabilitado
+        // Si alguna tarjeta aÃºn no ha llegado a su fecha de cierre, el botÃ³n debe estar deshabilitado
         if (today < closingDate) {
           allCardsReachedClosingDate = false;
           break;
@@ -506,10 +467,10 @@ const CreditCards = () => {
     return allCardsReachedClosingDate;
   };
 
-  // Cargar información de resúmenes de tarjetas
+  // Cargar informaciÃ³n de resÃºmenes de tarjetas
   useEffect(() => {
     if (userData?.creditCards && selectedCard) {
-      // Verificar si hay resúmenes para esta tarjeta
+      // Verificar si hay resÃºmenes para esta tarjeta
       if (userData.creditCards[selectedCard]?.statements) {
         setCardStatements(userData.creditCards[selectedCard].statements);
       } else {
@@ -524,27 +485,27 @@ const CreditCards = () => {
     }
   }, [userData, selectedCard]);
 
-  // Función para verificar si una tarjeta específica ha sido pagada en el mes seleccionado
+  // FunciÃ³n para verificar si una tarjeta especÃ­fica ha sido pagada en el mes seleccionado
   const isCardPaid = (cardId) => {
     if (!cardId) return false;
     const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-    // Verificar específicamente que exista el pago para esta tarjeta en este mes
+    // Verificar especÃ­ficamente que exista el pago para esta tarjeta en este mes
     return !!(userData?.creditCards?.[cardId]?.payments?.[selectedYearMonth]);
   };
 
-  // Función para verificar si hay pagos registrados para el mes seleccionado
+  // FunciÃ³n para verificar si hay pagos registrados para el mes seleccionado
   const areCardsActuallyPaid = () => {
     // Verificar si existe un registro de pago global para este mes
     const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     const globalPaymentExists = !!(userData?.creditCardPayments?.[selectedYearMonth]);
     
-    // Si hay un pago global registrado, consideramos que está pagado
+    // Si hay un pago global registrado, consideramos que estÃ¡ pagado
     if (globalPaymentExists) return true;
     
-    // Si no hay tarjetas, consideramos que está pagado (no hay nada que pagar)
+    // Si no hay tarjetas, consideramos que estÃ¡ pagado (no hay nada que pagar)
     if (cards.length === 0) return true;
     
-    // Si el total de gastos de todas las tarjetas es cero, consideramos que está pagado
+    // Si el total de gastos de todas las tarjetas es cero, consideramos que estÃ¡ pagado
     const totalCardExpenses = getAllCardsTotal();
     if (totalCardExpenses === 0) return true;
     
@@ -556,7 +517,7 @@ const CreditCards = () => {
       // Primero, verificamos si hay alguna tarjeta con saldo
       const anyCardHasBalance = cards.some(card => getCardTotal(card.id) > 0);
       
-      // Si ninguna tarjeta tiene saldo, consideramos que está pagado
+      // Si ninguna tarjeta tiene saldo, consideramos que estÃ¡ pagado
       if (!anyCardHasBalance) return true;
       
       cards.forEach(card => {
@@ -572,28 +533,28 @@ const CreditCards = () => {
       });
     }
     
-    // Devolver true si todas las tarjetas relevantes están pagadas y hay al menos una con registro
+    // Devolver true si todas las tarjetas relevantes estÃ¡n pagadas y hay al menos una con registro
     return (allRelevantCardsPaid && anyCardHasPaidRecord);
   };
   
-  // Verificación consolidada del estado de pago - ejecutada cuando tenemos todos los datos necesarios
+  // VerificaciÃ³n consolidada del estado de pago - ejecutada cuando tenemos todos los datos necesarios
   useEffect(() => {
     if (userData && cards.length > 0) {
-      console.log('Ejecutando verificación completa de estado de pago');
+      console.log('Ejecutando verificaciÃ³n completa de estado de pago');
       checkMonthPaymentStatus();
     }
   }, [userData, cards, selectedMonth, selectedYear]);
 
-  // Restablecer el estado de verificación cuando cambia el mes o año
+  // Restablecer el estado de verificaciÃ³n cuando cambia el mes o aÃ±o
   useEffect(() => {
-    console.log('Mes o año cambiado, reiniciando estado de verificación');
+    console.log('Mes o aÃ±o cambiado, reiniciando estado de verificaciÃ³n');
     setPaymentStatusChecked(false);
-    // Ya no necesitamos modificar paymentDisabled aquí, ya que se determina directamente en el botón
-    // setPaymentDisabled(true); // Bloquear el botón por defecto hasta que se verifique
+    // Ya no necesitamos modificar paymentDisabled aquÃ­, ya que se determina directamente en el botÃ³n
+    // setPaymentDisabled(true); // Bloquear el botÃ³n por defecto hasta que se verifique
   }, [selectedMonth, selectedYear]);
 
-  // Efecto adicional para forzar la verificación del botón cuando se detecta una incoherencia
-  // Este efecto ya no es necesario ya que el estado del botón se controla directamente
+  // Efecto adicional para forzar la verificaciÃ³n del botÃ³n cuando se detecta una incoherencia
+  // Este efecto ya no es necesario ya que el estado del botÃ³n se controla directamente
   /* useEffect(() => {
     // Verificar si estamos en el mes anterior al actual
     const today = new Date();
@@ -608,7 +569,7 @@ const CreditCards = () => {
       prevYear = currentYear - 1;
     }
     
-    // Si estamos en el mes anterior y no está pagado
+    // Si estamos en el mes anterior y no estÃ¡ pagado
     if (selectedYear === prevYear && selectedMonth === prevMonth) {
       if (!areCardsActuallyPaid()) {
         // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
@@ -625,9 +586,9 @@ const CreditCards = () => {
           }
         }
         
-        // Si hay incoherencia (tarjeta vencida pero botón deshabilitado), corregir
+        // Si hay incoherencia (tarjeta vencida pero botÃ³n deshabilitado), corregir
         if (anyCardPastDueDate && paymentDisabled && paymentStatusChecked) {
-          console.log("⚠️ CORRECCIÓN: Se detectó una incoherencia - Activando botón de pago");
+          console.log("âš ï¸ CORRECCIÃ“N: Se detectÃ³ una incoherencia - Activando botÃ³n de pago");
           setPaymentDisabled(false);
         }
       }
@@ -635,10 +596,10 @@ const CreditCards = () => {
   }, [paymentStatusChecked, paymentDisabled, cards, selectedMonth, selectedYear]); */
   // Nota: No incluimos areCardsActuallyPaid en las dependencias para evitar el error
   // "Cannot access 'areCardsActuallyPaid' before initialization" y ciclos de renderizado.
-  // Como areCardsActuallyPaid es una función interna que depende del estado, incluirla en
-  // las dependencias causaría múltiples re-renders innecesarios.
+  // Como areCardsActuallyPaid es una funciÃ³n interna que depende del estado, incluirla en
+  // las dependencias causarÃ­a mÃºltiples re-renders innecesarios.
 
-  // Función para verificar directamente en Firebase si el mes ya ha sido pagado
+  // FunciÃ³n para verificar directamente en Firebase si el mes ya ha sido pagado
   const checkMonthPaymentStatus = async () => {
     try {
       const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -647,7 +608,7 @@ const CreditCards = () => {
       // Verificar si existe un registro de pago global para este mes
       const globalPaymentExists = !!(userData?.creditCardPayments?.[selectedYearMonth]);
       
-      // Si ya existe un pago global, consideramos que está pagado
+      // Si ya existe un pago global, consideramos que estÃ¡ pagado
       if (globalPaymentExists) {
         setPaymentStatusChecked(true);
         return true;
@@ -659,14 +620,14 @@ const CreditCards = () => {
         return true; // Consideramos pagado si no hay tarjetas
       }
       
-      // Si el total de todas las tarjetas es cero, consideramos que está pagado
+      // Si el total de todas las tarjetas es cero, consideramos que estÃ¡ pagado
       const totalCardExpenses = getAllCardsTotal();
       if (totalCardExpenses === 0) {
         setPaymentStatusChecked(true);
         return true;
       }
       
-      // Verificar si todas las tarjetas están pagadas
+      // Verificar si todas las tarjetas estÃ¡n pagadas
       let allCardsPaid = true;
       let anyCardWithBalance = false;
       
@@ -677,20 +638,20 @@ const CreditCards = () => {
         if (cardTotal > 0) {
           anyCardWithBalance = true;
           
-          // Verificar si esta tarjeta ya está pagada
+          // Verificar si esta tarjeta ya estÃ¡ pagada
           if (!isCardPaid(card.id)) {
             allCardsPaid = false;
           }
         }
       }
       
-      // Si no hay tarjetas con saldo, consideramos que está pagado
+      // Si no hay tarjetas con saldo, consideramos que estÃ¡ pagado
       if (!anyCardWithBalance) {
         setPaymentStatusChecked(true);
         return true;
       }
       
-      // Si todas las tarjetas con saldo están pagadas, consideramos que está pagado
+      // Si todas las tarjetas con saldo estÃ¡n pagadas, consideramos que estÃ¡ pagado
       if (allCardsPaid) {
         setPaymentStatusChecked(true);
         return true;
@@ -727,22 +688,22 @@ const CreditCards = () => {
         }
       }
       
-      // Habilitar el botón solo si:
+      // Habilitar el botÃ³n solo si:
       // 1. Estamos en el mes anterior al actual
-      // 2. Las tarjetas aún no han sido pagadas
+      // 2. Las tarjetas aÃºn no han sido pagadas
       // 3. Al menos una tarjeta ha superado la fecha de vencimiento
       
-      // Forzar que este botón siempre esté activo cuando estamos en el mes anterior y hay tarjetas vencidas
+      // Forzar que este botÃ³n siempre estÃ© activo cuando estamos en el mes anterior y hay tarjetas vencidas
       const shouldBeEnabled = isSelectedMonthPrevious && !allCardsPaid && anyCardPastDueDate;
       
-      console.log('ESTADO FINAL DEL BOTÓN:', {
+      console.log('ESTADO FINAL DEL BOTÃ“N:', {
         isSelectedMonthPrevious,
         allCardsPaid,
         anyCardPastDueDate,
         shouldBeEnabled
       });
       
-      // Ya no necesitamos modificar paymentDisabled aquí
+      // Ya no necesitamos modificar paymentDisabled aquÃ­
       // setPaymentDisabled(!shouldBeEnabled);
       setPaymentStatusChecked(true);
       
@@ -754,7 +715,7 @@ const CreditCards = () => {
     }
   };
 
-  // Manejar selección de archivo
+  // Manejar selecciÃ³n de archivo
   const handleFileChange = (event) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
@@ -767,7 +728,7 @@ const CreditCards = () => {
     }
   };
 
-  // Abrir diálogo de subida - ahora solo valida si hay una tarjeta seleccionada
+  // Abrir diÃ¡logo de subida - ahora solo valida si hay una tarjeta seleccionada
   const handleOpenUploadDialog = () => {
     // Verificar que haya una tarjeta seleccionada
     if (!selectedCard || !cards.find(card => card.id === selectedCard)) {
@@ -775,12 +736,12 @@ const CreditCards = () => {
       return false;
     }
     return true;
-    // Ya no necesitamos abrir el diálogo porque la funcionalidad está integrada
+    // Ya no necesitamos abrir el diÃ¡logo porque la funcionalidad estÃ¡ integrada
     // setUploadDialogOpen(true);
     // setSelectedFile(null);
   };
 
-  // Esta función ya no es necesaria
+  // Esta funciÃ³n ya no es necesaria
   // const handleCloseUploadDialog = () => {
   //   setUploadDialogOpen(false);
   //   setSelectedFile(null);
@@ -793,7 +754,7 @@ const CreditCards = () => {
     setUploading(true);
 
     try {
-      // Verificar que el usuario esté autenticado
+      // Verificar que el usuario estÃ© autenticado
       if (!auth.currentUser) {
         throw new Error("Usuario no autenticado");
       }
@@ -802,11 +763,11 @@ const CreditCards = () => {
       console.log("Usuario actual:", auth.currentUser.uid);
       console.log("Tarjeta seleccionada:", selectedCard);
 
-      // Crear nombre único para el archivo - incluir mes y año para mejor organización
+      // Crear nombre Ãºnico para el archivo - incluir mes y aÃ±o para mejor organizaciÃ³n
       const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
       const fileName = `${selectedYearMonth}_${selectedCard}_${selectedFile.name.replace(/\s+/g, '_')}`;
       
-      // Ruta simplificada con estructura clara por usuario, tarjeta y año-mes
+      // Ruta simplificada con estructura clara por usuario, tarjeta y aÃ±o-mes
       const storagePath = `statements/${auth.currentUser.uid}/${selectedCard}/${selectedYearMonth}/${fileName}`;
       
       console.log("Intentando subir archivo a:", storagePath);
@@ -816,7 +777,7 @@ const CreditCards = () => {
       
       // Verificar primero si tenemos permisos para escribir
       try {
-        // Subir en chunks pequeños con manejo de progreso
+        // Subir en chunks pequeÃ±os con manejo de progreso
         const uploadTask = storageRef.put(selectedFile, {
           contentType: 'application/pdf',
           customMetadata: {
@@ -840,11 +801,11 @@ const CreditCards = () => {
         await uploadTask;
         console.log("Archivo subido exitosamente");
       } catch (uploadError) {
-        console.error("Error específico durante la subida:", uploadError);
+        console.error("Error especÃ­fico durante la subida:", uploadError);
         throw uploadError;
       }
       
-      // Obtener URL de descarga con token de autenticación
+      // Obtener URL de descarga con token de autenticaciÃ³n
       const downloadURL = await storageRef.getDownloadURL();
       console.log("URL de descarga obtenida:", downloadURL);
       
@@ -869,33 +830,33 @@ const CreditCards = () => {
       setCardStatements(updatedCardStatements);
       
       showAlert('Resumen subido correctamente', 'success');
-      // Ya no es necesario cerrar el diálogo
+      // Ya no es necesario cerrar el diÃ¡logo
       // setUploadDialogOpen(false);
       setSelectedFile(null);
     } catch (error) {
       console.error('Error al subir el resumen:', error);
-      console.error('Código de error:', error.code);
+      console.error('CÃ³digo de error:', error.code);
       console.error('Mensaje de error:', error.message);
       
-      // Mensaje de error más informativo
+      // Mensaje de error mÃ¡s informativo
       let errorMessage = 'Error al subir el archivo. ';
       
       if (error.code === 'storage/unauthorized') {
-        errorMessage += 'No tienes permisos para subir archivos. Es posible que necesites activar esta función en Firebase.';
+        errorMessage += 'No tienes permisos para subir archivos. Es posible que necesites activar esta funciÃ³n en Firebase.';
         console.error('Problema de permisos detectado. Revisa las reglas de seguridad en Firebase Storage.');
       } else if (error.code === 'storage/canceled') {
         errorMessage += 'La subida fue cancelada.';
       } else if (error.code === 'storage/unknown') {
-        errorMessage += 'Ocurrió un error desconocido. Verifica tu conexión a internet.';
+        errorMessage += 'OcurriÃ³ un error desconocido. Verifica tu conexiÃ³n a internet.';
       } else if (error.code === 'storage/quota-exceeded') {
         errorMessage += 'Se ha excedido la cuota de almacenamiento permitida.';
       } else {
-        errorMessage += error.message || 'Inténtalo de nuevo.';
+        errorMessage += error.message || 'IntÃ©ntalo de nuevo.';
       }
       
-      // Solución alternativa si hay problemas de permisos: mostrar instrucciones
+      // SoluciÃ³n alternativa si hay problemas de permisos: mostrar instrucciones
       if (error.code === 'storage/unauthorized') {
-        showAlert('Esta función requiere configuración adicional. Por favor, contacta al administrador.', 'warning');
+        showAlert('Esta funciÃ³n requiere configuraciÃ³n adicional. Por favor, contacta al administrador.', 'warning');
       } else {
         showAlert(errorMessage, 'error');
       }
@@ -918,7 +879,7 @@ const CreditCards = () => {
       if (statement.storagePath) {
         console.log("Usando ruta de almacenamiento:", statement.storagePath);
         const storageRef = storage.ref(statement.storagePath);
-        // Obtener URL fresca con nuevo token de autenticación
+        // Obtener URL fresca con nuevo token de autenticaciÃ³n
         const freshURL = await storageRef.getDownloadURL();
         console.log("URL fresca obtenida:", freshURL);
         window.open(freshURL, '_blank');
@@ -929,20 +890,20 @@ const CreditCards = () => {
       }
     } catch (error) {
       console.error('Error al descargar el archivo:', error);
-      console.error('Código de error:', error.code);
+      console.error('CÃ³digo de error:', error.code);
       console.error('Mensaje de error:', error.message);
       
-      // Intentar URL alternativa si está disponible
+      // Intentar URL alternativa si estÃ¡ disponible
       if ((error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found') && statement.downloadURL) {
         console.log("Intentando con URL alternativa guardada");
         window.open(statement.downloadURL, '_blank');
       } else {
-        showAlert('Error al descargar el archivo. Intenta nuevamente más tarde.', 'error');
+        showAlert('Error al descargar el archivo. Intenta nuevamente mÃ¡s tarde.', 'error');
       }
     }
   };
 
-  // Función para mostrar alertas
+  // FunciÃ³n para mostrar alertas
   const showAlert = (message, severity) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
@@ -953,21 +914,21 @@ const CreditCards = () => {
     setSnackbarOpen(false);
   };
 
-  // Calcular los próximos viernes
+  // Calcular los prÃ³ximos viernes
   const calculateNextFridays = (count) => {
     const fridays = [];
     const today = new Date();
     let nextFriday = new Date(today);
     
-    // Avanzar hasta el próximo viernes (día 5)
+    // Avanzar hasta el prÃ³ximo viernes (dÃ­a 5)
     while (nextFriday.getDay() !== 5) {
       nextFriday.setDate(nextFriday.getDate() + 1);
     }
     
-    // Añadir el primer viernes
+    // AÃ±adir el primer viernes
     fridays.push(new Date(nextFriday));
     
-    // Añadir los siguientes viernes si es necesario
+    // AÃ±adir los siguientes viernes si es necesario
     for (let i = 1; i < count; i++) {
       const newFriday = new Date(fridays[i-1]);
       newFriday.setDate(newFriday.getDate() + 7);
@@ -977,7 +938,7 @@ const CreditCards = () => {
     return fridays;
   };
 
-  // Función para actualizar el número de pagos
+  // FunciÃ³n para actualizar el nÃºmero de pagos
   const handlePaymentCountChange = (event) => {
     const count = parseInt(event.target.value, 10);
     setNumberOfPayments(count);
@@ -990,7 +951,7 @@ const CreditCards = () => {
     setPaymentAmounts(newAmounts);
   };
 
-  // Nueva función para actualizar el monto de una cuota específica
+  // Nueva funciÃ³n para actualizar el monto de una cuota especÃ­fica
   const handlePaymentAmountChange = (index, value) => {
     const newValue = parseFloat(value) || 0;
     const newAmounts = [...paymentAmounts];
@@ -998,11 +959,11 @@ const CreditCards = () => {
     
     // Actualizar los montos restantes
     if (index === paymentAmounts.length - 1) {
-      // Si es el último pago, ajustamos el monto total
+      // Si es el Ãºltimo pago, ajustamos el monto total
       const newTotal = newAmounts.reduce((sum, amount) => sum + amount, 0);
       setRoundedAmount(newTotal);
     } else {
-      // Si no es el último pago, ajustamos el último pago para mantener el total
+      // Si no es el Ãºltimo pago, ajustamos el Ãºltimo pago para mantener el total
       const totalWithoutLast = newAmounts.slice(0, -1).reduce((sum, amount) => sum + amount, 0);
       newAmounts[newAmounts.length - 1] = roundedAmount - totalWithoutLast;
     }
@@ -1010,7 +971,7 @@ const CreditCards = () => {
     setPaymentAmounts(newAmounts);
   };
 
-  // Función para abrir el diálogo de pago
+  // FunciÃ³n para abrir el diÃ¡logo de pago
   const handleOpenPaymentDialog = () => {
     const totalAmount = getAllCardsTotal();
     
@@ -1029,22 +990,22 @@ const CreditCards = () => {
     // Inicializar el arreglo de montos
     setPaymentAmounts([initialRoundedAmount]);
     
-    // Abrir el diálogo
+    // Abrir el diÃ¡logo
     setPaymentDialogOpen(true);
   };
 
-  // Función para cerrar el diálogo de pago
+  // FunciÃ³n para cerrar el diÃ¡logo de pago
   const handleClosePaymentDialog = () => {
     setPaymentDialogOpen(false);
   };
 
-  // Función para manejar el pago de todas las tarjetas
+  // FunciÃ³n para manejar el pago de todas las tarjetas
   const handlePayCreditCard = () => {
-    // Abrir el diálogo de configuración de pago en lugar de procesar el pago directamente
+    // Abrir el diÃ¡logo de configuraciÃ³n de pago en lugar de procesar el pago directamente
     handleOpenPaymentDialog();
   };
 
-  // Función para procesar el pago después de configurarlo
+  // FunciÃ³n para procesar el pago despuÃ©s de configurarlo
   const processCardPayment = () => {
     const totalAmount = getAllCardsTotal();
     
@@ -1060,7 +1021,7 @@ const CreditCards = () => {
       return;
     }
 
-    // Verificar si tenemos acceso a dollarRate y usar un valor por defecto si no está disponible
+    // Verificar si tenemos acceso a dollarRate y usar un valor por defecto si no estÃ¡ disponible
     const dollarRateVenta = userData?.dollarRate?.venta || 1;
     
     // Obtener el saldo actual de ahorros o usar 0 como valor predeterminado
@@ -1074,7 +1035,7 @@ const CreditCards = () => {
     setSnackbarSeverity("info");
     setSnackbarOpen(true);
 
-    // Cerrar el diálogo
+    // Cerrar el diÃ¡logo
     setPaymentDialogOpen(false);
     
     // Operaciones de base de datos en paralelo
@@ -1109,7 +1070,7 @@ const CreditCards = () => {
       }
     });
     
-    // Crear múltiples gastos para los pagos
+    // Crear mÃºltiples gastos para los pagos
     for (let i = 0; i < numberOfPayments; i++) {
       const paymentDate = paymentDates[i];
       const formattedDate = `${paymentDate.getDate()}/${paymentDate.getMonth() + 1}/${paymentDate.getFullYear()}`;
@@ -1144,10 +1105,10 @@ const CreditCards = () => {
       newTotal: (currentSavings - roundedAmount),
     };
     
-    // Ejecutar todas las actualizaciones como una transacción
+    // Ejecutar todas las actualizaciones como una transacciÃ³n
     database.ref().update(updates)
       .then(() => {
-        // Confirmar que se completó la actualización correctamente
+        // Confirmar que se completÃ³ la actualizaciÃ³n correctamente
         checkMonthPaymentStatus();
         
         showAlert(`Pago de $${formatAmount(roundedAmount)} registrado en ${numberOfPayments} cuota(s) para ${getMonthName(selectedMonth)} ${selectedYear}`, "success");
@@ -1158,25 +1119,25 @@ const CreditCards = () => {
       });
   };
 
-  // Función para verificar si el mes seleccionado es un mes futuro
+  // FunciÃ³n para verificar si el mes seleccionado es un mes futuro
   const isFutureMonth = () => {
     const today = new Date();
     const currentMonth = today.getMonth() + 1; // 1-12
     const currentYear = today.getFullYear();
     
-    // Si el año seleccionado es mayor al actual, es futuro
+    // Si el aÃ±o seleccionado es mayor al actual, es futuro
     if (selectedYear > currentYear) return true;
     
-    // Si estamos en el mismo año, verificar si el mes es mayor al actual
+    // Si estamos en el mismo aÃ±o, verificar si el mes es mayor al actual
     if (selectedYear === currentYear && selectedMonth > currentMonth) return true;
     
     // En cualquier otro caso, no es futuro
     return false;
   };
 
-  // FUNCIONALIDAD DE ACTUALIZACIÓN DE FECHAS INTEGRADA
+  // FUNCIONALIDAD DE ACTUALIZACIÃ“N DE FECHAS INTEGRADA
   
-  // Abrir diálogo de actualización de fechas
+  // Abrir diÃ¡logo de actualizaciÃ³n de fechas
   const handleOpenUpdateDatesDialog = (cardId) => {
     if (!cardId || !userData?.creditCards?.[cardId]) {
       showAlert('No se pudo encontrar la tarjeta seleccionada', 'error');
@@ -1189,7 +1150,7 @@ const CreditCards = () => {
     loadCardDates(cardId);
   };
   
-  // Cerrar diálogo de actualización de fechas
+  // Cerrar diÃ¡logo de actualizaciÃ³n de fechas
   const handleCloseUpdateDatesDialog = () => {
     setUpdateDatesDialogOpen(false);
     setClosingDate('');
@@ -1200,7 +1161,7 @@ const CreditCards = () => {
     setSaving(false);
   };
 
-  // Función para verificar si una fecha está fuera del límite permitido (1 mes)
+  // FunciÃ³n para verificar si una fecha estÃ¡ fuera del lÃ­mite permitido (1 mes)
   const isDateBeyondLimit = (date) => {
     const checkDate = date instanceof Date ? date : new Date(date);
     const today = new Date();
@@ -1213,15 +1174,15 @@ const CreditCards = () => {
     const currentMonth = today.getMonth() + 1; // Mes actual (1-12)
     const currentYear = today.getFullYear();
     
-    // Mes y año de la fecha a comprobar
+    // Mes y aÃ±o de la fecha a comprobar
     const checkMonth = checkDate.getMonth() + 1; // Convertir a formato 1-12
     const checkYear = checkDate.getFullYear();
     
-    // Calcular el mes límite (puede ser en el año siguiente)
-    let limitMonth = currentMonth + 1; // Límite de 1 mes
+    // Calcular el mes lÃ­mite (puede ser en el aÃ±o siguiente)
+    let limitMonth = currentMonth + 1; // LÃ­mite de 1 mes
     let limitYear = currentYear;
     
-    // Ajustar si el mes límite se extiende al año siguiente
+    // Ajustar si el mes lÃ­mite se extiende al aÃ±o siguiente
     if (limitMonth > 12) {
       limitYear += 1;
       limitMonth = limitMonth % 12;
@@ -1230,11 +1191,11 @@ const CreditCards = () => {
       }
     }
     
-    // Comparar años primero
+    // Comparar aÃ±os primero
     if (checkYear > limitYear) return true;
     if (checkYear < limitYear) return false;
     
-    // Si estamos en el mismo año, comparar meses
+    // Si estamos en el mismo aÃ±o, comparar meses
     return checkMonth > limitMonth;
   };
 
@@ -1259,7 +1220,7 @@ const CreditCards = () => {
     
     const card = userData.creditCards[cardId];
     
-    // Consultar las fechas para el mes y año seleccionados
+    // Consultar las fechas para el mes y aÃ±o seleccionados
     const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     if (card.dates && card.dates[monthKey]) {
       const monthData = card.dates[monthKey];
@@ -1267,7 +1228,7 @@ const CreditCards = () => {
       if (monthData.closingDate) {
         setClosingDate(monthData.closingDate);
       } else if (card.defaultClosingDay) {
-        // Si no hay fecha de cierre configurada, usar el día por defecto con el mes y año seleccionados
+        // Si no hay fecha de cierre configurada, usar el dÃ­a por defecto con el mes y aÃ±o seleccionados
         const day = String(card.defaultClosingDay).padStart(2, '0');
         setClosingDate(`${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${day}`);
       } else {
@@ -1321,32 +1282,32 @@ const CreditCards = () => {
     }
   };
 
-  // Función para determinar si una fecha debe ser deshabilitada para la fecha de cierre
+  // FunciÃ³n para determinar si una fecha debe ser deshabilitada para la fecha de cierre
   const shouldDisableClosingDate = (date) => {
     const jsDate = date.toDate();
     return isDateBeyondLimit(jsDate);
   };
 
-  // Función para determinar si una fecha debe ser deshabilitada para vencimiento
+  // FunciÃ³n para determinar si una fecha debe ser deshabilitada para vencimiento
   const shouldDisableDueDate = (date) => {
     const jsDate = date.toDate();
     
-    // Si no hay fecha de cierre seleccionada, solo aplicar el límite de 3 meses
+    // Si no hay fecha de cierre seleccionada, solo aplicar el lÃ­mite de 3 meses
     if (!closingDate) return isDateBeyondLimit(jsDate);
     
     try {
-      // Si hay fecha de cierre, la fecha de vencimiento debe ser posterior a ésta
+      // Si hay fecha de cierre, la fecha de vencimiento debe ser posterior a Ã©sta
       const closingDateObj = new Date(closingDate);
       
       // Obtener el mes siguiente a la fecha de cierre (para permitir fechas en dicho mes)
       const nextMonthDate = new Date(closingDateObj);
       nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-      nextMonthDate.setDate(0); // Último día del mes siguiente
+      nextMonthDate.setDate(0); // Ãšltimo dÃ­a del mes siguiente
       
       // La fecha no debe ser anterior a la fecha de cierre
       if (jsDate < closingDateObj) return true;
       
-      // Si la fecha está en el mismo mes o el mes siguiente al cierre, permitirla
+      // Si la fecha estÃ¡ en el mismo mes o el mes siguiente al cierre, permitirla
       const jsDateYear = jsDate.getFullYear();
       const jsDateMonth = jsDate.getMonth();
       const closingYear = closingDateObj.getFullYear();
@@ -1360,7 +1321,7 @@ const CreditCards = () => {
         return false;
       }
       
-      // Para otras fechas, aplicar el límite general
+      // Para otras fechas, aplicar el lÃ­mite general
       return isDateBeyondLimit(jsDate);
     } catch (error) {
       console.error('Error al procesar fecha de cierre:', error);
@@ -1368,38 +1329,38 @@ const CreditCards = () => {
     }
   };
 
-  // Función para manejar el cambio de fecha de cierre
+  // FunciÃ³n para manejar el cambio de fecha de cierre
   const handleClosingDateChange = (date) => {
     if (date) {
-      // Guardar el objeto fecha completo en lugar de solo el día
+      // Guardar el objeto fecha completo en lugar de solo el dÃ­a
       const formattedDate = date.format('YYYY-MM-DD');
       setClosingDate(formattedDate);
     }
   };
 
-  // Función para manejar el cambio de fecha de vencimiento
+  // FunciÃ³n para manejar el cambio de fecha de vencimiento
   const handleDueDateChange = (date) => {
     if (date) {
-      // Guardar el objeto fecha completo en lugar de solo el día
+      // Guardar el objeto fecha completo en lugar de solo el dÃ­a
       const formattedDate = date.format('YYYY-MM-DD');
       setDueDate(formattedDate);
     }
   };
 
-  // Validación de campos básica
+  // ValidaciÃ³n de campos bÃ¡sica
   const validateUpdateInputs = () => {
     const newErrors = {
       closingDate: !closingDate,
       dueDate: !dueDate
     };
     
-    setUpdateError(newErrors.closingDate ? 'Por favor selecciona una fecha de cierre válida' : '');
-    setUpdateError(newErrors.dueDate ? 'Por favor selecciona una fecha de vencimiento válida' : '');
+    setUpdateError(newErrors.closingDate ? 'Por favor selecciona una fecha de cierre vÃ¡lida' : '');
+    setUpdateError(newErrors.dueDate ? 'Por favor selecciona una fecha de vencimiento vÃ¡lida' : '');
     
     return !Object.values(newErrors).some(error => error);
   };
 
-  // Función para actualizar las fechas de la tarjeta en Firebase
+  // FunciÃ³n para actualizar las fechas de la tarjeta en Firebase
   const handleUpdateDates = async () => {
     if (!validateUpdateInputs()) {
       return;
@@ -1417,26 +1378,382 @@ const CreditCards = () => {
         dueDate: dueDate
       });
       
-      // Mostrar mensaje de éxito
+      // Mostrar mensaje de Ã©xito
       setUpdateSuccess(true);
       showAlert('Fechas actualizadas correctamente', 'success');
       
-      // Cerrar el diálogo después de 1.5 segundos
+      // Cerrar el diÃ¡logo despuÃ©s de 1.5 segundos
       setTimeout(() => {
         handleCloseUpdateDatesDialog();
-        // Recargar la página para reflejar los cambios
+        // Recargar la pÃ¡gina para reflejar los cambios
         window.location.reload();
       }, 1500);
     } catch (error) {
       console.error('Error al actualizar las fechas:', error);
-      setUpdateError('Error al actualizar las fechas. Inténtalo de nuevo.');
+      setUpdateError('Error al actualizar las fechas. IntÃ©ntalo de nuevo.');
     } finally {
       setSaving(false);
     }
   };
 
+  // FunciÃ³n para obtener el Ã­cono de categorÃ­a adecuado
+  const getCategoryIcon = (category) => {
+    const categoryLower = (category || '').toLowerCase();
+    
+    if (categoryLower.includes('comida') || categoryLower.includes('restaurant')) {
+      return <RestaurantIcon />;
+    } else if (categoryLower.includes('compra') || categoryLower.includes('super')) {
+      return <ShoppingCartIcon />;
+    } else if (categoryLower.includes('ropa') || categoryLower.includes('moda')) {
+      return <LocalMallIcon />;
+    } else if (categoryLower.includes('auto') || categoryLower.includes('combustible')) {
+      return <DirectionsCarIcon />;
+    } else if (categoryLower.includes('casa') || categoryLower.includes('hogar')) {
+      return <HomeIcon />;
+    } else if (categoryLower.includes('pago') || categoryLower.includes('servicio')) {
+      return <AttachMoneyIcon />;
+    } else {
+      return <ShoppingCartIcon />;
+    }
+  };
+  
+  // Obtener el color para una categorÃ­a especÃ­fica
+  const getCategoryColor = (category) => {
+    const categoryLower = (category || '').toLowerCase();
+    
+    if (categoryLower.includes('comida') || categoryLower.includes('restaurant')) {
+      return theme.palette.error.main;
+    } else if (categoryLower.includes('compra') || categoryLower.includes('super')) {
+      return theme.palette.primary.main;
+    } else if (categoryLower.includes('ropa') || categoryLower.includes('moda')) {
+      return theme.palette.secondary.main;
+    } else if (categoryLower.includes('auto') || categoryLower.includes('combustible')) {
+      return theme.palette.warning.main;
+    } else if (categoryLower.includes('casa') || categoryLower.includes('hogar')) {
+      return theme.palette.success.main;
+    } else if (categoryLower.includes('pago') || categoryLower.includes('servicio')) {
+      return theme.palette.info.main;
+    } else {
+      return theme.palette.grey[700];
+    }
+  };
+  
+  // Componente de lista de transacciones
+  const TransactionsList = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortOrder, setSortOrder] = useState('date-desc');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [expandedGroups, setExpandedGroups] = useState({});
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    
+    // Si no hay transacciones o tarjeta seleccionada, mostrar mensaje
+    if (!selectedCard || transactions.length === 0) {
+      return (
+        <Card sx={{ p: 4, borderRadius: 3, textAlign: 'center', mt: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <CreditCardIcon sx={{ fontSize: 48, color: theme.palette.grey[400] }} />
+            <Typography variant="h6" color="textSecondary">
+              {!selectedCard ? 'Selecciona una tarjeta para ver transacciones' : 'No hay transacciones para este perÃ­odo'}
+            </Typography>
+          </Box>
+        </Card>
+      );
+    }
+    
+    // Agrupar transacciones por fecha
+    const groupTransactionsByDate = () => {
+      const groups = {};
+      const filteredTransactions = transactions.filter(transaction => {
+        const matchesSearch = searchTerm === '' || 
+          transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          transaction.category?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCategory = filterCategory === '' || 
+          transaction.category?.toLowerCase().includes(filterCategory.toLowerCase());
+        
+        return matchesSearch && matchesCategory;
+      });
+      
+      // Ordenar transacciones
+      const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+        if (sortOrder === 'date-desc') {
+          return new Date(b.date) - new Date(a.date);
+        } else if (sortOrder === 'date-asc') {
+          return new Date(a.date) - new Date(b.date);
+        } else if (sortOrder === 'amount-desc') {
+          return b.amount - a.amount;
+        } else if (sortOrder === 'amount-asc') {
+          return a.amount - b.amount;
+        }
+        return 0;
+      });
+      
+      // Agrupar por fecha
+      sortedTransactions.forEach(transaction => {
+        const dateObj = new Date(transaction.date);
+        const dateStr = dateObj.toISOString().split('T')[0];
+        
+        if (!groups[dateStr]) {
+          groups[dateStr] = {
+            date: dateStr,
+            formattedDate: obtenerFechaFormateada(transaction.date),
+            transactions: [],
+            total: 0
+          };
+          // Inicializar el grupo como expandido por defecto
+          if (expandedGroups[dateStr] === undefined) {
+            setExpandedGroups(prev => ({ ...prev, [dateStr]: true }));
+          }
+        }
+        
+        groups[dateStr].transactions.push(transaction);
+        groups[dateStr].total += transaction.amount;
+      });
+      
+      return groups;
+    };
+    
+    const transactionGroups = groupTransactionsByDate();
+    const groupDates = Object.keys(transactionGroups).sort((a, b) => new Date(b) - new Date(a));
+    
+    const toggleGroup = (dateStr) => {
+      setExpandedGroups(prev => ({
+        ...prev,
+        [dateStr]: !prev[dateStr]
+      }));
+    };
+    
+    // FunciÃ³n para aplicar filtros rÃ¡pidos de categorÃ­a
+    const setQuickFilter = (category) => {
+      setFilterCategory(filterCategory === category ? '' : category);
+    };
+    
+    return (
+      <Card sx={{ borderRadius: 3, overflow: 'hidden', mt: 4 }}>
+        <Box sx={{ 
+          p: 2, 
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: 2
+        }}>
+          <Typography variant="h6" fontWeight="bold">
+            Transacciones de la Tarjeta
+          </Typography>
+          
+          {/* Barra de bÃºsqueda */}
+          <Box sx={{ 
+            flexGrow: 1, 
+            display: 'flex',
+            px: 2,
+            py: 1,
+            bgcolor: alpha(theme.palette.primary.main, 0.08),
+            borderRadius: 2
+          }}>
+            <InputBase
+              placeholder="Buscar transacciones..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ flexGrow: 1, ml: 1 }}
+              inputProps={{ 'aria-label': 'buscar transacciones' }}
+            />
+            <IconButton type="button" aria-label="search">
+              <SearchIcon />
+            </IconButton>
+          </Box>
+          
+          {/* Botones de ordenaciÃ³n y filtrado */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Ordenar" arrow>
+              <IconButton 
+                onClick={(e) => {
+                  const nextOrder = {
+                    'date-desc': 'date-asc',
+                    'date-asc': 'amount-desc',
+                    'amount-desc': 'amount-asc',
+                    'amount-asc': 'date-desc'
+                  }[sortOrder];
+                  setSortOrder(nextOrder);
+                }}
+                color={sortOrder !== 'date-desc' ? 'primary' : 'default'}
+              >
+                <SortIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Filtrar" arrow>
+              <IconButton 
+                color={filterCategory ? 'primary' : 'default'}
+                onClick={() => setFilterCategory('')}
+              >
+                <FilterListIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+        
+        {/* Chips de filtrado rÃ¡pido por categorÃ­a */}
+        <Box sx={{ px: 2, py: 1.5, display: 'flex', flexWrap: 'wrap', gap: 1, borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Chip 
+            icon={<RestaurantIcon />} 
+            label="Comida" 
+            variant={filterCategory === 'comida' ? 'filled' : 'outlined'}
+            color={filterCategory === 'comida' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('comida')}
+            clickable
+          />
+          <Chip 
+            icon={<ShoppingCartIcon />} 
+            label="Compras" 
+            variant={filterCategory === 'compra' ? 'filled' : 'outlined'}
+            color={filterCategory === 'compra' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('compra')}
+            clickable
+          />
+          <Chip 
+            icon={<LocalMallIcon />} 
+            label="Ropa" 
+            variant={filterCategory === 'ropa' ? 'filled' : 'outlined'}
+            color={filterCategory === 'ropa' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('ropa')}
+            clickable
+          />
+          <Chip 
+            icon={<DirectionsCarIcon />} 
+            label="Auto" 
+            variant={filterCategory === 'auto' ? 'filled' : 'outlined'}
+            color={filterCategory === 'auto' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('auto')}
+            clickable
+          />
+          <Chip 
+            icon={<HomeIcon />} 
+            label="Hogar" 
+            variant={filterCategory === 'hogar' ? 'filled' : 'outlined'}
+            color={filterCategory === 'hogar' ? 'primary' : 'default'}
+            onClick={() => setQuickFilter('hogar')}
+            clickable
+          />
+        </Box>
+          
+        {/* Lista de transacciones agrupadas por fecha */}
+        <List sx={{ py: 0 }}>
+          {groupDates.length > 0 ? (
+            groupDates.map(dateStr => (
+              <React.Fragment key={dateStr}>
+                {/* Cabecera del grupo de fecha */}
+                <ListItem 
+                  button 
+                  onClick={() => toggleGroup(dateStr)}
+                  sx={{ 
+                    borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                    py: 1.5,
+                    bgcolor: alpha(theme.palette.primary.main, 0.03)
+                  }}
+                >
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="subtitle1" fontWeight="medium">
+                          {transactionGroups[dateStr].formattedDate}
+                        </Typography>
+                        <Typography variant="subtitle1" fontWeight="bold" color="error.main">
+                          {formatAmount(transactionGroups[dateStr].total)}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={`${transactionGroups[dateStr].transactions.length} transacciones`}
+                  />
+                  <ChevronRightIcon 
+                    sx={{ 
+                      transform: expandedGroups[dateStr] ? 'rotate(90deg)' : 'none',
+                      transition: 'transform 0.3s'
+                    }} 
+                  />
+                </ListItem>
+                
+                {/* Transacciones del grupo */}
+                {expandedGroups[dateStr] && transactionGroups[dateStr].transactions.map((transaction, idx) => (
+                  <ListItem 
+                    key={transaction.id || idx}
+                    sx={{ 
+                      py: 1.5,
+                      px: 2,
+                      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+                      backgroundColor: idx % 2 === 0 ? alpha(theme.palette.background.default, 0.4) : 'transparent'
+                    }}
+                  >
+                    <Box sx={{ 
+                      mr: 2, 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      bgcolor: alpha(getCategoryColor(transaction.category), 0.1),
+                      color: getCategoryColor(transaction.category)
+                    }}>
+                      {getCategoryIcon(transaction.category)}
+                    </Box>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body1" fontWeight="medium" noWrap>
+                          {transaction.description || 'Sin descripciÃ³n'}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box sx={{ display: 'flex', flexDirection: 'column', mt: 0.5 }}>
+                          <Typography variant="caption" noWrap sx={{ color: theme.palette.text.secondary }}>
+                            {transaction.category || 'Sin categorÃ­a'}
+                            {transaction.subcategory && ` â€¢ ${transaction.subcategory}`}
+                          </Typography>
+                          {transaction.installments > 1 && (
+                            <Chip 
+                              label={`Cuota ${transaction.currentInstallment || 1}/${transaction.installments}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{ mt: 0.5, height: 20, maxWidth: 'fit-content' }}
+                            />
+                          )}
+                        </Box>
+                      }
+                      primaryTypographyProps={{ variant: 'body2' }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'flex-end',
+                      minWidth: 80
+                    }}>
+                      <Typography variant="body1" fontWeight="bold" color="error">
+                        {formatAmount(transaction.amount)}
+                      </Typography>
+                      {transaction.amountUSD && (
+                        <Typography variant="caption" color="text.secondary">
+                          USD {formatAmount(transaction.amountUSD)}
+                        </Typography>
+                      )}
+                    </Box>
+                  </ListItem>
+                ))}
+              </React.Fragment>
+            ))
+          ) : (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body1" color="textSecondary">
+                No se encontraron transacciones con los filtros aplicados
+              </Typography>
+            </Box>
+          )}
+        </List>
+      </Card>
+    );
+  };
+
   return (
-    <Layout title="Tarjetas de Crédito">
+    <Layout title="Tarjetas de CrÃ©dito">
       <Box 
         sx={{ 
           minHeight: '100vh',
@@ -1458,7 +1775,7 @@ const CreditCards = () => {
             boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.18)}`,
             position: 'sticky',
             top: {
-              xs: 56, // Altura del AppBar en móviles
+              xs: 56, // Altura del AppBar en mÃ³viles
               sm: 64  // Altura del AppBar en escritorio
             },
             zIndex: 10,
@@ -1469,7 +1786,7 @@ const CreditCards = () => {
             }
           }}
         >
-          {/* Barra principal con información del contexto actual */}
+          {/* Barra principal con informaciÃ³n del contexto actual */}
           <Box
             sx={{
               background: `linear-gradient(90deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
@@ -1480,7 +1797,7 @@ const CreditCards = () => {
               gap: 1
             }}
           >
-            {/* Fila 1: Navegación principal */}
+            {/* Fila 1: NavegaciÃ³n principal */}
             <Box 
               sx={{
                 display: 'flex', 
@@ -1491,7 +1808,7 @@ const CreditCards = () => {
                 width: '100%'
               }}
             >
-              {/* Indicador contextual del período seleccionado */}
+              {/* Indicador contextual del perÃ­odo seleccionado */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Avatar
                   sx={{
@@ -1527,12 +1844,12 @@ const CreditCards = () => {
                     }}
                   >
                     <PaymentIcon fontSize="inherit" /> 
-                    {cards.length} {cards.length === 1 ? 'tarjeta' : 'tarjetas'} • Total: {formatAmount(getAllCardsTotal())}
+                    {cards.length} {cards.length === 1 ? 'tarjeta' : 'tarjetas'} â€¢ Total: {formatAmount(getAllCardsTotal())}
                   </Typography>
                 </Box>
               </Box>
 
-              {/* Controles de navegación rápida */}
+              {/* Controles de navegaciÃ³n rÃ¡pida */}
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   variant="contained"
@@ -1560,7 +1877,7 @@ const CreditCards = () => {
               </Box>
             </Box>
 
-            {/* Fila 2: Selección detallada de mes y año */}
+            {/* Fila 2: SelecciÃ³n detallada de mes y aÃ±o */}
             <Box
               sx={{
                 mt: { xs: 1, md: 2 },
@@ -1573,7 +1890,7 @@ const CreditCards = () => {
                 backdropFilter: 'blur(5px)'
               }}
             >
-              {/* Selector de mes táctil y accesible */}
+              {/* Selector de mes tÃ¡ctil y accesible */}
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center',
@@ -1642,8 +1959,8 @@ const CreditCards = () => {
                         idx === selectedMonth - 1 + 1 ||
                         idx === selectedMonth - 1 + 2;
                       
-                      // Verificar si este mes está más allá del límite de 1 mes
-                      // Solo aplicamos la restricción para meses futuros
+                      // Verificar si este mes estÃ¡ mÃ¡s allÃ¡ del lÃ­mite de 1 mes
+                      // Solo aplicamos la restricciÃ³n para meses futuros
                       const thisMonthDate = new Date(selectedYear, idx, 1);
                       const today = new Date();
                       const currentMonth = today.getMonth();
@@ -1652,7 +1969,7 @@ const CreditCards = () => {
                       // Solo verificar meses futuros, no restringir meses pasados
                       let isBeyondLimit = false;
                       
-                      // Si es un mes futuro (este año o posterior)
+                      // Si es un mes futuro (este aÃ±o o posterior)
                       if (thisMonthDate.getFullYear() > currentYear || 
                           (thisMonthDate.getFullYear() === currentYear && idx > currentMonth + 1)) {
                         isBeyondLimit = true;
@@ -1717,7 +2034,7 @@ const CreditCards = () => {
                   <span>
                     <IconButton
                       onClick={() => {
-                        // Calcular el próximo mes
+                        // Calcular el prÃ³ximo mes
                         const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
                         const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
                         
@@ -1726,17 +2043,17 @@ const CreditCards = () => {
                         const currentMonth = today.getMonth() + 1; // 1-12 (formato)
                         const currentYear = today.getFullYear();
                         
-                        // Verificar si estamos intentando ir a un mes futuro más allá del límite
+                        // Verificar si estamos intentando ir a un mes futuro mÃ¡s allÃ¡ del lÃ­mite
                         const isFutureLimitExceeded = 
                           (nextYear > currentYear) || 
                           (nextYear === currentYear && nextMonth > currentMonth + 1);
                         
-                        // Si excede el límite y estamos en un año anterior, ir al mes actual del año actual
+                        // Si excede el lÃ­mite y estamos en un aÃ±o anterior, ir al mes actual del aÃ±o actual
                         if (isFutureLimitExceeded && selectedYear < currentYear) {
                           setSelectedMonth(currentMonth);
                           setSelectedYear(currentYear);
                         } 
-                        // Si no excede el límite o estamos navegando normalmente, avanzar un mes
+                        // Si no excede el lÃ­mite o estamos navegando normalmente, avanzar un mes
                         else if (!isFutureLimitExceeded) {
                           if (selectedMonth === 12) {
                             setSelectedMonth(1);
@@ -1745,13 +2062,13 @@ const CreditCards = () => {
                             setSelectedMonth(selectedMonth + 1);
                           }
                         }
-                        // Si excede el límite y estamos en el año actual, no hacer nada (botón debería estar deshabilitado)
+                        // Si excede el lÃ­mite y estamos en el aÃ±o actual, no hacer nada (botÃ³n deberÃ­a estar deshabilitado)
                       }}
                       color="inherit"
                       size="small"
                       aria-label="Mes siguiente"
                       disabled={(() => {
-                        // Verificar si el próximo mes estaría más allá del límite de 1 mes
+                        // Verificar si el prÃ³ximo mes estarÃ­a mÃ¡s allÃ¡ del lÃ­mite de 1 mes
                         const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
                         const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
                         
@@ -1760,13 +2077,13 @@ const CreditCards = () => {
                         const currentMonth = today.getMonth() + 1; // 1-12
                         const currentYear = today.getFullYear();
                         
-                        // Permitir navegación normal en años pasados, excepto si navegamos al año actual
-                        // a un mes más allá del límite permitido
+                        // Permitir navegaciÃ³n normal en aÃ±os pasados, excepto si navegamos al aÃ±o actual
+                        // a un mes mÃ¡s allÃ¡ del lÃ­mite permitido
                         if (selectedYear < currentYear && nextYear < currentYear) {
                           return false;
                         }
                         
-                        // Si navegaríamos al año actual o posterior, verificar el límite de meses
+                        // Si navegarÃ­amos al aÃ±o actual o posterior, verificar el lÃ­mite de meses
                         if (nextYear === currentYear && nextMonth <= currentMonth + 1) {
                           return false;
                         }
@@ -1792,7 +2109,7 @@ const CreditCards = () => {
                   </span>
                 </Tooltip>
                 
-                {/* Selector de año intuitivo */}
+                {/* Selector de aÃ±o intuitivo */}
                 <Box
                   sx={{
                     display: 'flex',
@@ -1805,7 +2122,7 @@ const CreditCards = () => {
                   <IconButton
                     size="small"
                     onClick={() => setSelectedYear(selectedYear - 1)}
-                    aria-label="Año anterior"
+                    aria-label="AÃ±o anterior"
                     sx={{ 
                       color: theme.palette.common.white,
                       '&:hover': { 
@@ -1816,13 +2133,13 @@ const CreditCards = () => {
                     <KeyboardArrowLeftIcon fontSize="small" />
                   </IconButton>
                   
-                  <Tooltip title="Seleccionar año" arrow>
+                  <Tooltip title="Seleccionar aÃ±o" arrow>
                     <Box
                       role="button"
                       tabIndex={0}
-                      aria-label={`Año ${selectedYear}`}
+                      aria-label={`AÃ±o ${selectedYear}`}
                       onClick={() => {
-                        // Aquí podría abrirse un selector de año más avanzado
+                        // AquÃ­ podrÃ­a abrirse un selector de aÃ±o mÃ¡s avanzado
                         const currentYear = new Date().getFullYear();
                         setSelectedYear(currentYear);
                       }}
@@ -1863,7 +2180,7 @@ const CreditCards = () => {
                     </Box>
                   </Tooltip>
                   
-                  <Tooltip title="Año siguiente" arrow>
+                  <Tooltip title="AÃ±o siguiente" arrow>
                     <span>
                       <IconButton
                         size="small"
@@ -1873,15 +2190,15 @@ const CreditCards = () => {
                           const currentMonth = today.getMonth() + 1; // 1-12
                           const currentYear = today.getFullYear();
                           
-                          // Si el año al que vamos es el actual o futuro Y el mes seleccionado
-                          // está más allá del límite, ajustamos al mes actual
+                          // Si el aÃ±o al que vamos es el actual o futuro Y el mes seleccionado
+                          // estÃ¡ mÃ¡s allÃ¡ del lÃ­mite, ajustamos al mes actual
                           if (nextYear >= currentYear && selectedMonth > currentMonth + 1) {
                             setSelectedMonth(currentMonth);
                           }
                           
                           setSelectedYear(nextYear);
                         }}
-                        aria-label="Año siguiente"
+                        aria-label="AÃ±o siguiente"
                         disabled={selectedYear >= new Date().getFullYear()}
                         sx={{ 
                           color: theme.palette.common.white,
@@ -1904,7 +2221,7 @@ const CreditCards = () => {
           </Box>
         </Paper>
           
-        {/* Total combinado de todas las tarjetas - Diseño mejorado con gradiente */}
+        {/* Total combinado de todas las tarjetas - DiseÃ±o mejorado con gradiente */}
         {cards.length > 0 && (
           <Grid item xs={12} sx={{ mb: 3, mt: 5 }}>
             <Card 
@@ -1946,27 +2263,30 @@ const CreditCards = () => {
                     startIcon={<PaymentIcon />}
                     onClick={handlePayCreditCard}
                     disabled={(() => {
-                      // Deshabilitar si es un mes futuro
-                      if (isFutureMonth()) return true;
-                      
-                      // Deshabilitar si ya está pagado
+                      // Primero verificar si estÃ¡ pagado
                       if (areCardsActuallyPaid()) return true;
                       
-                      // Deshabilitar si no hay gastos
+                      // Luego verificar si no hay gastos
                       if (getAllCardsTotal() <= 0) return true;
 
-                      // Lógica existente para mes anterior y vencimiento
+                      // Verificar si estamos en el mes anterior al actual
                       const today = new Date();
                       const currentMonth = today.getMonth() + 1;
                       const currentYear = today.getFullYear();
+                      
+                      // Calcular el mes anterior
                       let prevMonth = currentMonth - 1;
                       let prevYear = currentYear;
                       if (prevMonth === 0) {
                         prevMonth = 12;
                         prevYear = currentYear - 1;
                       }
+                      
+                      // Si es el mes anterior, verificar si hay tarjetas vencidas
                       if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                        // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
                         let anyCardPastDueDate = false;
+                        
                         for (const card of cards) {
                           const cardDates = getCardDates(card.id);
                           if (cardDates && cardDates.dueDate) {
@@ -1977,10 +2297,12 @@ const CreditCards = () => {
                             }
                           }
                         }
-                        return !anyCardPastDueDate; // Habilitar solo si hay vencidas
+                        
+                        // Habilitar el botÃ³n si hay tarjetas vencidas, deshabilitarlo si no
+                        return !anyCardPastDueDate;
                       }
                       
-                      // Deshabilitar en cualquier otro caso (mes actual, meses pasados no vencidos)
+                      // En cualquier otro caso, deshabilitarlo
                       return true;
                     })()}
                     sx={{ 
@@ -2003,33 +2325,34 @@ const CreditCards = () => {
                     }}
                   >
                     {(() => {
-                      // Texto para mes futuro
-                      if (isFutureMonth()) {
-                        return 'Mes Futuro';
-                      }
-
-                      // Texto si ya está pagado
+                      // Primero verificar si estÃ¡ pagado
                       if (areCardsActuallyPaid()) {
                         return 'Tarjeta Pagada';
                       }
                       
-                      // Texto si no hay gastos
+                      // Luego verificar si no hay gastos
                       if (getAllCardsTotal() <= 0) {
-                        return 'Sin Gastos';
+                        return 'No hay gastos para pagar';
                       }
 
-                      // Lógica existente para mes anterior y vencimiento
+                      // Verificar si estamos en el mes anterior al actual
                       const today = new Date();
                       const currentMonth = today.getMonth() + 1;
                       const currentYear = today.getFullYear();
+                      
+                      // Calcular el mes anterior
                       let prevMonth = currentMonth - 1;
                       let prevYear = currentYear;
                       if (prevMonth === 0) {
                         prevMonth = 12;
                         prevYear = currentYear - 1;
                       }
+                      
+                      // Si es el mes anterior y se permite el pago
                       if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                        // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
                         let anyCardPastDueDate = false;
+                        
                         for (const card of cards) {
                           const cardDates = getCardDates(card.id);
                           if (cardDates && cardDates.dueDate) {
@@ -2040,21 +2363,22 @@ const CreditCards = () => {
                             }
                           }
                         }
+                        
                         if (anyCardPastDueDate) {
                           return 'Pagar Tarjetas Vencidas';
                         } else {
-                          return 'Esperar Vencimiento'; // Texto cuando aún no vence
+                          return 'Espera al vencimiento';
                         }
                       }
                       
-                      // Texto por defecto para otros casos (mes actual, meses pasados no vencidos)
-                      return 'Pago No Disponible';
+                      // En cualquier otro caso
+                      return 'No Disponible';
                     })()}
                   </Button>
                 </Box>
               </Box>
               
-              {/* Añadir resumen visual de tarjetas */}
+              {/* AÃ±adir resumen visual de tarjetas */}
               {cards.length > 1 && (
                 <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                   <Grid container spacing={2}>
@@ -2137,7 +2461,7 @@ const CreditCards = () => {
                       {/* Quitamos el selector de tarjeta */}
                       {selectedCard && (
                         <>
-                          {/* Quitamos el botón de subir resumen */}
+                          {/* Quitamos el botÃ³n de subir resumen */}
                           <Tooltip title="Opciones de tarjeta">
                             <IconButton 
                               color="inherit"
@@ -2171,7 +2495,7 @@ const CreditCards = () => {
                 />
                 
                 <CardContent sx={{ p: 2.5 }}>
-                  {/* Información de la tarjeta */}
+                  {/* InformaciÃ³n de la tarjeta */}
                   {selectedCard ? (
                     <>
                       <Box mb={3}>
@@ -2209,7 +2533,7 @@ const CreditCards = () => {
                                         Cierre
                                       </Typography>
                                     </Stack>
-                                    <Tooltip title="Fecha en que la tarjeta cierra el período actual" arrow>
+                                    <Tooltip title="Fecha en que la tarjeta cierra el perÃ­odo actual" arrow>
                                       <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
                                         <DateRangeIcon fontSize="small" />
                                       </IconButton>
@@ -2228,8 +2552,8 @@ const CreditCards = () => {
                                     {getCardDates()?.closingDate && (
                                       <Typography variant="caption" color="textSecondary">
                                         {new Date() > new Date(getCardDates().closingDate) 
-                                          ? 'Período cerrado' 
-                                          : 'Período activo'}
+                                          ? 'PerÃ­odo cerrado' 
+                                          : 'PerÃ­odo activo'}
                                       </Typography>
                                     )}
                                   </Box>
@@ -2265,7 +2589,7 @@ const CreditCards = () => {
                                         Vencimiento
                                       </Typography>
                                     </Stack>
-                                    <Tooltip title="Fecha límite para pagar la tarjeta sin intereses" arrow>
+                                    <Tooltip title="Fecha lÃ­mite para pagar la tarjeta sin intereses" arrow>
                                       <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
                                         <DateRangeIcon fontSize="small" />
                                       </IconButton>
@@ -2287,12 +2611,12 @@ const CreditCards = () => {
                                           const closingDate = getCardDates()?.closingDate ? new Date(getCardDates().closingDate) : null;
                                           const dueDate = new Date(getCardDates().dueDate);
                                           
-                                          // Si la tarjeta ya está pagada, no mostrar ninguna leyenda
+                                          // Si la tarjeta ya estÃ¡ pagada, no mostrar ninguna leyenda
                                           if (isCardPaid(selectedCard)) {
-                                            return null; // No mostrar leyenda si ya está pagada
+                                            return null; // No mostrar leyenda si ya estÃ¡ pagada
                                           }
                                           
-                                          // Solo mostrar leyenda si no está pagada
+                                          // Solo mostrar leyenda si no estÃ¡ pagada
                                           if (today > dueDate) {
                                             return (
                                               <Typography variant="caption" 
@@ -2302,7 +2626,7 @@ const CreditCards = () => {
                                                   color: theme.palette.error.main
                                                 }}
                                               >
-                                                ¡Atención! Fecha vencida
+                                                Â¡AtenciÃ³n! Fecha vencida
                                               </Typography>
                                             );
                                           } else if (closingDate && today > closingDate) {
@@ -2326,7 +2650,7 @@ const CreditCards = () => {
                                                   color: theme.palette.info.main
                                                 }}
                                               >
-                                                Período sin cerrar
+                                                PerÃ­odo sin cerrar
                                               </Typography>
                                             );
                                           }
@@ -2417,7 +2741,7 @@ const CreditCards = () => {
                               </Grid>
                             </Grid>
                             
-                            {/* Bloque "Resumen del Mes" movido aquí */}
+                            {/* Resto del cÃ³digo mantiene la funcionalidad pero con mejor estilo visual */}
                             <Box mt={3}>
                               <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
                                 Resumen del Mes
@@ -2631,7 +2955,7 @@ const CreditCards = () => {
                                             </Button>
                                           </label>
                                           <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
-                                            Sólo se aceptan archivos PDF. Tamaño máximo: 10MB.
+                                            SÃ³lo se aceptan archivos PDF. TamaÃ±o mÃ¡ximo: 10MB.
                                           </Typography>
                                         </Box>
                                       </Box>
@@ -2641,68 +2965,291 @@ const CreditCards = () => {
                               )}
                             </Box>
                             
-                            {/* Bloque "Movimientos del periodo" ahora viene después */}
-                            <Grid container spacing={2} mt={3}> {/* Ajustado mt a 3 para consistencia */}
-                              <Grid item xs={12}>
-                                <Card 
-                                  elevation={2} 
+                            <Box mt={2}>
+                              {(() => {
+                                // Solo mostrar el mensaje para configurar fechas si:
+                                // 1. No estÃ¡n configuradas las fechas
+                                // 2. Es el mes actual o el prÃ³ximo mes, o el mes anterior
+                                const today = new Date();
+                                const currentMonth = today.getMonth() + 1;
+                                const currentYear = today.getFullYear();
+                                
+                                // Calcular el mes anterior
+                                let prevMonth = currentMonth - 1;
+                                let prevYear = currentYear;
+                                if (prevMonth === 0) {
+                                  prevMonth = 12;
+                                  prevYear = currentYear - 1;
+                                }
+
+                                // Determinar si mostrar el mensaje de configuraciÃ³n de fechas
+                                const shouldShowDatesConfig = !areDatesConfigured() && (
+                                  // Es el mes actual
+                                  (selectedYear === currentYear && selectedMonth === currentMonth) ||
+                                  // Es el mes siguiente
+                                  (selectedYear === currentYear && selectedMonth === currentMonth + 1) ||
+                                  // Es diciembre del aÃ±o actual y el mes siguiente es enero del prÃ³ximo aÃ±o
+                                  (currentMonth === 12 && selectedMonth === 1 && selectedYear === currentYear + 1) ||
+                                  // Es el mes anterior
+                                  (selectedYear === prevYear && selectedMonth === prevMonth)
+                                );
+
+                                if (shouldShowDatesConfig) {
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
                                       sx={{ 
-                                    p: 0, 
-                                    borderRadius: 3,
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                      transform: 'translateY(-4px)',
-                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    }
-                                  }}
-                                >
-                                  <Box sx={{ 
-                                    p: 2,
-                                    background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.info.dark} 100%)`,
-                                    color: 'white',
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.info.main, 0.15),
+                                        borderStyle: 'dashed',
                                         display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2,
+                                        mb: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                                          Configura las fechas para {getMonthName(selectedMonth)} {selectedYear}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Las fechas pueden variar cada mes. MantÃ©n actualizada esta informaciÃ³n.
+                                        </Typography>
+                                      </Box>
+                                      <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<DateRangeIcon />}
+                                        onClick={() => handleOpenUpdateDatesDialog(selectedCard)}
+                                        sx={{ whiteSpace: 'nowrap' }}
+                                      >
+                                        Actualizar Fechas
+                                      </Button>
+                                    </Paper>
+                                  );
+                                }
+                                
+                                return null;
+                              })()}
+                              
+                              {(() => {
+                                // Si no hay gastos, mostrar un mensaje adecuado
+                                if (getAllCardsTotal() <= 0) {
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: theme.palette.info.light + '15',
+                                        display: 'flex',
+                                        flexDirection: 'row',
                                         alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                  }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <CreditCardIcon fontSize="small" />
-                                      <Typography variant="body2" fontWeight="medium">
-                                        Movimientos del Periodo
+                                        gap: 1
+                                      }}
+                                    >
+                                      <PaymentIcon color="info" />
+                                      <Box>
+                                        <Typography variant="body1" fontWeight="medium" color="info.main">
+                                          No hay gastos para pagar
                                         </Typography>
-                                    </Stack>
-                                    <Tooltip title="Detalle de transacciones de este periodo" arrow>
-                                      <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
-                                        <ReceiptIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
+                                        <Typography variant="body2" color="text.secondary">
+                                          No hay gastos registrados para este mes
+                                        </Typography>
                                       </Box>
-                                  <Box sx={{ 
-                                    p: 2,
-                                    borderLeft: `4px solid ${theme.palette.info.main}`,
+                                    </Paper>
+                                  );
+                                }
+                                
+                                // Si ya estÃ¡ pagado, mostrar mensaje correspondiente
+                                if (areCardsActuallyPaid()) {
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.success.main, 0.15),
+                                        borderStyle: 'dashed',
                                         display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 0.5,
-                                    maxHeight: '600px', // Limit height to show approx 5-6 days
-                                    overflow: 'auto'
-                                  }}>
-                                    {transactions.length > 0 ? (
-                                      <CreditCardMovements 
-                                        transactions={allCardTransactions[selectedCard] || []} 
-                                        loading={false}
-                                      />
-                                    ) : (
-                                      <Box sx={{ textAlign: 'center', py: 2 }}>
-                                        <Typography variant="body2" color="textSecondary">
-                                          No hay movimientos registrados en este periodo
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="success.main">
+                                          Tarjeta Pagada
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Todas las tarjetas de este mes ya han sido pagadas
                                         </Typography>
                                       </Box>
-                                    )}
+                                    </Paper>
+                                  );
+                                }
+                                
+                                // Verificar si estamos en el mes anterior al mes actual
+                                const today = new Date();
+                                const currentMonth = today.getMonth() + 1;
+                                const currentYear = today.getFullYear();
+                                
+                                // Calcular el mes anterior
+                                let prevMonth = currentMonth - 1;
+                                let prevYear = currentYear;
+                                if (prevMonth === 0) {
+                                  prevMonth = 12;
+                                  prevYear = currentYear - 1;
+                                }
+                                
+                                // Solo mostrar mensajes para el mes actual, el siguiente o el anterior
+                                // Para meses mÃ¡s antiguos no mostrar nada
+                                const isRelevantMonth = 
+                                  // Es el mes actual
+                                  (selectedYear === currentYear && selectedMonth === currentMonth) ||
+                                  // Es un mes futuro del aÃ±o actual
+                                  (selectedYear === currentYear && selectedMonth > currentMonth) ||
+                                  // Es un aÃ±o futuro
+                                  (selectedYear > currentYear) ||
+                                  // Es el mes anterior
+                                  (selectedYear === prevYear && selectedMonth === prevMonth);
+                                
+                                if (!isRelevantMonth) {
+                                  // No mostrar mensajes para meses antiguos excepto el anterior
+                                  return null;
+                                }
+                                
+                                // Si es el mes anterior y se permite el pago
+                                if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                                  // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
+                                  let anyCardPastDueDate = false;
+                                  
+                                  for (const card of cards) {
+                                    const cardDates = getCardDates(card.id);
+                                    if (cardDates && cardDates.dueDate) {
+                                      const dueDate = new Date(cardDates.dueDate);
+                                      if (today > dueDate) {
+                                        anyCardPastDueDate = true;
+                                        break;
+                                      }
+                                    }
+                                  }
+                                  
+                                  if (anyCardPastDueDate) {
+                                    return (
+                                      <Paper 
+                                        variant="outlined" 
+                                        sx={{ 
+                                          p: 2, 
+                                          borderRadius: 1, 
+                                          bgcolor: alpha(theme.palette.warning.main, 0.15),
+                                          borderStyle: 'dashed',
+                                          display: 'flex',
+                                          flexDirection: { xs: 'column', sm: 'row' },
+                                          alignItems: { xs: 'flex-start', sm: 'center' },
+                                          justifyContent: 'space-between',
+                                          gap: 2
+                                        }}
+                                      >
+                                        <Box>
+                                          <Typography variant="subtitle2" fontWeight="medium" color="warning.main">
+                                            Pago disponible para mes vencido
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            Las tarjetas del mes anterior estÃ¡n vencidas y disponibles para pago.
+                                          </Typography>
                                         </Box>
-                                </Card>
-                              </Grid>
-                            </Grid>
+                                      </Paper>
+                                    );
+                                  } else {
+                                    // Si ninguna tarjeta ha vencido todavÃ­a, mostrar que debe esperar
+                                    return (
+                                      <Paper 
+                                        variant="outlined" 
+                                        sx={{ 
+                                          p: 2, 
+                                          borderRadius: 1, 
+                                          bgcolor: alpha(theme.palette.info.main, 0.15),
+                                          borderStyle: 'dashed',
+                                          display: 'flex',
+                                          flexDirection: { xs: 'column', sm: 'row' },
+                                          alignItems: { xs: 'flex-start', sm: 'center' },
+                                          justifyContent: 'space-between',
+                                          gap: 2
+                                        }}
+                                      >
+                                        <Box>
+                                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                                            Espera al vencimiento
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            Las tarjetas aÃºn no han llegado a su fecha de vencimiento.
+                                          </Typography>
+                                        </Box>
+                                      </Paper>
+                                    );
+                                  }
+                                } else if (isFutureMonth()) {
+                                  // Si es un mes futuro
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.info.main, 0.15),
+                                        borderStyle: 'dashed',
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                                          Mes futuro
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Este mes aÃºn no estÃ¡ disponible para pagos.
+                                        </Typography>
+                                      </Box>
+                                    </Paper>
+                                  );
+                                } else {
+                                  // Para el mes actual
+                                  return (
+                                    <Paper 
+                                      variant="outlined" 
+                                      sx={{ 
+                                        p: 2, 
+                                        borderRadius: 1, 
+                                        bgcolor: alpha(theme.palette.primary.main, 0.15),
+                                        borderStyle: 'dashed',
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: { xs: 'flex-start', sm: 'center' },
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                      }}
+                                    >
+                                      <Box>
+                                        <Typography variant="subtitle2" fontWeight="medium" color="primary.main">
+                                          Mes en curso
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Las tarjetas se podrÃ¡n pagar el prÃ³ximo mes cuando venzan.
+                                        </Typography>
+                                      </Box>
+                                    </Paper>
+                                  );
+                                }
+                              })()}
+                            </Box>
                           </>
                         )}
                       </Box>
@@ -2726,14 +3273,14 @@ const CreditCards = () => {
                     >
                       <CreditCardIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, mb: 2 }} />
                       <Typography variant="h6" color="textSecondary" paragraph>
-                        Selecciona una tarjeta o añade una nueva
+                        Selecciona una tarjeta o aÃ±ade una nueva
                       </Typography>
                       <Button
                         variant="contained"
                         onClick={() => navigate('/NuevaTarjeta')}
                         startIcon={<AddIcon />}
                       >
-                        Añadir Tarjeta
+                        AÃ±adir Tarjeta
                       </Button>
                     </Paper>
                   )}
@@ -2758,14 +3305,14 @@ const CreditCards = () => {
               >
                 <CreditCardIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, mb: 2 }} />
                 <Typography variant="h6" color="textSecondary" paragraph>
-                  Selecciona una tarjeta o añade una nueva
+                  Selecciona una tarjeta o aÃ±ade una nueva
                 </Typography>
                 <Button
                   variant="contained"
                   onClick={() => navigate('/NuevaTarjeta')}
                   startIcon={<AddIcon />}
                 >
-                  Añadir Tarjeta
+                  AÃ±adir Tarjeta
                 </Button>
               </Paper>
             )}
@@ -2773,7 +3320,7 @@ const CreditCards = () => {
         </Grid>
       </Box>
       
-      {/* Menú de opciones para tarjetas */}
+      {/* MenÃº de opciones para tarjetas */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -2801,7 +3348,7 @@ const CreditCards = () => {
         </Alert>
       </Snackbar>
       
-      {/* Diálogo de actualización de fechas de tarjeta */}
+      {/* DiÃ¡logo de actualizaciÃ³n de fechas de tarjeta */}
       <Dialog
         open={updateDatesDialogOpen}
         onClose={handleCloseUpdateDatesDialog}
@@ -2950,7 +3497,7 @@ const CreditCards = () => {
                         },
                       }}
                       displayEmpty
-                      renderValue={(selected) => selected || 'Año'}
+                      renderValue={(selected) => selected || 'AÃ±o'}
                     >
                       {Array.from(
                         { length: 5 }, 
@@ -3001,8 +3548,8 @@ const CreditCards = () => {
                   bgcolor: 'rgba(255,255,255,0.1)',
                 }}>
                   <Typography variant="body2" color="white" sx={{ opacity: 0.8 }}>
-                    La fecha de cierre es cuando finaliza el período de facturación. 
-                    Todas las compras posteriores se incluirán en el próximo mes.
+                    La fecha de cierre es cuando finaliza el perÃ­odo de facturaciÃ³n. 
+                    Todas las compras posteriores se incluirÃ¡n en el prÃ³ximo mes.
                   </Typography>
                 </Box>
                 
@@ -3109,7 +3656,7 @@ const CreditCards = () => {
                   bgcolor: 'rgba(255,255,255,0.1)',
                 }}>
                   <Typography variant="body2" color="white" sx={{ opacity: 0.8 }}>
-                    Es el día límite para realizar el pago de tu tarjeta.
+                    Es el dÃ­a lÃ­mite para realizar el pago de tu tarjeta.
                     Debes pagar antes de esta fecha para evitar intereses.
                   </Typography>
                 </Box>
@@ -3207,7 +3754,7 @@ const CreditCards = () => {
           }}>
             <InfoIcon sx={{ color: 'white' }} fontSize="small" />
             <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-              Solo puedes configurar fechas hasta un máximo de 1 mes en el futuro. 
+              Solo puedes configurar fechas hasta un mÃ¡ximo de 1 mes en el futuro. 
               Los meses ya configurados se muestran como deshabilitados.
             </Typography>
           </Box>
@@ -3248,7 +3795,7 @@ const CreditCards = () => {
               borderRadius: 1,
               px: 4,
               py: 1.2,
-              bgcolor: '#474bc2', // Color del botón como la barra superior
+              bgcolor: '#474bc2', // Color del botÃ³n como la barra superior
               textTransform: 'none',
               fontWeight: 'bold',
               '&:hover': {
@@ -3264,7 +3811,7 @@ const CreditCards = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Diálogo para configurar pagos de tarjetas */}
+      {/* DiÃ¡logo para configurar pagos de tarjetas */}
       <Dialog
         open={paymentDialogOpen}
         onClose={handleClosePaymentDialog}
@@ -3299,11 +3846,11 @@ const CreditCards = () => {
             />
             
             <FormControl fullWidth margin="normal">
-              <InputLabel>Número de pagos</InputLabel>
+              <InputLabel>NÃºmero de pagos</InputLabel>
               <Select
                 value={numberOfPayments}
                 onChange={handlePaymentCountChange}
-                label="Número de pagos"
+                label="NÃºmero de pagos"
               >
                 <MenuItem value={1}>1 pago</MenuItem>
                 <MenuItem value={2}>2 pagos</MenuItem>
@@ -3358,7 +3905,7 @@ const CreditCards = () => {
             
             <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
               <Typography variant="body2" color="text.secondary">
-                Los pagos se realizarán en los viernes indicados, y las tarjetas se marcarán como pagadas después de completar todos los pagos.
+                Los pagos se realizarÃ¡n en los viernes indicados, y las tarjetas se marcarÃ¡n como pagadas despuÃ©s de completar todos los pagos.
               </Typography>
             </Box>
           </Box>
@@ -3377,67 +3924,99 @@ const CreditCards = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Mensaje si no hay tarjeta seleccionada */}
-      {!selectedCard && cards.length > 0 && (
-        <Card
-          sx={{ 
-            mt: 3, 
-            p: 0,
-            borderRadius: 2,
-            bgcolor: theme.palette.mode === 'dark' ? '#2d2d2d' : 'white',
-            boxShadow: theme.shadows[4],
-            width: '100%',
-            maxWidth: '100%',
-            overflow: 'hidden'
-          }}
-        >
-          <CardContent sx={{ p: 0 }}>
-            <Box sx={{ 
-              p: 2, 
-              backgroundColor: theme.palette.primary.main,
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <ReceiptIcon sx={{ mr: 1 }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  Movimientos del Período
-                </Typography>
-              </Box>
-            </Box>
-            
-            <Box 
-              sx={{ 
-                p: 6, 
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center'
-              }}
-            >
-              <CreditCardIcon sx={{ 
-                fontSize: 80, 
-                color: theme.palette.primary.main, 
-                opacity: 0.7, 
-                mb: 3 
-              }} />
-              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 'medium' }}>
-                Selecciona una tarjeta
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400 }}>
-                Haz clic en una de las tarjetas arriba para ver sus movimientos en este período
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
+
+      {/* Lista de transacciones de la tarjeta */}
+      {selectedCard && <TransactionsList />}
+
+      {/* DiÃ¡logo para marcar como pagadas */}
+      <Dialog
+        open={markAsPaidDialogOpen}
+        onClose={handleCloseMarkAsPaidDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Marcar tarjetas como pagadas
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            Â¿EstÃ¡s seguro de que deseas marcar las siguientes tarjetas como pagadas para el mes de {getMonthName(selectedMonth)} {selectedYear}?
+          </Typography>
+          
+          {/* Lista de tarjetas */}
+          <List sx={{ mt: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+            {getUnpaidCards().map((card) => (
+              <ListItem key={card.id} sx={{ py: 1.5, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}` }}>
+                <ListItemText
+                  primary={card.name}
+                  secondary={`Total: ${formatAmount(calculateCardTotal(card.id))}`}
+                />
+              </ListItem>
+            ))}
+          </List>
+
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <TextField
+              label="NÃºmero de referencia (opcional)"
+              fullWidth
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+              margin="normal"
+              helperText="NÃºmero de transacciÃ³n o referencia de pago"
+            />
+          </Box>
+          
+          <Box sx={{ mt: 2, p: 2, bgcolor: alpha(theme.palette.success.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.success.main, 0.2)}` }}>
+            <Typography variant="body2" color="success.main">
+              Las tarjetas se marcarÃ¡n como pagadas y se crearÃ¡ un registro de pago para {getMonthName(selectedMonth)} {selectedYear}.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            variant="outlined" 
+            onClick={handleCloseMarkAsPaidDialog}
+            sx={{ 
+              borderRadius: 1,
+              px: 3,
+              py: 1,
+              mr: 1,
+              color: 'text.secondary',
+              borderColor: 'divider',
+              '&:hover': {
+                borderColor: 'text.primary',
+                bgcolor: 'background.paper'
+              }
+            }}
+          >
+            Cancelar
+          </Button>
+          
+          <Button 
+            variant="contained" 
+            color="success"
+            onClick={handleMarkAsPaid}
+            startIcon={<CheckCircleIcon />}
+            disabled={markingAsPaid}
+            sx={{ 
+              borderRadius: 1,
+              px: 3,
+              py: 1,
+              textTransform: 'none',
+              fontWeight: 'bold',
+              '&.Mui-disabled': {
+                bgcolor: alpha(theme.palette.success.main, 0.5)
+              }
+            }}
+          >
+            {markingAsPaid ? 'Procesando...' : 'Confirmar Pago'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Layout>
   );
 };
 
 export default CreditCards; 
+
 

@@ -24,7 +24,12 @@ import {
   Checkbox,
   Fab,
   CircularProgress,
-  alpha
+  alpha,
+  ListItemText,
+  ListItemIcon,
+  ListItemButton,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import { useStore } from '../../store';
 import { database, auth } from '../../firebase';
@@ -43,15 +48,17 @@ import CheckIcon from '@mui/icons-material/Check';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ListAltIcon from '@mui/icons-material/ListAlt';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import TaskAltIcon from '@mui/icons-material/TaskAlt'; // Icono para completado
 
 const Habits = () => {
   const { userData } = useStore();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Ajustado a 'sm' para mejor responsividad
   const navigate = useNavigate();
   
   // Estado para la navegación temporal
-  const [viewMode, setViewMode] = useState('today'); // 'today', 'all', 'history'
+  const [viewMode, setViewMode] = useState('today'); // 'today', 'all'
   const [selectedDate, setSelectedDate] = useState(new Date()); // Fecha seleccionada para navegación
   
   // Estados para los hábitos
@@ -70,7 +77,6 @@ const Habits = () => {
   useEffect(() => {
     setLoading(true);
     if (userData && userData.habits) {
-      // Transformar el objeto de hábitos en un array con sus IDs
       const habitsArray = Object.keys(userData.habits)
         .filter(key => key !== 'completed') // Excluir el nodo "completed"
         .map(id => ({
@@ -80,7 +86,6 @@ const Habits = () => {
       
       setHabits(habitsArray);
       
-      // Cargar los hábitos completados para la fecha seleccionada
       const dateStr = formatDate(selectedDate);
       if (userData.habits.completed && userData.habits.completed[dateStr]) {
         setCompletedHabits(userData.habits.completed[dateStr]);
@@ -90,57 +95,73 @@ const Habits = () => {
 
       setLoading(false);
     } else {
+      setHabits([]); // Asegurarse de limpiar los hábitos si no hay datos
+      setCompletedHabits({});
       setLoading(false);
     }
-  }, [userData, selectedDate]); // Ahora dependemos de selectedDate también
+  }, [userData]); // Solo depende de userData inicialmente
+
+  // Recargar hábitos completados cuando cambia la fecha seleccionada
+  useEffect(() => {
+    if (viewMode === 'today' && userData?.habits?.completed) {
+      const dateStr = formatDate(selectedDate);
+      setCompletedHabits(userData.habits.completed[dateStr] || {});
+    } else if (viewMode === 'all') {
+      setCompletedHabits({}); // No hay hábitos completados en la vista 'all'
+    }
+  }, [selectedDate, viewMode, userData]);
+
 
   // Filtrar hábitos según el modo de vista y la fecha seleccionada
   useEffect(() => {
     if (habits.length === 0) {
       setFilteredHabits([]);
+      setStats({ totalHabits: 0, completedToday: 0, completion: 0, streakHabits: [] });
       return;
     }
 
     let filtered = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     
-    // Si la vista es "today", filtramos por la fecha seleccionada
     if (viewMode === 'today') {
       filtered = habits.filter(habit => shouldShowHabitForDate(habit, selectedDate));
-    } 
-    // Si la vista es "all", mostramos todos los hábitos
-    else if (viewMode === 'all') {
-      filtered = habits;
-    }
-    // Para el historial, mostramos todos por ahora (se podría implementar un filtro más sofisticado)
-    else {
-      filtered = habits;
+    } else if (viewMode === 'all') {
+      filtered = habits; // Mostrar todos en la vista 'all'
     }
 
     setFilteredHabits(filtered);
 
-    // Calcular estadísticas
-    const totalActive = filtered.length;
-    const habitsCompletedOnSelectedDate = filtered.filter(habit => 
-      completedHabits[habit.id] && completedHabits[habit.id].completedAt
-    ).length;
-    
-    const completionPercentage = totalActive > 0 
-      ? Math.round((habitsCompletedOnSelectedDate / totalActive) * 100) 
-      : 0;
+    // Calcular estadísticas (solo relevantes para 'today')
+    if (viewMode === 'today') {
+      const totalActive = filtered.length;
+      const habitsCompletedOnSelectedDate = filtered.filter(habit => 
+        completedHabits[habit.id]?.completedAt
+      ).length;
+      
+      const completionPercentage = totalActive > 0 
+        ? Math.round((habitsCompletedOnSelectedDate / totalActive) * 100) 
+        : 0;
 
-    // Hábitos con racha
-    const habitsWithStreak = habits.filter(habit => habit.streak && habit.streak > 2)
-      .sort((a, b) => b.streak - a.streak)
-      .slice(0, 3);
+      const habitsWithStreak = habits.filter(habit => habit.streak && habit.streak > 2)
+        .sort((a, b) => b.streak - a.streak)
+        .slice(0, 3); // Mostrar las 3 mejores rachas
 
-    setStats({
-      totalHabits: totalActive,
-      completedToday: habitsCompletedOnSelectedDate,
-      completion: completionPercentage,
-      streakHabits: habitsWithStreak
-    });
+      setStats({
+        totalHabits: totalActive,
+        completedToday: habitsCompletedOnSelectedDate,
+        completion: completionPercentage,
+        streakHabits: habitsWithStreak
+      });
+    } else {
+      // Resetear o ajustar stats para la vista 'all' si es necesario
+      setStats({
+        totalHabits: habits.length, // Total de hábitos creados
+        completedToday: 0, // No aplica
+        completion: 0, // No aplica
+        streakHabits: habits.filter(habit => habit.streak && habit.streak > 2)
+          .sort((a, b) => b.streak - a.streak)
+          .slice(0, 3) // Mostrar rachas generales
+      });
+    }
 
   }, [habits, viewMode, completedHabits, selectedDate]);
   
@@ -156,51 +177,111 @@ const Habits = () => {
       case 'weekends':
         return dayOfWeek === 0 || dayOfWeek === 6; // Sábado o domingo
       case 'custom':
-        return habit.customDays && habit.customDays.includes(dayOfWeek);
+        // Asegurarse de que customDays es un array antes de usar includes
+        return Array.isArray(habit.customDays) && habit.customDays.includes(dayOfWeek);
       default:
-        return true;
+        return true; // Por defecto, mostrar si no hay frecuencia clara (o manejar como error)
     }
   };
   
   // Formatear fecha como YYYY-MM-DD para usar como clave
   const formatDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const d = new Date(date); // Asegurarse de que es un objeto Date
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
   
   // Marcar/desmarcar un hábito como completado
-  const toggleHabitCompletion = (habitId) => {
+  const toggleHabitCompletion = async (habitId) => {
     const dateStr = formatDate(selectedDate);
-    const newCompletedHabits = { ...completedHabits };
-    
-    if (newCompletedHabits[habitId]) {
-      delete newCompletedHabits[habitId];
-    } else {
-      newCompletedHabits[habitId] = {
-        completedAt: new Date().toISOString(),
-        habitId: habitId
-      };
-    }
-    
-    setCompletedHabits(newCompletedHabits);
-    
-    // Guardar en Firebase
-    database.ref(`${auth.currentUser.uid}/habits/completed/${dateStr}`).set(newCompletedHabits);
-
-    // Actualizar racha del hábito
+    const habitRef = database.ref(`${auth.currentUser.uid}/habits/${habitId}`);
+    const completedRef = database.ref(`${auth.currentUser.uid}/habits/completed/${dateStr}/${habitId}`);
     const habit = habits.find(h => h.id === habitId);
-    if (habit) {
-      let newStreak;
-      if (!newCompletedHabits[habitId]) {
-        // Si se desmarca, decrementar la racha si es mayor que 0
-        newStreak = Math.max(0, (habit.streak || 0) - 1);
+    
+    if (!habit) return;
+
+    const isCurrentlyCompleted = !!completedHabits[habitId];
+    const newCompletedStatus = !isCurrentlyCompleted;
+    let newStreak = habit.streak || 0;
+
+    // --- Calcular Nueva Racha ---
+    if (newCompletedStatus) { // Marcando como completado
+      const previousScheduledDate = getPreviousScheduledDate(habit, selectedDate);
+      if (previousScheduledDate) {
+        const prevDateStr = formatDate(previousScheduledDate);
+        const wasCompletedPreviously = !!(userData?.habits?.completed?.[prevDateStr]?.[habitId]);
+        if (wasCompletedPreviously) {
+          newStreak = (habit.streak || 0) + 1; // Continuar racha
+        } else {
+          newStreak = 1; // Iniciar nueva racha
+        }
       } else {
-        // Si se marca, incrementar la racha
-        newStreak = (habit.streak || 0) + 1;
+        newStreak = 1; // Iniciar nueva racha (primera vez o sin fecha anterior válida)
       }
-      database.ref(`${auth.currentUser.uid}/habits/${habitId}/streak`).set(newStreak);
+    } else { // Desmarcando
+      const currentStreak = habit.streak || 0;
+      // Solo decrementar racha si se desmarca el día de hoy
+      if (isToday(selectedDate)) {
+        newStreak = Math.max(0, currentStreak - 1);
+      } else {
+        newStreak = currentStreak; // No cambiar racha al desmarcar días pasados
+      }
+    }
+    // ---------------------------
+
+    // Optimistic UI Update for completion status
+    setCompletedHabits(prev => {
+      const updated = {...prev};
+      if (newCompletedStatus) {
+        updated[habitId] = { completedAt: new Date().toISOString(), habitId };
+      } else {
+        delete updated[habitId];
+      }
+      return updated;
+    });
+
+    // Optimistic UI Update for streak
+    setHabits(prevHabits => prevHabits.map(h => 
+      h.id === habitId ? { ...h, streak: newStreak } : h
+    ));
+
+    try {
+      // Actualizar estado de completado en Firebase
+      if (newCompletedStatus) {
+        await completedRef.set({ completedAt: new Date().toISOString(), habitId });
+      } else {
+        await completedRef.remove();
+      }
+      
+      // Actualizar racha en Firebase solo si cambió
+      if (newStreak !== (habit.streak || 0)) {
+        await habitRef.update({ streak: newStreak });
+      }
+
+    } catch (error) {
+      console.error("Error updating habit completion:", error);
+      // Revertir UI en caso de error
+      setCompletedHabits(prev => { // Revertir estado completado
+        const reverted = {...prev};
+        if (newCompletedStatus) { 
+          delete reverted[habitId];
+        } else { 
+          // Para revertir el desmarcado, necesitamos el estado original
+          // Si no lo guardamos, podríamos simplemente dejarlo como estaba antes del error
+          // o intentar buscarlo de nuevo. Por simplicidad, lo dejamos así.
+          // Considera guardar el estado previo si la reversión precisa es crucial.
+          if (isCurrentlyCompleted) { // Si originalmente estaba completado
+             reverted[habitId] = { completedAt: 'reverted', habitId }; // O estado original
+          }
+        }
+        return reverted;
+      });
+      setHabits(prevHabits => prevHabits.map(h => // Revertir racha
+        h.id === habitId ? { ...h, streak: habit.streak || 0 } : h
+      ));
+      // Mostrar un mensaje de error al usuario (ej. con un Snackbar)
     }
   };
   
@@ -226,16 +307,14 @@ const Habits = () => {
     setSelectedDate(new Date());
   };
   
-  // Obtener nombre del día de la semana
-  const getDayName = (date) => {
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    return days[date.getDay()];
+  // Obtener nombre del día de la semana (corto)
+  const getShortDayName = (date) => {
+    return date.toLocaleDateString('es-ES', { weekday: 'long' });
   };
   
-  // Obtener nombre del mes
-  const getMonthName = (date) => {
-    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    return months[date.getMonth()];
+  // Formato de fecha legible
+  const getFormattedDate = (date) => {
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
   };
   
   // Comprobar si la fecha seleccionada es hoy
@@ -245,488 +324,413 @@ const Habits = () => {
            date.getMonth() === today.getMonth() &&
            date.getFullYear() === today.getFullYear();
   };
-  
-  // Panel de estadísticas y navegación
-  const StatsAndNav = () => {
-    return (
-      <Card elevation={2} sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-        <Box 
-          sx={{ 
-            py: 1.5, 
-            px: 2,
-            background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-            color: 'white'
-          }}
-        >
-          <Stack 
-            direction={isMobile ? "column" : "row"} 
-            justifyContent="space-between"
-            alignItems={isMobile ? "flex-start" : "center"}
-            spacing={2}
-          >
-            <Typography variant="h6">
-              Seguimiento de Hábitos
-            </Typography>
-            
-            <Stack direction="row" spacing={1}>
-              <Button 
-                variant={viewMode === 'today' ? 'contained' : 'outlined'} 
-                color="inherit"
-                size="small"
-                onClick={() => setViewMode('today')}
-                startIcon={<TodayIcon />}
-                sx={{
-                  bgcolor: viewMode === 'today' ? 'rgba(255,255,255,0.2)' : 'transparent',
-                  '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.3)'
-                  }
-                }}
-              >
-                Por Día
-              </Button>
-              
-              <Button 
-                variant={viewMode === 'all' ? 'contained' : 'outlined'}
-                color="inherit"
-                size="small"
-                onClick={() => setViewMode('all')}
-                startIcon={<DateRangeIcon />}
-                sx={{
-                  bgcolor: viewMode === 'all' ? 'rgba(255,255,255,0.2)' : 'transparent',
-                  '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.3)'
-                  }
-                }}
-              >
-                Todos
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-        
-        {viewMode === 'today' && (
-          <Box 
-            sx={{ 
-              p: 2, 
-              bgcolor: 'rgba(0, 0, 0, 0.02)',
-              borderBottom: '1px solid',
-              borderColor: 'divider'
-            }}
-          >
-            <Stack 
-              direction="row" 
-              alignItems="center" 
-              justifyContent="center"
-              spacing={2}
-            >
-              <IconButton 
-                onClick={goToPreviousDay}
-                color="primary"
-                size="small"
-              >
-                <ChevronLeftIcon />
-              </IconButton>
-              
-              <Typography 
-                variant="h6" 
-                align="center"
-                color="text.primary"
-                sx={{ 
-                  fontWeight: 'medium',
-                  minWidth: isMobile ? '200px' : '300px',
-                  textAlign: 'center'
-                }}
-              >
-                {getDayName(selectedDate)}, {selectedDate.getDate()} de {getMonthName(selectedDate)} de {selectedDate.getFullYear()}
-              </Typography>
-              
-              <IconButton 
-                onClick={goToNextDay}
-                color="primary"
-                size="small"
-              >
-                <ChevronRightIcon />
-              </IconButton>
-              
-              {!isToday(selectedDate) && (
-                <Tooltip title="Ir a hoy">
-                  <Button 
-                    variant="outlined" 
-                    color="primary"
-                    size="small"
-                    onClick={goToToday}
-                    startIcon={<CalendarTodayIcon />}
-                    sx={{ ml: 1 }}
-                  >
-                    Hoy
-                  </Button>
-                </Tooltip>
-              )}
-            </Stack>
-          </Box>
-        )}
-        
-        <CardContent>
-          <Grid container spacing={3}>
-            {/* Progreso del día */}
-            <Grid item xs={12} sm={4}>
-              <Paper 
-                elevation={0} 
-                variant="outlined" 
-                sx={{ 
-                  p: 2, 
-                  height: '100%',
-                  borderRadius: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <CircularProgressWithLabel value={stats.completion} />
-                <Typography variant="h6" fontWeight="bold" mt={1}>
-                  {stats.completedToday}/{stats.totalHabits}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {isToday(selectedDate) 
-                    ? 'Hábitos completados hoy' 
-                    : 'Hábitos completados este día'}
-                </Typography>
-              </Paper>
-            </Grid>
-            
-            {/* Rachas más largas */}
-            <Grid item xs={12} sm={8}>
-              <Paper 
-                elevation={0} 
-                variant="outlined" 
-                sx={{ 
-                  p: 2, 
-                  height: '100%',
-                  borderRadius: 2
-                }}
-              >
-                <Box 
-                  sx={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    mb: 1.5
-                  }}
-                >
-                  <LocalFireDepartmentIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Mejores rachas
-                  </Typography>
-                </Box>
-                
-                {stats.streakHabits.length > 0 ? (
-                  <Stack spacing={1.5}>
-                    {stats.streakHabits.map(habit => (
-                      <Box 
-                        key={habit.id}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          p: 1.5,
-                          bgcolor: `${theme.palette.warning.light}10`,
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          '&:hover': {
-                            bgcolor: `${theme.palette.warning.light}20`
-                          }
-                        }}
-                        onClick={() => navigate(`/DetalleHabito?id=${habit.id}`)}
-                      >
-                        <Typography variant="body2" fontWeight="medium">
-                          {habit.name}
-                        </Typography>
-                        <Chip 
-                          icon={<LocalFireDepartmentIcon />} 
-                          label={`${habit.streak} días`}
-                          size="small"
-                          color="warning"
-                        />
-                      </Box>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Box sx={{ py: 2, textAlign: 'center' }}>
-                    <Typography variant="body2" color="textSecondary">
-                      Aún no tienes rachas destacadas
-                    </Typography>
-                  </Box>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-    );
-  };
-  
-  // Panel de hábitos filtrados
-  const HabitsPanel = () => {
-    if (loading) {
-      return (
-        <Card elevation={2} sx={{ p: 3, borderRadius: 2 }}>
-          <Box textAlign="center" py={4}>
-            <CircularProgressIndicator />
-            <Typography variant="body1" color="textSecondary" sx={{ mt: 2 }}>
-              Cargando hábitos...
-            </Typography>
-          </Box>
-        </Card>
-      );
-    }
-    
-    // Texto para el encabezado según la vista y fecha
-    let headerText = '';
-    if (viewMode === 'today') {
-      if (isToday(selectedDate)) {
-        headerText = 'Mis Hábitos para Hoy';
-      } else {
-        const futureDate = selectedDate > new Date();
-        headerText = futureDate ? 'Mis Hábitos para Este Día' : 'Mis Hábitos Completados';
+
+  // Función auxiliar para obtener la fecha anterior en que un hábito estaba programado
+  const getPreviousScheduledDate = (habit, currentDate) => {
+    let previousDate = new Date(currentDate);
+    // Retroceder máximo 30 días para evitar bucles infinitos y mejorar rendimiento
+    for (let i = 0; i < 30; i++) { 
+      previousDate.setDate(previousDate.getDate() - 1);
+      if (shouldShowHabitForDate(habit, previousDate)) {
+        return previousDate; // Devolver la primera fecha anterior encontrada donde debía hacerse
       }
-    } else {
-      headerText = 'Todos Mis Hábitos';
     }
-    
-    return (
-      <Card elevation={2} sx={{ borderRadius: 2 }}>
-        <CardHeader 
-          title={
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-              <Typography variant="h6">
-                {headerText}
-              </Typography>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                startIcon={<AddIcon />}
-                onClick={createNewHabit}
-                size="small"
-              >
-                Nuevo Hábito
-              </Button>
-            </Box>
-          }
-        />
-        <Divider />
-        <CardContent>
-          {filteredHabits.length > 0 ? (
-            <Grid container spacing={2}>
-              {filteredHabits.map((habit) => (
-                <Grid item xs={12} sm={6} md={4} key={habit.id}>
-                  <Card 
-                    variant="outlined" 
-                    sx={{ 
-                      borderColor: completedHabits[habit.id] ? theme.palette.success.main : theme.palette.divider,
-                      bgcolor: completedHabits[habit.id] ? `${theme.palette.success.main}10` : 'transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        boxShadow: 3,
-                        transform: 'translateY(-2px)'
-                      }
-                    }}
-                    onClick={() => navigate(`/DetalleHabito?id=${habit.id}`)}
-                  >
-                    <CardContent>
-                      <Box display="flex" alignItems="center" justifyContent="space-between">
-                        <Box>
-                          <Typography variant="subtitle1" fontWeight="medium">
-                            {habit.name}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {getFrequencyText(habit)}
-                          </Typography>
-                          {habit.streak > 0 && (
-                            <Chip 
-                              label={`Racha: ${habit.streak} días`} 
-                              size="small" 
-                              color="warning" 
-                              icon={<LocalFireDepartmentIcon />}
-                              sx={{ mt: 1 }}
-                            />
-                          )}
-                        </Box>
-                        <Tooltip title={completedHabits[habit.id] ? "Desmarcar como completado" : "Marcar como completado"}>
-                          <IconButton 
-                            color={completedHabits[habit.id] ? "success" : "default"}
-                            onClick={(e) => {
-                              e.stopPropagation(); // Previene que se abra la vista de detalles
-                              toggleHabitCompletion(habit.id);
-                            }}
-                            sx={{
-                              bgcolor: completedHabits[habit.id] ? `${theme.palette.success.light}20` : 'transparent'
-                            }}
-                          >
-                            <CheckCircleIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Box textAlign="center" py={4}>
-              <SentimentVerySatisfiedIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, opacity: 0.5, mb: 2 }} />
-              {viewMode === 'today' ? (
-                isToday(selectedDate) ? (
-                  <>
-                    <Typography variant="h6" color="textSecondary" gutterBottom>
-                      ¡No tienes hábitos para completar hoy!
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ maxWidth: 500, mx: 'auto', mb: 3 }}>
-                      Puedes crear nuevos hábitos o revisar otros días.
-                    </Typography>
-                  </>
-                ) : (
-                  <>
-                    <Typography variant="h6" color="textSecondary" gutterBottom>
-                      No hay hábitos programados para esta fecha
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary" sx={{ maxWidth: 500, mx: 'auto', mb: 3 }}>
-                      Prueba a revisar otro día o añade nuevos hábitos.
-                    </Typography>
-                  </>
-                )
-              ) : (
-                <>
-                  <Typography variant="h6" color="textSecondary" gutterBottom>
-                    No hay hábitos configurados
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ maxWidth: 500, mx: 'auto', mb: 3 }}>
-                    Comienza a crear hábitos para mejorar tu productividad diaria.
-                  </Typography>
-                </>
-              )}
-              <Button 
-                variant="contained" 
-                color="primary" 
-                startIcon={<AddIcon />}
-                onClick={createNewHabit}
-                size="small"
-              >
-                Crear mi primer hábito
-              </Button>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-    );
+    return null; // No se encontró una fecha anterior programada en el rango
   };
-  
+
   // Obtener texto para frecuencia
   const getFrequencyText = (habit) => {
     switch (habit.frequency) {
-      case 'daily':
-        return 'Todos los días';
-      case 'weekdays':
-        return 'Lunes a viernes';
-      case 'weekends':
-        return 'Fines de semana';
+      case 'daily': return 'Diario';
+      case 'weekdays': return 'L-V';
+      case 'weekends': return 'S-D';
       case 'custom':
-        if (habit.customDays && habit.customDays.length > 0) {
-          const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-          return habit.customDays.map(day => days[day]).join(', ');
+        if (Array.isArray(habit.customDays) && habit.customDays.length > 0) {
+          const days = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+          // Ordenar los días seleccionados
+          const sortedDays = [...habit.customDays].sort((a, b) => a - b);
+          return sortedDays.map(dayIndex => days[dayIndex]).join(', ');
         }
-        return 'Días personalizados';
-      default:
-        return 'Frecuencia no especificada';
+        return 'Personalizado';
+      default: return ''; // Frecuencia no especificada o desconocida
     }
   };
-  
-  // Componente interno para el círculo de progreso
-  const CircularProgressWithLabel = (props) => {
+
+  // Componente interno para el círculo de progreso mejorado
+  const CircularProgressWithLabel = ({ value }) => {
     return (
-      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-        <Box
+      <Box sx={{ position: 'relative', display: 'inline-flex', width: 80, height: 80 }}>
+        <CircularProgress
+          variant="determinate"
           sx={{
-            width: 70,
-            height: 70,
-            borderRadius: '50%',
-            background: `conic-gradient(${theme.palette.primary.main} ${props.value}%, ${theme.palette.grey[200]} 0)`,
-            transform: 'rotate(-90deg)'
+            color: (theme) => theme.palette.grey[theme.palette.mode === 'light' ? 200 : 800],
+            position: 'absolute',
+            left: 0,
+            zIndex: 1, // Detrás del progreso real
           }}
+          size={80}
+          thickness={4}
+          value={100}
+        />
+        <CircularProgress
+          variant="determinate"
+          value={value}
+          sx={{ 
+            color: 'primary.main', 
+            zIndex: 2, // Encima del fondo gris
+            animation: 'progress-animation 0.5s ease-out',
+            '@keyframes progress-animation': {
+              '0%': { strokeDashoffset: 100 }, // Ajusta según el tamaño
+              '100%': { strokeDashoffset: 0 },
+            },
+          }}
+          size={80}
+          thickness={4}
         />
         <Box
           sx={{
-            position: 'absolute',
             top: 0,
             left: 0,
             bottom: 0,
             right: 0,
+            position: 'absolute',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
           }}
         >
-          <Box
-            sx={{
-              width: 54,
-              height: 54,
-              borderRadius: '50%',
-              bgcolor: 'background.paper',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
+          <Typography 
+            variant="h6" 
+            component="div" 
+            color="text.primary"
+            fontWeight="bold"
           >
-            <Typography variant="subtitle1" color="text.secondary">
-              {`${props.value}%`}
-            </Typography>
-          </Box>
+            {`${Math.round(value)}%`}
+          </Typography>
         </Box>
       </Box>
     );
   };
 
-  // Indicador circular de carga
-  const CircularProgressIndicator = () => {
+  // --- Componentes de UI Rediseñados ---
+
+  // Panel Superior (Navegación y Estadísticas)
+  const ControlPanel = () => (
+    <Paper
+      elevation={2}
+      sx={{
+        p: { xs: 1.5, sm: 2 },
+        mb: 3,
+        borderRadius: 3,
+        overflow: 'hidden',
+        border: 'none',
+        // background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.light, 0.1)} 100%)`
+        bgcolor: 'background.paper' // Fondo sólido para mejor contraste
+      }}
+    >
+      <Stack 
+        direction={{ xs: 'column', md: 'row' }} 
+        spacing={2} 
+        divider={!isMobile && <Divider orientation="vertical" flexItem />}
+      >
+        {/* Columna Izquierda: Navegación y Progreso Diario */}
+        <Stack spacing={2} sx={{ flex: 1 }}>
+          {/* Selector de Vista */}
+          <ToggleButtonGroup
+            color="primary"
+            value={viewMode}
+            exclusive
+            onChange={(event, newViewMode) => {
+              if (newViewMode !== null) {
+                setViewMode(newViewMode);
+              }
+            }}
+            aria-label="Modo de vista"
+            size="small"
+            fullWidth={isMobile}
+          >
+            <ToggleButton value="today" aria-label="Vista por día">
+              <TodayIcon sx={{ mr: 0.5 }} fontSize="small"/> 
+              Por Día
+            </ToggleButton>
+            <ToggleButton value="all" aria-label="Todos los hábitos">
+              <ListAltIcon sx={{ mr: 0.5 }} fontSize="small"/> 
+              Todos
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          {/* Navegador de Día (Solo visible en modo 'today') */}
+          {viewMode === 'today' && (
+            <Box>
+               <Stack 
+                direction="row" 
+                alignItems="center" 
+                justifyContent="space-between" 
+                spacing={1}
+                sx={{ 
+                  bgcolor: alpha(theme.palette.primary.main, 0.05), 
+                  p: 1, 
+                  borderRadius: 2 
+                }}
+              >
+                <Tooltip title="Día anterior">
+                  <IconButton onClick={goToPreviousDay} size="small" color="primary">
+                    <ChevronLeftIcon />
+                  </IconButton>
+                </Tooltip>
+                
+                <Stack direction="column" alignItems="center" sx={{ textAlign: 'center' }}>
+                   <Typography variant="body1" fontWeight="medium">
+                    {getShortDayName(selectedDate)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {getFormattedDate(selectedDate)}
+                  </Typography>
+                </Stack>
+
+                <Tooltip title="Día siguiente">
+                  <IconButton onClick={goToNextDay} size="small" color="primary" disabled={isToday(selectedDate)}>
+                    <ChevronRightIcon />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+               {!isToday(selectedDate) && (
+                <Button 
+                  variant="text" 
+                  size="small" 
+                  onClick={goToToday} 
+                  startIcon={<CalendarTodayIcon />}
+                  sx={{ mt: 1, display: 'flex', mx: 'auto' }} // Centrar botón
+                >
+                  Ir a Hoy
+                </Button>
+              )}
+            </Box>
+          )}
+
+           {/* Progreso Diario (Solo visible en modo 'today') */}
+           {viewMode === 'today' && (
+            <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mt: 1 }}>
+               <CircularProgressWithLabel value={stats.completion} />
+              <Stack>
+                <Typography variant="h5" fontWeight="bold">
+                  {stats.completedToday} / {stats.totalHabits}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Completados {isToday(selectedDate) ? 'hoy' : 'ese día'}
+                </Typography>
+              </Stack>
+            </Stack>
+           )}
+        </Stack>
+
+        {/* Columna Derecha: Rachas (Visible en ambos modos) */}
+        <Stack spacing={1.5} sx={{ flex: 1, pt: { xs: 2, md: 0 } }}>
+           <Stack direction="row" alignItems="center" spacing={1}>
+            <LocalFireDepartmentIcon color="warning" />
+            <Typography variant="subtitle1" fontWeight="medium">
+              Mejores Rachas
+            </Typography>
+          </Stack>
+          {stats.streakHabits.length > 0 ? (
+            <List dense disablePadding>
+              {stats.streakHabits.map((habit) => (
+                <ListItem 
+                  key={habit.id} 
+                  disablePadding
+                  secondaryAction={
+                    <Chip 
+                      label={`${habit.streak} días`} 
+                      size="small" 
+                      color="warning" 
+                      variant="outlined"
+                      icon={<LocalFireDepartmentIcon fontSize="small"/>}
+                    />
+                  }
+                  sx={{ 
+                    mb: 0.5, 
+                    bgcolor: alpha(theme.palette.warning.main, 0.05),
+                    borderRadius: 1.5,
+                    pl: 1.5, // Padding a la izquierda
+                  }}
+                >
+                  <ListItemText 
+                    primary={habit.name} 
+                    primaryTypographyProps={{ variant: 'body2', fontWeight: 500, noWrap: true }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 80 }}>
+              <Typography variant="body2" color="text.secondary">
+                Aún no hay rachas destacadas.
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+
+  // Componente para un Item de Hábito en la lista
+  const HabitItem = ({ habit }) => {
+    const isCompleted = viewMode === 'today' && !!completedHabits[habit.id];
+    
     return (
-      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            borderTop: `3px solid ${theme.palette.primary.main}`,
-            borderRight: `3px solid ${theme.palette.primary.main}`,
-            borderBottom: `3px solid ${theme.palette.grey[300]}`,
-            borderLeft: `3px solid ${theme.palette.grey[300]}`,
-            animation: 'spin 1s linear infinite',
-            '@keyframes spin': {
-              '0%': {
-                transform: 'rotate(0deg)',
-              },
-              '100%': {
-                transform: 'rotate(360deg)',
-              },
-            },
-          }}
-        />
+      <Paper 
+        elevation={0} 
+        variant="outlined" 
+        sx={{ 
+          mb: 1.5, 
+          borderRadius: 2.5, // Bordes más redondeados
+          overflow: 'hidden', // Para que el fondo no se salga
+          transition: 'all 0.2s ease',
+          bgcolor: isCompleted ? alpha(theme.palette.success.main, 0.08) : 'background.paper',
+          borderColor: isCompleted ? alpha(theme.palette.success.main, 0.3) : theme.palette.divider,
+          '&:hover': {
+            boxShadow: theme.shadows[2],
+            borderColor: isCompleted ? theme.palette.success.main : theme.palette.primary.main,
+          }
+        }}
+      >
+        <ListItem
+          secondaryAction={
+             viewMode === 'today' ? ( // Checkbox solo en vista 'today'
+               <Checkbox
+                edge="end"
+                onChange={() => toggleHabitCompletion(habit.id)}
+                checked={isCompleted}
+                icon={<RadioButtonUncheckedIcon />}
+                checkedIcon={<CheckCircleIcon />}
+                color="success"
+                disabled={!isToday(selectedDate) && !isCompleted} // Deshabilitar si no es hoy y no está completado
+                sx={{ mr: 1 }} // Margen para separar del borde
+              />
+             ) : ( // Flecha en vista 'all'
+               <IconButton edge="end" aria-label="details" onClick={() => navigate(`/DetalleHabito?id=${habit.id}`)} size="small">
+                  <ArrowForwardIosIcon fontSize="small" />
+                </IconButton>
+             )
+          }
+          disablePadding
+          sx={{ pt: 1, pb: 1 }} // Padding vertical
+        >
+          <ListItemButton 
+             onClick={() => navigate(`/DetalleHabito?id=${habit.id}`)} 
+             sx={{ borderRadius: 'inherit', py: 1 }} // Heredar border radius y ajustar padding
+           >
+            {/* Puedes añadir un icono aquí si lo implementas */}
+             {/* <ListItemIcon sx={{ minWidth: 40 }}> 
+              <SomeIcon /> 
+            </ListItemIcon> */}
+            <ListItemText
+              primary={habit.name}
+              secondary={getFrequencyText(habit)}
+              primaryTypographyProps={{ fontWeight: 'medium', color: isCompleted ? 'text.secondary' : 'text.primary', sx: { textDecoration: isCompleted ? 'line-through' : 'none' } }}
+              secondaryTypographyProps={{ variant: 'caption' }}
+            />
+            {habit.streak > 0 && viewMode === 'all' && ( // Mostrar racha solo en vista 'all'
+              <Chip 
+                label={`${habit.streak}`} 
+                size="small" 
+                color="warning" 
+                icon={<LocalFireDepartmentIcon />} 
+                variant="outlined"
+                sx={{ ml: 1 }}
+              />
+            )}
+          </ListItemButton>
+        </ListItem>
+      </Paper>
+    );
+  };
+
+  // Panel Principal de Hábitos
+  const HabitsListPanel = () => {
+    if (loading) {
+      return (
+        <Box textAlign="center" py={5}>
+          <CircularProgress />
+          <Typography variant="body1" color="textSecondary" sx={{ mt: 2 }}>
+            Cargando hábitos...
+          </Typography>
+        </Box>
+      );
+    }
+
+    const title = viewMode === 'today' 
+      ? (isToday(selectedDate) ? 'Hábitos de Hoy' : 'Hábitos para el ' + getFormattedDate(selectedDate))
+      : 'Todos los Hábitos';
+
+    return (
+      <Box>
+         <Typography variant="h6" gutterBottom sx={{ pl: 1, mb: 2 }}>
+          {title} ({filteredHabits.length})
+        </Typography>
+        {filteredHabits.length > 0 ? (
+          <List disablePadding>
+            {filteredHabits.map((habit) => (
+              <HabitItem key={habit.id} habit={habit} />
+            ))}
+          </List>
+        ) : (
+          <Paper 
+            variant="outlined" 
+            sx={{ 
+              p: 4, 
+              textAlign: 'center', 
+              borderStyle: 'dashed', 
+              borderRadius: 2,
+              bgcolor: alpha(theme.palette.primary.main, 0.03)
+            }}
+          >
+            <AssignmentTurnedInIcon sx={{ fontSize: 50, color: 'text.secondary', opacity: 0.6, mb: 2 }} />
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+              {viewMode === 'today'
+                ? (habits.length === 0 ? 'Aún no has creado ningún hábito.' : 'No hay hábitos programados para este día.')
+                : 'Aún no has creado ningún hábito.'}
+            </Typography>
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />}
+              onClick={createNewHabit}
+              size="medium"
+            >
+              Crear Hábito
+            </Button>
+          </Paper>
+        )}
       </Box>
     );
   };
-  
+
   return (
     <Layout title="Seguimiento de Hábitos">
-      <Box sx={{ py: 2 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <StatsAndNav />
-          </Grid>
+       <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}> {/* Ajusta maxWidth según necesidad */}
+        <Stack spacing={3}>
+          {/* Panel de Control (Stats y Navegación) */}
+          <ControlPanel />
+
+          {/* Lista de Hábitos */}
+          <HabitsListPanel />
           
-          <Grid item xs={12}>
-            <HabitsPanel />
-          </Grid>
-        </Grid>
-      </Box>
+        </Stack>
+      </Container>
+
+      {/* Botón Flotante para añadir */}
+      <Fab 
+        color="primary" 
+        aria-label="añadir hábito" 
+        onClick={createNewHabit}
+        sx={{
+          position: 'fixed',
+          bottom: { xs: 70, sm: 30 }, // Ajustar posición para evitar barra inferior en móvil
+          right: { xs: 16, sm: 30 }
+        }}
+      >
+        <AddIcon />
+      </Fab>
     </Layout>
   );
 };
