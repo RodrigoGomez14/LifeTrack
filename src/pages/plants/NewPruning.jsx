@@ -44,17 +44,26 @@ const NewPruning = () => {
 
   return (
     <Layout title="Nueva Poda">
-      <Box sx={{ maxWidth: 600, mx: 'auto', p: { xs: 2, md: 0 } }}>
+      <Box sx={{ 
+        maxWidth: 600, 
+        mx: 'auto', 
+        p: { xs: 2, md: 0 },
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        minHeight: 'calc(100vh - 70px)'
+      }}>
         <Card elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <Box sx={{ 
             p: 3, 
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            bgcolor: alpha(theme.palette.success.main, 0.1)
+            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+            color: '#ffffff'
           }}>
-            <ContentCutIcon fontSize="large" color="success" />
-            <Typography variant="h5" component="h1">
+            <ContentCutIcon fontSize="large" sx={{ color: '#ffffff' }} />
+            <Typography variant="h5" component="h1" sx={{ color: '#ffffff' }}>
               Registrar Nueva Poda
             </Typography>
           </Box>
@@ -85,6 +94,16 @@ const NewPruning = () => {
                   disabled={!type}
                   fullWidth
                   size="large"
+                  sx={{ 
+                    bgcolor: theme.palette.success.main,
+                    color: '#ffffff',
+                    py: 1.5,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.success.main, 0.3)}`,
+                    '&:hover': {
+                      bgcolor: theme.palette.success.dark,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.success.main, 0.4)}`
+                    }
+                  }}
                 >
                   AGREGAR PODA
                 </Button>

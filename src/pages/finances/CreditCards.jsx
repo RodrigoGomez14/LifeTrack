@@ -53,6 +53,7 @@ import {
   Info as InfoIcon,
   Receipt as ReceiptIcon,
   CreditCard as CreditCardIcon,
+  Check as CheckIcon,
   // ... existing icons ...
 } from '@mui/icons-material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -2054,54 +2055,152 @@ const CreditCards = () => {
                 </Box>
               </Box>
               
-              {/* Añadir resumen visual de tarjetas */}
-              {cards.length > 1 && (
-                <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-                  <Grid container spacing={2}>
-                    {cards.map(card => (
-                      <Grid item xs={12} sm={6} md={4} key={card.id}>
-                        <Box 
-                          onClick={() => handleCardSelect(card.id)} 
-                          sx={{ 
-                            cursor: 'pointer',
-                            p: 1.5, 
-                            borderRadius: 2,
-                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                            bgcolor: selectedCard === card.id ? alpha(theme.palette.primary.light, 0.1) : 'transparent',
-                            transition: 'all 0.2s',
-                            '&:hover': {
-                              bgcolor: alpha(theme.palette.primary.light, 0.05),
-                              transform: 'translateY(-2px)'
-                            }
+              {/* Selector de tarjetas mejorado */}
+              <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`, mt: 2 }}>
+                <Typography variant="subtitle2" fontWeight="medium" sx={{ mb: 2, color: alpha(theme.palette.text.primary, 0.7) }}>
+                  Selecciona una tarjeta:
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, mt: 2 }}>
+                  {cards.map(card => {
+                    const isSelected = selectedCard === card.id;
+                    const cardTotal = getCardTotal(card.id);
+                    const isPending = !isCardPaid(card.id);
+                    const cardType = card.name.toLowerCase().includes('visa') ? 'visa' : 
+                                   card.name.toLowerCase().includes('master') ? 'mastercard' : 'credit-card';
+                    
+                    return (
+                      <Box
+                        key={card.id}
+                        onClick={() => handleCardSelect(card.id)}
+                        sx={{
+                          mt: 1,
+                          minWidth: 200,
+                          borderRadius: 2,
+                          overflow: 'hidden',
+                          boxShadow: isSelected 
+                            ? `0 8px 16px ${alpha(theme.palette.primary.main, 0.25)}` 
+                            : `0 2px 8px ${alpha(theme.palette.common.black, 0.08)}`,
+                          transition: 'all 0.3s ease',
+                          transform: isSelected ? 'translateY(-4px)' : 'none',
+                          cursor: 'pointer',
+                          border: isSelected 
+                            ? `2px solid ${theme.palette.primary.main}`
+                            : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                          position: 'relative',
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.2)}`
+                          }
+                        }}
+                      >
+                        {/* Indicador de seleccionada */}
+                        {isSelected && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 10,
+                              left: 10,
+                              width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              bgcolor: theme.palette.primary.main,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              zIndex: 2
+                            }}
+                          >
+                            <CheckIcon sx={{ color: 'white', fontSize: 16 }} />
+                          </Box>
+                        )}
+                        
+                        {/* Gradiente de fondo según tipo de tarjeta */}
+                        <Box
+                          sx={{
+                            p: 2,
+                            background: cardType === 'visa' 
+                              ? 'linear-gradient(135deg, #1a237e 0%, #303f9f 100%)' 
+                              : cardType === 'mastercard'
+                                ? 'linear-gradient(135deg, #b71c1c 0%, #e53935 100%)'
+                                : 'linear-gradient(135deg, #455a64 0%, #78909c 100%)',
+                            color: 'white',
+                            position: 'relative',
+                            overflow: 'hidden'
                           }}
                         >
+                          {/* Patrón de fondo */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              opacity: 0.15,
+                              background: 'radial-gradient(circle, transparent 20%, black 20%, black 21%, transparent 21%), radial-gradient(circle, transparent 20%, black 20%, black 21%, transparent 21%)',
+                              backgroundSize: '12px 12px',
+                              backgroundPosition: '0 0, 6px 6px'
+                            }}
+                          />
+                          
+                          {/* Ícono de tipo de tarjeta en lugar de imagen */}
+                          <Box display="flex" alignItems="center" mb={1.5}>
+                            {cardType === 'visa' ? (
+                              <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>VISA</Typography>
+                            ) : cardType === 'mastercard' ? (
+                              <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>MASTER</Typography>
+                            ) : (
+                              <CreditCardIcon sx={{ fontSize: 24 }} />
+                            )}
+                          </Box>
+                          
+                          {/* Número de tarjeta con últimos 4 dígitos */}
+                          <Typography 
+                            variant="body2" 
+                            fontWeight="medium" 
+                            sx={{ 
+                              mb: 1.5, 
+                              fontFamily: 'monospace', 
+                              letterSpacing: 1,
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                          >
+                            **** **** **** {card.lastFourDigits || '0000'}
+                          </Typography>
+                          
+                        </Box>
+                        
+                        <Box sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
                           <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Box display="flex" alignItems="center">
-                              <Avatar 
-                                sx={{ 
-                                  width: 32, 
-                                  height: 32, 
-                                  mr: 1,
-                                  bgcolor: alpha(theme.palette.primary.main, 0.2),
-                                  color: theme.palette.primary.main
-                                }}
-                              >
-                                <CreditCardIcon fontSize="small" />
-                              </Avatar>
-                              <Typography variant="body2" fontWeight="medium" noWrap>
-                                {card.name}
-                              </Typography>
-                            </Box>
-                            <Typography variant="body2" fontWeight="bold" color="error.main">
-                              {formatAmount(getCardTotal(card.id))}
+                            <Typography variant="subtitle2" color="text.secondary">
+                              Total:
+                            </Typography>
+                            <Typography variant="subtitle1" fontWeight="bold" color={isPending ? "error.main" : "success.main"}>
+                              {formatAmount(cardTotal)}
                             </Typography>
                           </Box>
+                          
+                          {/* Etiqueta de estado */}
+                          <Box mt={1} display="flex" justifyContent="flex-end">
+                            <Chip 
+                              label={isPending ? "Pendiente" : "Pagada"}
+                              size="small"
+                              color={isPending ? "error" : "success"}
+                              variant={isPending ? "filled" : "outlined"}
+                              sx={{ 
+                                height: 24, 
+                                fontWeight: 'medium',
+                                fontSize: '0.7rem'
+                              }}
+                            />
+                          </Box>
                         </Box>
-                      </Grid>
-                    ))}
-                  </Grid>
+                      </Box>
+                    );
+                  })}
                 </Box>
-              )}
+              </Box>
             </Card>
           </Grid>
         )}

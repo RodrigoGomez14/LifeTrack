@@ -35,6 +35,7 @@ import PlantCalendar from './pages/plants/PlantCalendar';
 import Configuracion from './pages/basics/Configuracion';
 import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
+import NewPhoto from './pages/plants/NewPhoto';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
@@ -373,6 +374,13 @@ function App() {
           <Route path="/Planta" element={<PrivateRoute><Plant /></PrivateRoute>} />
           <Route path="/PlantaCalendario" element={<PrivateRoute><PlantCalendar /></PrivateRoute>} />
           <Route path="/NuevaPlanta" element={<PrivateRoute><NewPlant /></PrivateRoute>} />
+          <Route path="/NuevoRiego" element={<PrivateRoute><NewIrrigation /></PrivateRoute>} />
+          <Route path="/NuevaPoda" element={<PrivateRoute><NewPruning /></PrivateRoute>} />
+          <Route path="/NuevoInsecticida" element={<PrivateRoute><NewInsecticide /></PrivateRoute>} />
+          <Route path="/NuevoTransplante" element={<PrivateRoute><NewTransplant /></PrivateRoute>} />
+          <Route path="/Aditivos" element={<PrivateRoute><Aditives /></PrivateRoute>} />
+          <Route path="/NuevoAditivo" element={<PrivateRoute><NewAditive /></PrivateRoute>} />
+          <Route path="/NuevaFoto" element={<PrivateRoute><NewPhoto /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

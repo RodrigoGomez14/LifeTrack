@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Layout from '../../components/layout/Layout';
 import { 
   Grid, 
@@ -16,7 +16,16 @@ import {
   InputAdornment,
   Divider,
   IconButton,
-  alpha
+  alpha,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Avatar,
+  Stack,
+  Backdrop,
+  Zoom,
+  Container
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -29,6 +38,14 @@ import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import SpaIcon from '@mui/icons-material/Spa';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ScienceIcon from '@mui/icons-material/Science';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EventIcon from '@mui/icons-material/Event';
+import OpacityIcon from '@mui/icons-material/Opacity';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CloseIcon from '@mui/icons-material/Close';
 import { useTheme } from '@mui/material/styles';
 
 const PlantsList = () => {
@@ -36,6 +53,11 @@ const PlantsList = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPlant, setSelectedPlant] = useState(null);
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const [currentPlantId, setCurrentPlantId] = useState(null);
+  const [showDetailBackdrop, setShowDetailBackdrop] = useState(false);
+  const [detailPlant, setDetailPlant] = useState(null);
   
   // Filtrar plantas según término de búsqueda
   const filteredPlants = userData?.plants?.active 
@@ -73,212 +95,604 @@ const PlantsList = () => {
     return stats;
   };
 
+  // Manejadores para el menú contextual
+  const handleOpenMenu = (event, plantId) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setCurrentPlantId(plantId);
+    setMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseMenu = () => {
+    setMenuAnchorEl(null);
+  };
+
+  const handleOptionSelect = (option) => {
+    handleCloseMenu();
+    
+    switch (option) {
+      case 'edit':
+        navigate(`/EditarPlanta/?${currentPlantId}`);
+        break;
+      case 'delete':
+        // Lógica para eliminar planta (añadir confirmación)
+        // ...
+        break;
+      case 'calendar':
+        navigate(`/PlantaCalendario/?${currentPlantId}`);
+        break;
+      case 'water':
+        navigate(`/NuevoRiego/?${currentPlantId}`);
+        break;
+      case 'prune':
+        navigate(`/NuevaPoda/?${currentPlantId}`);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Manejador para seleccionar planta
+  const handlePlantSelect = (plantId) => {
+    setSelectedPlant(plantId);
+  };
+
+  // Mostrar detalle rápido de planta
+  const handleShowDetail = (event, plant, id) => {
+    event.stopPropagation();
+    event.preventDefault();
+    setDetailPlant({...plant, id});
+    setShowDetailBackdrop(true);
+  };
+
   return (
     <Layout title="Mis Plantas">
-      <Box sx={{ mb: 4 }}>
-        <Paper 
-          elevation={0}
-          sx={{ 
-            p: 2, 
-            display: 'flex', 
-            alignItems: 'center', 
-            mb: 2,
-            backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-            borderRadius: 2
-          }}
-        >
-          <TextField
-            placeholder="Buscar plantas..."
-            variant="outlined"
-            fullWidth
-            size="small"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="action" />
-                </InputAdornment>
-              ),
+      <Container maxWidth="lg" sx={{ py: 2 }}>
+        <Box sx={{ mb: 4 }}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              mt: 3,
+              mb: 4, 
+              borderRadius: 3, 
+              overflow: 'hidden',
+              bgcolor: 'white',
+              boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
             }}
-            sx={{ mr: 1 }}
-          />
-          <IconButton size="small">
-            <FilterListIcon />
-          </IconButton>
-        </Paper>
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Button 
-            variant="contained" 
-            color="secondary"
-            startIcon={<ScienceIcon />}
-            component={Link}
-            to="/Aditivos"
-            sx={{ borderRadius: 2 }}
           >
-            Ver Aditivos
-          </Button>
-          
-          <Fab 
-            color="primary" 
-            aria-label="add" 
-            component={Link}
-            to="/NuevaPlanta"
-            size="medium"
-          >
-            <AddIcon />
-          </Fab>
-        </Box>
-      </Box>
-
-      {userData?.plants ? (
-        <>
-          <Typography variant="h6" gutterBottom sx={{ 
-            ml: 1, 
-            display: 'flex', 
-            alignItems: 'center',
-            fontWeight: 'medium' 
-          }}>
-            <ForestIcon sx={{ mr: 1, color: theme.palette.secondary.main }} />
-            Plantas Activas ({filteredPlants.length})
-          </Typography>
-          
-          <Grid container spacing={2}>
-            {filteredPlants.map(([id, plant], index) => (
-              <Grid item xs={12} sm={6} md={4} key={id}>
-                <Card 
-                  elevation={2} 
-                  sx={{ 
-                    height: '100%',
-                    borderRadius: 2,
-                    transition: 'transform 0.2s ease-in-out',
+            <CardContent sx={{
+              p: 3,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+              color: '#ffffff',
+            }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#ffffff' }}>
+                  Mis Plantas
+                </Typography>
+                
+                <Fab 
+                  color="primary" 
+                  aria-label="add" 
+                  component={Link}
+                  to="/NuevaPlanta"
+                  size="medium"
+                  sx={{
+                    bgcolor: alpha('#ffffff', 0.2),
+                    color: '#ffffff',
+                    boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.15)}`,
                     '&:hover': {
-                      transform: 'translateY(-5px)',
-                      boxShadow: 4
+                      bgcolor: alpha('#ffffff', 0.3),
+                      boxShadow: `0 10px 20px ${alpha(theme.palette.common.black, 0.2)}`
                     }
                   }}
                 >
-                  <CardActionArea 
-                    component={Link}
-                    to={`/Planta/?${id}`}
-                    sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
-                  >
-                    <Box sx={{ 
-                      height: 140, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                      color: theme.palette.secondary.main
-                    }}>
-                      {plant.images && Object.keys(plant.images).length > 0 ? (
-                        <CardMedia
-                          component="img"
-                          height="140"
-                          image={plant.images[Object.keys(plant.images)[0]].url}
-                          alt={plant.name}
-                        />
-                      ) : getPlantIcon(index)}
-                    </Box>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6" component="div" gutterBottom>
-                        {plant.name}
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', mb: 1 }}>
-                        <Chip 
-                          label={`${plant.quantity} unidades`} 
+                  <AddIcon />
+                </Fab>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Paper 
+            elevation={3}
+            sx={{ 
+              p: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              mb: 3,
+              borderRadius: 2,
+              backgroundColor: alpha(theme.palette.background.paper, 0.8),
+              backdropFilter: 'blur(8px)',
+              boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.05)}`
+            }}
+          >
+            <TextField
+              placeholder="Buscar plantas..."
+              variant="outlined"
+              fullWidth
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mr: 1 }}
+            />
+            <IconButton size="small">
+              <FilterListIcon />
+            </IconButton>
+          </Paper>
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Button 
+              variant="contained"
+              startIcon={<ScienceIcon />}
+              component={Link}
+              to="/Aditivos"
+              sx={{ 
+                bgcolor: theme.palette.primary.main,
+                color: '#ffffff',
+                borderRadius: 2,
+                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
+                padding: '8px 16px',
+                '&:hover': {
+                  bgcolor: theme.palette.primary.dark,
+                  boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`
+                }
+              }}
+            >
+              Ver Aditivos
+            </Button>
+          </Box>
+        </Box>
+
+        {userData?.plants ? (
+          <>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                mb: 4, 
+                borderRadius: 3,
+                overflow: 'hidden',
+                boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
+              }}
+            >
+              <Box sx={{ 
+                p: 2, 
+                background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
+                color: '#ffffff',
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center'
+              }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    fontWeight: 'medium',
+                    color: '#ffffff' 
+                  }}
+                >
+                  <ForestIcon sx={{ mr: 1, color: '#ffffff' }} />
+                  Plantas Activas 
+                  <Chip 
+                    label={filteredPlants.length} 
+                    size="small" 
+                    sx={{ 
+                      ml: 1, 
+                      bgcolor: alpha('#ffffff', 0.2),
+                      color: '#ffffff',
+                      fontWeight: 'bold'
+                    }} 
+                  />
+                </Typography>
+              </Box>
+            </Card>
+            
+            <Grid container spacing={3}>
+              {filteredPlants.map(([id, plant], index) => {
+                const isSelected = selectedPlant === id;
+                const plantStats = getPlantStats(plant);
+                const hasImage = plant.images && Object.keys(plant.images).length > 0;
+                
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={id}>
+                    <Card 
+                      elevation={isSelected ? 3 : 1}
+                      onClick={() => handlePlantSelect(id)}
+                      sx={{ 
+                        borderRadius: 3,
+                        position: 'relative',
+                        height: '100%',
+                        transition: 'all 0.3s ease',
+                        transform: isSelected ? 'translateY(-4px)' : 'none',
+                        cursor: 'pointer',
+                        border: isSelected 
+                          ? `2px solid ${theme.palette.primary.main}`
+                          : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                        boxShadow: isSelected 
+                          ? `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}` 
+                          : `0 2px 10px ${alpha(theme.palette.common.black, 0.05)}`,
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}`
+                        },
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>
+                        <IconButton 
                           size="small" 
-                          sx={{ mr: 1, bgcolor: alpha(theme.palette.primary.main, 0.1) }}
-                        />
-                        {plant.potVolume && (
-                          <Chip 
-                            label={`${plant.potVolume}L`} 
-                            size="small"
-                            sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1) }}
-                          />
-                        )}
+                          onClick={(e) => handleOpenMenu(e, id)}
+                          sx={{ 
+                            bgcolor: alpha('#ffffff', 0.8),
+                            backdropFilter: 'blur(4px)',
+                            '&:hover': {
+                              bgcolor: '#ffffff'
+                            }
+                          }}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
                       </Box>
                       
-                      <Divider sx={{ my: 1 }} />
-                      
-                      <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 1 }}>
-                        {getPlantStats(plant).map((stat, idx) => (
-                          <Box key={idx} sx={{ textAlign: 'center' }}>
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              mb: 0.5,
-                              color: stat.color
-                            }}>
-                              {stat.icon}
-                            </Box>
-                            <Typography variant="body2" color="text.secondary">
-                              {stat.value} {stat.label}
+                      <CardActionArea 
+                        component={Link}
+                        to={`/Planta/?${id}`}
+                        sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                      >
+                        <Box sx={{ 
+                          height: 160, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          color: theme.palette.primary.main,
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          {hasImage ? (
+                            <CardMedia
+                              component="img"
+                              height="160"
+                              image={plant.images[Object.keys(plant.images)[0]].url}
+                              alt={plant.name}
+                              sx={{ 
+                                objectFit: 'cover',
+                                transition: '0.3s transform ease-in-out',
+                                '&:hover': {
+                                  transform: 'scale(1.05)'
+                                }
+                              }}
+                            />
+                          ) : getPlantIcon(index)}
+                          
+                          <Box 
+                            sx={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: '40%',
+                              background: hasImage ? 
+                                'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
+                                'transparent',
+                              display: 'flex',
+                              alignItems: 'flex-end',
+                              px: 2,
+                              py: 1,
+                              zIndex: 1
+                            }}
+                          >
+                            <Typography
+                              variant="h6"
+                              component="div"
+                              sx={{
+                                color: hasImage ? '#ffffff' : 'text.primary',
+                                textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
+                                fontWeight: 'medium',
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                            >
+                              {plant.name}
+                              <IconButton 
+                                size="small" 
+                                onClick={(e) => handleShowDetail(e, plant, id)}
+                                sx={{ 
+                                  color: hasImage ? '#ffffff' : theme.palette.primary.main,
+                                  bgcolor: hasImage ? 
+                                    alpha('#ffffff', 0.2) : 
+                                    alpha(theme.palette.primary.main, 0.1),
+                                  backdropFilter: 'blur(4px)',
+                                  '&:hover': {
+                                    bgcolor: hasImage ? 
+                                      alpha('#ffffff', 0.3) : 
+                                      alpha(theme.palette.primary.main, 0.2)
+                                  }
+                                }}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
                             </Typography>
                           </Box>
-                        ))}
-                      </Box>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-          
-          {filteredPlants.length === 0 && (
-            <Box sx={{ 
-              textAlign: 'center', 
-              p: 4, 
+                        </Box>
+                        
+                        <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+                          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                            <Chip 
+                              icon={<LocalFloristIcon fontSize="small" />}
+                              label={`${plant.quantity} unid.`} 
+                              size="small" 
+                              sx={{ 
+                                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                color: theme.palette.primary.main,
+                                borderRadius: 1.5
+                              }}
+                            />
+                            {plant.potVolume && (
+                              <Chip 
+                                label={`${plant.potVolume}L`} 
+                                size="small"
+                                sx={{ 
+                                  bgcolor: alpha(theme.palette.primary.light, 0.2),
+                                  color: theme.palette.primary.dark,
+                                  borderRadius: 1.5
+                                }}
+                              />
+                            )}
+                          </Box>
+                          
+                          <Divider sx={{ my: 1 }} />
+                          
+                          <Stack direction="row" spacing={2} justifyContent="space-around" mt={2}>
+                            {plantStats.map((stat, idx) => (
+                              <Box key={idx} sx={{ textAlign: 'center' }}>
+                                <Avatar 
+                                  sx={{ 
+                                    width: 36, 
+                                    height: 36, 
+                                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                    color: theme.palette.primary.main,
+                                    mb: 0.5,
+                                    mx: 'auto'
+                                  }}
+                                >
+                                  {stat.icon}
+                                </Avatar>
+                                <Typography variant="body2" fontWeight="medium" color={theme.palette.primary.main}>
+                                  {stat.value}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {stat.label}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Stack>
+                        </CardContent>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+            
+            {filteredPlants.length === 0 && (
+              <Box sx={{ 
+                textAlign: 'center', 
+                p: 4, 
+                bgcolor: alpha(theme.palette.background.paper, 0.5),
+                borderRadius: 2,
+                border: `1px dashed ${theme.palette.divider}`,
+                backdropFilter: 'blur(8px)',
+                boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.03)}`
+              }}>
+                <ForestIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.2), mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No se encontraron plantas
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  {searchTerm ? 'Intenta con otra búsqueda' : 'Agrega tu primera planta para comenzar'}
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />}
+                  component={Link}
+                  to="/NuevaPlanta"
+                  sx={{
+                    bgcolor: theme.palette.primary.main,
+                    color: '#ffffff',
+                    borderRadius: 8,
+                    px: 3,
+                    py: 1,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                    '&:hover': {
+                      bgcolor: theme.palette.primary.dark
+                    }
+                  }}
+                >
+                  Agregar Planta
+                </Button>
+              </Box>
+            )}
+          </>
+        ) : (
+          <Box sx={{ 
+            textAlign: 'center', 
+            p: 4, 
+            bgcolor: alpha(theme.palette.background.paper, 0.5),
+            borderRadius: 2,
+            border: `1px dashed ${theme.palette.divider}`,
+            backdropFilter: 'blur(8px)',
+            boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.03)}`
+          }}>
+            <ForestIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.2), mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Aún no tienes plantas
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Agrega tu primera planta para comenzar a hacer seguimiento
+            </Typography>
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />}
+              component={Link}
+              to="/NuevaPlanta"
+              sx={{
+                bgcolor: theme.palette.primary.main,
+                color: '#ffffff',
+                borderRadius: 8,
+                px: 3,
+                py: 1,
+                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                '&:hover': {
+                  bgcolor: theme.palette.primary.dark
+                }
+              }}
+            >
+              Agregar Planta
+            </Button>
+          </Box>
+        )}
+      </Container>
+      
+      {/* Menú contextual para opciones de planta */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleCloseMenu}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            minWidth: 200,
+            borderRadius: 2,
+            overflow: 'visible',
+            mt: 1,
+            '&:before': {
+              content: '""',
+              display: 'block',
+              position: 'absolute',
+              top: 0,
+              right: 14,
+              width: 10,
+              height: 10,
               bgcolor: 'background.paper',
-              borderRadius: 2,
-              border: `1px dashed ${theme.palette.divider}`
-            }}>
-              <ForestIcon sx={{ fontSize: 60, color: alpha(theme.palette.text.secondary, 0.2), mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No se encontraron plantas
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                {searchTerm ? 'Intenta con otra búsqueda' : 'Agrega tu primera planta para comenzar'}
-              </Typography>
-              <Button 
-                variant="contained" 
-                startIcon={<AddIcon />}
-                component={Link}
-                to="/NuevaPlanta"
-              >
-                Agregar Planta
-              </Button>
-            </Box>
-          )}
-        </>
-      ) : (
-        <Box sx={{ 
-          textAlign: 'center', 
-          p: 4, 
-          bgcolor: 'background.paper',
-          borderRadius: 2,
-          border: `1px dashed ${theme.palette.divider}`
-        }}>
-          <ForestIcon sx={{ fontSize: 60, color: alpha(theme.palette.text.secondary, 0.2), mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Aún no tienes plantas
-          </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph>
-            Agrega tu primera planta para comenzar a hacer seguimiento
-          </Typography>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />}
-            component={Link}
-            to="/NuevaPlanta"
-          >
-            Agregar Planta
-          </Button>
-        </Box>
-      )}
+              transform: 'translateY(-50%) rotate(45deg)',
+              zIndex: 0
+            }
+          }
+        }}
+      >
+        <MenuItem onClick={() => handleOptionSelect('edit')}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+          </ListItemIcon>
+          <ListItemText>Editar planta</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleOptionSelect('calendar')}>
+          <ListItemIcon>
+            <EventIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+          </ListItemIcon>
+          <ListItemText>Ver calendario</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleOptionSelect('water')}>
+          <ListItemIcon>
+            <OpacityIcon fontSize="small" color="info" />
+          </ListItemIcon>
+          <ListItemText>Registrar riego</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleOptionSelect('prune')}>
+          <ListItemIcon>
+            <ContentCutIcon fontSize="small" color="success" />
+          </ListItemIcon>
+          <ListItemText>Registrar poda</ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => handleOptionSelect('delete')} sx={{ color: theme.palette.error.main }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Eliminar</ListItemText>
+        </MenuItem>
+      </Menu>
+      
+      {/* Backdrop para vista rápida */}
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={showDetailBackdrop}
+        onClick={() => setShowDetailBackdrop(false)}
+      >
+        {detailPlant && (
+          <Zoom in={showDetailBackdrop}>
+            <Paper
+              elevation={4}
+              sx={{
+                width: { xs: '90%', sm: '70%', md: '50%' },
+                maxWidth: 500,
+                maxHeight: '80vh',
+                overflow: 'auto',
+                borderRadius: 2,
+                p: 3
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h5" component="h2">
+                  {detailPlant.name}
+                </Typography>
+                <IconButton onClick={() => setShowDetailBackdrop(false)}>
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+              
+              <Divider sx={{ mb: 2 }} />
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Información General
+                  </Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <Chip 
+                      icon={<LocalFloristIcon fontSize="small" />}
+                      label={`${detailPlant.quantity} unidades`} 
+                      size="small" 
+                      sx={{ mr: 1, mb: 1, bgcolor: alpha(theme.palette.primary.main, 0.1) }}
+                    />
+                    {detailPlant.potVolume && (
+                      <Chip 
+                        label={`Maceta de ${detailPlant.potVolume}L`} 
+                        size="small"
+                        sx={{ mr: 1, mb: 1, bgcolor: alpha(theme.palette.primary.light, 0.2) }}
+                      />
+                    )}
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sx={{ mt: 1 }}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    component={Link}
+                    to={`/Planta/?${detailPlant.id}`}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Ver detalles completos
+                  </Button>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Zoom>
+        )}
+      </Backdrop>
     </Layout>
   );
 };

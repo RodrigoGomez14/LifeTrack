@@ -115,17 +115,26 @@ const NewPlant = () => {
 
   return (
     <Layout title="Nueva Planta">
-      <Box sx={{ maxWidth: 600, mx: 'auto', p: { xs: 2, md: 0 } }}>
-        <Card elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      <Box sx={{ 
+        maxWidth: 600, 
+        mx: 'auto', 
+        p: { xs: 2, md: 0 },
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        minHeight: 'calc(100vh - 70px)'
+      }}>
+        <Card elevation={3} sx={{ borderRadius: 3, overflow: 'hidden' }}>
           <Box sx={{ 
             p: 3, 
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            bgcolor: alpha(theme.palette.secondary.main, 0.1)
+            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+            color: '#ffffff'
           }}>
-            <ForestIcon fontSize="large" color="secondary" />
-            <Typography variant="h5" component="h1">
+            <ForestIcon fontSize="large" sx={{ color: '#ffffff' }} />
+            <Typography variant="h5" component="h1" sx={{ color: '#ffffff' }}>
               Agregar Nueva Planta
             </Typography>
           </Box>
@@ -251,7 +260,12 @@ const NewPlant = () => {
               </Button>
               <Button 
                 variant="contained"
-                color="secondary"
+                sx={{ 
+                  bgcolor: theme.palette.secondary.main,
+                  '&:hover': {
+                    bgcolor: theme.palette.secondary.dark
+                  }
+                }}
                 onClick={handleFormSubmit}
                 disabled={!name || !quantity}
                 startIcon={<AddIcon />}

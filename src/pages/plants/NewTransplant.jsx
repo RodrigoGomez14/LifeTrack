@@ -58,17 +58,26 @@ const NewTransplant = () => {
 
   return (
     <Layout title="Nuevo Transplante">
-      <Box sx={{ maxWidth: 600, mx: 'auto', p: { xs: 2, md: 0 } }}>
+      <Box sx={{ 
+        maxWidth: 600, 
+        mx: 'auto', 
+        p: { xs: 2, md: 0 },
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        minHeight: 'calc(100vh - 70px)'
+      }}>
         <Card elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <Box sx={{ 
             p: 3, 
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            bgcolor: alpha(theme.palette.warning.main, 0.1)
+            background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
+            color: '#ffffff'
           }}>
-            <SwapHorizIcon fontSize="large" color="warning" />
-            <Typography variant="h5" component="h1">
+            <SwapHorizIcon fontSize="large" sx={{ color: '#ffffff' }} />
+            <Typography variant="h5" component="h1" sx={{ color: '#ffffff' }}>
               Registrar Nuevo Transplante
             </Typography>
           </Box>
@@ -115,6 +124,16 @@ const NewTransplant = () => {
                   disabled={!newVol}
                   fullWidth
                   size="large"
+                  sx={{ 
+                    bgcolor: theme.palette.warning.main,
+                    color: '#ffffff',
+                    py: 1.5,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.warning.main, 0.3)}`,
+                    '&:hover': {
+                      bgcolor: theme.palette.warning.dark,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.warning.main, 0.4)}`
+                    }
+                  }}
                 >
                   REGISTRAR TRANSPLANTE
                 </Button>
