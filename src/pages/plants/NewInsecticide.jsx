@@ -65,7 +65,7 @@ const NewInsecticide = () => {
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff'
           }}>
             <BugReportIcon fontSize="large" sx={{ color: '#ffffff' }} />

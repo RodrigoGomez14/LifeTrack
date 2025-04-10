@@ -59,7 +59,7 @@ const NewPruning = () => {
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff'
           }}>
             <ContentCutIcon fontSize="large" sx={{ color: '#ffffff' }} />

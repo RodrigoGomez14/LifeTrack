@@ -47,6 +47,7 @@ import ContentCutIcon from '@mui/icons-material/ContentCut';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CloseIcon from '@mui/icons-material/Close';
 import { useTheme } from '@mui/material/styles';
+import HistoryIcon from '@mui/icons-material/History';
 
 const PlantsList = () => {
   const { userData } = useStore();
@@ -58,6 +59,11 @@ const PlantsList = () => {
   const [currentPlantId, setCurrentPlantId] = useState(null);
   const [showDetailBackdrop, setShowDetailBackdrop] = useState(false);
   const [detailPlant, setDetailPlant] = useState(null);
+  const [sort, setSortMethod] = useState('name');
+  
+  // Debugging userData structure
+  console.log("userData:", userData);
+  console.log("userData?.plants:", userData?.plants);
   
   // Filtrar plantas según término de búsqueda
   const filteredPlants = userData?.plants?.active 
@@ -65,6 +71,65 @@ const PlantsList = () => {
       .filter(([id, plant]) => plant.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .sort((a, b) => a[1].name.localeCompare(b[1].name))
     : [];
+
+  // Variable para plantas archivadas - mejorar acceso a los datos
+  const archivedPlants = (() => {
+    if (!userData?.plants) return [];
+    
+    // Intentar acceder a history directamente
+    if (userData.plants.history && typeof userData.plants.history === 'object') {
+      return Object.entries(userData.plants.history)
+        .filter(([key, plant]) => 
+          plant && typeof plant === 'object' && 
+          (!searchTerm || (plant.name && plant.name.toLowerCase().includes(searchTerm.toLowerCase())))
+        )
+        .sort((a, b) => {
+          if (a[1]?.name && b[1]?.name) return a[1].name.localeCompare(b[1].name);
+          return 0;
+        });
+    }
+    
+    // Intentar con "archived" como alternativa
+    if (userData.plants.archived && typeof userData.plants.archived === 'object') {
+      return Object.entries(userData.plants.archived)
+        .filter(([key, plant]) => 
+          plant && typeof plant === 'object' && 
+          (!searchTerm || (plant.name && plant.name.toLowerCase().includes(searchTerm.toLowerCase())))
+        )
+        .sort((a, b) => {
+          if (a[1]?.name && b[1]?.name) return a[1].name.localeCompare(b[1].name);
+          return 0;
+        });
+    }
+    
+    // Buscar en posibles propiedades alternativas
+    for (const key in userData.plants) {
+      if (key !== 'active' && typeof userData.plants[key] === 'object') {
+        console.log(`Revisando propiedad alternativa: ${key}`);
+        const entries = Object.entries(userData.plants[key]);
+        // Revisar si esta propiedad contiene plantas archivadas
+        for (const [id, possiblePlant] of entries) {
+          if (possiblePlant && typeof possiblePlant === 'object' && possiblePlant.finishDate) {
+            console.log(`Posible colección de plantas archivadas encontrada en: ${key}`);
+            return entries
+              .filter(([_, plant]) => 
+                plant && typeof plant === 'object' && 
+                (!searchTerm || (plant.name && plant.name.toLowerCase().includes(searchTerm.toLowerCase())))
+              )
+              .sort((a, b) => {
+                if (a[1]?.name && b[1]?.name) return a[1].name.localeCompare(b[1].name);
+                return 0;
+              });
+          }
+        }
+      }
+    }
+    
+    console.log("No se encontraron plantas archivadas en ninguna estructura");
+    return [];
+  })();
+  
+  console.log("Plantas archivadas encontradas:", archivedPlants);
 
   // Función para obtener un ícono aleatorio para las plantas que no tienen imágenes
   const getPlantIcon = (index) => {
@@ -167,28 +232,28 @@ const PlantsList = () => {
             }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Typography variant="h4" fontWeight="bold" sx={{ color: '#ffffff' }}>
-                  Mis Plantas
-                </Typography>
-                
-                <Fab 
-                  color="primary" 
-                  aria-label="add" 
-                  component={Link}
-                  to="/NuevaPlanta"
-                  size="medium"
-                  sx={{
+              Mis Plantas
+            </Typography>
+            
+            <Fab 
+              color="primary" 
+              aria-label="add" 
+              component={Link}
+              to="/NuevaPlanta"
+              size="medium"
+              sx={{
                     bgcolor: alpha('#ffffff', 0.2),
                     color: '#ffffff',
                     boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.15)}`,
-                    '&:hover': {
+                '&:hover': {
                       bgcolor: alpha('#ffffff', 0.3),
                       boxShadow: `0 10px 20px ${alpha(theme.palette.common.black, 0.2)}`
-                    }
-                  }}
-                >
-                  <AddIcon />
-                </Fab>
-              </Stack>
+                }
+              }}
+            >
+              <AddIcon />
+            </Fab>
+          </Stack>
             </CardContent>
           </Card>
 
@@ -228,7 +293,7 @@ const PlantsList = () => {
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Button 
-              variant="contained"
+              variant="contained" 
               startIcon={<ScienceIcon />}
               component={Link}
               to="/Aditivos"
@@ -268,29 +333,29 @@ const PlantsList = () => {
                 justifyContent: 'space-between', 
                 alignItems: 'center'
               }}>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    fontWeight: 'medium',
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  fontWeight: 'medium',
                     color: '#ffffff' 
-                  }}
-                >
+                }}
+              >
                   <ForestIcon sx={{ mr: 1, color: '#ffffff' }} />
-                  Plantas Activas 
-                  <Chip 
-                    label={filteredPlants.length} 
-                    size="small" 
-                    sx={{ 
-                      ml: 1, 
+                Plantas Activas 
+                <Chip 
+                  label={filteredPlants.length} 
+                  size="small" 
+                  sx={{ 
+                    ml: 1, 
                       bgcolor: alpha('#ffffff', 0.2),
                       color: '#ffffff',
-                      fontWeight: 'bold'
-                    }} 
-                  />
-                </Typography>
-              </Box>
+                    fontWeight: 'bold'
+                  }} 
+                />
+              </Typography>
+            </Box>
             </Card>
             
             <Grid container spacing={3}>
@@ -359,7 +424,7 @@ const PlantsList = () => {
                             <CardMedia
                               component="img"
                               height="160"
-                              image={plant.images[Object.keys(plant.images)[0]].url}
+                              image={plant.profilePhotoUrl || plant.images[Object.keys(plant.images)[0]].url || plant.images[Object.keys(plant.images)[0]].dataUrl}
                               alt={plant.name}
                               sx={{ 
                                 objectFit: 'cover',
@@ -483,7 +548,280 @@ const PlantsList = () => {
               })}
             </Grid>
             
-            {filteredPlants.length === 0 && (
+            {/* Sección de Archivo de Plantas - siempre visible */}
+            <Card 
+              elevation={3} 
+              sx={{ 
+                mt: 6,
+                mb: 4, 
+                borderRadius: 3,
+                overflow: 'hidden',
+                boxShadow: `0 8px 32px ${alpha(theme.palette.secondary.main, 0.1)}`,
+              }}
+            >
+              <Box sx={{ 
+                p: 2, 
+                background: `linear-gradient(135deg, ${theme.palette.secondary.light} 0%, ${theme.palette.secondary.main} 100%)`,
+                color: '#ffffff',
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center'
+              }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    fontWeight: 'medium',
+                    color: '#ffffff' 
+                  }}
+                >
+                  <HistoryIcon sx={{ mr: 1, color: '#ffffff' }} />
+                  Archivo de Plantas 
+                  <Chip 
+                    label={archivedPlants.length} 
+                    size="small" 
+                    sx={{ 
+                      ml: 1, 
+                      bgcolor: alpha('#ffffff', 0.2),
+                      color: '#ffffff',
+                      fontWeight: 'bold'
+                    }} 
+                  />
+                </Typography>
+              </Box>
+            </Card>
+            
+            {archivedPlants.length > 0 ? (
+              <Grid container spacing={3}>
+                {archivedPlants.map(([id, plant], index) => {
+                  if (!plant || typeof plant !== 'object') {
+                    console.log("Datos de planta archivada inválidos:", id, plant);
+                    return null;
+                  }
+                  
+                  const isSelected = selectedPlant === id;
+                  const plantStats = getPlantStats(plant);
+                  const hasImage = plant.images && Object.keys(plant.images).length > 0;
+                  
+                  // Verificar que la planta tiene datos válidos para mostrar
+                  const hasValidData = plant.name && typeof plant.name === 'string';
+                  if (!hasValidData) {
+                    console.log("Planta sin datos válidos:", id, plant);
+                    return null;
+                  }
+                  
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={id}>
+                      <Card 
+                        elevation={isSelected ? 3 : 1}
+                        onClick={() => handlePlantSelect(id)}
+                        sx={{ 
+                          borderRadius: 3,
+                          position: 'relative',
+                          height: '100%',
+                          transition: 'all 0.3s ease',
+                          transform: isSelected ? 'translateY(-4px)' : 'none',
+                          cursor: 'pointer',
+                          border: isSelected 
+                            ? `2px solid ${theme.palette.secondary.main}`
+                            : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                          boxShadow: isSelected 
+                            ? `0 10px 20px ${alpha(theme.palette.secondary.main, 0.15)}` 
+                            : `0 2px 10px ${alpha(theme.palette.common.black, 0.05)}`,
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: `0 10px 20px ${alpha(theme.palette.secondary.main, 0.15)}`
+                          },
+                          opacity: 0.9,
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>
+                          <Chip
+                            size="small"
+                            label="Archivada"
+                            sx={{
+                              bgcolor: alpha(theme.palette.secondary.main, 0.2),
+                              color: theme.palette.secondary.main,
+                              fontWeight: 'medium',
+                              fontSize: '0.7rem'
+                            }}
+                          />
+                        </Box>
+                        
+                        <CardActionArea 
+                          component={Link}
+                          to={`/Planta/?${id}`}
+                          sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                        >
+                          <Box sx={{ 
+                            height: 160, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            bgcolor: alpha(theme.palette.secondary.main, 0.05),
+                            color: theme.palette.secondary.main,
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            {hasImage ? (
+                              <CardMedia
+                                component="img"
+                                height="160"
+                                image={
+                                  plant.profilePhotoUrl || 
+                                  (plant.images && Object.keys(plant.images).length > 0 && 
+                                    (plant.images[Object.keys(plant.images)[0]]?.url || 
+                                     plant.images[Object.keys(plant.images)[0]]?.dataUrl)
+                                  ) || 
+                                  'https://placehold.co/600x400?text=Planta'
+                                }
+                                alt={plant.name}
+                                sx={{ 
+                                  objectFit: 'cover',
+                                  opacity: 0.9,
+                                  filter: 'grayscale(20%)',
+                                }}
+                              />
+                            ) : getPlantIcon(index)}
+                            
+                            <Box 
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: '40%',
+                                background: hasImage ? 
+                                  'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
+                                  'transparent',
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                px: 2,
+                                py: 1,
+                                zIndex: 1
+                              }}
+                            >
+                              <Typography
+                                variant="h6"
+                                component="div"
+                                sx={{
+                                  color: hasImage ? '#ffffff' : 'text.primary',
+                                  textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
+                                  fontWeight: 'medium',
+                                  width: '100%',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                {plant.name}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          
+                          <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                              {plant.finishDate && (
+                                <Chip 
+                                  icon={<HistoryIcon fontSize="small" />}
+                                  label={`Completada: ${plant.finishDate}`} 
+                                  size="small" 
+                                  sx={{ 
+                                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                    color: theme.palette.secondary.main,
+                                    borderRadius: 1.5,
+                                    mb: 1,
+                                    width: '100%'
+                                  }}
+                                />
+                              )}
+                              
+                              {plant.quantity && (
+                                <Chip 
+                                  icon={<LocalFloristIcon fontSize="small" />}
+                                  label={`${plant.quantity} unid.`} 
+                                  size="small" 
+                                  sx={{ 
+                                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                    color: theme.palette.secondary.main,
+                                    borderRadius: 1.5
+                                  }}
+                                />
+                              )}
+                              
+                              {plant.genetic && (
+                                <Chip 
+                                  label={plant.genetic} 
+                                  size="small"
+                                  sx={{ 
+                                    bgcolor: alpha(theme.palette.secondary.light, 0.2),
+                                    color: theme.palette.secondary.dark,
+                                    borderRadius: 1.5
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            
+                            {plant.wetFlowersWeight && (
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                  Cosecha:
+                                </Typography>
+                                <Stack direction="row" spacing={2} justifyContent="space-around">
+                                  {plant.wetFlowersWeight && (
+                                    <Box sx={{ textAlign: 'center' }}>
+                                      <Typography variant="body2" fontWeight="medium" color={theme.palette.secondary.main}>
+                                        {plant.wetFlowersWeight}g
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Flores húmedas
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                  {plant.dryFlowersWeight && (
+                                    <Box sx={{ textAlign: 'center' }}>
+                                      <Typography variant="body2" fontWeight="medium" color={theme.palette.secondary.main}>
+                                        {plant.dryFlowersWeight}g
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Flores secas
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                </Stack>
+                              </Box>
+                            )}
+                          </CardContent>
+                        </CardActionArea>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            ) : (
+              <Box sx={{ 
+                textAlign: 'center', 
+                p: 4, 
+                mb: 4,
+                bgcolor: alpha(theme.palette.background.paper, 0.5),
+                borderRadius: 2,
+                border: `1px dashed ${theme.palette.divider}`,
+                backdropFilter: 'blur(8px)',
+                boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.03)}`
+              }}>
+                <HistoryIcon sx={{ fontSize: 60, color: alpha(theme.palette.secondary.main, 0.2), mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No hay plantas archivadas
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Cuando coseches plantas, aparecerán aquí para mantener un historial
+                </Typography>
+              </Box>
+            )}
+            
+            {filteredPlants.length === 0 && archivedPlants.length === 0 && (
               <Box sx={{ 
                 textAlign: 'center', 
                 p: 4, 
@@ -561,6 +899,34 @@ const PlantsList = () => {
           </Box>
         )}
       </Container>
+      
+      {/* Componente de depuración solo visible en desarrollo */}
+      {process.env.NODE_ENV === 'development' && (
+        <Box sx={{ 
+          position: 'fixed', 
+          bottom: 20, 
+          right: 20, 
+          zIndex: 9999,
+          maxWidth: 350,
+          maxHeight: 400,
+          overflow: 'auto',
+          p: 2,
+          borderRadius: 2,
+          bgcolor: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          backdropFilter: 'blur(8px)',
+          display: 'none', // Inicialmente oculto, cambiar a 'block' para activar
+        }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Debug Data:</Typography>
+          <pre style={{ fontSize: '10px', whiteSpace: 'pre-wrap' }}>
+            {JSON.stringify({ 
+              userData: userData,
+              archivedPlants: archivedPlants,
+              filteredPlants: filteredPlants
+            }, null, 2)}
+          </pre>
+        </Box>
+      )}
       
       {/* Menú contextual para opciones de planta */}
       <Menu

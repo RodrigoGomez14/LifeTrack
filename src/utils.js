@@ -12,7 +12,7 @@ import DriveEtaIcon from '@mui/icons-material/DriveEta';
 
 // Función para formatear un monto de dinero
 export const formatAmount = (amount, isUSD = false) => {
-  if (amount === null || amount === undefined) return '$0';
+  if (amount === null || amount === undefined) return '0';
   
   // Si es un valor menor a 1000, mostrarlo normal
   if (Math.abs(amount) < 1000) {
@@ -20,13 +20,13 @@ export const formatAmount = (amount, isUSD = false) => {
       style: 'currency', 
       currency: isUSD ? 'USD' : 'ARS',
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(amount).replace('ARS', '');
   }
   
   // Para valores más grandes, usar notación abreviada
   let absValue = Math.abs(amount);
   let sign = amount < 0 ? '-' : '';
-  let symbol = isUSD ? 'USD ' : '$';
+  let symbol = isUSD ? 'USD ' : '';
   
   if (absValue >= 1000000000) {
     // Mil millones o más (B)

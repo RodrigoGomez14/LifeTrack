@@ -343,7 +343,7 @@ const NewPhoto = () => {
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff'
           }}>
             <PhotoCameraIcon fontSize="large" sx={{ color: '#ffffff' }} />

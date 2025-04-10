@@ -262,7 +262,6 @@ const Aditives = () => {
               borderRadius: 3,
               overflow: 'hidden',
               mb: 4,
-              backgroundColor: '#212121',
               width: '100%'
             }}
           >
@@ -272,7 +271,6 @@ const Aditives = () => {
               variant="fullWidth"
               textColor="inherit"
               sx={{ 
-                bgcolor: '#212121',
                 '& .Mui-selected': {
                   color: tabValue === 0 ? '#4caf50' : '#f44336' 
                 },
@@ -308,7 +306,7 @@ const Aditives = () => {
               />
         </Tabs>
             
-            <Box sx={{ p: 2, bgcolor: '#1a1a1a', minHeight: '300px' }}>
+            <Box sx={{ p: 2, minHeight: '300px' }}>
               {tabValue === 0 ? (
                 <>
                   {userData?.plants?.aditives?.fertilizantes && Object.keys(userData.plants.aditives.fertilizantes).length > 0 ? (

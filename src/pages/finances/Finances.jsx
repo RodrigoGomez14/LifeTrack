@@ -107,6 +107,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import TodayIcon from '@mui/icons-material/Today';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import InfoIcon from '@mui/icons-material/Info';
 
 const Finances = () => {
   const { userData, dollarRate } = useStore();
@@ -213,7 +215,7 @@ const Finances = () => {
       
       // Si hay un array de datos, procesamos todas las transacciones para agrupar por categoría
       if (monthData.data && Array.isArray(monthData.data)) {
-        // Procesar todas las transacciones, incluidas las de tarjeta
+        // Procesar todas las transacciones, excluyendo las que deben omitirse de los totales
         monthData.data.forEach(transaction => {
           const category = transaction.category || "Sin categoría";
           
@@ -244,8 +246,8 @@ const Finances = () => {
             }
           }
           
-          // Si no está oculta de la lista y no es una transacción futura, sumamos al total
-          if (!transaction.hiddenFromList && !isFutureTransaction) {
+          // Si no está oculta, no es una transacción futura y no debe excluirse de totales, sumamos al total
+          if (!transaction.hiddenFromList && !isFutureTransaction && !transaction.excludeFromTotal) {
             categoryData[category].total += transaction.amount || 0;
             
             // Agregar subcategoría si existe
@@ -395,7 +397,7 @@ const Finances = () => {
         
         // Si hay datos detallados, calcular el total excluyendo transacciones ocultas y futuras
         if (monthData.data && Array.isArray(monthData.data)) {
-          // Filtrar para excluir transacciones ocultas
+          // Filtrar para excluir transacciones ocultas, futuras o con tarjeta
           const visibleData = monthData.data.filter(transaction => {
             // Comprobar si es una transacción futura
             if (transaction.date) {
@@ -414,13 +416,13 @@ const Finances = () => {
               }
             }
             
-            // Incluir solo si no está oculta
-            return !transaction.hiddenFromList;
+            // Incluir solo si no está oculta y no debe excluirse de los totales
+            return !transaction.hiddenFromList && !transaction.excludeFromTotal;
           });
           
           expenseData[monthIndex] = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
         } else {
-          // Si no hay datos detallados, usar el total (que puede incluir transacciones ocultas)
+          // Si no hay datos detallados, usar el total
           expenseData[monthIndex] = monthData.total || 0;
         }
       });
@@ -1892,8 +1894,18 @@ const Finances = () => {
       today.setHours(0, 0, 0, 0); // Normalizar a las 00:00:00
       
       return allTransactions.filter(transaction => {
+        // Identificar si es una transacción con tarjeta
+        const isCreditCard = transaction.paymentMethod === 'creditCard' || 
+                            transaction.creditCardTransaction === true ||
+                            transaction.excludeFromTotal === true;
+        
         // Excluir transacciones con fecha futura
-        if (transaction.isFutureTransaction || transaction.hiddenFromList) {
+        if (transaction.isFutureTransaction) {
+          return false;
+        }
+        
+        // No excluir transacciones con tarjeta aunque estén marcadas como hiddenFromList
+        if (transaction.hiddenFromList && !isCreditCard) {
           return false;
         }
         
@@ -1922,7 +1934,7 @@ const Finances = () => {
           const subcategoryMatch = transaction.subcategory?.toLowerCase().includes(searchLower);
           const amountMatch = transaction.amount?.toString().includes(searchLower);
           const paymentMethodMatch = 
-            (transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction) 
+            (transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction || transaction.excludeFromTotal) 
               ? 'tarjeta'.includes(searchLower) 
               : 'efectivo'.includes(searchLower);
           
@@ -2077,198 +2089,136 @@ const Finances = () => {
       all: filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
       visible: filteredTransactions.filter(t => !t.hiddenFromList).reduce((sum, t) => sum + (t.amount || 0), 0),
       hidden: filteredTransactions.filter(t => t.hiddenFromList).reduce((sum, t) => sum + (t.amount || 0), 0),
+      // Totales adicionales
+      withoutCard: filteredTransactions.filter(t => !t.hiddenFromList && !t.excludeFromTotal).reduce((sum, t) => sum + (t.amount || 0), 0),
+      withCard: filteredTransactions.filter(t => !t.hiddenFromList && t.excludeFromTotal).reduce((sum, t) => sum + (t.amount || 0), 0),
       count: filteredTransactions.length,
       hiddenCount: filteredTransactions.filter(t => t.hiddenFromList).length,
-      visibleCount: filteredTransactions.filter(t => !t.hiddenFromList).length
+      visibleCount: filteredTransactions.filter(t => !t.hiddenFromList).length,
+      cardCount: filteredTransactions.filter(t => t.excludeFromTotal).length
     };
     
     // Componente para renderizar una transacción individual
     const TransactionItem = ({ transaction, dateGroup }) => {
-      const paymentMethod = getPaymentMethodInfo(transaction);
-      // Detectar explícitamente si es transacción de tarjeta
-      const isCreditCard = transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction === true;
+      const paymentInfo = getPaymentMethodInfo(transaction);
+      
+      // Determinar si es una transacción con tarjeta que se excluye de los totales
+      const isExcludedFromTotal = transaction.excludeFromTotal;
       
       return (
-        <Paper 
-          elevation={10} 
+        <Box 
           sx={{ 
-            p: 2, 
-            mb: 1.5, 
+            p: 2,
             borderRadius: 2,
-            borderColor: isCreditCard ? alpha(theme.palette.info.light, 0.4) : theme.palette.divider,
-            bgcolor: isCreditCard ? alpha(theme.palette.info.light, 0.08) : theme.palette.background.paper,
-            transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s',
+            mb: 1,
+            bgcolor: 'background.paper',
+            border: `1px solid ${theme.palette.divider}`,
             position: 'relative',
             overflow: 'hidden',
-            '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.07)}`,
-              bgcolor: isCreditCard ? alpha(theme.palette.info.light, 0.12) : alpha(theme.palette.primary.main, 0.05)
-            }
+            ...(isExcludedFromTotal && {
+              borderStyle: 'dashed',
+              borderColor: theme.palette.info.light,
+              bgcolor: alpha(theme.palette.info.main, 0.04)
+            })
           }}
         >
-          {/* Indicador lateral de tipo de pago */}
-          <Box 
-            sx={{ 
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              height: '100%',
-              width: 4,
-              bgcolor: paymentMethod.color,
-              opacity: 0.7
-            }} 
-          />
-          
-          <Grid container spacing={2} alignItems="flex-start">
-            {/* Icono de categoría */}
-            <Grid item>
-              <Avatar 
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={2} sm={1}>
+              <Box 
                 sx={{ 
-                  bgcolor: alpha(isCreditCard ? theme.palette.info.light : theme.palette.background.paper, 0.2),
-                  color: isCreditCard ? theme.palette.info.main : theme.palette.text.secondary,
-                  width: 40,
-                  height: 40
+                  bgcolor: getCategoryColor(transaction.category || 'default', 0),
+                  color: 'white',
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 },
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
-                {React.cloneElement(getCategoryIcon(transaction.category), { fontSize: 'small' })}
-              </Avatar>
-      </Grid>
+                {getCategoryIcon(transaction.category || 'default')}
+              </Box>
+            </Grid>
             
-            {/* Información principal */}
-            <Grid item xs>
-              <Stack spacing={0.5}>
-                <Typography 
-                  variant="subtitle1" 
-                  component="div" 
-                  sx={{ 
-                    fontWeight: 'medium',
-                    color: isCreditCard ? theme.palette.info.dark : 'text.primary',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                  {transaction.description}
-                  {isCreditCard && (
-                    <Chip 
-                      size="small" 
-                      label="Tarjeta" 
-                      color="info" 
-                      variant="outlined"
-                      sx={{ height: 20, fontSize: '0.7rem' }} 
-                    />
-                  )}
-                  {transaction.installments > 1 && (
-                    <Chip 
-                      size="small"
-                      label={`${transaction.currentInstallment || 1}/${transaction.installments}`}
-                      color="warning"
-                      variant="outlined"
-                      sx={{ height: 20, fontSize: '0.7rem' }}
-                    />
-                  )}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  {/* Categoria y subcategoria con mejor alineación */}
-                  <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Grid item xs={7} sm={8}>
+              <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                {transaction.description}
+                {isExcludedFromTotal && (
                   <Chip 
-                    size="small"
-                    label={transaction.category}
+                    label="Tarjeta" 
+                    size="small" 
                     sx={{ 
-                        height: 24,
-                        bgcolor: theme.palette.mode === 'dark' 
-                          ? alpha(getCategoryColor(transaction.category), 0.3) 
-                          : alpha(getCategoryColor(transaction.category), 0.1),
-                        color: theme.palette.mode === 'dark' 
-                          ? alpha(getCategoryColor(transaction.category), 1) 
-                          : getCategoryColor(transaction.category),
-                        fontWeight: 700,
-                        borderRadius: 1,
-                        border: theme.palette.mode === 'dark' 
-                          ? `2px solid ${alpha(getCategoryColor(transaction.category), 0.7)}` 
-                          : `1px solid ${alpha(getCategoryColor(transaction.category), 0.2)}`
-                      }}
-                      icon={React.cloneElement(
-                        getCategoryIcon(transaction.category), 
-                        { style: { fontSize: '0.8rem' } }
-                      )}
+                      ml: 1, 
+                      height: 20, 
+                      fontSize: '0.7rem',
+                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                      color: theme.palette.info.main,
+                      borderRadius: 1
+                    }} 
                   />
-                  
-                  {transaction.subcategory && (
-                      <>
-                        <ChevronRightIcon 
-                          sx={{ 
-                            fontSize: '0.9rem', 
-                            color: theme.palette.mode === 'dark' ? theme.palette.grey[300] : 'text.secondary', 
-                            opacity: 1
-                          }} 
-                        />
-                        <Chip
-                          size="small"
-                          label={transaction.subcategory}
-                          sx={{ 
-                            height: 24,
-                            bgcolor: alpha(theme.palette.background.paper, 0.9),
-                            color: theme.palette.text.primary,
-                            fontWeight: 500,
-                            borderRadius: 1,
-                            border: `1px solid ${theme.palette.divider}`
-                          }}
-                        />
-                      </>
-                    )}
-                  </Stack>
-                </Box>
-              </Stack>
-      </Grid>
-            
-            {/* Método de pago e importe */}
-            <Grid item xs={12} sm="auto">
-              <Stack 
-                direction="row" 
-                spacing={2} 
-                alignItems="center" 
-                justifyContent={{ xs: 'space-between', sm: 'flex-end' }}
-                sx={{ mt: { xs: 1, sm: 0 } }}
-              >
+                )}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
                 <Chip
+                  label={transaction.category}
                   size="small"
-                  icon={React.cloneElement(paymentMethod.icon, { fontSize: 'small' })}
-                  label={paymentMethod.label}
-                  sx={{
-                    bgcolor: paymentMethod.bgColor,
-                    color: paymentMethod.color,
-                    border: '1px solid',
-                    borderColor: paymentMethod.borderColor,
-                    '& .MuiChip-icon': {
-                      color: paymentMethod.color
-                    }
+                  sx={{ 
+                    height: 20, 
+                    fontSize: '0.7rem',
+                    bgcolor: alpha(getCategoryColor(transaction.category || 'default', 0), 0.1),
+                    color: getCategoryColor(transaction.category || 'default', 0)
                   }}
                 />
+                {transaction.subcategory && (
+                  <Chip
+                    label={transaction.subcategory}
+                    size="small"
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.7rem',
+                      bgcolor: 'background.paper',
+                      border: `1px solid ${alpha(getCategoryColor(transaction.category || 'default', 0), 0.2)}`,
+                      color: 'text.secondary'
+                    }}
+                  />
+                )}
                 
-                <Typography 
-                  variant="h6" 
-                  component="div"
+                <Box 
                   sx={{ 
-                    fontWeight: 'bold',
-                    color: isCreditCard 
-                      ? theme.palette.info.main
-                      : dataType === 'expenses' 
-                        ? theme.palette.error.main 
-                        : theme.palette.success.main,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 0.5
+                    ml: 1,
+                    borderRadius: 1,
+                    px: 1,
+                    py: 0.25,
+                    bgcolor: paymentInfo.bgColor,
+                    border: `1px solid ${paymentInfo.borderColor}`
                   }}
                 >
-                  {formatAmount(transaction.amount)}
-                </Typography>
+                  <Box component="span" sx={{ color: paymentInfo.color, display: 'flex', mr: 0.5, fontSize: 14 }}>
+                    {paymentInfo.icon}
+                  </Box>
+                  <Typography variant="caption" sx={{ color: paymentInfo.color, fontWeight: 'medium' }}>
+                    {paymentInfo.label}
+                  </Typography>
+                </Box>
               </Stack>
             </Grid>
+            
+            <Grid item xs={3} sm={3} sx={{ textAlign: 'right' }}>
+              <Typography 
+                variant="subtitle1" 
+                fontWeight="bold" 
+                color={transaction.amount < 0 ? 'success.main' : 'error.main'}
+              >
+                ${formatAmount(transaction.amount)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                USD {formatAmount(transaction.amountUSD || (transaction.amount / (transaction.valorUSD || dollarRate?.venta || 1)))}
+              </Typography>
+            </Grid>
           </Grid>
-        </Paper>
+        </Box>
       );
     };
     
@@ -2279,8 +2229,17 @@ const Finances = () => {
       
       // Verificar si hay transacciones con tarjeta en este grupo
       const hasCreditCardTransactions = dateData.transactions.some(
-        t => t.paymentMethod === 'creditCard' || t.creditCardTransaction === true
+        t => t.paymentMethod === 'creditCard' || t.creditCardTransaction === true || t.excludeFromTotal === true
       );
+      
+      // Calcular los totales separados por método de pago
+      const cashTotal = dateData.transactions
+        .filter(t => !t.excludeFromTotal)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+        
+      const cardTotal = dateData.transactions
+        .filter(t => t.excludeFromTotal)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
       
       return (
         <Card 
@@ -2339,7 +2298,7 @@ const Finances = () => {
                   fontWeight="bold"
                   color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main}
                 >
-                  {formatAmount(dateData.cashTotal)} {/* Mostramos solo el total en efectivo */}
+                  ${formatAmount(cashTotal)} {/* Solo mostramos el total en efectivo */}
                 </Typography>
                 
               </Stack>

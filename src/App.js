@@ -35,7 +35,8 @@ import PlantCalendar from './pages/plants/PlantCalendar';
 import Configuracion from './pages/basics/Configuracion';
 import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
-import NewPhoto from './pages/plants/NewPhoto';
+import NewPhoto from './pages/plants/NewPhoto.jsx';
+import NewLog from './pages/plants/NewLog.jsx';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
@@ -156,10 +157,14 @@ function App() {
           }
           
           groupdedFinances.expenses[year].months[month].data.push(transaction);
-          groupdedFinances.expenses[year].months[month].total += transaction.amount;
-          groupdedFinances.expenses[year].months[month].totalUSD += transaction.amountUSD;
-          groupdedFinances.expenses[year].total += transaction.amount;
-          groupdedFinances.expenses[year].totalUSD += transaction.amountUSD;
+          
+          // Solo sumar al total si no es una transacción con tarjeta que debe excluirse
+          if (!transaction.excludeFromTotal) {
+            groupdedFinances.expenses[year].months[month].total += transaction.amount;
+            groupdedFinances.expenses[year].months[month].totalUSD += transaction.amountUSD;
+            groupdedFinances.expenses[year].total += transaction.amount;
+            groupdedFinances.expenses[year].totalUSD += transaction.amountUSD;
+          }
         } else {
           console.warn(`Transacción de gasto ${transactionId} sin fecha válida:`, transaction);
         }
@@ -174,6 +179,7 @@ function App() {
     // Procesar plantas
     if(data.plants){
       groupedPlants['active'] = data.plants.active;
+      groupedPlants['history'] = data.plants.history;
       let aditives = {fertilizantes:{},insecticidas:{}};
       Object.keys(data.plants.aditives).forEach((aditiveId) => {
         if(data.plants.aditives[aditiveId].type==='Fertilizante'){
@@ -381,6 +387,7 @@ function App() {
           <Route path="/Aditivos" element={<PrivateRoute><Aditives /></PrivateRoute>} />
           <Route path="/NuevoAditivo" element={<PrivateRoute><NewAditive /></PrivateRoute>} />
           <Route path="/NuevaFoto" element={<PrivateRoute><NewPhoto /></PrivateRoute>} />
+          <Route path="/NuevoLog" element={<PrivateRoute><NewLog /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

@@ -40,8 +40,9 @@ const NewPlant = () => {
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [potVolume, setPotVolume] = useState('');
+  const [genetic, setGenetic] = useState('');
   const [etapa, setEtapa] = useState('Germinacion');
-  const [inicioGerminacion, setInicioGerminacion] = useState(null);
+  const [birthDate, setBirthDate] = useState(null);
   const [inicioVegetativo, setInicioVegetativo] = useState(null);
   const [inicioFloracion, setInicioFloracion] = useState(null);
   const [errors, setErrors] = useState({});
@@ -59,6 +60,14 @@ const NewPlant = () => {
     
     if (potVolume && (isNaN(potVolume) || potVolume <= 0)) {
       newErrors.potVolume = 'Ingresa un volumen válido';
+    }
+    
+    if (!genetic.trim()) {
+      newErrors.genetic = 'La genética es obligatoria';
+    }
+    
+    if (!birthDate) {
+      newErrors.birthDate = 'La fecha de nacimiento es obligatoria';
     }
     
     setErrors(newErrors);
@@ -85,11 +94,12 @@ const NewPlant = () => {
       name: name.trim(),
       quantity: parseInt(quantity),
       potVolume: potVolume ? parseFloat(potVolume) : null,
-      etapa: etapa
+      etapa: etapa,
+      genetic: genetic.trim()
     };
     
-    if (inicioGerminacion) {
-      plantData.inicioGerminacion = formatDate(inicioGerminacion);
+    if (birthDate) {
+      plantData.birthDate = formatDate(birthDate);
     }
     
     if (inicioVegetativo) {
@@ -105,8 +115,9 @@ const NewPlant = () => {
     setName('');
     setQuantity('');
     setPotVolume('');
+    setGenetic('');
     setEtapa('Germinacion');
-    setInicioGerminacion(null);
+    setBirthDate(null);
     setInicioVegetativo(null);
     setInicioFloracion(null);
 
@@ -130,7 +141,7 @@ const NewPlant = () => {
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff'
           }}>
             <ForestIcon fontSize="large" sx={{ color: '#ffffff' }} />
@@ -150,6 +161,19 @@ const NewPlant = () => {
                   fullWidth
                   error={!!errors.name}
                   helperText={errors.name}
+                  required
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  label="Genética"
+                  placeholder="Ej: White Widow, Northern Lights, etc."
+                  value={genetic}
+                  onChange={(e) => setGenetic(e.target.value)}
+                  fullWidth
+                  error={!!errors.genetic}
+                  helperText={errors.genetic}
                   required
                 />
               </Grid>
@@ -209,13 +233,16 @@ const NewPlant = () => {
                 <Stack spacing={3}>
                   <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
                     <DatePicker
-                      label="Inicio de Germinación"
-                      value={inicioGerminacion}
-                      onChange={(date) => setInicioGerminacion(date)}
+                      label="Fecha de nacimiento (Inicio de Germinación)"
+                      value={birthDate}
+                      onChange={(date) => setBirthDate(date)}
                       slotProps={{
                         textField: {
                           fullWidth: true,
                           variant: 'outlined',
+                          required: true,
+                          error: !!errors.birthDate,
+                          helperText: errors.birthDate
                         }
                       }}
                     />
@@ -267,7 +294,7 @@ const NewPlant = () => {
                   }
                 }}
                 onClick={handleFormSubmit}
-                disabled={!name || !quantity}
+                disabled={!name || !quantity || !genetic || !birthDate}
                 startIcon={<AddIcon />}
               >
                 Agregar Planta

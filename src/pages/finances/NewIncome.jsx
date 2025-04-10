@@ -482,7 +482,7 @@ const NewIncome = () => {
                   Equivalente en USD:
                 </Typography>
                 <Typography variant="h6" fontWeight="bold" color="primary">
-                  USD {formatAmount(parseFloat(amount) / dollarRate['venta'])}
+                  USD {(parseFloat(amount) / dollarRate['venta']).toFixed(1)}
                 </Typography>
               </Stack>
             </Card>

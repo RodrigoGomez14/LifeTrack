@@ -14,50 +14,51 @@ import {
 import { database, auth } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
-import { useStore } from "../../store";
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { useTheme } from '@mui/material/styles';
+import NoteAltIcon from '@mui/icons-material/NoteAlt';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
 
-const NewTransplant = () => {
+const NewLog = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const {userData} = useStore();
   const theme = useTheme();
-  const [newVol, setNewVol] = useState("");
-  
-  // Obtener el volumen actual de la maceta
-  const currentPlantId = checkSearch(location.search);
-  const currentPlant = userData?.plants?.active?.[currentPlantId];
-  const currentPotVolume = currentPlant?.potVolume || "No especificado";
+  const [description, setDescription] = useState("");
+  const [logDate, setLogDate] = useState(new Date());
 
-  const handleNewTransplant = () => {
+  const formatDate = (date) => {
+    if (!date) return getDate();
+    
+    const d = new Date(date);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleNewLog = () => {
     database
       .ref(
         `${auth.currentUser.uid}/plants/active/${checkSearch(
           location.search
-        )}/transplants`
+        )}/logs`
       )
       .push({
-        date: getDate(),
-        previousPot: userData.plants.active[checkSearch(location.search)].potVolume,
-        newPot: parseInt(newVol),
+        date: formatDate(logDate),
+        description: description,
+        timestamp: Date.now()
       });
-    
-    
-    database.ref(`${auth.currentUser.uid}/plants/active/${checkSearch(location.search)}`).transaction((data) => {
-      if (data) {
-        data.potVolume = parseInt(newVol);
-      }
-      return data;
-    });
 
-    setNewVol("");
+    setDescription("");
+    setLogDate(new Date());
 
     navigate(`/Planta/?${checkSearch(location.search)}`);
   };
 
   return (
-    <Layout title="Nuevo Transplante">
+    <Layout title="Nuevo Registro">
       <Box sx={{ 
         maxWidth: 600, 
         mx: 'auto', 
@@ -67,7 +68,7 @@ const NewTransplant = () => {
         justifyContent: 'center',
         minHeight: 'calc(100vh - 70px)'
       }}>
-        <Card elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <Card elevation={3} sx={{ borderRadius: 3, overflow: 'hidden' }}>
           <Box sx={{ 
             p: 3, 
             display: 'flex', 
@@ -76,66 +77,71 @@ const NewTransplant = () => {
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff'
           }}>
-            <SwapHorizIcon fontSize="large" sx={{ color: '#ffffff' }} />
+            <NoteAltIcon fontSize="large" sx={{ color: '#ffffff' }} />
             <Typography variant="h5" component="h1" sx={{ color: '#ffffff' }}>
-              Registrar Nuevo Transplante
+              Añadir Nuevo Registro
             </Typography>
           </Box>
           
           <CardContent sx={{ p: 3 }}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <Box sx={{ mb: 3, p: 2, bgcolor: alpha(theme.palette.background.default, 0.5), borderRadius: 1 }}>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Volumen actual de la maceta
-                  </Typography>
-                  <Typography variant="h6">
-                    {currentPotVolume} litros
-                  </Typography>
-                </Box>
+                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+                  <DatePicker
+                    label="Fecha del registro"
+                    value={logDate}
+                    onChange={(date) => setLogDate(date)}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        variant: 'outlined',
+                      }
+                    }}
+                  />
+                </LocalizationProvider>
               </Grid>
               
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }}>
                   <Typography variant="body2" color="text.secondary">
-                    NUEVA MACETA
+                    DESCRIPCIÓN
                   </Typography>
                 </Divider>
               </Grid>
-
+              
               <Grid item xs={12}>
                 <TextField
-                  label="Volumen de la nueva maceta (litros)"
-                  type="number"
-                  value={newVol}
-                  onChange={(e) => setNewVol(e.target.value)}
+                  label="Descripción"
+                  placeholder="Escribe los detalles de tu registro aquí..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   required
                   fullWidth
-                  helperText="Ingresa el volumen en litros"
-                  InputProps={{ inputProps: { min: 0.1, step: 0.1 } }}
+                  multiline
+                  rows={6}
+                  helperText="Puedes registrar cualquier evento, observación o detalle relevante sobre tu planta"
                 />
               </Grid>
               
               <Grid item xs={12} sx={{ mt: 2 }}>
                 <Button
                   variant="contained"
-                  color="warning"
-                  onClick={handleNewTransplant}
-                  disabled={!newVol}
+                  onClick={handleNewLog}
+                  disabled={!description.trim()}
                   fullWidth
                   size="large"
                   sx={{ 
-                    bgcolor: theme.palette.warning.main,
+                    bgcolor: '#9c27b0',
                     color: '#ffffff',
                     py: 1.5,
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.warning.main, 0.3)}`,
+                    boxShadow: `0 4px 12px ${alpha('#9c27b0', 0.3)}`,
                     '&:hover': {
-                      bgcolor: theme.palette.warning.dark,
-                      boxShadow: `0 6px 16px ${alpha(theme.palette.warning.main, 0.4)}`
+                      bgcolor: '#7b1fa2',
+                      boxShadow: `0 6px 16px ${alpha('#9c27b0', 0.4)}`
                     }
                   }}
                 >
-                  REGISTRAR TRANSPLANTE
+                  GUARDAR REGISTRO
                 </Button>
               </Grid>
             </Grid>
@@ -146,4 +152,4 @@ const NewTransplant = () => {
   );
 };
 
-export default NewTransplant;
+export default NewLog; 

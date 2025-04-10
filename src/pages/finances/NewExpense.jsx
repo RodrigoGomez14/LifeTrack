@@ -147,12 +147,13 @@ const NewExpense = () => {
         database.ref(`${auth.currentUser.uid}/creditCards/transactions/${selectedCard}`).push(transactionData);
         
         // Si es la primera cuota, registrarla también en los gastos generales
-        // pero con una marca para que no se muestre en el listado hasta que se pague la tarjeta
+        // pero con una marca para que no se contabilice en las sumas totales
         if (i === 0) {
           database.ref(`${auth.currentUser.uid}/expenses`).push({
             ...transactionData,
             creditCardTransaction: true,
-            hiddenFromList: true // Marca para que no se muestre en el listado de Finanzas
+            excludeFromTotal: true, // Marca para excluir de los cálculos totales
+            hiddenFromList: false   // Asegurar que no se oculte de la lista
           });
         }
       }
@@ -628,7 +629,7 @@ const NewExpense = () => {
                   Equivalente en USD:
                 </Typography>
                 <Typography variant="h6" fontWeight="bold" color="primary">
-                  USD {formatAmount(parseFloat(amount) / dollarRate['venta'])}
+                  USD {(parseFloat(amount) / dollarRate['venta']).toFixed(1)}
                 </Typography>
               </Stack>
             </Card>

@@ -83,7 +83,7 @@ const NewIrrigation = () => {
             display: 'flex', 
             alignItems: 'center', 
             gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.info.dark} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff'
           }}>
             <OpacityIcon fontSize="large" sx={{ color: '#ffffff' }} />
