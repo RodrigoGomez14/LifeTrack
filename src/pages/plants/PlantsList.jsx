@@ -213,105 +213,116 @@ const PlantsList = () => {
   return (
     <Layout title="Mis Plantas">
       <Container maxWidth="lg" sx={{ py: 2 }}>
-        <Box sx={{ mb: 4 }}>
-          <Card 
-            elevation={3} 
-            sx={{ 
-              mt: 3,
-              mb: 4, 
-              borderRadius: 3, 
-              overflow: 'hidden',
-              bgcolor: 'white',
-              boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
-            }}
-          >
-            <CardContent sx={{
-              p: 3,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              color: '#ffffff',
-            }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="h4" fontWeight="bold" sx={{ color: '#ffffff' }}>
-              Mis Plantas
-            </Typography>
-            
-            <Fab 
-              color="primary" 
-              aria-label="add" 
-              component={Link}
-              to="/NuevaPlanta"
-              size="medium"
-              sx={{
-                    bgcolor: alpha('#ffffff', 0.2),
-                    color: '#ffffff',
-                    boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.15)}`,
-                '&:hover': {
-                      bgcolor: alpha('#ffffff', 0.3),
-                      boxShadow: `0 10px 20px ${alpha(theme.palette.common.black, 0.2)}`
-                }
-              }}
-            >
-              <AddIcon />
-            </Fab>
-          </Stack>
-            </CardContent>
-          </Card>
-
+        <Box sx={{ mb: 4, mt: { xs: 6, sm: 8 } }}>
           <Paper 
             elevation={3}
             sx={{ 
-              p: 2, 
-              display: 'flex', 
-              alignItems: 'center', 
-              mb: 3,
-              borderRadius: 2,
-              backgroundColor: alpha(theme.palette.background.paper, 0.8),
-              backdropFilter: 'blur(8px)',
-              boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.05)}`
+              p: 2.5, 
+              borderRadius: 3,
+              backgroundColor: alpha(theme.palette.background.paper, 0.9),
+              backdropFilter: 'blur(10px)',
+              boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.07)}`,
+              mb: 4,
+              position: 'relative',
+              overflow: 'hidden',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '4px',
+                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              }
             }}
           >
-            <TextField
-              placeholder="Buscar plantas..."
-              variant="outlined"
-              fullWidth
-              size="small"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ mr: 1 }}
-            />
-            <IconButton size="small">
-              <FilterListIcon />
-            </IconButton>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={8} md={9}>
+                <TextField
+                  placeholder="Buscar plantas por nombre, tipo o genética..."
+                  variant="outlined"
+                  fullWidth
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon color="primary" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchTerm && (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setSearchTerm('')}>
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: alpha(theme.palette.primary.main, 0.2),
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: alpha(theme.palette.primary.main, 0.5),
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: theme.palette.primary.main,
+                      }
+                    }
+                  }}
+                  sx={{ 
+                    '& .MuiInputBase-root': {
+                      height: 56,
+                      fontSize: '1.05rem',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4} md={3} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                <Button 
+                  variant="contained" 
+                  startIcon={<ScienceIcon />}
+                  component={Link}
+                  to="/Aditivos"
+                  size="large"
+                  sx={{ 
+                    bgcolor: theme.palette.primary.main,
+                    color: '#ffffff',
+                    borderRadius: 2,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                    padding: '12px 24px',
+                    width: { xs: '100%', md: 'auto' },
+                    minWidth: { sm: '180px' },
+                    '&:hover': {
+                      bgcolor: theme.palette.primary.dark,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.35)}`,
+                      transform: 'translateY(-2px)',
+                    },
+                    transition: 'all 0.3s ease',
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    textTransform: 'none',
+                  }}
+                >
+                  Ver Aditivos
+                </Button>
+              </Grid>
+              {searchTerm && (
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Chip 
+                      label={`${filteredPlants.length} resultados encontrados`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      onDelete={() => setSearchTerm('')}
+                      sx={{ fontWeight: 'medium' }}
+                    />
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
           </Paper>
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Button 
-              variant="contained" 
-              startIcon={<ScienceIcon />}
-              component={Link}
-              to="/Aditivos"
-              sx={{ 
-                bgcolor: theme.palette.primary.main,
-                color: '#ffffff',
-                borderRadius: 2,
-                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
-                padding: '8px 16px',
-                '&:hover': {
-                  bgcolor: theme.palette.primary.dark,
-                  boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.3)}`
-                }
-              }}
-            >
-              Ver Aditivos
-            </Button>
-          </Box>
         </Box>
 
         {userData?.plants ? (

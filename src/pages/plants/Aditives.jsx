@@ -209,59 +209,13 @@ const Aditives = () => {
         }}
       >
         <Container maxWidth={false} sx={{ px: { xs: 1, sm: 2 } }}>
-          <Card 
-            elevation={3} 
-            sx={{ 
-              mt: 2,
-              mb: 3, 
-              borderRadius: 3, 
-              overflow: 'hidden',
-              bgcolor: 'white',
-              boxShadow: `0 8px 32px ${alpha(theme.palette.secondary.main, 0.1)}`,
-              width: '100%'
-            }}
-          >
-            <CardContent sx={{
-              p: 3,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              color: '#ffffff',
-            }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <ScienceIcon fontSize="large" sx={{ color: '#ffffff' }} />
-                  <Typography variant="h4" fontWeight="bold" sx={{ color: '#ffffff' }}>
-                    Mis Aditivos
-                  </Typography>
-                </Box>
-                
-                <Fab 
-                  color="primary" 
-                  aria-label="add" 
-                  component={Link}
-                  to="/NuevoAditivo"
-                  size="medium"
-                  sx={{
-                    bgcolor: alpha('#ffffff', 0.2),
-                    color: '#ffffff',
-                    boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.15)}`,
-                    '&:hover': {
-                      bgcolor: alpha('#ffffff', 0.3),
-                      boxShadow: `0 10px 20px ${alpha(theme.palette.common.black, 0.2)}`
-                    }
-                  }}
-                >
-                  <AddIcon />
-                </Fab>
-              </Stack>
-            </CardContent>
-          </Card>
-          
           <Paper 
             elevation={3}
             sx={{ 
               borderRadius: 3,
               overflow: 'hidden',
               mb: 4,
+              mt: { xs: 6, sm: 8 },
               width: '100%'
             }}
           >
@@ -304,14 +258,14 @@ const Aditives = () => {
                 iconPosition="start"
                 sx={{ color: 'white' }}
               />
-        </Tabs>
+            </Tabs>
             
             <Box sx={{ p: 2, minHeight: '300px' }}>
               {tabValue === 0 ? (
                 <>
                   {userData?.plants?.aditives?.fertilizantes && Object.keys(userData.plants.aditives.fertilizantes).length > 0 ? (
                     <Stack spacing={2}>
-            {Object.keys(userData.plants.aditives.fertilizantes).map(fertilizante => (
+                      {Object.keys(userData.plants.aditives.fertilizantes).map(fertilizante => (
                         <EnhancedAditiveAccordion 
                           key={fertilizante} 
                           aditive={userData.plants.aditives.fertilizantes[fertilizante]} 
@@ -361,7 +315,7 @@ const Aditives = () => {
                 <>
                   {userData?.plants?.aditives?.insecticidas && Object.keys(userData.plants.aditives.insecticidas).length > 0 ? (
                     <Stack spacing={2}>
-            {Object.keys(userData.plants.aditives.insecticidas).map(insecticida => (
+                      {Object.keys(userData.plants.aditives.insecticidas).map(insecticida => (
                         <EnhancedAditiveAccordion 
                           key={insecticida} 
                           aditive={userData.plants.aditives.insecticidas[insecticida]} 

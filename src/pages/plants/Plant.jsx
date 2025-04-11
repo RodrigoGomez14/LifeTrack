@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { ref, push, set, remove, update, onValue } from "firebase/database";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { format, parseISO, add, isSameDay } from 'date-fns';
+import { format, parseISO, add, isSameDay, formatDistance } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Layout from "../../components/layout/Layout";
 import { Calendar, momentLocalizer } from "react-big-calendar";
@@ -118,6 +118,9 @@ import ViewWeekIcon from '@mui/icons-material/ViewWeek';
 import StarIcon from '@mui/icons-material/Star';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import PhotoAlbumIcon from '@mui/icons-material/PhotoAlbum';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { Global } from '@emotion/react';
+import 'moment/locale/es';
 
 moment.locale("es");
 
@@ -154,12 +157,36 @@ const localizer = momentLocalizer(moment);
 const calculateDaysBetween = (startDateStr, endDateStr = null) => {
   if (!startDateStr) return null;
   
-  const parts = startDateStr.split('/');
-  if (parts.length !== 3) return null;
+  // Parsear la fecha de inicio
+  const startParts = startDateStr.split('/');
+  if (startParts.length !== 3) return null;
   
-  const startDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-  const endDate = endDateStr ? new Date(endDateStr) : new Date();
+  // Crear fecha de inicio correctamente (día/mes/año)
+  const startDate = new Date(parseInt(startParts[2]), parseInt(startParts[1]) - 1, parseInt(startParts[0]));
   
+  // Parsear la fecha de fin si existe
+  let endDate;
+  if (endDateStr) {
+    const endParts = endDateStr.split('/');
+    if (endParts.length === 3) {
+      // Crear fecha de fin correctamente (día/mes/año)
+      endDate = new Date(parseInt(endParts[2]), parseInt(endParts[1]) - 1, parseInt(endParts[0]));
+    } else {
+      // Si el formato no es válido, usar la fecha actual
+      endDate = new Date();
+    }
+  } else {
+    // Si no se proporciona fecha de fin, usar la fecha actual
+    endDate = new Date();
+  }
+  
+  // Asegurar que ambas fechas sean instancias válidas de Date
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    console.error('Fechas inválidas:', { startDateStr, endDateStr, startDate, endDate });
+    return null;
+  }
+
+  // Calcular diferencia en días
   const diffTime = Math.abs(endDate - startDate);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
@@ -211,7 +238,7 @@ const Plant = () => {
   const [leavesWeight, setLeavesWeight] = useState('');
   const [isMovingToHistory, setIsMovingToHistory] = useState(false);
   
-  const calendarHeight = 600; // Variable para controlar la altura
+  const calendarHeight = 700; // Variable para controlar la altura
 
   // Reemplazar la función handleNavigate para usar correctamente la API de react-big-calendar
   // y permitir navegación adaptativa según el modo de visualización
@@ -245,318 +272,55 @@ const Plant = () => {
     setCurrentDate(date);
   };
 
-  // Actualizar los estilos personalizados para eliminar completamente cualquier control nativo
+  // Simplifico los estilos para centrarnos en lo básico y asegurar que funcione
   const customCalendarStyles = {
-    // Ocultar completamente la toolbar y todos sus elementos
+    // Ocultar toolbar
     '.rbc-toolbar': {
-      display: 'none !important'
+      display: 'none'
     },
-    '.rbc-toolbar-label': {
-      display: 'none !important'
-    },
-    '.rbc-btn-group': {
-      display: 'none !important'
-    },
-    // Ocultar cualquier texto que muestre el mes/año en la vista de mes
-    '.rbc-month-header': {
-      visibility: 'visible' // Mantener visible los días de la semana
-    },
-    // Ocultar cualquier elemento adicional que pueda mostrar fecha
-    '.rbc-calendar .rbc-toolbar .rbc-toolbar-label': {
-      display: 'none !important'
-    },
-    // Ocultar el header del mes actual
-    '.rbc-month-view .rbc-header': {
-      textTransform: 'capitalize',
-      borderBottomWidth: '1px'
-    },
-    // Eliminar cualquier indicador de mes o año
-    '.rbc-month-view .rbc-row-bg': {
-      borderLeft: 'none'
-    },
-    '.rbc-month-view .rbc-date-cell': {
-      textAlign: 'left',
-      padding: '5px 8px'
-    },
-    // Asegurarse que cualquier otro indicador de fecha esté oculto
-    '.rbc-month-view .rbc-month-row': {
-      overflow: 'hidden'
-    },
-    '.rbc-month-view .rbc-month-row .rbc-row-content': {
-      margin: 0,
-      padding: 0
-    },
-    // Mantener todos los demás estilos que mejoran la visualización
+    
+    // Estilos para el encabezado
     '.rbc-header': {
-      padding: '10px 5px',
-      fontWeight: '700',
-      fontSize: '1rem',
-      backgroundColor: alpha(theme.palette.primary.main, 0.08),
-      borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-      textTransform: 'capitalize',
-      '&:first-of-type': {
-        borderTopLeftRadius: '8px'
-      },
-      '&:last-child': {
-        borderTopRightRadius: '8px'
-      }
-    },
-    '.rbc-month-view': {
+      padding: 0,
+      margin: 0,
       border: 'none',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.05)}`
+      height: '150px'
     },
-    '.rbc-month-row': {
-      overflow: 'visible'
+    
+    // Eliminar estilos que pueden estar causando conflictos
+    '.rbc-header span': {
+      display: 'none'
     },
-    '.rbc-row-content': {
-      zIndex: 1
+    
+    // Filas del calendario
+    '.rbc-row': {
+      border: 'none'
     },
-    '.rbc-day-bg': {
-      transition: 'all 0.2s ease',
-      '&:hover': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.03)
-      }
-    },
-    '.rbc-off-range-bg': {
-      backgroundColor: alpha(theme.palette.background.default, 0.6)
-    },
-    '.rbc-off-range': {
-      color: alpha(theme.palette.text.secondary, 0.5)
-    },
-    '.rbc-today': {
-      backgroundColor: alpha(theme.palette.primary.main, 0.08),
-    },
+    
+    // Eventos
     '.rbc-event': {
-      borderRadius: '6px',
-      padding: '2px',
-      margin: '1px 1px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-      transition: 'transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
-      '&:hover': {
-        transform: 'translateY(-1px) scale(1.01)',
-        boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
-      }
-    },
-    '.rbc-day-slot .rbc-event': {
-      borderLeft: '4px solid'
-    },
-    '.rbc-show-more': {
-      color: theme.palette.primary.main,
-      fontWeight: 'bold',
-      backgroundColor: alpha(theme.palette.primary.main, 0.08),
       borderRadius: '4px',
-      padding: '2px 4px',
-      '&:hover': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.12)
-      }
-    },
-    '.rbc-date-cell': {
-      padding: '5px 8px',
-      textAlign: 'center',
-      fontSize: '1.1rem',
-      fontWeight: 'bold'
-    },
-    '.rbc-row-bg': {
-      zIndex: 0
+      boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
     },
     
-    // Estilos mejorados para la vista diaria
-    '.rbc-day-view': {
-      border: 'none',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.05)}`,
-      backgroundColor: alpha(theme.palette.background.paper, 0.7)
-    },
-    '.rbc-time-view': {
-      border: 'none',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.05)}`
-    },
+    // Tiempo contenido
     '.rbc-time-header': {
-      backgroundColor: alpha(theme.palette.background.paper, 0.7),
-      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
-      '.rbc-header': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.05),
-        borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-        padding: '10px 5px',
-        fontSize: '1rem',
-        fontWeight: 'bold',
-        textAlign: 'center',
-        color: theme.palette.text.primary
-      }
+      height: '150px'
     },
     
-    // Estilos específicos para la vista semanal
-    '.rbc-week-view': {
-      border: 'none',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.05)}`,
-      minHeight: calendarHeight,
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      '.rbc-header': {
-        padding: '12px 5px 16px 5px', // Aumentar el padding inferior
-        fontSize: '0.95rem',
-        fontWeight: 'bold',
-        textAlign: 'center',
-        color: theme.palette.text.primary,
-        background: `linear-gradient(to bottom, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(theme.palette.primary.main, 0.03)})`,
-        borderBottom: `2px solid ${alpha(theme.palette.primary.main, 0.15)}`,
-        marginBottom: '6px', // Añadir margen inferior adicional
-        '& span': {
-          display: 'block',
-          textTransform: 'capitalize',
-          fontSize: '0.85rem',
-          fontWeight: 'normal',
-          color: theme.palette.text.secondary,
-          marginTop: '2px'
-        }
-      },
-      '.rbc-row': {
-        flex: 1,
-        minHeight: 'auto', // Altura del calendario menos el encabezado
-        display: 'flex',
-        flexDirection: 'column'
-      },
-      '.rbc-row-segment': {
-        padding: '0 1px'
-      },
-      '.rbc-row-content': {
-        flex: 1,
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%'
-      },
-      '.rbc-row-content-scrollable': {
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'auto'
-      },
-      '.rbc-day-bg': {
-        flex: 1,
-        transition: 'all 0.2s ease',
-        boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.divider, 0.2)}`,
-        display: 'flex',
-        flexDirection: 'column',
-        '&:hover': {
-          backgroundColor: alpha(theme.palette.primary.main, 0.03)
-        }
-      },
-      '.rbc-today': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.06),
-        boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.primary.main, 0.3)}`,
-      },
-      '.rbc-events-container': {
-        margin: '1px 0'
-      },
-      '.rbc-event': {
-        backgroundColor: 'transparent',
-        borderRadius: '8px',
-        padding: '4px 6px',
-        margin: '2px 1px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-        border: 'none',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        '&:hover': {
-          transform: 'translateY(-1px)',
-          boxShadow: '0 3px 6px rgba(0,0,0,0.15)'
-        }
-      }
+    '.rbc-time-header-content': {
+      height: '150px'
     },
     
-    '.rbc-time-content': {
-      borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-      '&::-webkit-scrollbar': {
-        width: '6px'
-      },
-      '&::-webkit-scrollbar-thumb': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-        borderRadius: '10px'
-      },
-      '&::-webkit-scrollbar-track': {
-        backgroundColor: alpha(theme.palette.background.paper, 0.1)
-      }
-    },
-    '.rbc-timeslot-group': {
-      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`
-    },
-    '.rbc-label': {
-      fontSize: '0.8rem',
-      color: theme.palette.text.secondary,
-      fontWeight: 'medium',
-      padding: '5px'
-    },
-    '.rbc-time-slot': {
-      backgroundColor: alpha(theme.palette.background.default, 0.3),
-      transition: 'all 0.3s ease',
-      '&:hover': {
-        backgroundColor: alpha(theme.palette.primary.main, 0.03)
-      }
-    },
-    '.rbc-events-container': {
-      marginRight: '0'
-    },
-    '.rbc-time-view .rbc-event': {
-      borderRadius: '8px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      padding: '4px 8px',
-      transition: 'all 0.2s ease',
-      overflow: 'hidden',
-      border: 'none',
-      margin: '1px 2px',
-      '&:hover': {
-        transform: 'translateY(-1px)',
-        boxShadow: '0 4px 8px rgba(0,0,0,0.15)'
-      }
-    },
-    '.rbc-time-view .rbc-event-label': {
-      fontSize: '0.75rem',
-      fontWeight: 'bold',
-      textTransform: 'uppercase',
-      paddingBottom: '2px',
-      borderBottom: `1px solid ${alpha(theme.palette.common.white, 0.3)}`,
-      marginBottom: '2px'
-    },
-    '.rbc-time-view .rbc-event-content': {
-      fontSize: '0.85rem'
-    },
-    // Alldayevents
-    '.rbc-allday-cell': {
-      backgroundColor: alpha(theme.palette.background.paper, 0.5),
-      boxShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.05)}`,
-      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
-      padding: '4px',
-      maxHeight: 'none',
-      '.rbc-allday-cell-text': {
-        fontSize: '0.75rem',
-        fontWeight: 'bold',
-        color: theme.palette.text.secondary
-      }
-    },
-    '.rbc-allday-events': {
-      position: 'relative',
-      zIndex: 1
-    },
-    '.rbc-time-gutter .rbc-timeslot-group': {
-      borderRight: `1px solid ${alpha(theme.palette.divider, 0.8)}`
+    '.rbc-time-header-content > .rbc-row': {
+      height: '150px'
     }
   };
   
-  // Mejorar el enhancedCalendarStyles para incorporar los estilos personalizados
+  // Estilo para el componente Calendar
   const enhancedCalendarStyles = {
-    height: calendarHeight,
+    height: '700px', // Aumentamos la altura
     width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
     ...customCalendarStyles
   };
 
@@ -1757,12 +1521,23 @@ const Plant = () => {
   };
 
   // Función para calcular los días de vida de la planta
-  // Usa la función global calculateDaysBetween declarada al inicio del archivo
   const calculateLifeDays = () => {
-    if (plant.birthDate) {
-      return calculateDaysBetween(plant.birthDate);
-    }
-    return null;
+    // Sumar los días de todas las etapas para obtener el total correcto
+    let totalDays = 0;
+    
+    // Días en etapa de germinación
+    const germinacionDays = calculateDaysInStage('Germinacion');
+    if (germinacionDays) totalDays += germinacionDays;
+    
+    // Días en etapa vegetativa
+    const vegetativoDays = calculateDaysInStage('Vegetativo');
+    if (vegetativoDays) totalDays += vegetativoDays;
+    
+    // Días en etapa de floración
+    const floracionDays = calculateDaysInStage('Floracion');
+    if (floracionDays) totalDays += floracionDays;
+    
+    return totalDays > 0 ? totalDays : null;
   };
   
   // Función para calcular las semanas de vida
@@ -1923,9 +1698,15 @@ const Plant = () => {
   const handleSetProfilePhoto = (imageUrl, imageKey) => {
     setShowProfilePhotoSelector(false);
     
+    // Determinar la ruta correcta según si la planta está archivada o activa
+    const plantId = checkSearch(location.search);
+    const dbPath = plant.isArchived 
+      ? `${auth.currentUser.uid}/plants/history/${plantId}` 
+      : `${auth.currentUser.uid}/plants/active/${plantId}`;
+    
     // Actualizar la base de datos con la foto de perfil seleccionada
     database
-      .ref(`${auth.currentUser.uid}/plants/active/${checkSearch(location.search)}`)
+      .ref(dbPath)
       .update({
         profilePhotoUrl: imageUrl,
         profilePhotoKey: imageKey
@@ -2093,6 +1874,193 @@ const Plant = () => {
       });
   };
 
+  // Función para cambiar el estado de la planta a Enfrascado
+  const changeToEnfrascado = () => {
+    const plantId = checkSearch(location.search);
+    const dbPath = `${auth.currentUser.uid}/plants/history/${plantId}`;
+    
+    const today = getDate();
+    
+    // Actualizar la planta con finalSecado y cambiar etapa a Enfrascado
+    database
+      .ref(dbPath)
+      .update({
+        finalSecado: today,
+        etapa: 'Enfrascado'
+      })
+      .then(() => {
+        // Actualizar el estado local
+        setPlant(prev => ({
+          ...prev,
+          finalSecado: today,
+          etapa: 'Enfrascado'
+        }));
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Planta enfrascada',
+          text: 'Se ha finalizado el secado y la planta ha pasado a estado de enfrascado',
+          confirmButtonColor: theme.palette.primary.main
+        });
+      })
+      .catch(error => {
+        console.error("Error al actualizar estado:", error);
+        
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo cambiar el estado de la planta. Inténtalo nuevamente.',
+          confirmButtonColor: theme.palette.primary.main
+        });
+      });
+  };
+
+  // Añadir función formatWeekDisplay para mostrar el rango de fechas de la semana
+  const formatWeekDisplay = (date) => {
+    // Obtener el primer día de la semana (domingo o lunes según configuración)
+    const start = new Date(date);
+    start.setDate(date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1)); // Ajustar para que la semana inicie en lunes
+    
+    // Obtener el último día de la semana
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    
+    // Formatear ambas fechas
+    const startMonth = start.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
+    const endMonth = end.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
+    
+    // Si ambas fechas están en el mismo mes, mostrar una versión simplificada
+    if (start.getMonth() === end.getMonth()) {
+      return `${start.getDate()} - ${end.getDate()} de ${startMonth}`;
+    }
+    
+    // Si están en diferentes meses, mostrar ambos meses
+    return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth}`;
+  };
+
+  // Añadir un componente personalizado para el encabezado de los días en la vista semanal
+  const CustomHeader = React.memo(({ date }) => {
+    const isToday = isSameDay(date, new Date());
+    
+    const dayName = date.toLocaleDateString('es-ES', { weekday: 'short' });
+    const dayNumber = date.getDate();
+    
+    return (
+      <Box 
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '4px 0',
+          height: '100%',
+          backgroundColor: isToday ? '#e8f5e9' : 'transparent',
+          borderRadius: '4px',
+          '&:hover': {
+            backgroundColor: '#f0f4c3',
+          }
+        }}
+      >
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            textTransform: 'uppercase',
+            fontWeight: 500,
+            fontSize: '0.7rem',
+            lineHeight: 1
+          }}
+        >
+          {dayName}
+        </Typography>
+        <Typography 
+          variant="body1"
+          sx={{ 
+            fontWeight: isToday ? 700 : 500,
+            fontSize: '1.1rem',
+            color: isToday ? '#2e7d32' : 'inherit'
+          }}
+        >
+          {dayNumber}
+        </Typography>
+      </Box>
+    );
+  });
+
+  // Modificar la función calculateDaysSinceStageChange para usar birthDate para Germinación
+  const calculateDaysSinceStageChange = () => {
+    if (plant.isArchived && plant.finishDate) {
+      return calculateDryingDays();
+    } else if (plant.etapa === 'Secado' && plant.finishDate) {
+      return calculateDryingDays();
+    } else if (plant.etapa === 'Floracion' && plant.inicioFloracion) {
+      return calculateDaysBetween(plant.inicioFloracion);
+    } else if (plant.etapa === 'Vegetativo' && plant.inicioVegetativo) {
+      return calculateDaysBetween(plant.inicioVegetativo);
+    } else if (plant.etapa === 'Germinacion' && plant.birthDate) {
+      return calculateDaysBetween(plant.birthDate);
+    }
+    return null;
+  };
+
+  // Función para calcular días de secado
+  const calculateDryingDays = () => {
+    if (!plant.finishDate) return null;
+    
+    // Si existe finalSecado, calcular la diferencia entre finishDate y finalSecado
+    if (plant.finalSecado) {
+      return calculateDaysBetween(plant.finishDate, plant.finalSecado);
+    }
+    
+    // Si no existe finalSecado, calcular la diferencia entre finishDate y la fecha actual
+    return calculateDaysBetween(plant.finishDate);
+  };
+
+  // Función para manejar el proceso de cosecha
+  const handleHarvest = () => {
+    Swal.fire({
+      title: '¿Estás seguro de cosechar esta planta?',
+      text: 'La planta pasará a etapa de secado y se moverá al historial de plantas',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: theme.palette.secondary.main,
+      cancelButtonColor: theme.palette.primary.main,
+      confirmButtonText: 'Sí, cosechar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Obtener ID de la planta y fecha actual
+        const plantId = checkSearch(location.search);
+        const today = getDate();
+        
+        // Actualizar a etapa "Secado" y guardar la fecha de finalización
+        const updateData = {
+          etapa: 'Secado',
+          inicioSecado: today,
+          finishDate: today
+        };
+        
+        // Actualizar en la base de datos
+        database
+          .ref(`${auth.currentUser.uid}/plants/active/${plantId}`)
+          .update(updateData)
+          .then(() => {
+            // Mover la planta al historial después de actualizar
+            moveToHistory();
+          })
+          .catch(error => {
+            console.error("Error al cosechar la planta:", error);
+            
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: 'No se pudo cosechar la planta. Inténtalo nuevamente.',
+              confirmButtonColor: theme.palette.primary.main
+            });
+          });
+      }
+    });
+  };
+
   if (loading) {
     return (
       <Layout title="Cargando planta...">
@@ -2198,99 +2166,71 @@ const Plant = () => {
       etapaProgress = 50;
   }
 
-  // Modificar la función calculateDaysSinceStageChange para usar birthDate para Germinación
-  const calculateDaysSinceStageChange = () => {
-    if (plant.etapa === 'Floracion' && plant.inicioFloracion) {
-      return calculateDaysBetween(plant.inicioFloracion);
-    } else if (plant.etapa === 'Vegetativo' && plant.inicioVegetativo) {
-      return calculateDaysBetween(plant.inicioVegetativo);
-    } else if (plant.etapa === 'Germinacion' && plant.birthDate) {
-      return calculateDaysBetween(plant.birthDate);
-    }
-    return null;
-  };
-
-  // Añadir función formatWeekDisplay para mostrar el rango de fechas de la semana
-  const formatWeekDisplay = (date) => {
-    // Obtener el primer día de la semana (domingo o lunes según configuración)
-    const start = new Date(date);
-    start.setDate(date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1)); // Ajustar para que la semana inicie en lunes
-    
-    // Obtener el último día de la semana
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    
-    // Formatear ambas fechas
-    const startMonth = start.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
-    const endMonth = end.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
-    
-    // Si ambas fechas están en el mismo mes, mostrar una versión simplificada
-    if (start.getMonth() === end.getMonth()) {
-      return `${start.getDate()} - ${end.getDate()} de ${startMonth}`;
-    }
-    
-    // Si están en diferentes meses, mostrar ambos meses
-    return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth}`;
-  };
-
-  // Añadir un componente personalizado para el encabezado de los días en la vista semanal
-  const CustomHeader = ({ date, label }) => {
-    // Obtener el nombre del día
-    const dayName = format(date, 'EEEE', { locale: es });
-    // Obtener el número del día
-    const dayNumber = format(date, 'd', { locale: es });
-    
-    // Verificar si es el día actual
-    const isToday = isSameDay(date, new Date());
-    
+  // Estilos globales para las animaciones
+  const GlobalStyles = () => {
     return (
-      <Box
-        sx={{
-          padding: '6px 4px 10px 4px', // Aumentar el padding inferior
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          width: '100%',
-          height: '100%'
+      <Global
+        styles={{
+          '.rbc-toolbar': {
+            display: 'none !important'
+          },
+          '.rbc-header': {
+            padding: '0 !important',
+            margin: '0 !important',
+            border: 'none !important',
+            height: 'auto !important',
+            minHeight: 'auto !important',
+            overflow: 'visible !important'
+          },
+          '.rbc-header > span': {
+            display: 'none !important'
+          },
+          '.rbc-row': {
+            border: 'none !important'
+          },
+          '.rbc-month-row': {
+            minHeight: '110px !important'
+          },
+          '.rbc-event': {
+            borderRadius: '4px !important',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1) !important'
+          },
+          '.rbc-date-cell': {
+            padding: '0 !important'
+          },
+          '.rbc-off-range-bg': {
+            backgroundColor: '#f8f8f8 !important'
+          },
+          '.rbc-off-range': {
+            color: '#bbb !important'
+          },
+          '.rbc-today': {
+            backgroundColor: 'transparent !important'
+          },
+          '.rbc-day-bg.rbc-today': {
+            position: 'relative'
+          },
+          '.rbc-day-bg.rbc-today:after': {
+            content: "''",
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(25, 118, 210, 0.05)',
+            pointerEvents: 'none'
+          }
         }}
-      >
-        <Typography
-          variant="caption"
-          sx={{
-            textTransform: 'capitalize',
-            color: theme.palette.text.secondary,
-            fontSize: '0.85rem',
-            fontWeight: 'medium',
-            mb: 1.2 // Aumentar el margen inferior
-          }}
-        >
-          {dayName}
-        </Typography>
-        <Box
-          sx={{
-            width: '36px',
-            height: '36px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            backgroundColor: isToday ? theme.palette.primary.main : 'transparent',
-            color: isToday ? '#ffffff' : theme.palette.text.primary,
-            fontWeight: isToday ? 'bold' : 'medium',
-            fontSize: '1.1rem',
-            boxShadow: isToday ? `0 2px 8px ${alpha(theme.palette.primary.main, 0.4)}` : 'none',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          {dayNumber}
-        </Box>
-      </Box>
+      />
     );
   };
 
   return (
     <Layout title={plant.name}>
       <Box sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden', py: 2, px: { xs: 1, sm: 2, md: 3 } }}>
+        {/* Estilos globales para animaciones */}
+        <GlobalStyles />
+        
         {/* Encabezado mejorado */}
         <Card 
           elevation={3} 
@@ -2309,11 +2249,20 @@ const Plant = () => {
             alignItems: 'center', 
             gap: 2,
             background: plant.isArchived 
-              ? `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`
+              ? `linear-gradient(135deg, #5c6bc0 0%, #3949ab 100%)`
               : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff',
             position: 'relative'
           }}>
+            {/* Botón para volver atrás */}
+            <IconButton 
+              sx={{ color: '#ffffff', mr: 1 }}
+              component={Link}
+              to="/Plantas"
+            >
+              <ArrowBackIcon />
+            </IconButton>
+
             {plant.isArchived ? (
               <HistoryIcon fontSize="large" sx={{ color: '#ffffff' }} />
             ) : (
@@ -2339,28 +2288,26 @@ const Plant = () => {
                 />
               )}
             </Box>
-            
-            {/* Botón para volver a lista de plantas */}
-            <Button
-              variant="text"
-              component={Link}
-              to="/Plantas"
-              startIcon={<ArrowBackIcon />}
-              sx={{
-                ml: 'auto',
-                color: '#ffffff',
-                bgcolor: alpha('#ffffff', 0.1),
-                '&:hover': {
-                  bgcolor: alpha('#ffffff', 0.2)
-                },
-                borderRadius: 2,
-                px: 2
-              }}
-            >
-              Volver
-            </Button>
           </Box>
         </Card>
+
+        {/* Alerta para plantas archivadas */}
+        {plant.isArchived && (
+          <Alert 
+            severity="info" 
+            icon={<HistoryIcon />}
+            sx={{ 
+              mb: 3, 
+              borderRadius: 2
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              <Typography variant="body1">
+                Esta planta se encuentra archivada y no puede ser modificada
+              </Typography>
+            </Box>
+          </Alert>
+        )}
 
         {/* Sección de estadísticas y datos detallados */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -2560,36 +2507,28 @@ const Plant = () => {
                     </Box>
                   </ListItem>
                   
-                  <ListItem 
-                    divider
-                          sx={{
-                      py: 1.8, 
-                      px: 3,
-                      borderLeft: `4px solid transparent`,
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.secondary.main, 0.03),
-                        borderLeft: `4px solid ${theme.palette.secondary.main}`
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                      <Typography variant="subtitle1" color="text.secondary">Cambiar etapa</Typography>
-                      <Button 
-                        variant="contained" 
-                        color="secondary"
-                        size="small"
-                        onClick={handleChangeStage}
-                        disabled={isChangingStage || plant.isArchived}
-                        sx={{ boxShadow: 2 }}
-                      >
-                        {plant.isArchived ? 'Completado' : 
-                          plant.etapa === 'Germinacion' ? 'Avanzar a Vegetativo' : 
-                          plant.etapa === 'Vegetativo' ? 'Avanzar a Floración' : 
-                          plant.etapa === 'Floracion' ? 'Avanzar a Secado' : 
-                          'Finalizar'}
-                      </Button>
+                  {/* Fecha de la cosecha - Solo visible cuando existe finishDate */}
+                  {plant.finishDate && (
+                    <ListItem 
+                      divider
+                      sx={{ 
+                        py: 1.8, 
+                        px: 3,
+                        borderLeft: `4px solid ${theme.palette.secondary.main}`,
+                        bgcolor: alpha(theme.palette.secondary.main, 0.03)
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1" color="text.secondary">Fecha de la cosecha</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <CalendarTodayIcon fontSize="small" sx={{ color: theme.palette.secondary.main }} />
+                          <Typography variant="subtitle1" fontWeight="medium" sx={{ ml: 1 }}>
+                            {convertToDetailedDate(plant.finishDate)}
+                          </Typography>
+                        </Box>
                       </Box>
-                  </ListItem>
+                    </ListItem>
+                  )}
                   
                   {/* Sección con las 3 etapas en una fila */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 2, bgcolor: alpha(theme.palette.background.default, 0.5) }}>
@@ -2692,8 +2631,22 @@ const Plant = () => {
                             color: theme.palette.secondary.main
                           }}
                         />
-                  </Box>
-                </Box>
+                        
+                        {/* Botón para cambiar a Enfrascado cuando hay finishDate pero no finalSecado */}
+                        {plant.isArchived && plant.finishDate && !plant.finalSecado && (
+                          <Button
+                            variant="contained"
+                            color="secondary"
+                            size="small"
+                            onClick={changeToEnfrascado}
+                            startIcon={<LocalFloristIcon />}
+                            sx={{ ml: 2 }}
+                          >
+                            Finalizar secado
+                          </Button>
+                        )}
+                      </Box>
+                    </Box>
                   </ListItem>
                 </List>
               </CardContent>
@@ -2729,6 +2682,45 @@ const Plant = () => {
                   color: '#ffffff'
                 }
               }}
+              action={
+                !plant.isArchived && plant.etapa === 'Floracion' && (
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    size="large"
+                    onClick={handleHarvest}
+                    startIcon={<LocalFloristIcon />}
+                    sx={{ 
+                      fontWeight: 'bold',
+                      fontSize: '1.1rem',
+                      py: 1,
+                      px: 3,
+                      bgcolor: '#e65100', // Color naranja-rojo llamativo
+                      '&:hover': {
+                        bgcolor: '#bf360c',
+                        boxShadow: '0 6px 16px rgba(230, 81, 0, 0.6)',
+                        transform: 'translateY(-2px)'
+                      },
+                      boxShadow: '0 4px 12px rgba(230, 81, 0, 0.4)',
+                      transition: 'all 0.3s ease',
+                      '@keyframes pulse': {
+                        '0%': {
+                          boxShadow: '0 0 0 0 rgba(230, 81, 0, 0.4)'
+                        },
+                        '70%': {
+                          boxShadow: '0 0 0 15px rgba(230, 81, 0, 0)'
+                        },
+                        '100%': {
+                          boxShadow: '0 0 0 0 rgba(230, 81, 0, 0)'
+                        }
+                      },
+                      animation: 'pulse 2s infinite'
+                    }}
+                  >
+                    COSECHAR
+                  </Button>
+                )
+              }
             />
             <CardContent sx={{ p: 3 }}>
               <Grid container spacing={2}>
@@ -2765,7 +2757,7 @@ const Plant = () => {
                   <Button
                     variant="contained"
                     component={Link}
-                    to={`/NuevaPoda/?${checkSearch(location.search)}`}
+                    to={`/NuevoPoda/?${checkSearch(location.search)}`}
                     startIcon={<ContentCutIcon />}
                     fullWidth
                     sx={{ 
@@ -3383,9 +3375,16 @@ const Plant = () => {
               selectable={true}
               components={{
                 event: viewMode === 'week' ? EventComponent : DailyEventComponent,
-                toolbar: () => null, // Eliminar toolbar completamente
+                toolbar: () => null,
+                header: CustomHeader,
+                month: {
+                  header: CustomHeader
+                },
                 week: {
-                  header: CustomHeader // Usar el componente personalizado para el encabezado
+                  header: CustomHeader
+                },
+                day: {
+                  header: CustomHeader
                 }
               }}
               popup
@@ -3502,613 +3501,100 @@ const Plant = () => {
             </>
           )}
       </Dialog>
-      
-        {/* Modal para mostrar todos los eventos de un día */}
-        <Dialog
-          open={openDayEventsModal}
-          onClose={() => setOpenDayEventsModal(false)}
-          maxWidth="sm"
-          fullWidth
-        TransitionComponent={Fade}
-        transitionDuration={300}
-          PaperProps={{
-            sx: {
-              borderRadius: 3,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-              overflow: 'hidden'
-            }
-          }}
-        >
-          <Box sx={{ 
-            position: 'relative', 
-            overflow: 'hidden'
-          }}>
-            <Box sx={{ 
-              p: 2.5, 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              color: '#ffffff',
-              boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.5)}`
-            }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar 
-                  sx={{ 
-                    bgcolor: alpha('#ffffff', 0.2), 
-                    color: '#ffffff',
-                    width: 40,
-                    height: 40
-                  }}
-                >
-                  <CalendarMonthIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
-                    {selectedDay && `${selectedDay.getDate()} de ${selectedDay.toLocaleString('es-ES', { month: 'long' })}`}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: alpha('#ffffff', 0.9) }}>
-                    {selectedDay && `${selectedDay.getFullYear()} • ${dayEvents.length} actividades`}
-                  </Typography>
-                </Box>
-              </Stack>
-          <IconButton
-                onClick={() => setOpenDayEventsModal(false)}
-                size="small"
-            sx={{
-                  color: 'white',
-                  bgcolor: alpha('#ffffff', 0.15),
-              '&:hover': {
-                    bgcolor: alpha('#ffffff', 0.25)
-                  },
-                  transition: 'all 0.2s ease'
-            }}
-          >
-                <CloseIcon fontSize="small" />
-          </IconButton>
-        </Box>
-            
-            <DialogContent 
-        sx={{ 
-                p: 0,
-                maxHeight: 450,
-                '&::-webkit-scrollbar': {
-                  width: '8px'
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                  borderRadius: '4px'
-                },
-                '&::-webkit-scrollbar-track': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                }
-              }}
-            >
-              {dayEvents.length > 0 ? (
-                <List sx={{ py: 0 }}>
-                  {dayEvents.map((event, index) => (
-                    <ListItem
-                      key={event.id || index}
-                      divider={index < dayEvents.length - 1}
-                      button
-            onClick={() => {
-                        setSelectedEvent(event);
-                        setOpenDayEventsModal(false);
-                        setOpenCalendarModal(true);
-                      }}
-                      sx={{ 
-                        py: 2,
-                        px: 3,
-                        transition: 'all 0.2s',
-                '&:hover': {
-                          bgcolor: alpha(event.color, 0.1),
-                          transform: 'translateY(-2px)'
-                        },
-                        borderLeft: `4px solid ${event.color}`
-                      }}
-                    >
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item>
-                          <Avatar 
-            sx={{
-                              bgcolor: alpha(event.color, 0.15), 
-                              color: event.color,
-                              boxShadow: `0 2px 8px ${alpha(event.color, 0.25)}`
-                            }}
-                          >
-                            {event.icon === 'water' && <WaterDropIcon />}
-                            {event.icon === 'bug' && <BugReportIcon />}
-                            {event.icon === 'cut' && <ContentCutIcon />}
-                            {event.icon === 'swap' && <SwapHorizIcon />}
-                            {event.icon === 'photo' && <PhotoCameraIcon />}
-                          </Avatar>
-                        </Grid>
-                        <Grid item xs>
-                          <Typography variant="subtitle1" fontWeight="medium">
-                            {event.title}
-                          </Typography>
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary"
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5
-                            }}
-                          >
-                            {event.resourceType === 'Riego' && (
-                              <>
-                                <span>{event.details.quantity} ml</span>
-                                {event.details.aditives && event.details.aditives.length > 0 && (
-                                  <Chip 
-                                    label={`${event.details.aditives.length} aditivos`} 
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ 
-                                      height: 20, 
-                                      fontSize: '0.7rem',
-                                      borderColor: alpha(event.color, 0.5),
-                                      color: event.color
-                                    }}
-                                  />
-                                )}
-                              </>
-                            )}
-                            
-                            {event.resourceType === 'Insecticida' && (
-                              <>
-                                <span>{event.details.product}</span>
-                                <Chip 
-                                  label={event.details.appMethod} 
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{ 
-                                    height: 20, 
-                                    fontSize: '0.7rem',
-                                    borderColor: alpha(event.color, 0.5),
-                                    color: event.color
-                                  }}
-                                />
-                              </>
-                            )}
-                            
-                            {event.resourceType === 'Poda' && (
-                              <span>Tipo: {event.details.type}</span>
-                            )}
-                            
-                            {event.resourceType === 'Transplante' && (
-                              <span>{event.details.previousPot}L → {event.details.newPot}L</span>
-                            )}
-                            
-                            {event.resourceType === 'Foto' && (
-                              <span>{event.details.description || 'Sin descripción'}</span>
-                            )}
-                </Typography>
-                        </Grid>
-                        {event.resourceType === 'Foto' && event.thumbnail && (
-                          <Grid item>
-                            <Box 
-                              component="img" 
-                              src={event.imageUrl} 
-                              alt="Miniatura" 
-                              sx={{ 
-                                width: 50, 
-                                height: 50, 
-                                objectFit: 'cover', 
-                                borderRadius: 2,
-                                border: `2px solid ${alpha(event.color, 0.5)}`,
-                                boxShadow: `0 2px 8px ${alpha(event.color, 0.25)}`
-                              }} 
-                            />
-                          </Grid>
-                        )}
-                      </Grid>
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Box sx={{ p: 4, textAlign: 'center' }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No hay actividades registradas para este día
-                  </Typography>
-              </Box>
-            )}
-            </DialogContent>
-          </Box>
-        </Dialog>
+    </Box>
 
-        {/* Diálogo de confirmación para cambio de etapa */}
-        <Dialog 
-          open={showStageDialog} 
-          onClose={() => setShowStageDialog(false)}
-          maxWidth="xs"
-          fullWidth
+    {/* Diálogo para seleccionar foto de perfil */}
+    <Dialog
+      open={showProfilePhotoSelector}
+      onClose={() => setShowProfilePhotoSelector(false)}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle>
+        Seleccionar Foto de Perfil
+        <IconButton
+          aria-label="cerrar"
+          onClick={() => setShowProfilePhotoSelector(false)}
+          sx={{ position: 'absolute', right: 8, top: 8 }}
         >
-          <DialogTitle>
-            {plant.etapa === 'Germinacion' 
-              ? '¿Avanzar a etapa vegetativa?' 
-              : plant.etapa === 'Vegetativo'
-                ? '¿Avanzar a etapa de floración?'
-                : '¿Finalizar ciclo?'}
-          </DialogTitle>
-          <DialogContent>
-            {plant.etapa === 'Germinacion' && (
-              <Typography variant="body1" paragraph>
-                Confirma si la planta ya ha desarrollado sus primeras hojas verdaderas y está lista para comenzar la etapa vegetativa.
-              </Typography>
-            )}
-            {plant.etapa === 'Vegetativo' && (
-              <Typography variant="body1" paragraph>
-                Confirma si la planta ha comenzado a mostrar flores y está lista para cambiar el ciclo de luz.
-              </Typography>
-            )}
-            {plant.etapa === 'Floracion' && (
-              <Typography variant="body1" paragraph>
-                Confirma si la planta ha sido cosechada y está lista para pasar a la etapa de secado.
-              </Typography>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowStageDialog(false)} color="primary">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={confirmStageChange} 
-              color="secondary" 
-              variant="contained"
-              disabled={isChangingStage}
-            >
-              {isChangingStage ? 'Actualizando...' : 'Confirmar'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Diálogo para seleccionar foto de perfil */}
-        <Dialog
-          open={showProfilePhotoSelector}
-          onClose={() => setShowProfilePhotoSelector(false)}
-          maxWidth="md"
-                  fullWidth
-        >
-          <DialogTitle>
-            Seleccionar Foto de Perfil
-            <IconButton
-              aria-label="cerrar"
-              onClick={() => setShowProfilePhotoSelector(false)}
-              sx={{ position: 'absolute', right: 8, top: 8 }}
-            >
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent>
-            {plant.images && Object.keys(plant.images).length > 0 ? (
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                {Object.entries(plant.images).map(([key, image]) => {
-                  const isCurrentProfile = plant.profilePhotoKey === key;
-                  return (
-                    <Grid item xs={6} sm={4} md={3} key={key}>
-                      <Paper 
-                        elevation={3} 
-        sx={{ 
-                          p: 1, 
-                          position: 'relative',
-                          border: isCurrentProfile ? `2px solid ${theme.palette.primary.main}` : 'none',
-                          opacity: isCurrentProfile ? 0.8 : 1,
-                          transition: 'all 0.2s',
-            '&:hover': {
-                            transform: 'scale(1.03)',
-                            boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.15)}`
-                          }
-                        }}
-                      >
-                        <Box 
-                          sx={{ 
-                            width: '100%', 
-                            height: 150, 
-                            backgroundImage: `url(${image.url || image.dataUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            borderRadius: 1,
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => handleSetProfilePhoto(image.url || image.dataUrl, key)}
-                        />
-                        
-                        {isCurrentProfile && (
-                          <Chip 
-                            label="Actual" 
-                            color="primary" 
-                            size="small"
-            sx={{
-                              position: 'absolute', 
-                              top: 8, 
-                              right: 8,
-                              fontWeight: 'bold'
-                            }}
-                          />
-                        )}
-                        
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
-                          {image.date}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  );
-                })}
-              </Grid>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body1" color="text.secondary" gutterBottom>
-                  No hay fotos disponibles
-                </Typography>
-                <Button
-                  variant="contained"
-                  component={Link}
-                  to={`/NuevaFoto/?${checkSearch(location.search)}`}
-                  startIcon={<AddAPhotoIcon />}
-                  sx={{ mt: 2 }}
-                >
-                  Añadir Nueva Foto
-                </Button>
-              </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-      
-        {/* Diálogo para datos de cosecha */}
-        <Dialog 
-          open={showHarvestDialog} 
-          onClose={() => setShowHarvestDialog(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle sx={{ pb: 1 }}>
-            Registrar datos de cosecha
-          </DialogTitle>
-          <DialogContent sx={{ pt: 3 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Peso de flores húmedas (g)"
-                  fullWidth
-                  type="number"
-                  value={wetFlowersWeight}
-                  onChange={(e) => setWetFlowersWeight(e.target.value)}
-                  variant="outlined"
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">g</InputAdornment>,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Peso de flores secas (g)"
-                  fullWidth
-                  type="number"
-                  value={dryFlowersWeight}
-                  onChange={(e) => setDryFlowersWeight(e.target.value)}
-                  variant="outlined"
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">g</InputAdornment>,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Peso de hojas (g)"
-                  fullWidth
-                  type="number"
-                  value={leavesWeight}
-                  onChange={(e) => setLeavesWeight(e.target.value)}
-                  variant="outlined"
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">g</InputAdornment>,
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3 }}>
-            <Button 
-              onClick={() => setShowHarvestDialog(false)} 
-              color="primary"
-              variant="outlined"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              onClick={saveHarvestData} 
-              color="primary" 
-              variant="contained"
-              startIcon={<LocalFloristIcon />}
-            >
-              Guardar datos
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Ahora, modificaremos la sección donde se muestra la etapa actual para añadir un botón para ver datos de cosecha
-        // y otro para archivar la planta cuando está en etapa de Secado */}
-        {plant?.etapa === 'Secado' && (
-          <>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={() => setShowHarvestDialog(true)}
-              startIcon={<ParkIcon />}
-              sx={{ 
-                mt: 2,
-                borderColor: theme.palette.primary.main,
-                color: theme.palette.primary.main,
-                '&:hover': {
-                  borderColor: theme.palette.primary.dark,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                }
-              }}
-            >
-              Ver Datos de Cosecha
-            </Button>
-            
-            <Button
-              variant="contained"
-              color="error"
-              onClick={moveToHistory}
-              startIcon={<HistoryIcon />}
-              disabled={isMovingToHistory}
-            sx={{
-                mt: 2,
-                bgcolor: theme.palette.error.main,
-                color: '#fff',
-                '&:hover': {
-                  bgcolor: theme.palette.error.dark,
-                }
-              }}
-            >
-              {isMovingToHistory ? (
-                <>
-                  <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                  Archivando...
-                </>
-              ) : (
-                'Archivar Planta'
-              )}
-            </Button>
-          </>
-        )}
-
-        {/* Sección de Datos de Cosecha - solo se muestra si la planta está archivada */}
-        {plant.isArchived && (
-          <Card 
-            elevation={3} 
-            sx={{ 
-              borderRadius: 3, 
-              overflow: 'hidden',
-              mb: 4
-            }}
-          >
-            <CardHeader
-              title={
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <ParkIcon sx={{ color: '#ffffff' }} />
-                  <Typography variant="h6" fontWeight="medium">
-                    Datos de Cosecha
-                  </Typography>
-                </Stack>
-              }
-              sx={{
-                p: 2,
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                background: `linear-gradient(135deg, ${theme.palette.secondary.light} 0%, ${theme.palette.secondary.main} 100%)`,
-                color: '#ffffff',
-                '& .MuiTypography-root': {
-                  color: '#ffffff'
-                }
-              }}
-            />
-            <CardContent sx={{ p: 3 }}>
-              {plant.finishDate ? (
-                <Grid container spacing={3}>
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                          Datos de Flores
-                        </Typography>
-                        <List disablePadding>
-                          <ListItem sx={{ px: 0 }}>
-                            <ListItemText 
-                              primary="Flores húmedas" 
-                              secondary={plant.wetFlowersWeight ? `${plant.wetFlowersWeight}g` : 'No registrado'} 
-                            />
-                          </ListItem>
-                          <ListItem sx={{ px: 0 }}>
-                            <ListItemText 
-                              primary="Flores secas" 
-                              secondary={plant.dryFlowersWeight ? `${plant.dryFlowersWeight}g` : 'No registrado'} 
-                            />
-                          </ListItem>
-                        </List>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                          Datos Adicionales
-                        </Typography>
-                        <List disablePadding>
-                          <ListItem sx={{ px: 0 }}>
-                            <ListItemText 
-                              primary="Hojas" 
-                              secondary={plant.leavesWeight ? `${plant.leavesWeight}g` : 'No registrado'} 
-                            />
-                          </ListItem>
-                          <ListItem sx={{ px: 0 }}>
-                            <ListItemText 
-                              primary="Fecha de finalización" 
-                              secondary={convertToDetailedDate(plant.finishDate)} 
-                            />
-                          </ListItem>
-                        </List>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  {(!plant.wetFlowersWeight || !plant.dryFlowersWeight) && (
-                    <Grid item xs={12} sx={{ mt: 2 }}>
-                      <Button 
-                        variant="contained" 
-                        color="secondary" 
-                        fullWidth
-                        onClick={() => setShowHarvestDialog(true)}
-                        startIcon={<LocalFloristIcon />}
-                        sx={{ py: 1.5, borderRadius: 2 }}
-                      >
-                        Actualizar datos de cosecha
-                      </Button>
-                    </Grid>
-                  )}
-                </Grid>
-              ) : (
-                <Box sx={{ textAlign: 'center', py: 2 }}>
-                  <Button 
-                    variant="contained" 
-                    color="secondary" 
-                    onClick={() => {
-                      // Para plantas archivadas el botón finalizar registra la fecha de fin de secado
-                      database
-                        .ref(`${auth.currentUser.uid}/plants/history/${checkSearch(location.search)}`)
-                        .update({
-                          finishDate: getDate()
-                        })
-                        .then(() => {
-                          setPlant(prev => ({
-                            ...prev,
-                            finishDate: getDate()
-                          }));
-                          
-                          Swal.fire({
-                            icon: 'success',
-                            title: 'Secado finalizado',
-                            text: 'Se ha registrado la fecha de finalización del secado',
-                            confirmButtonColor: theme.palette.primary.main
-                          }).then(() => {
-                            setShowHarvestDialog(true);
-                          });
-                        });
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent>
+        {plant.images && Object.keys(plant.images).length > 0 ? (
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            {Object.entries(plant.images).map(([key, image]) => {
+              const isCurrentProfile = plant.profilePhotoKey === key;
+              return (
+                <Grid item xs={6} sm={4} md={3} key={key}>
+                  <Paper 
+                    elevation={3} 
+                    sx={{ 
+                      p: 1, 
+                      position: 'relative',
+                      border: isCurrentProfile ? `2px solid ${theme.palette.primary.main}` : 'none',
+                      opacity: isCurrentProfile ? 0.8 : 1,
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        transform: 'scale(1.03)',
+                        boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.15)}`
+                      }
                     }}
-                    startIcon={<LocalFloristIcon />}
-                    sx={{ py: 1.5, px: 4, borderRadius: 2 }}
                   >
-                    Finalizar secado y registrar cosecha
-                  </Button>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
+                    <Box 
+                      sx={{ 
+                        width: '100%', 
+                        height: 150, 
+                        backgroundImage: `url(${image.url || image.dataUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        borderRadius: 1,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleSetProfilePhoto(image.url || image.dataUrl, key)}
+                    />
+                    
+                    {isCurrentProfile && (
+                      <Chip 
+                        label="Actual" 
+                        color="primary" 
+                        size="small"
+                        sx={{
+                          position: 'absolute', 
+                          top: 8, 
+                          right: 8,
+                          fontWeight: 'bold'
+                        }}
+                      />
+                    )}
+                    
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+                      {image.date}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body1" color="text.secondary" gutterBottom>
+              No hay fotos disponibles
+            </Typography>
+            <Button
+              variant="contained"
+              component={Link}
+              to={`/NuevaFoto/?${checkSearch(location.search)}`}
+              startIcon={<AddAPhotoIcon />}
+              sx={{ mt: 2 }}
+            >
+              Añadir Nueva Foto
+            </Button>
+          </Box>
         )}
-        </Box>
-    </Layout>
+      </DialogContent>
+    </Dialog>
+  </Layout>
   );
 };
 

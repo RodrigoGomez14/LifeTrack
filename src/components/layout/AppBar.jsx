@@ -28,7 +28,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { formatAmount } from '../../utils';
 import { useStore } from '../../store';
@@ -40,12 +40,21 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SpeedIcon from '@mui/icons-material/Speed';
+import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import ScienceIcon from '@mui/icons-material/Science';
 
 const AppBar = ({ toggleDrawer, title }) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { userData } = useStore();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  // Verificar si estamos en la página de plantas
+  const isInPlantsPage = location.pathname === '/Plantas' || location.pathname === '/plantas';
+  
+  // Verificar si estamos en la página de aditivos
+  const isInAditivesPage = location.pathname === '/Aditivos' || location.pathname === '/aditivos';
   
   // Obtener el nombre de usuario para personalizar la interfaz
   const displayName = auth.currentUser?.displayName || '';
@@ -87,6 +96,12 @@ const AppBar = ({ toggleDrawer, title }) => {
         break;
       case 'exchange':
         navigate('/exchange');
+        break;
+      case 'new-plant':
+        navigate('/NuevaPlanta');
+        break;
+      case 'new-aditive':
+        navigate('/NuevoAditivo');
         break;
       default:
         break;
@@ -261,6 +276,26 @@ const AppBar = ({ toggleDrawer, title }) => {
                   {firstName ? `${firstName}, ¿qué quieres hacer?` : '¿Qué quieres hacer?'}
                 </Typography>
                 <Divider sx={{ mb: 1 }} />
+                {/* Mostrar opción de agregar planta solo si estamos en la página de plantas */}
+                {isInPlantsPage && (
+                  <MenuItem onClick={() => handleQuickAction('new-plant')}>
+                    <ListItemIcon>
+                      <LocalFloristIcon color="success" />
+                    </ListItemIcon>
+                    <ListItemText primary="Nueva planta" />
+                  </MenuItem>
+                )}
+                
+                {/* Mostrar opción de agregar aditivo solo si estamos en la página de aditivos */}
+                {isInAditivesPage && (
+                  <MenuItem onClick={() => handleQuickAction('new-aditive')}>
+                    <ListItemIcon>
+                      <ScienceIcon color="secondary" />
+                    </ListItemIcon>
+                    <ListItemText primary="Nuevo aditivo" />
+                  </MenuItem>
+                )}
+                
                 <MenuItem onClick={() => handleQuickAction('new-expense')}>
                   <ListItemIcon>
                     <RemoveCircleIcon color="error" />
