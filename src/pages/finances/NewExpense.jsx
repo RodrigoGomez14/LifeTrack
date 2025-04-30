@@ -146,16 +146,13 @@ const NewExpense = () => {
         // Guardar la transacción en la tarjeta seleccionada
         database.ref(`${auth.currentUser.uid}/creditCards/transactions/${selectedCard}`).push(transactionData);
         
-        // Si es la primera cuota, registrarla también en los gastos generales
-        // pero con una marca para que no se contabilice en las sumas totales
-        if (i === 0) {
-          database.ref(`${auth.currentUser.uid}/expenses`).push({
-            ...transactionData,
-            creditCardTransaction: true,
-            excludeFromTotal: true, // Marca para excluir de los cálculos totales
-            hiddenFromList: false   // Asegurar que no se oculte de la lista
-          });
-        }
+        // Guardar todas las cuotas en expenses (no solo la primera)
+        database.ref(`${auth.currentUser.uid}/expenses`).push({
+          ...transactionData,
+          creditCardTransaction: true,
+          excludeFromTotal: true, // Marca para excluir de los cálculos totales
+          hiddenFromList: false   // Asegurar que no se oculte de la lista
+        });
       }
     }
 
@@ -284,7 +281,7 @@ const NewExpense = () => {
   };
 
   // Array de opciones de cuotas
-  const installmentOptions = [1, 3, 6, 9, 12, 18, 24];
+  const installmentOptions = [1, 3, 4, 6, 9, 12, 18, 24];
 
   const renderStep1 = () => (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -928,7 +925,7 @@ const NewExpense = () => {
                         }
                       }}
                     >
-                      {[1, 3, 6, 9, 12, 18, 24].map(option => (
+                      {installmentOptions.map(option => (
                         <MenuItem key={option} value={option}>
                           {option === 1 ? 'Pago único' : `${option} cuotas`}
                         </MenuItem>

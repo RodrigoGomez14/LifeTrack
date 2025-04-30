@@ -251,7 +251,11 @@ const CreditCards = () => {
           const currentMonthDates = getCardDates(card.id);
           let prevMonthClosingDate = null;
           
-          if (currentMonthDates?.closingDate) {
+          if (currentMonthDates?.prevClosingDate) {
+            // Si tenemos una fecha de cierre del mes anterior, usarla directamente
+            prevMonthClosingDate = new Date(currentMonthDates.prevClosingDate);
+          } else if (currentMonthDates?.closingDate) {
+            // Si no tenemos la fecha de cierre del mes anterior pero sí la actual, calcular la anterior
             const currentClosingDate = new Date(currentMonthDates.closingDate);
             // Retroceder un mes para obtener el mes anterior
             const prevMonth = new Date(currentClosingDate);
@@ -276,15 +280,53 @@ const CreditCards = () => {
             }
           }
           
-          // Si no se pudo determinar la fecha de cierre anterior, usar el primer día del mes anterior
+          // Si no se pudo determinar la fecha de cierre anterior, usar el día de cierre predeterminado del mes anterior
           if (!prevMonthClosingDate) {
-            prevMonthClosingDate = new Date(selectedYear, selectedMonth - 2, 1);
+            // Obtener el mes y año anteriores
+            let prevMonth = selectedMonth - 1;
+            let prevYear = selectedYear;
+            if (prevMonth === 0) {
+              prevMonth = 12;
+              prevYear = selectedYear - 1;
+            }
+            
+            // Si tenemos un día de cierre predeterminado, usarlo
+            if (card.defaultClosingDay) {
+              prevMonthClosingDate = new Date(prevYear, prevMonth - 1, card.defaultClosingDay);
+            } else {
+              // Como último recurso, usar el último día del mes anterior
+              prevMonthClosingDate = new Date(prevYear, prevMonth, 0);
+            }
           }
           
           // Fecha de cierre actual
           const currentClosingDate = currentMonthDates?.closingDate 
             ? new Date(currentMonthDates.closingDate)
-            : new Date(selectedYear, selectedMonth - 1, new Date(selectedYear, selectedMonth, 0).getDate());
+            : (() => {
+                // Si no hay fecha de cierre para el mes actual, construirla usando:
+                // 1. El mismo día que el cierre anterior (para mantener consistencia entre meses)
+                // 2. O el día de cierre predeterminado como respaldo
+                const prevClosingDay = prevMonthClosingDate.getDate();
+                
+                let closingDay;
+                // Priorizar usar el mismo día que el cierre anterior
+                if (prevClosingDay) {
+                  closingDay = prevClosingDay;
+                  console.log(`[${card.name}] Usando el mismo día de cierre que el mes anterior: ${closingDay}`);
+                } else if (card.defaultClosingDay) {
+                  closingDay = card.defaultClosingDay;
+                  console.log(`[${card.name}] Usando el día de cierre predeterminado: ${closingDay}`);
+                } else {
+                  // Último recurso: usar el último día del mes
+                  closingDay = new Date(selectedYear, selectedMonth, 0).getDate();
+                  console.log(`[${card.name}] Usando el último día del mes: ${closingDay}`);
+                }
+                
+                return new Date(selectedYear, selectedMonth - 1, closingDay);
+              })();
+          
+          // Log del rango de fechas para debugging
+          console.log(`[Card: ${card.name}] Período de facturación: ${prevMonthClosingDate.toISOString().split('T')[0]} a ${currentClosingDate.toISOString().split('T')[0]}`);
           
           // Procesar transacciones de la tarjeta actual
           Object.keys(userData.creditCards.transactions[card.id]).forEach(key => {
@@ -308,7 +350,7 @@ const CreditCards = () => {
               transactionDate = new Date();
             }
             
-            // Filtrar por período de facturación
+            // Filtrar por período de facturación - Usar estrictamente > para prevMonthClosingDate
             if (transactionDate > prevMonthClosingDate && transactionDate <= currentClosingDate) {
               cardTransactions.push({
                 id: key,
@@ -414,25 +456,38 @@ const CreditCards = () => {
     const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
     
     // Buscar fechas de cierre del mes anterior
+    let prevClosingDay = null;
     if (card.dates && card.dates[prevMonthKey] && card.dates[prevMonthKey].closingDate) {
       prevMonthClosingDate = card.dates[prevMonthKey].closingDate;
+      // Obtener el día del cierre anterior para usarlo si es necesario
+      prevClosingDay = new Date(prevMonthClosingDate).getDate();
     } else if (card.defaultClosingDay) {
       // Si no hay fecha específica para el mes anterior, construirla con el día de cierre predeterminado
-      prevMonthClosingDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(card.defaultClosingDay).padStart(2, '0')}`;
+      prevClosingDay = card.defaultClosingDay;
+      prevMonthClosingDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevClosingDay).padStart(2, '0')}`;
     }
     
     // Fechas para el mes seleccionado
     if (card.dates && card.dates[currentMonth]) {
+      // Si ya tenemos fecha configurada, usarla
       return {
         ...card.dates[currentMonth],
         prevClosingDate: prevMonthClosingDate
       };
     }
     
-    // Si no hay fechas específicas para el mes seleccionado, devolver fechas en formato compatible
-    if (card.defaultClosingDay && card.defaultDueDay) {
-      // Crear fechas con el año y mes seleccionados, pero usando los días por defecto
-      const closingDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(card.defaultClosingDay).padStart(2, '0')}`;
+    // Si no hay fechas específicas para el mes seleccionado, usar valores consistentes
+    
+    // Para la fecha de cierre, intentar:
+    // 1. Usar el mismo día de cierre que el mes anterior si existe
+    // 2. De lo contrario, usar el día de cierre predeterminado
+    let closingDay = prevClosingDay || card.defaultClosingDay;
+    if (!closingDay) {
+      // Si todo lo demás falla, usar el último día del mes
+      closingDay = new Date(selectedYear, selectedMonth, 0).getDate();
+    }
+    
+    const closingDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(closingDay).padStart(2, '0')}`;
       
       // Para la fecha de vencimiento, que generalmente cae en el mes siguiente
       let dueYear = selectedYear;
@@ -446,16 +501,13 @@ const CreditCards = () => {
         dueMonth = selectedMonth + 1;
       }
       
-      const dueDate = `${dueYear}-${String(dueMonth).padStart(2, '0')}-${String(card.defaultDueDay).padStart(2, '0')}`;
+    const dueDate = `${dueYear}-${String(dueMonth).padStart(2, '0')}-${String(card.defaultDueDay || closingDay).padStart(2, '0')}`;
       
       return {
         closingDate: closingDate,
         dueDate: dueDate,
         prevClosingDate: prevMonthClosingDate
       };
-    }
-    
-    return null;
   };
 
   // Calcular el total de todas las tarjetas
@@ -2319,11 +2371,45 @@ const CreditCards = () => {
                                     bgcolor: theme.palette.background.paper,
                                     borderLeft: `4px solid ${theme.palette.primary.main}`
                                   }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="h6" fontWeight="medium">
-                                      {getCardDates()?.closingDate 
-                                        ? obtenerFechaFormateada(getCardDates().closingDate)
-                                        : 'No establecido'}
+                                        {(() => {
+                                          // Si hay fechas específicas para este mes en la tarjeta, mostrarlas
+                                          const card = cards.find(c => c.id === selectedCard);
+                                          const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+                                          
+                                          // Solo mostrar la fecha si está explícitamente configurada
+                                          if (card?.dates && card.dates[currentMonth]?.closingDate) {
+                                            return obtenerFechaFormateada(card.dates[currentMonth].closingDate);
+                                          }
+                                          
+                                          // De lo contrario, mostrar como no establecido
+                                          return 'No establecido';
+                                        })()}
                                     </Typography>
+                                      {(() => {
+                                        // Verificar si las fechas no están configuradas
+                                        const card = cards.find(c => c.id === selectedCard);
+                                        const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+                                        const fechasNoConfiguradas = !(card?.dates && card.dates[currentMonth]?.closingDate);
+                                        
+                                        if (fechasNoConfiguradas) {
+                                          return (
+                                            <Tooltip title="Actualizar fechas">
+                                              <IconButton 
+                                                size="small"
+                                                color="primary"
+                                                onClick={() => handleOpenUpdateDatesDialog(selectedCard)}
+                                                sx={{ ml: 1 }}
+                                              >
+                                                <DateRangeIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
+                                    </Box>
                                     {getCardDates()?.closingDate && (
                                       <Typography variant="caption" color="textSecondary">
                                         {new Date() > new Date(getCardDates().closingDate) 
@@ -2374,25 +2460,69 @@ const CreditCards = () => {
                                     p: 2,
                                     borderLeft: `4px solid ${theme.palette.error.main}`
                                   }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="h6" fontWeight="medium">
-                                      {getCardDates()?.dueDate 
-                                        ? obtenerFechaFormateada(getCardDates().dueDate)
-                                        : 'No establecido'}
+                                        {(() => {
+                                          // Si hay fechas específicas para este mes en la tarjeta, mostrarlas
+                                          const card = cards.find(c => c.id === selectedCard);
+                                          const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+                                          
+                                          // Solo mostrar la fecha si está explícitamente configurada
+                                          if (card?.dates && card.dates[currentMonth]?.dueDate) {
+                                            return obtenerFechaFormateada(card.dates[currentMonth].dueDate);
+                                          }
+                                          
+                                          // De lo contrario, mostrar como no establecido
+                                          return 'No establecido';
+                                        })()}
                                     </Typography>
+                                      {(() => {
+                                        // Verificar si las fechas no están configuradas
+                                        const card = cards.find(c => c.id === selectedCard);
+                                        const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+                                        const fechasNoConfiguradas = !(card?.dates && card.dates[currentMonth]?.dueDate);
+                                        
+                                        if (fechasNoConfiguradas) {
+                                          return (
+                                            <Tooltip title="Actualizar fechas">
+                                              <IconButton 
+                                                size="small"
+                                                color="error"
+                                                onClick={() => handleOpenUpdateDatesDialog(selectedCard)}
+                                                sx={{ ml: 1 }}
+                                              >
+                                                <DateRangeIcon fontSize="small" />
+                                              </IconButton>
+                                            </Tooltip>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
+                                    </Box>
                                     {getCardDates()?.dueDate && (
                                       <>
                                         {(() => {
                                           const today = new Date();
                                           const closingDate = getCardDates()?.closingDate ? new Date(getCardDates().closingDate) : null;
-                                          const dueDate = new Date(getCardDates().dueDate);
+                                          const dueDate = getCardDates()?.dueDate ? new Date(getCardDates().dueDate) : null;
                                           
                                           // Si la tarjeta ya está pagada, no mostrar ninguna leyenda
                                           if (isCardPaid(selectedCard)) {
                                             return null; // No mostrar leyenda si ya está pagada
                                           }
                                           
-                                          // Solo mostrar leyenda si no está pagada
-                                          if (today > dueDate) {
+                                          // Verificar si las fechas están configuradas explícitamente
+                                          const card = cards.find(c => c.id === selectedCard);
+                                          const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+                                          const fechasConfiguradas = card?.dates && card.dates[currentMonth]?.closingDate && card.dates[currentMonth]?.dueDate;
+                                          
+                                          // Si las fechas no están configuradas, no mostrar leyendas
+                                          if (!fechasConfiguradas) {
+                                            return null;
+                                          }
+                                          
+                                          // Solo mostrar leyenda si no está pagada y las fechas están configuradas
+                                          if (dueDate && today > dueDate) {
                                             return (
                                               <Typography variant="caption" 
                                                 sx={{ 
@@ -2422,10 +2552,10 @@ const CreditCards = () => {
                                                 sx={{ 
                                                   display: 'inline-flex', 
                                                   alignItems: 'center',
-                                                  color: theme.palette.info.main
+                                                  color: theme.palette.success.main
                                                 }}
                                               >
-                                                Período sin cerrar
+                                                Período activo
                                               </Typography>
                                             );
                                           }
