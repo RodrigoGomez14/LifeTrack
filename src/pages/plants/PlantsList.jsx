@@ -369,195 +369,235 @@ const PlantsList = () => {
             </Box>
             </Card>
             
-            <Grid container spacing={3}>
-              {filteredPlants.map(([id, plant], index) => {
-                const isSelected = selectedPlant === id;
-                const plantStats = getPlantStats(plant);
-                const hasImage = plant.images && Object.keys(plant.images).length > 0;
-                
-                return (
-                  <Grid item xs={12} sm={6} md={4} key={id}>
-                    <Card 
-                      elevation={isSelected ? 3 : 1}
-                      onClick={() => handlePlantSelect(id)}
-                      sx={{ 
-                        borderRadius: 3,
-                        position: 'relative',
-                        height: '100%',
-                        transition: 'all 0.3s ease',
-                        transform: isSelected ? 'translateY(-4px)' : 'none',
-                        cursor: 'pointer',
-                        border: isSelected 
-                          ? `2px solid ${theme.palette.primary.main}`
-                          : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                        boxShadow: isSelected 
-                          ? `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}` 
-                          : `0 2px 10px ${alpha(theme.palette.common.black, 0.05)}`,
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}`
-                        },
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => handleOpenMenu(e, id)}
-                          sx={{ 
-                            bgcolor: alpha('#ffffff', 0.8),
-                            backdropFilter: 'blur(4px)',
-                            '&:hover': {
-                              bgcolor: '#ffffff'
-                            }
-                          }}
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                      
-                      <CardActionArea 
-                        component={Link}
-                        to={`/Planta/?${id}`}
-                        sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
-                      >
-                        <Box sx={{ 
-                          height: 160, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          bgcolor: alpha(theme.palette.primary.main, 0.05),
-                          color: theme.palette.primary.main,
+            {filteredPlants.length > 0 ? (
+              <Grid container spacing={3}>
+                {filteredPlants.map(([id, plant], index) => {
+                  const isSelected = selectedPlant === id;
+                  const plantStats = getPlantStats(plant);
+                  const hasImage = plant.images && Object.keys(plant.images).length > 0;
+                  
+                  return (
+                    <Grid item xs={12} sm={6} md={4} key={id}>
+                      <Card 
+                        elevation={isSelected ? 3 : 1}
+                        onClick={() => handlePlantSelect(id)}
+                        sx={{ 
+                          borderRadius: 3,
                           position: 'relative',
+                          height: '100%',
+                          transition: 'all 0.3s ease',
+                          transform: isSelected ? 'translateY(-4px)' : 'none',
+                          cursor: 'pointer',
+                          border: isSelected 
+                            ? `2px solid ${theme.palette.primary.main}`
+                            : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                          boxShadow: isSelected 
+                            ? `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}` 
+                            : `0 2px 10px ${alpha(theme.palette.common.black, 0.05)}`,
+                          '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}`
+                          },
                           overflow: 'hidden'
-                        }}>
-                          {hasImage ? (
-                            <CardMedia
-                              component="img"
-                              height="160"
-                              image={plant.profilePhotoUrl || plant.images[Object.keys(plant.images)[0]].url || plant.images[Object.keys(plant.images)[0]].dataUrl}
-                              alt={plant.name}
-                              sx={{ 
-                                objectFit: 'cover',
-                                transition: '0.3s transform ease-in-out',
-                                '&:hover': {
-                                  transform: 'scale(1.05)'
-                                }
-                              }}
-                            />
-                          ) : getPlantIcon(index)}
-                          
-                          <Box 
-                            sx={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              height: '40%',
-                              background: hasImage ? 
-                                'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
-                                'transparent',
-                              display: 'flex',
-                              alignItems: 'flex-end',
-                              px: 2,
-                              py: 1,
-                              zIndex: 1
+                        }}
+                      >
+                        <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => handleOpenMenu(e, id)}
+                            sx={{ 
+                              bgcolor: alpha('#ffffff', 0.8),
+                              backdropFilter: 'blur(4px)',
+                              '&:hover': {
+                                bgcolor: '#ffffff'
+                              }
                             }}
                           >
-                            <Typography
-                              variant="h6"
-                              component="div"
-                              sx={{
-                                color: hasImage ? '#ffffff' : 'text.primary',
-                                textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
-                                fontWeight: 'medium',
-                                width: '100%',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}
-                            >
-                              {plant.name}
-                              <IconButton 
-                                size="small" 
-                                onClick={(e) => handleShowDetail(e, plant, id)}
-                                sx={{ 
-                                  color: hasImage ? '#ffffff' : theme.palette.primary.main,
-                                  bgcolor: hasImage ? 
-                                    alpha('#ffffff', 0.2) : 
-                                    alpha(theme.palette.primary.main, 0.1),
-                                  backdropFilter: 'blur(4px)',
-                                  '&:hover': {
-                                    bgcolor: hasImage ? 
-                                      alpha('#ffffff', 0.3) : 
-                                      alpha(theme.palette.primary.main, 0.2)
-                                  }
-                                }}
-                              >
-                                <ContentCopyIcon fontSize="small" />
-                              </IconButton>
-                            </Typography>
-                          </Box>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
                         </Box>
                         
-                        <CardContent sx={{ flexGrow: 1, pt: 2 }}>
-                          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                            <Chip 
-                              icon={<LocalFloristIcon fontSize="small" />}
-                              label={`${plant.quantity} unid.`} 
-                              size="small" 
-                              sx={{ 
-                                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                color: theme.palette.primary.main,
-                                borderRadius: 1.5
-                              }}
-                            />
-                            {plant.potVolume && (
-                              <Chip 
-                                label={`${plant.potVolume}L`} 
-                                size="small"
+                        <CardActionArea 
+                          component={Link}
+                          to={`/Planta/?${id}`}
+                          sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                        >
+                          <Box sx={{ 
+                            height: 160, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            bgcolor: alpha(theme.palette.primary.main, 0.05),
+                            color: theme.palette.primary.main,
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            {hasImage ? (
+                              <CardMedia
+                                component="img"
+                                height="160"
+                                image={plant.profilePhotoUrl || plant.images[Object.keys(plant.images)[0]].url || plant.images[Object.keys(plant.images)[0]].dataUrl}
+                                alt={plant.name}
                                 sx={{ 
-                                  bgcolor: alpha(theme.palette.primary.light, 0.2),
-                                  color: theme.palette.primary.dark,
+                                  objectFit: 'cover',
+                                  transition: '0.3s transform ease-in-out',
+                                  '&:hover': {
+                                    transform: 'scale(1.05)'
+                                  }
+                                }}
+                              />
+                            ) : getPlantIcon(index)}
+                            
+                            <Box 
+                              sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: '40%',
+                                background: hasImage ? 
+                                  'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
+                                  'transparent',
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                px: 2,
+                                py: 1,
+                                zIndex: 1
+                              }}
+                            >
+                              <Typography
+                                variant="h6"
+                                component="div"
+                                sx={{
+                                  color: hasImage ? '#ffffff' : 'text.primary',
+                                  textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
+                                  fontWeight: 'medium',
+                                  width: '100%',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                {plant.name}
+                                <IconButton 
+                                  size="small" 
+                                  onClick={(e) => handleShowDetail(e, plant, id)}
+                                  sx={{ 
+                                    color: hasImage ? '#ffffff' : theme.palette.primary.main,
+                                    bgcolor: hasImage ? 
+                                      alpha('#ffffff', 0.2) : 
+                                      alpha(theme.palette.primary.main, 0.1),
+                                    backdropFilter: 'blur(4px)',
+                                    '&:hover': {
+                                      bgcolor: hasImage ? 
+                                        alpha('#ffffff', 0.3) : 
+                                        alpha(theme.palette.primary.main, 0.2)
+                                    }
+                                  }}
+                                >
+                                  <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                              </Typography>
+                            </Box>
+                          </Box>
+                          
+                          <CardContent sx={{ flexGrow: 1, pt: 2 }}>
+                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                              <Chip 
+                                icon={<LocalFloristIcon fontSize="small" />}
+                                label={`${plant.quantity} unid.`} 
+                                size="small" 
+                                sx={{ 
+                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                  color: theme.palette.primary.main,
                                   borderRadius: 1.5
                                 }}
                               />
-                            )}
-                          </Box>
-                          
-                          <Divider sx={{ my: 1 }} />
-                          
-                          <Stack direction="row" spacing={2} justifyContent="space-around" mt={2}>
-                            {plantStats.map((stat, idx) => (
-                              <Box key={idx} sx={{ textAlign: 'center' }}>
-                                <Avatar 
+                              {plant.potVolume && (
+                                <Chip 
+                                  label={`${plant.potVolume}L`} 
+                                  size="small"
                                   sx={{ 
-                                    width: 36, 
-                                    height: 36, 
-                                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                    color: theme.palette.primary.main,
-                                    mb: 0.5,
-                                    mx: 'auto'
+                                    bgcolor: alpha(theme.palette.primary.light, 0.2),
+                                    color: theme.palette.primary.dark,
+                                    borderRadius: 1.5
                                   }}
-                                >
-                                  {stat.icon}
-                                </Avatar>
-                                <Typography variant="body2" fontWeight="medium" color={theme.palette.primary.main}>
-                                  {stat.value}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {stat.label}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Stack>
-                        </CardContent>
-                      </CardActionArea>
-                    </Card>
-                  </Grid>
-                );
-              })}
-            </Grid>
+                                />
+                              )}
+                            </Box>
+                            
+                            <Divider sx={{ my: 1 }} />
+                            
+                            <Stack direction="row" spacing={2} justifyContent="space-around" mt={2}>
+                              {plantStats.map((stat, idx) => (
+                                <Box key={idx} sx={{ textAlign: 'center' }}>
+                                  <Avatar 
+                                    sx={{ 
+                                      width: 36, 
+                                      height: 36, 
+                                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                      color: theme.palette.primary.main,
+                                      mb: 0.5,
+                                      mx: 'auto'
+                                    }}
+                                  >
+                                    {stat.icon}
+                                  </Avatar>
+                                  <Typography variant="body2" fontWeight="medium" color={theme.palette.primary.main}>
+                                    {stat.value}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {stat.label}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Stack>
+                          </CardContent>
+                        </CardActionArea>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            ) : (
+              <Box sx={{ 
+                textAlign: 'center', 
+                p: 4,
+                mb: 4,
+                bgcolor: alpha(theme.palette.background.paper, 0.5),
+                borderRadius: 2,
+                border: `1px dashed ${theme.palette.divider}`,
+                backdropFilter: 'blur(8px)',
+                boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.03)}`
+              }}>
+                <ForestIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.2), mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No hay plantas activas
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  {searchTerm ? 'Intenta con otra búsqueda' : 'Agrega tu primera planta para comenzar'}
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />}
+                  component={Link}
+                  to="/NuevaPlanta"
+                  sx={{
+                    bgcolor: theme.palette.primary.main,
+                    color: '#ffffff',
+                    borderRadius: 8,
+                    px: 3,
+                    py: 1,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
+                    '&:hover': {
+                      bgcolor: theme.palette.primary.dark
+                    }
+                  }}
+                >
+                  Agregar Planta
+                </Button>
+              </Box>
+            )}
             
             {/* Sección de Archivo de Plantas - siempre visible */}
             <Card 
@@ -829,45 +869,6 @@ const PlantsList = () => {
                 <Typography variant="body2" color="text.secondary" paragraph>
                   Cuando coseches plantas, aparecerán aquí para mantener un historial
                 </Typography>
-              </Box>
-            )}
-            
-            {filteredPlants.length === 0 && archivedPlants.length === 0 && (
-              <Box sx={{ 
-                textAlign: 'center', 
-                p: 4, 
-                bgcolor: alpha(theme.palette.background.paper, 0.5),
-                borderRadius: 2,
-                border: `1px dashed ${theme.palette.divider}`,
-                backdropFilter: 'blur(8px)',
-                boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.03)}`
-              }}>
-                <ForestIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.2), mb: 2 }} />
-                <Typography variant="h6" color="text.secondary" gutterBottom>
-                  No se encontraron plantas
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  {searchTerm ? 'Intenta con otra búsqueda' : 'Agrega tu primera planta para comenzar'}
-                </Typography>
-                <Button 
-                  variant="contained" 
-                  startIcon={<AddIcon />}
-                  component={Link}
-                  to="/NuevaPlanta"
-                  sx={{
-                    bgcolor: theme.palette.primary.main,
-                    color: '#ffffff',
-                    borderRadius: 8,
-                    px: 3,
-                    py: 1,
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.25)}`,
-                    '&:hover': {
-                      bgcolor: theme.palette.primary.dark
-                    }
-                  }}
-                >
-                  Agregar Planta
-                </Button>
               </Box>
             )}
           </>

@@ -28,9 +28,12 @@ import {
   ListItemText,
   ListItemIcon,
   ListItemButton,
-  ToggleButtonGroup,
-  ToggleButton
+  Skeleton,
 } from '@mui/material';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import moment from 'moment';
+import 'moment/locale/es';
 import { useStore } from '../../store';
 import { database, auth } from '../../firebase';
 import AddIcon from '@mui/icons-material/Add';
@@ -38,39 +41,47 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import TodayIcon from '@mui/icons-material/Today';
 import DateRangeIcon from '@mui/icons-material/DateRange';
 import HistoryIcon from '@mui/icons-material/History';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import SentimentVerySatisfiedIcon from '@mui/icons-material/SentimentVerySatisfied';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { useNavigate } from 'react-router-dom';
 import CheckIcon from '@mui/icons-material/Check';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import ListAltIcon from '@mui/icons-material/ListAlt';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
-import TaskAltIcon from '@mui/icons-material/TaskAlt'; // Icono para completado
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { Global } from '@emotion/react';
+import ReactApexChart from 'react-apexcharts';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+
+// Configurar locale de moment
+moment.locale('es');
+const localizer = momentLocalizer(moment);
 
 const Habits = () => {
   const { userData } = useStore();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Ajustado a 'sm' para mejor responsividad
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   
   // Estado para la navegación temporal
-  const [viewMode, setViewMode] = useState('today'); // 'today', 'all'
-  const [selectedDate, setSelectedDate] = useState(new Date()); // Fecha seleccionada para navegación
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
   
   // Estados para los hábitos
   const [habits, setHabits] = useState([]);
-  const [filteredHabits, setFilteredHabits] = useState([]);
   const [completedHabits, setCompletedHabits] = useState({});
+  const [allWeeksCompletedHabits, setAllWeeksCompletedHabits] = useState({});
+  const [habitEvents, setHabitEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalHabits: 0,
     completedToday: 0,
-    completion: 0,
-    streakHabits: []
+    completion: 0
   });
   
   // Cargar hábitos del usuario
@@ -86,88 +97,268 @@ const Habits = () => {
       
       setHabits(habitsArray);
       
-      const dateStr = formatDate(selectedDate);
-      if (userData.habits.completed && userData.habits.completed[dateStr]) {
-        setCompletedHabits(userData.habits.completed[dateStr]);
-      } else {
-        setCompletedHabits({});
-      }
-
+      // Cargar hábitos completados para la semana actual
+      loadCompletedHabitsForWeek(currentWeek);
+      
+      // Cargar datos de todas las semanas para el gráfico
+      loadAllWeeksCompletedHabits();
+      
       setLoading(false);
     } else {
       setHabits([]); // Asegurarse de limpiar los hábitos si no hay datos
       setCompletedHabits({});
+      setAllWeeksCompletedHabits({});
       setLoading(false);
     }
   }, [userData]); // Solo depende de userData inicialmente
 
-  // Recargar hábitos completados cuando cambia la fecha seleccionada
-  useEffect(() => {
-    if (viewMode === 'today' && userData?.habits?.completed) {
-      const dateStr = formatDate(selectedDate);
-      setCompletedHabits(userData.habits.completed[dateStr] || {});
-    } else if (viewMode === 'all') {
-      setCompletedHabits({}); // No hay hábitos completados en la vista 'all'
-    }
-  }, [selectedDate, viewMode, userData]);
+  // Obtener el inicio y fin de la semana actual
+  const getWeekRange = (date) => {
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Ajustar cuando el día es domingo
+    
+    const weekStart = new Date(date);
+    weekStart.setDate(diff);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    return { start: weekStart, end: weekEnd };
+  };
 
-
-  // Filtrar hábitos según el modo de vista y la fecha seleccionada
-  useEffect(() => {
-    if (habits.length === 0) {
-      setFilteredHabits([]);
-      setStats({ totalHabits: 0, completedToday: 0, completion: 0, streakHabits: [] });
+  // Cargar hábitos completados para una semana específica
+  const loadCompletedHabitsForWeek = (date) => {
+    if (!userData?.habits?.completed) {
+      setCompletedHabits({});
       return;
     }
-
-    let filtered = [];
     
-    if (viewMode === 'today') {
-      filtered = habits.filter(habit => shouldShowHabitForDate(habit, selectedDate));
-    } else if (viewMode === 'all') {
-      filtered = habits; // Mostrar todos en la vista 'all'
+    const { start, end } = getWeekRange(date);
+    
+    // Crear un objeto para almacenar todos los hábitos completados de la semana
+    const weeklyCompleted = {};
+    
+    // Recorrer cada día de la semana
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const dateStr = formatDate(currentDate);
+      if (userData.habits.completed[dateStr]) {
+        weeklyCompleted[dateStr] = userData.habits.completed[dateStr];
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
     }
+    
+    setCompletedHabits(weeklyCompleted);
+  };
 
-    setFilteredHabits(filtered);
-
-    // Calcular estadísticas (solo relevantes para 'today')
-    if (viewMode === 'today') {
-      const totalActive = filtered.length;
-      const habitsCompletedOnSelectedDate = filtered.filter(habit => 
-        completedHabits[habit.id]?.completedAt
-      ).length;
+  // Nueva función para cargar datos de hábitos completados para múltiples semanas
+  const loadAllWeeksCompletedHabits = () => {
+    if (!userData?.habits?.completed) {
+      setAllWeeksCompletedHabits({});
+      return;
+    }
+    
+    const allCompleted = {};
+    
+    // Obtener la fecha actual
+    const currentDate = new Date();
+    
+    // Cargar datos para las últimas 5 semanas
+    for (let i = 4; i >= 0; i--) {
+      const weekStart = new Date(currentDate);
+      weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
       
-      const completionPercentage = totalActive > 0 
-        ? Math.round((habitsCompletedOnSelectedDate / totalActive) * 100) 
-        : 0;
-
-      const habitsWithStreak = habits.filter(habit => habit.streak && habit.streak > 2)
-        .sort((a, b) => b.streak - a.streak)
-        .slice(0, 3); // Mostrar las 3 mejores rachas
-
-      setStats({
-        totalHabits: totalActive,
-        completedToday: habitsCompletedOnSelectedDate,
-        completion: completionPercentage,
-        streakHabits: habitsWithStreak
-      });
-    } else {
-      // Resetear o ajustar stats para la vista 'all' si es necesario
-      setStats({
-        totalHabits: habits.length, // Total de hábitos creados
-        completedToday: 0, // No aplica
-        completion: 0, // No aplica
-        streakHabits: habits.filter(habit => habit.streak && habit.streak > 2)
-          .sort((a, b) => b.streak - a.streak)
-          .slice(0, 3) // Mostrar rachas generales
-      });
+      const { start, end } = getWeekRange(weekStart);
+      
+      // Recorrer cada día de la semana
+      const weekDate = new Date(start);
+      while (weekDate <= end) {
+        const dateStr = formatDate(weekDate);
+        if (userData.habits.completed[dateStr]) {
+          allCompleted[dateStr] = userData.habits.completed[dateStr];
+        }
+        weekDate.setDate(weekDate.getDate() + 1);
+      }
     }
-
-  }, [habits, viewMode, completedHabits, selectedDate]);
+    
+    setAllWeeksCompletedHabits(allCompleted);
+  };
+  
+  // Efecto para actualizar los eventos cuando cambian los hábitos o los hábitos completados
+  useEffect(() => {
+    if (habits.length > 0) {
+      generateHabitEvents();
+    } else {
+      setHabitEvents([]);
+    }
+  }, [habits, completedHabits, currentWeek]);
+  
+  // Generar eventos de hábitos para el calendario
+  const generateHabitEvents = () => {
+    if (!habits.length) return;
+    
+    const events = [];
+    const { start, end } = getWeekRange(currentWeek);
+    
+    // Variables para estadísticas
+    let totalCompletions = 0;
+    let totalPossible = 0;
+    let habitStats = {};
+    let dayStats = {};
+    
+    // Para cada día de la semana
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const dateStr = formatDate(currentDate);
+      const dayOfWeek = currentDate.getDay(); // 0: domingo, 1: lunes, ..., 6: sábado
+      const dayName = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek];
+      
+      // Inicializar estadísticas para este día
+      dayStats[dateStr] = {
+        day: dayName,
+        total: 0,
+        completed: 0,
+        percentage: 0,
+        score: 0
+      };
+      
+      // Para cada hábito, verificar si corresponde a este día
+      habits.forEach(habit => {
+        if (shouldShowHabitForDate(habit, currentDate)) {
+          // Incrementar el contador total de hábitos para este día
+          dayStats[dateStr].total++;
+          totalPossible++;
+          
+          // Inicializar estadísticas para este hábito si no existen
+          if (!habitStats[habit.id]) {
+            habitStats[habit.id] = {
+              id: habit.id,
+              name: habit.name,
+              color: habit.color || 'primary',
+              possibleDays: 0,
+              completedDays: 0,
+              percentage: 0
+            };
+          }
+          
+          habitStats[habit.id].possibleDays++;
+          
+          // Verificar si el hábito fue completado este día
+          const isCompleted = completedHabits[dateStr] && completedHabits[dateStr][habit.id];
+          if (isCompleted) {
+            dayStats[dateStr].completed++;
+            totalCompletions++;
+            habitStats[habit.id].completedDays++;
+          }
+          
+          // Crear evento para el calendario
+          events.push({
+            id: `${habit.id}-${dateStr}`,
+            title: habit.name,
+            start: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0),
+            end: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59),
+            allDay: true,
+            resource: {
+              habit,
+              date: dateStr,
+              isCompleted: !!isCompleted
+            }
+          });
+        }
+      });
+      
+      // Calcular porcentaje para este día
+      if (dayStats[dateStr].total > 0) {
+        dayStats[dateStr].percentage = Math.round((dayStats[dateStr].completed / dayStats[dateStr].total) * 100);
+        
+        // Calcular score ponderado para este día, similar a la fórmula de hábitos
+        // La fórmula combina 30% del porcentaje con 20 puntos por cada hábito completado
+        dayStats[dateStr].score = (dayStats[dateStr].percentage * 0.3) + (dayStats[dateStr].completed * 20);
+      }
+      
+      // Avanzar al siguiente día
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Calcular porcentajes para hábitos
+    Object.keys(habitStats).forEach(habitId => {
+      const habit = habitStats[habitId];
+      habit.percentage = habit.possibleDays > 0 
+        ? Math.round((habit.completedDays / habit.possibleDays) * 100) 
+        : 0;
+    });
+    
+    setHabitEvents(events);
+    
+    // Calcular estadísticas para el día actual
+    const today = formatDate(new Date());
+    const todayHabits = habits.filter(habit => shouldShowHabitForDate(habit, new Date()));
+    const completedToday = todayHabits.filter(habit => 
+      completedHabits[today] && completedHabits[today][habit.id]
+    ).length;
+    
+    // Encontrar el hábito más consistente
+    let mostConsistentHabit = { percentage: 0, completedDays: 0, score: 0 };
+    let leastConsistentHabit = { percentage: 100 };
+    
+    Object.values(habitStats).forEach(habit => {
+      // Calcular una puntuación ponderada que considere tanto el porcentaje como la cantidad de días completados
+      // La fórmula da más peso a hábitos con más días completados cuando los porcentajes son similares
+      const score = (habit.percentage * 0.5) + (habit.completedDays * 15);
+      
+      // Agregar la puntuación al objeto habit
+      habit.score = score;
+      
+      if (habit.possibleDays > 0 && score > mostConsistentHabit.score) {
+        mostConsistentHabit = habit;
+      }
+      if (habit.percentage < leastConsistentHabit.percentage && habit.possibleDays > 0) {
+        leastConsistentHabit = habit;
+      }
+    });
+    
+    // Encontrar el mejor y peor día, ahora usando el score ponderado
+    let bestDay = { score: 0 };
+    let worstDay = { percentage: 100 };
+    
+    Object.values(dayStats).forEach(day => {
+      if (day.score > bestDay.score && day.total > 0) {
+        bestDay = day;
+      }
+      if (day.percentage < worstDay.percentage && day.total > 0) {
+        worstDay = {
+          ...day,
+          percentage: day.percentage
+        };
+      }
+    });
+    
+      setStats({
+      totalHabits: habits.length,
+      todayHabits: todayHabits.length,
+      completedToday,
+      completion: todayHabits.length > 0 
+        ? Math.round((completedToday / todayHabits.length) * 100) 
+        : 0,
+      weeklyCompletion: totalPossible > 0 
+        ? Math.round((totalCompletions / totalPossible) * 100) 
+        : 0,
+      mostConsistentHabit,
+      leastConsistentHabit,
+      bestDay,
+      worstDay,
+      habitStats: Object.values(habitStats).sort((a, b) => b.percentage - a.percentage),
+      dayStats: dayStats
+    });
+  };
   
   // Determinar si un hábito debe mostrarse para una fecha específica
   const shouldShowHabitForDate = (habit, date) => {
     const dayOfWeek = date.getDay(); // 0: domingo, 1: lunes, ..., 6: sábado
+    const dayOfMonth = date.getDate(); // 1-31
+    const month = date.getMonth() + 1; // 1-12
     
     switch (habit.frequency) {
       case 'daily':
@@ -179,8 +370,14 @@ const Habits = () => {
       case 'custom':
         // Asegurarse de que customDays es un array antes de usar includes
         return Array.isArray(habit.customDays) && habit.customDays.includes(dayOfWeek);
+      case 'monthly':
+        // Verificar si el día del mes está en la lista de días mensuales
+        return Array.isArray(habit.monthlyDays) && habit.monthlyDays.includes(dayOfMonth);
+      case 'yearly':
+        // Verificar si el mes actual está en la lista de meses anuales
+        return Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
       default:
-        return true; // Por defecto, mostrar si no hay frecuencia clara (o manejar como error)
+        return true; // Por defecto, mostrar si no hay frecuencia clara
     }
   };
   
@@ -194,58 +391,57 @@ const Habits = () => {
   };
   
   // Marcar/desmarcar un hábito como completado
-  const toggleHabitCompletion = async (habitId) => {
-    const dateStr = formatDate(selectedDate);
+  const toggleHabitCompletion = async (habitId, dateStr) => {
     const habitRef = database.ref(`${auth.currentUser.uid}/habits/${habitId}`);
     const completedRef = database.ref(`${auth.currentUser.uid}/habits/completed/${dateStr}/${habitId}`);
     const habit = habits.find(h => h.id === habitId);
     
     if (!habit) return;
 
-    const isCurrentlyCompleted = !!completedHabits[habitId];
+    const isCurrentlyCompleted = completedHabits[dateStr] && completedHabits[dateStr][habitId];
     const newCompletedStatus = !isCurrentlyCompleted;
-    let newStreak = habit.streak || 0;
 
-    // --- Calcular Nueva Racha ---
-    if (newCompletedStatus) { // Marcando como completado
-      const previousScheduledDate = getPreviousScheduledDate(habit, selectedDate);
-      if (previousScheduledDate) {
-        const prevDateStr = formatDate(previousScheduledDate);
-        const wasCompletedPreviously = !!(userData?.habits?.completed?.[prevDateStr]?.[habitId]);
-        if (wasCompletedPreviously) {
-          newStreak = (habit.streak || 0) + 1; // Continuar racha
-        } else {
-          newStreak = 1; // Iniciar nueva racha
-        }
-      } else {
-        newStreak = 1; // Iniciar nueva racha (primera vez o sin fecha anterior válida)
-      }
-    } else { // Desmarcando
-      const currentStreak = habit.streak || 0;
-      // Solo decrementar racha si se desmarca el día de hoy
-      if (isToday(selectedDate)) {
-        newStreak = Math.max(0, currentStreak - 1);
-      } else {
-        newStreak = currentStreak; // No cambiar racha al desmarcar días pasados
-      }
-    }
-    // ---------------------------
-
-    // Optimistic UI Update for completion status
+    // Optimistic UI Update for completion status in both state variables
     setCompletedHabits(prev => {
       const updated = {...prev};
+      if (!updated[dateStr]) {
+        updated[dateStr] = {};
+      }
+      
       if (newCompletedStatus) {
-        updated[habitId] = { completedAt: new Date().toISOString(), habitId };
+        updated[dateStr][habitId] = { completedAt: new Date().toISOString(), habitId };
       } else {
-        delete updated[habitId];
+        if (updated[dateStr]) {
+          delete updated[dateStr][habitId];
+          // Si ya no hay hábitos completados para esta fecha, eliminar la fecha
+          if (Object.keys(updated[dateStr]).length === 0) {
+            delete updated[dateStr];
+          }
+        }
       }
       return updated;
     });
-
-    // Optimistic UI Update for streak
-    setHabits(prevHabits => prevHabits.map(h => 
-      h.id === habitId ? { ...h, streak: newStreak } : h
-    ));
+    
+    // También actualizar allWeeksCompletedHabits para mantener el gráfico actualizado
+    setAllWeeksCompletedHabits(prev => {
+      const updated = {...prev};
+      if (!updated[dateStr]) {
+        updated[dateStr] = {};
+      }
+      
+      if (newCompletedStatus) {
+        updated[dateStr][habitId] = { completedAt: new Date().toISOString(), habitId };
+      } else {
+        if (updated[dateStr]) {
+          delete updated[dateStr][habitId];
+          // Si ya no hay hábitos completados para esta fecha, eliminar la fecha
+          if (Object.keys(updated[dateStr]).length === 0) {
+            delete updated[dateStr];
+          }
+        }
+      }
+      return updated;
+    });
 
     try {
       // Actualizar estado de completado en Firebase
@@ -254,34 +450,54 @@ const Habits = () => {
       } else {
         await completedRef.remove();
       }
-      
-      // Actualizar racha en Firebase solo si cambió
-      if (newStreak !== (habit.streak || 0)) {
-        await habitRef.update({ streak: newStreak });
-      }
 
     } catch (error) {
       console.error("Error updating habit completion:", error);
-      // Revertir UI en caso de error
-      setCompletedHabits(prev => { // Revertir estado completado
+      // Revertir UI en caso de error - ambos estados
+      setCompletedHabits(prev => {
         const reverted = {...prev};
-        if (newCompletedStatus) { 
-          delete reverted[habitId];
-        } else { 
-          // Para revertir el desmarcado, necesitamos el estado original
-          // Si no lo guardamos, podríamos simplemente dejarlo como estaba antes del error
-          // o intentar buscarlo de nuevo. Por simplicidad, lo dejamos así.
-          // Considera guardar el estado previo si la reversión precisa es crucial.
-          if (isCurrentlyCompleted) { // Si originalmente estaba completado
-             reverted[habitId] = { completedAt: 'reverted', habitId }; // O estado original
+        if (!reverted[dateStr]) {
+          reverted[dateStr] = {};
+        }
+        
+        if (!newCompletedStatus) { // Si estábamos desmarcando
+          if (isCurrentlyCompleted) { // Y originalmente estaba completado
+            reverted[dateStr][habitId] = { completedAt: 'reverted', habitId };
+          }
+        } else { // Si estábamos marcando
+          if (reverted[dateStr] && reverted[dateStr][habitId]) {
+            delete reverted[dateStr][habitId];
+            // Si ya no hay hábitos completados para esta fecha, eliminar la fecha
+            if (Object.keys(reverted[dateStr]).length === 0) {
+              delete reverted[dateStr];
+            }
           }
         }
         return reverted;
       });
-      setHabits(prevHabits => prevHabits.map(h => // Revertir racha
-        h.id === habitId ? { ...h, streak: habit.streak || 0 } : h
-      ));
-      // Mostrar un mensaje de error al usuario (ej. con un Snackbar)
+      
+      // También revertir allWeeksCompletedHabits
+      setAllWeeksCompletedHabits(prev => {
+        const reverted = {...prev};
+        if (!reverted[dateStr]) {
+          reverted[dateStr] = {};
+        }
+        
+        if (!newCompletedStatus) { // Si estábamos desmarcando
+          if (isCurrentlyCompleted) { // Y originalmente estaba completado
+            reverted[dateStr][habitId] = { completedAt: 'reverted', habitId };
+          }
+        } else { // Si estábamos marcando
+          if (reverted[dateStr] && reverted[dateStr][habitId]) {
+            delete reverted[dateStr][habitId];
+            // Si ya no hay hábitos completados para esta fecha, eliminar la fecha
+            if (Object.keys(reverted[dateStr]).length === 0) {
+              delete reverted[dateStr];
+            }
+          }
+        }
+        return reverted;
+      });
     }
   };
   
@@ -290,31 +506,38 @@ const Habits = () => {
     navigate('/NuevoHabito');
   };
   
-  // Navegación entre días
-  const goToPreviousDay = () => {
-    const prevDate = new Date(selectedDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    setSelectedDate(prevDate);
-  };
-  
-  const goToNextDay = () => {
-    const nextDate = new Date(selectedDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    setSelectedDate(nextDate);
-  };
-  
-  const goToToday = () => {
-    setSelectedDate(new Date());
-  };
-  
-  // Obtener nombre del día de la semana (corto)
-  const getShortDayName = (date) => {
-    return date.toLocaleDateString('es-ES', { weekday: 'long' });
-  };
-  
-  // Formato de fecha legible
-  const getFormattedDate = (date) => {
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Navegación entre semanas
+  const handleNavigate = (action) => {
+    let newDate = new Date(currentWeek);
+    
+    if (action === 'PREV') {
+      newDate.setDate(newDate.getDate() - 7);
+    } else if (action === 'NEXT') {
+      // Verificar si ya estamos en la semana actual o futura
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Obtener el inicio de la semana actual que se está viendo
+      const { start: currentWeekStart } = getWeekRange(currentWeek);
+      
+      // Obtener el inicio de la semana que contiene la fecha actual
+      const nowWeekStart = getWeekRange(today).start;
+      
+      // Si ya estamos en la semana actual o posterior, no permitir avanzar
+      if (currentWeekStart >= nowWeekStart) {
+        return; // No navegar al futuro
+      }
+      
+      newDate.setDate(newDate.getDate() + 7);
+    } else if (action === 'TODAY') {
+      newDate = new Date();
+    }
+    
+    setCurrentWeek(newDate);
+    loadCompletedHabitsForWeek(newDate);
+    
+    // No necesitamos volver a cargar allWeeksCompletedHabits ya que contiene datos de todas las semanas
+    // y se mantiene actualizado con los cambios
   };
   
   // Comprobar si la fecha seleccionada es hoy
@@ -323,19 +546,6 @@ const Habits = () => {
     return date.getDate() === today.getDate() &&
            date.getMonth() === today.getMonth() &&
            date.getFullYear() === today.getFullYear();
-  };
-
-  // Función auxiliar para obtener la fecha anterior en que un hábito estaba programado
-  const getPreviousScheduledDate = (habit, currentDate) => {
-    let previousDate = new Date(currentDate);
-    // Retroceder máximo 30 días para evitar bucles infinitos y mejorar rendimiento
-    for (let i = 0; i < 30; i++) { 
-      previousDate.setDate(previousDate.getDate() - 1);
-      if (shouldShowHabitForDate(habit, previousDate)) {
-        return previousDate; // Devolver la primera fecha anterior encontrada donde debía hacerse
-      }
-    }
-    return null; // No se encontró una fecha anterior programada en el rango
   };
 
   // Obtener texto para frecuencia
@@ -351,303 +561,1017 @@ const Habits = () => {
           const sortedDays = [...habit.customDays].sort((a, b) => a - b);
           return sortedDays.map(dayIndex => days[dayIndex]).join(', ');
         }
-        return 'Personalizado';
+        return 'Semanal';
+      case 'monthly':
+        if (Array.isArray(habit.monthlyDays) && habit.monthlyDays.length > 0) {
+          if (habit.monthlyDays.length === 1) {
+            return `Día ${habit.monthlyDays[0]} del mes`;
+          }
+          const sortedDays = [...habit.monthlyDays].sort((a, b) => a - b);
+          return `Días ${sortedDays.join(', ')} del mes`;
+        }
+        return 'Mensual';
+      case 'yearly':
+        if (Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.length > 0) {
+          const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+          // Ordenar los meses seleccionados
+          const sortedMonths = [...habit.yearlyMonths].sort((a, b) => a - b);
+          return sortedMonths.map(month => monthNames[month - 1]).join(', ');
+        }
+        return 'Anual';
       default: return ''; // Frecuencia no especificada o desconocida
     }
   };
 
-  // Componente interno para el círculo de progreso mejorado
-  const CircularProgressWithLabel = ({ value }) => {
+  // Formatear el rango de la semana
+  const formatWeekRangeDisplay = (date) => {
+    const { start, end } = getWeekRange(date);
+    const startDay = start.getDate();
+    const endDay = end.getDate();
+    const startMonth = start.toLocaleString('es-ES', { month: 'long' });
+    const endMonth = end.toLocaleString('es-ES', { month: 'long' });
+    const year = start.getFullYear();
+    
+    if (startMonth === endMonth) {
+      return `${startDay} - ${endDay} de ${startMonth} ${year}`;
+    } else {
+      return `${startDay} ${startMonth} - ${endDay} ${endMonth} ${year}`;
+    }
+  };
+
+  // Componente personalizado para el evento del calendario
+  const HabitEvent = ({ event }) => {
+    const { habit, date, isCompleted } = event.resource;
+    
+    // Usar el color específico del hábito o un color por defecto
+    const habitColor = habit.color ? theme.palette[habit.color].main : theme.palette.primary.main;
+    
     return (
-      <Box sx={{ position: 'relative', display: 'inline-flex', width: 80, height: 80 }}>
-        <CircularProgress
-          variant="determinate"
+      <Box 
           sx={{
-            color: (theme) => theme.palette.grey[theme.palette.mode === 'light' ? 200 : 800],
-            position: 'absolute',
-            left: 0,
-            zIndex: 1, // Detrás del progreso real
-          }}
-          size={80}
-          thickness={4}
-          value={100}
-        />
-        <CircularProgress
-          variant="determinate"
-          value={value}
-          sx={{ 
-            color: 'primary.main', 
-            zIndex: 2, // Encima del fondo gris
-            animation: 'progress-animation 0.5s ease-out',
-            '@keyframes progress-animation': {
-              '0%': { strokeDashoffset: 100 }, // Ajusta según el tamaño
-              '100%': { strokeDashoffset: 0 },
-            },
-          }}
-          size={80}
-          thickness={4}
-        />
-        <Box
-          sx={{
-            top: 0,
-            left: 0,
-            bottom: 0,
-            right: 0,
-            position: 'absolute',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Typography 
-            variant="h6" 
-            component="div" 
-            color="text.primary"
-            fontWeight="bold"
-          >
-            {`${Math.round(value)}%`}
+          display: 'flex', 
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          p: 0.5,
+          borderRadius: 1.5,
+          bgcolor: isCompleted 
+            ? alpha(habitColor, 0.15) // Mantener el color del hábito incluso cuando está completado
+            : alpha(habitColor, 0.2),
+          borderLeft: `3px solid ${habitColor}`,
+          mb: 0.5,
+          boxShadow: isCompleted ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            bgcolor: isCompleted 
+              ? alpha(habitColor, 0.25)
+              : alpha(habitColor, 0.35),
+            transform: 'translateY(-1px)',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+          }
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+          <Box 
+            sx={{ 
+              width: 6, 
+              height: 6, 
+              borderRadius: '50%', 
+              bgcolor: habitColor,
+              mr: 1 
+            }} 
+          />
+          <Typography variant="body2" noWrap sx={{ 
+            fontWeight: isCompleted ? 'normal' : 'medium',
+            textDecoration: isCompleted ? 'line-through' : 'none',
+            color: isCompleted ? alpha(theme.palette.text.primary, 0.7) : theme.palette.text.primary,
+            fontSize: '0.8rem'
+          }}>
+            {habit.name}
           </Typography>
         </Box>
+        <Checkbox
+          checked={isCompleted}
+          onChange={() => toggleHabitCompletion(habit.id, date)}
+          icon={<RadioButtonUncheckedIcon fontSize="small" />}
+          checkedIcon={<CheckCircleIcon fontSize="small" />}
+          size="small"
+          sx={{ 
+            p: 0.25,
+            color: habitColor,
+            '& svg': {
+              fontSize: '1rem'
+            },
+            '&.Mui-checked': {
+              color: habitColor // Mantener el color del hábito para la marca de verificación
+            }
+          }}
+        />
       </Box>
     );
   };
 
-  // --- Componentes de UI Rediseñados ---
-
-  // Panel Superior (Navegación y Estadísticas)
-  const ControlPanel = () => (
-    <Paper
-      elevation={2}
-      sx={{
-        p: { xs: 1.5, sm: 2 },
-        mb: 3,
-        borderRadius: 3,
-        overflow: 'hidden',
-        border: 'none',
-        // background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.light, 0.1)} 100%)`
-        bgcolor: 'background.paper' // Fondo sólido para mejor contraste
-      }}
-    >
-      <Stack 
-        direction={{ xs: 'column', md: 'row' }} 
-        spacing={2} 
-        divider={!isMobile && <Divider orientation="vertical" flexItem />}
-      >
-        {/* Columna Izquierda: Navegación y Progreso Diario */}
-        <Stack spacing={2} sx={{ flex: 1 }}>
-          {/* Selector de Vista */}
-          <ToggleButtonGroup
-            color="primary"
-            value={viewMode}
-            exclusive
-            onChange={(event, newViewMode) => {
-              if (newViewMode !== null) {
-                setViewMode(newViewMode);
-              }
-            }}
-            aria-label="Modo de vista"
-            size="small"
-            fullWidth={isMobile}
-          >
-            <ToggleButton value="today" aria-label="Vista por día">
-              <TodayIcon sx={{ mr: 0.5 }} fontSize="small"/> 
-              Por Día
-            </ToggleButton>
-            <ToggleButton value="all" aria-label="Todos los hábitos">
-              <ListAltIcon sx={{ mr: 0.5 }} fontSize="small"/> 
-              Todos
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          {/* Navegador de Día (Solo visible en modo 'today') */}
-          {viewMode === 'today' && (
-            <Box>
-               <Stack 
-                direction="row" 
-                alignItems="center" 
-                justifyContent="space-between" 
-                spacing={1}
-                sx={{ 
-                  bgcolor: alpha(theme.palette.primary.main, 0.05), 
-                  p: 1, 
-                  borderRadius: 2 
-                }}
-              >
-                <Tooltip title="Día anterior">
-                  <IconButton onClick={goToPreviousDay} size="small" color="primary">
-                    <ChevronLeftIcon />
-                  </IconButton>
-                </Tooltip>
-                
-                <Stack direction="column" alignItems="center" sx={{ textAlign: 'center' }}>
-                   <Typography variant="body1" fontWeight="medium">
-                    {getShortDayName(selectedDate)}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {getFormattedDate(selectedDate)}
-                  </Typography>
-                </Stack>
-
-                <Tooltip title="Día siguiente">
-                  <IconButton onClick={goToNextDay} size="small" color="primary" disabled={isToday(selectedDate)}>
-                    <ChevronRightIcon />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
-               {!isToday(selectedDate) && (
-                <Button 
-                  variant="text" 
-                  size="small" 
-                  onClick={goToToday} 
-                  startIcon={<CalendarTodayIcon />}
-                  sx={{ mt: 1, display: 'flex', mx: 'auto' }} // Centrar botón
-                >
-                  Ir a Hoy
-                </Button>
-              )}
-            </Box>
-          )}
-
-           {/* Progreso Diario (Solo visible en modo 'today') */}
-           {viewMode === 'today' && (
-            <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mt: 1 }}>
-               <CircularProgressWithLabel value={stats.completion} />
-              <Stack>
-                <Typography variant="h5" fontWeight="bold">
-                  {stats.completedToday} / {stats.totalHabits}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Completados {isToday(selectedDate) ? 'hoy' : 'ese día'}
-                </Typography>
-              </Stack>
-            </Stack>
-           )}
-        </Stack>
-
-        {/* Columna Derecha: Rachas (Visible en ambos modos) */}
-        <Stack spacing={1.5} sx={{ flex: 1, pt: { xs: 2, md: 0 } }}>
-           <Stack direction="row" alignItems="center" spacing={1}>
-            <LocalFireDepartmentIcon color="warning" />
-            <Typography variant="subtitle1" fontWeight="medium">
-              Mejores Rachas
-            </Typography>
-          </Stack>
-          {stats.streakHabits.length > 0 ? (
-            <List dense disablePadding>
-              {stats.streakHabits.map((habit) => (
-                <ListItem 
-                  key={habit.id} 
-                  disablePadding
-                  secondaryAction={
-                    <Chip 
-                      label={`${habit.streak} días`} 
-                      size="small" 
-                      color="warning" 
-                      variant="outlined"
-                      icon={<LocalFireDepartmentIcon fontSize="small"/>}
-                    />
-                  }
-                  sx={{ 
-                    mb: 0.5, 
-                    bgcolor: alpha(theme.palette.warning.main, 0.05),
-                    borderRadius: 1.5,
-                    pl: 1.5, // Padding a la izquierda
-                  }}
-                >
-                  <ListItemText 
-                    primary={habit.name} 
-                    primaryTypographyProps={{ variant: 'body2', fontWeight: 500, noWrap: true }}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 80 }}>
-              <Typography variant="body2" color="text.secondary">
-                Aún no hay rachas destacadas.
-              </Typography>
-            </Box>
-          )}
-        </Stack>
-      </Stack>
-    </Paper>
-  );
-
-  // Componente para un Item de Hábito en la lista
-  const HabitItem = ({ habit }) => {
-    const isCompleted = viewMode === 'today' && !!completedHabits[habit.id];
+  // Componente personalizado para renderizar estadísticas en cada día
+  const DayStatsWrapper = ({ children, value, day }) => {
+    const dateStr = formatDate(value);
+    const stats = window.dailyHabitStats?.[dateStr] || { total: 0, completed: 0 };
+    const isToday = value.getDate() === new Date().getDate() && 
+                   value.getMonth() === new Date().getMonth() && 
+                   value.getFullYear() === new Date().getFullYear();
+    
+    // Calcular el porcentaje de completado para la barra de progreso
+    const completionPercent = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+    const showStats = stats.total > 0;
     
     return (
-      <Paper 
-        elevation={0} 
-        variant="outlined" 
-        sx={{ 
-          mb: 1.5, 
-          borderRadius: 2.5, // Bordes más redondeados
-          overflow: 'hidden', // Para que el fondo no se salga
-          transition: 'all 0.2s ease',
-          bgcolor: isCompleted ? alpha(theme.palette.success.main, 0.08) : 'background.paper',
-          borderColor: isCompleted ? alpha(theme.palette.success.main, 0.3) : theme.palette.divider,
-          '&:hover': {
-            boxShadow: theme.shadows[2],
-            borderColor: isCompleted ? theme.palette.success.main : theme.palette.primary.main,
-          }
-        }}
-      >
-        <ListItem
-          secondaryAction={
-             viewMode === 'today' ? ( // Checkbox solo en vista 'today'
-               <Checkbox
-                edge="end"
-                onChange={() => toggleHabitCompletion(habit.id)}
-                checked={isCompleted}
-                icon={<RadioButtonUncheckedIcon />}
-                checkedIcon={<CheckCircleIcon />}
-                color="success"
-                disabled={!isToday(selectedDate) && !isCompleted} // Deshabilitar si no es hoy y no está completado
-                sx={{ mr: 1 }} // Margen para separar del borde
-              />
-             ) : ( // Flecha en vista 'all'
-               <IconButton edge="end" aria-label="details" onClick={() => navigate(`/DetalleHabito?id=${habit.id}`)} size="small">
-                  <ArrowForwardIosIcon fontSize="small" />
-                </IconButton>
-             )
-          }
-          disablePadding
-          sx={{ pt: 1, pb: 1 }} // Padding vertical
+      <Box sx={{ position: 'relative', height: '100%', width: '100%' }}>
+        {children}
+        
+        {showStats && (
+        <Box
+          sx={{
+            position: 'absolute',
+              top: 10, 
+              right: 10, 
+              borderRadius: '16px',
+            display: 'flex',
+            alignItems: 'center',
+              p: '4px 8px',
+              bgcolor: isToday ? alpha(theme.palette.primary.main, 0.2) : alpha(theme.palette.grey[600], 0.15),
+              border: `1px solid ${isToday ? alpha(theme.palette.primary.main, 0.3) : alpha(theme.palette.grey[500], 0.2)}`,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              zIndex: 5
+          }}
         >
-          <ListItemButton 
-             onClick={() => navigate(`/DetalleHabito?id=${habit.id}`)} 
-             sx={{ borderRadius: 'inherit', py: 1 }} // Heredar border radius y ajustar padding
-           >
-            {/* Puedes añadir un icono aquí si lo implementas */}
-             {/* <ListItemIcon sx={{ minWidth: 40 }}> 
-              <SomeIcon /> 
-            </ListItemIcon> */}
-            <ListItemText
-              primary={habit.name}
-              secondary={getFrequencyText(habit)}
-              primaryTypographyProps={{ fontWeight: 'medium', color: isCompleted ? 'text.secondary' : 'text.primary', sx: { textDecoration: isCompleted ? 'line-through' : 'none' } }}
-              secondaryTypographyProps={{ variant: 'caption' }}
+          <Typography 
+              variant="caption" 
+              sx={{ 
+                fontWeight: 'bold', 
+                color: isToday ? 'primary.main' : 'text.primary',
+                lineHeight: 1,
+                fontSize: '0.8rem'
+              }}
+            >
+              {stats.completed}/{stats.total}
+          </Typography>
+        </Box>
+        )}
+        
+        {showStats && (
+          <Box 
+            sx={{ 
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '4px',
+              bgcolor: alpha(theme.palette.grey[300], 0.5),
+              overflow: 'hidden',
+              zIndex: 5
+            }}
+          >
+            <Box 
+              sx={{ 
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: `${completionPercent}%`,
+                bgcolor: completionPercent === 100 
+                  ? theme.palette.success.main 
+                  : completionPercent > 50 
+                    ? theme.palette.info.main 
+                    : theme.palette.warning.main,
+                transition: 'width 0.3s ease'
+              }}
             />
-            {habit.streak > 0 && viewMode === 'all' && ( // Mostrar racha solo en vista 'all'
-              <Chip 
-                label={`${habit.streak}`} 
-                size="small" 
-                color="warning" 
-                icon={<LocalFireDepartmentIcon />} 
-                variant="outlined"
-                sx={{ ml: 1 }}
-              />
-            )}
-          </ListItemButton>
-        </ListItem>
-      </Paper>
+          </Box>
+        )}
+      </Box>
     );
   };
 
-  // Panel Principal de Hábitos
-  const HabitsListPanel = () => {
+  // Estilos para personalizar el calendario
+  const calendarStyles = {
+    height: '100%', // Usar 100% de la altura disponible en lugar de una altura fija
+    minHeight: '500px',
+    position: 'relative',
+    '.rbc-toolbar': {
+      display: 'none'
+    },
+    '.rbc-header': {
+      padding: '12px 8px',
+      fontWeight: 'bold',
+      fontSize: '1rem',
+      textTransform: 'uppercase',
+      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+      color: theme.palette.primary.dark,
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+      letterSpacing: '0.5px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    },
+    '.rbc-header + .rbc-header': {
+      borderLeft: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+    },
+    '.rbc-time-header': {
+      display: 'none'
+    },
+    '.rbc-time-content': {
+      display: 'none'
+    },
+    '.rbc-month-view, .rbc-agenda-view, .rbc-week-view': {
+      border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+      borderRadius: 12,
+      overflow: 'hidden',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+      backgroundColor: alpha(theme.palette.background.paper, 0.95),
+      height: '100%' // Asegurar que la vista ocupa toda la altura
+    },
+    '.rbc-month-row, .rbc-time-row': {
+      minHeight: '120px' // Celdas más altas pero no tan altas para evitar problemas de espacio
+    },
+    '.rbc-day-bg': {
+      transition: 'all 0.3s ease',
+      backgroundColor: 'white', // Fondo blanco para mejor contraste
+      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+    },
+    '.rbc-day-bg:hover': {
+      backgroundColor: alpha(theme.palette.background.default, 0.5)
+    },
+    '.rbc-today': {
+      backgroundColor: alpha(theme.palette.primary.light, 0.06),
+      borderTop: `2px solid ${theme.palette.primary.main}`,
+      boxShadow: 'inset 0 0 5px rgba(0,0,0,0.03)',
+    },
+    '.rbc-date-cell': {
+      padding: '10px 12px',
+      textAlign: 'center',
+      fontSize: '1rem',
+      fontWeight: 'medium',
+      position: 'relative',
+    },
+    '.rbc-date-cell.rbc-now': {
+      fontWeight: 'bold',
+      color: theme.palette.primary.main,
+    },
+    '.rbc-date-cell.rbc-now::after': {
+      content: '""',
+      position: 'absolute',
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: -1,
+    },
+    '.rbc-row-bg': {
+      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+    },
+    '.rbc-row-content': {
+      margin: '4px 0'
+    },
+    '.rbc-event': {
+      backgroundColor: 'transparent',
+      padding: 0,
+      border: 'none'
+    },
+    '.rbc-event-content': {
+      width: '100%'
+    },
+    '.rbc-row-segment': {
+      padding: '2px 6px'
+    },
+    '.rbc-show-more': {
+      backgroundColor: alpha(theme.palette.info.main, 0.1),
+      color: theme.palette.info.dark,
+      fontWeight: 'medium',
+      padding: '2px 8px',
+      borderRadius: 12,
+      fontSize: '0.75rem',
+      marginTop: 4,
+      transition: 'all 0.2s ease',
+      '&:hover': {
+        backgroundColor: alpha(theme.palette.info.main, 0.2),
+      }
+    },
+    '.rbc-off-range-bg': {
+      backgroundColor: alpha(theme.palette.background.default, 0.8)
+    },
+    '.rbc-off-range': {
+      color: alpha(theme.palette.text.disabled, 0.6)
+    },
+  };
+
+  // Estilos globales para el calendario
+  const GlobalStyles = () => (
+    <Global
+      styles={{
+        '.habits-calendar .rbc-event': {
+          backgroundColor: 'transparent !important',
+          border: 'none !important'
+        },
+        '.habits-calendar .rbc-event-content': {
+          width: '100% !important'
+        },
+        '.habits-calendar .rbc-day-bg': {
+          overflow: 'auto !important',
+          maxHeight: '150px !important',
+          msOverflowStyle: 'none !important',
+          scrollbarWidth: 'thin !important',
+          '&::-webkit-scrollbar': {
+            width: '4px !important'
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent !important'
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'rgba(0,0,0,0.1) !important',
+            borderRadius: '4px !important'
+          }
+        },
+        '.habits-calendar .rbc-month-view': {
+          flex: '1 0 0'
+        },
+        '.habits-calendar .rbc-month-header': {
+          fontWeight: 'bold !important'
+        },
+        '.habits-calendar .rbc-month-row': {
+          overflow: 'visible !important',
+          minHeight: '120px !important'
+        },
+        '.habits-calendar .rbc-off-range': {
+          opacity: '0.6 !important'
+        },
+        '.habits-calendar .rbc-day-slot': {
+          background: 'white !important'
+        },
+        '.habits-calendar .rbc-week-view': {
+          background: 'white !important',
+          flex: '1 !important',
+          display: 'flex !important',
+          flexDirection: 'column !important',
+          minHeight: '500px !important'
+        },
+        '.habits-calendar .rbc-calendar': {
+          height: '100% !important',
+          minHeight: '500px !important',
+          display: 'flex !important',
+          flexDirection: 'column !important'
+        }
+      }}
+    />
+  );
+
+  // Panel Superior (Navegación y Estadísticas)
+  const WeekNavigator = () => {
+    // Verificar si ya estamos en la semana actual o en el futuro
+    const isCurrentOrFutureWeek = () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Obtener el inicio de la semana actual que se está viendo
+      const { start: currentWeekStart } = getWeekRange(currentWeek);
+      
+      // Obtener el inicio de la semana que contiene la fecha actual
+      const nowWeekStart = getWeekRange(today).start;
+      
+      // Verificar si la semana que se está visualizando es la actual o posterior
+      return currentWeekStart >= nowWeekStart;
+    };
+    
+    // Calcular cuántas semanas en el pasado estamos
+    const getWeeksInPast = () => {
+      if (isCurrentOrFutureWeek()) return 0;
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Obtener el inicio de la semana actual que se está viendo
+      const { start: currentWeekStart } = getWeekRange(currentWeek);
+      
+      // Obtener el inicio de la semana que contiene la fecha actual
+      const nowWeekStart = getWeekRange(today).start;
+      
+      // Calcular la diferencia en días y convertir a semanas
+      const diffTime = Math.abs(nowWeekStart - currentWeekStart);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.round(diffDays / 7);
+    };
+    
+    const nextDisabled = isCurrentOrFutureWeek();
+    const weeksInPast = getWeeksInPast();
+    const isCurrentWeek = weeksInPast === 0;
+    
+    return (
+      <Card
+        elevation={3}
+        sx={{
+          width: '100%',
+          mb: 3,
+          mt: 2, // Agregar margen superior para separar del appbar
+          borderRadius: { xs: 2, sm: 3 },
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: { xs: theme.shadows[3], sm: theme.shadows[6] },
+          }
+        }}
+      >
+        <Box sx={{ 
+          p: { xs: 2, sm: 2.5 }, 
+          bgcolor: 'background.paper',
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+        }}>
+          <Stack 
+            direction="row" 
+            alignItems="center" 
+            justifyContent="space-between" 
+            spacing={2}
+          >
+            <Tooltip title="Semana anterior">
+              <IconButton 
+                onClick={() => handleNavigate('PREV')} 
+                size="small" 
+                color="primary"
+                sx={{
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  width: 36,
+                  height: 36,
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.2),
+                  }
+                }}
+              >
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            
+            <Box sx={{ 
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}>
+              <Typography variant={isMobile ? "h6" : "h5"} fontWeight="bold" color="primary.dark" align="center">
+                {formatWeekRangeDisplay(currentWeek)}
+              </Typography>
+              
+              {/* Mostrar el chip solo si no es la semana actual y es menor a 10 semanas atrás */}
+              {!isCurrentWeek && weeksInPast <= 10 && (
+                <Chip
+                  label={`${weeksInPast} ${weeksInPast === 1 ? 'semana' : 'semanas'} atrás`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  sx={{ 
+                    mt: 0.5, 
+                    fontSize: '0.75rem',
+                    height: 22,
+                    '& .MuiChip-label': { px: 1 }
+                  }}
+                />
+              )}
+              
+              {isCurrentWeek && (
+                <Chip
+                  label="Semana actual"
+                  size="small"
+                  color="success"
+                  sx={{ 
+                    mt: 0.5, 
+                    fontSize: '0.75rem',
+                    height: 22,
+                    '& .MuiChip-label': { px: 1 }
+                  }}
+                />
+              )}
+            </Box>
+
+            <Tooltip title={nextDisabled ? "No se puede navegar al futuro" : "Semana siguiente"}>
+              <span>
+                <IconButton 
+                  onClick={() => handleNavigate('NEXT')} 
+                  size="small" 
+                  color="primary"
+                  disabled={nextDisabled}
+                  sx={{
+                    bgcolor: alpha(theme.palette.primary.main, nextDisabled ? 0.05 : 0.1),
+                    color: nextDisabled ? alpha(theme.palette.primary.main, 0.4) : theme.palette.primary.main,
+                    width: 36,
+                    height: 36,
+                    '&:hover': {
+                      bgcolor: nextDisabled ? alpha(theme.palette.primary.main, 0.05) : alpha(theme.palette.primary.main, 0.2),
+                    }
+                  }}
+                >
+                  <ChevronRightIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+          
+                      {!isCurrentWeek && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                <Button 
+                  variant="contained" 
+                  size="small" 
+                  onClick={() => handleNavigate('TODAY')} 
+                  startIcon={<CalendarTodayIcon />}
+                  sx={{ 
+                    borderRadius: 2,
+                    py: 0.5,
+                    px: 2,
+                    boxShadow: 2
+                  }}
+                >
+                  Ir a semana actual
+                </Button>
+              </Box>
+            )}
+        </Box>
+      </Card>
+    );
+  };
+
+  // Componente de Tarjetas de Estadísticas
+  const StatCards = () => {
+    if (loading) {
+      return (
+        <Grid container spacing={3}>
+          {[1, 2, 3, 4].map((item) => (
+            <Grid item xs={12} sm={6} md={3} key={item}>
+              <Skeleton variant="rectangular" height={140} sx={{ borderRadius: 3 }} />
+            </Grid>
+          ))}
+        </Grid>
+      );
+    }
+    
+    const getColoredPercentage = (percentage) => {
+      if (percentage >= 80) return { color: theme.palette.success.main, text: 'Excelente' };
+      if (percentage >= 60) return { color: theme.palette.info.main, text: 'Muy bien' };
+      if (percentage >= 40) return { color: theme.palette.warning.main, text: 'Regular' };
+      return { color: theme.palette.error.main, text: 'Necesita mejorar' };
+    };
+    
+    return (
+      <Grid container spacing={3}>
+        {/* Tarjeta 1: Resumen de la semana */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              borderRadius: { xs: 2, sm: 3 }, 
+              height: '100%',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: { xs: 'none', sm: 'translateY(-5px)' },
+                boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+              }
+            }}
+          >
+            <Box
+              sx={{
+                p: { xs: 2, sm: 3 },
+                background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                borderBottom: `1px solid ${theme.palette.divider}`
+              }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    width: { xs: 36, sm: 40 },
+                    height: { xs: 36, sm: 40 }
+                  }}
+                >
+                  <CalendarViewWeekIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                    Progreso Semanal
+                  </Typography>
+                  <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                    {formatWeekRangeDisplay(currentWeek)}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+                        <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Box sx={{ mb: 2, mt: 2, textAlign: 'center' }}>
+                <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  {stats.weeklyCompletion}%
+                </Typography>
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{ 
+                    fontWeight: 'medium', 
+                    color: getColoredPercentage(stats.weeklyCompletion).color
+                  }}
+                >
+                  {getColoredPercentage(stats.weeklyCompletion).text}
+                </Typography>
+              </Box>
+              
+              <LinearProgress 
+                variant="determinate" 
+                value={stats.weeklyCompletion} 
+                color="primary"
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  mb: 2
+                }}
+              />
+              
+              <Box sx={{ mt: 'auto', pt: 1 }}>
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary" 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between' 
+                  }}
+                >
+                  <span>Total hábitos: {stats.totalHabits}</span>
+                  <span>Completado hoy: {stats.completedToday}/{stats.todayHabits}</span>
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Tarjeta 2: Hábito más consistente */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              borderRadius: { xs: 2, sm: 3 }, 
+              height: '100%',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: { xs: 'none', sm: 'translateY(-5px)' },
+                boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+              }
+            }}
+          >
+            <Box 
+              sx={{ 
+                p: { xs: 2, sm: 3 },
+                background: `linear-gradient(to right, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
+                borderBottom: `1px solid ${theme.palette.divider}`
+              }} 
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    width: { xs: 36, sm: 40 },
+                    height: { xs: 36, sm: 40 }
+                  }}
+                >
+                  <CheckCircleIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                    Mejor Rendimiento
+                  </Typography>
+                  <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                    Hábito más consistente
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+            <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {stats.habitStats && stats.habitStats.length > 0 ? (
+                <>
+                  <Box sx={{ mb: 2, mt: 2, display: 'flex', alignItems: 'center' }}>
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: theme.palette[stats.mostConsistentHabit.color]?.main || theme.palette.primary.main,
+                        mr: 2
+                      }}
+                    >
+                      {stats.mostConsistentHabit.name?.substring(0, 1) || '?'}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                        {stats.mostConsistentHabit.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {stats.mostConsistentHabit.completedDays} de {stats.mostConsistentHabit.possibleDays} días
+                      </Typography>
+                    </Box>
+                  </Box>
+                  
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={stats.mostConsistentHabit.percentage} 
+                    color="success"
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                      mb: 2
+                    }}
+                  />
+                  
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      textAlign: 'center',
+                      color: theme.palette.success.main,
+                      mb: 1
+                    }}
+                  >
+                    {stats.mostConsistentHabit.percentage}%
+                  </Typography>
+                  
+                  <Box sx={{ mt: 'auto', pt: 1 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'medium',
+                          color: theme.palette.success.main
+                        }}
+                      >
+                        Efectividad alta
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'medium',
+                          color: theme.palette.success.dark
+                        }}
+                      >
+                        Consistencia {stats.mostConsistentHabit.completedDays} días
+                      </Typography>
+                    </Stack>
+                  </Box>
+                </>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No hay datos suficientes
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Tarjeta 3: Mejor día de la semana */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              borderRadius: { xs: 2, sm: 3 }, 
+              height: '100%',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: { xs: 'none', sm: 'translateY(-5px)' },
+                boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+              }
+            }}
+          >
+            <Box 
+              sx={{ 
+                p: { xs: 2, sm: 3 },
+                background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
+                borderBottom: `1px solid ${theme.palette.divider}`
+              }} 
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    width: { xs: 36, sm: 40 },
+                    height: { xs: 36, sm: 40 }
+                  }}
+                >
+                  <TodayIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                    Mejor Día
+                  </Typography>
+                  <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                    Mayor cumplimiento
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+                        <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {stats.bestDay && stats.bestDay.day ? (
+                <>
+                  <Box sx={{ mb: 2, mt: 2, textAlign: 'center' }}>
+                    <Typography 
+                      variant="h4" 
+                      sx={{ 
+                        fontWeight: 'bold', 
+                        color: theme.palette.info.main
+                      }}
+                    >
+                      {stats.bestDay.day}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {stats.bestDay.completed} de {stats.bestDay.total} hábitos
+                    </Typography>
+                    <Typography variant="caption" color="info.dark" sx={{ mt: 0.5, display: 'block', fontWeight: 'medium' }}>
+                      Rendimiento destacado
+                    </Typography>
+                  </Box>
+                  
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={stats.bestDay.percentage} 
+                    color="info"
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                      mb: 2
+                    }}
+                  />
+                  
+                  <Box sx={{ mt: 'auto', pt: 1 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'medium',
+                          color: theme.palette.info.main
+                        }}
+                      >
+                        {stats.bestDay.percentage}% completado
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'medium',
+                          color: theme.palette.info.dark
+                        }}
+                      >
+                        {stats.bestDay.completed} hábitos
+                      </Typography>
+                    </Stack>
+                  </Box>
+                </>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No hay datos suficientes
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Tarjeta 4: Hábito que necesita mejorar */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            elevation={3} 
+            sx={{ 
+              borderRadius: { xs: 2, sm: 3 }, 
+              height: '100%',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: { xs: 'none', sm: 'translateY(-5px)' },
+                boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+              }
+            }}
+          >
+            <Box 
+              sx={{ 
+                p: { xs: 2, sm: 3 },
+                background: `linear-gradient(to right, ${theme.palette.warning.dark}, ${theme.palette.warning.main})`,
+                borderBottom: `1px solid ${theme.palette.divider}`
+              }} 
+            >
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    width: { xs: 36, sm: 40 },
+                    height: { xs: 36, sm: 40 }
+                  }}
+                >
+                  <HistoryIcon />
+                </Avatar>
+                <Box>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                    Necesita Mejorar
+                  </Typography>
+                  <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                    Hábito menos consistente
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+            <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {stats.habitStats && stats.habitStats.length > 0 && stats.leastConsistentHabit && stats.leastConsistentHabit.name ? (
+                <>
+                  <Box sx={{ mb: 2, mt: 2, display: 'flex', alignItems: 'center' }}>
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: theme.palette[stats.leastConsistentHabit.color]?.main || theme.palette.warning.main,
+                        mr: 2
+                      }}
+                    >
+                      {stats.leastConsistentHabit.name?.substring(0, 1) || '?'}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                        {stats.leastConsistentHabit.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {stats.leastConsistentHabit.completedDays} de {stats.leastConsistentHabit.possibleDays} días
+                      </Typography>
+                    </Box>
+                  </Box>
+                  
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={stats.leastConsistentHabit.percentage} 
+                    color="warning" 
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                      mb: 2
+                    }}
+                  />
+                  
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      textAlign: 'center',
+                      color: theme.palette.warning.main,
+                      mb: 1
+                    }}
+                  >
+                    {stats.leastConsistentHabit.percentage}%
+                  </Typography>
+                  
+                  <Box sx={{ mt: 'auto', pt: 1 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'medium',
+                          color: theme.palette.warning.main
+                        }}
+                      >
+                        Prioridad alta
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 'medium',
+                          color: theme.palette.warning.dark
+                        }}
+                      >
+                        Oportunidad de mejora
+                      </Typography>
+                    </Stack>
+                  </Box>
+                </>
+              ) : (
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No hay datos suficientes
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    );
+  };
+
+  // Componente del Calendario
+  const CalendarPanel = () => {
     if (loading) {
       return (
         <Box textAlign="center" py={5}>
@@ -659,64 +1583,408 @@ const Habits = () => {
       );
     }
 
-    const title = viewMode === 'today' 
-      ? (isToday(selectedDate) ? 'Hábitos de Hoy' : 'Hábitos para el ' + getFormattedDate(selectedDate))
-      : 'Todos los Hábitos';
+    return (
+      <Card
+        elevation={3}
+        sx={{
+          width: '100%',
+          height: 'auto',
+          minHeight: '500px',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: { xs: 2, sm: 3 },
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+          }
+        }}
+      >
+        <Box
+          sx={{
+            p: { xs: 2, sm: 3 },
+            background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Avatar
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 }
+                }}
+              >
+                <DateRangeIcon />
+              </Avatar>
+              <Box>
+                <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                  Seguimiento Semanal
+                </Typography>
+                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                  {formatWeekRangeDisplay(currentWeek)}
+                </Typography>
+              </Box>
+            </Box>
+          </Stack>
+        </Box>
+        
+        <Box sx={{ flex: 1, p: { xs: 1, sm: 2 }, bgcolor: 'background.paper' }} className="habits-calendar">
+          <Calendar
+            localizer={localizer}
+            events={habitEvents}
+            startAccessor="start"
+            endAccessor="end"
+            style={calendarStyles}
+            view="week"
+            views={['week']}
+            components={{
+              event: HabitEvent,
+              toolbar: () => null,
+              dateCellWrapper: DayStatsWrapper
+            }}
+            messages={{
+              today: 'Hoy',
+              previous: 'Anterior',
+              next: 'Siguiente',
+              week: 'Semana',
+              date: 'Fecha',
+              noEventsInRange: 'No hay hábitos para mostrar en este período',
+            }}
+            date={currentWeek}
+          />
+        </Box>
+      </Card>
+    );
+  };
+
+  // Componente para el gráfico de evolución semanal
+  const WeeklyEvolutionChart = () => {
+    const [chartData, setChartData] = useState({
+      series: [],
+      options: {}
+    });
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+    // Obtener datos históricos de hábitos completados
+    useEffect(() => {
+      if (!userData || !habits.length) return;
+
+      // Obtener la fecha actual
+      const currentDate = new Date();
+      
+      // Obtener las últimas 5 semanas (incluyendo la actual)
+      const weekLabels = [];
+      const weekDates = [];
+      
+      for (let i = 4; i >= 0; i--) {
+        const weekStart = new Date(currentDate);
+        weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
+        
+        // Formatear la fecha para mostrar como etiqueta
+        const weekLabel = `${formatDate(weekStart).substring(5)}`;
+        weekLabels.push(weekLabel);
+        
+        // Almacenar las fechas de inicio de cada semana
+        weekDates.push(weekStart);
+      }
+
+      // Preparar series de datos para el gráfico
+      const series = [];
+      
+      // Para cada una de las últimas 5 semanas
+      weekDates.forEach((weekStartDate, weekIndex) => {
+        // Calcular la fecha final de la semana (fecha inicial + 6 días)
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekStartDate.getDate() + 6);
+        
+        // Formatear fechas como DD/MM
+        const startFormatted = `${weekStartDate.getDate().toString().padStart(2, '0')}/${(weekStartDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        const endFormatted = `${weekEndDate.getDate().toString().padStart(2, '0')}/${(weekEndDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        
+        const weekData = {
+          name: `${startFormatted} - ${endFormatted}`,
+          data: Array(7).fill(0) // Inicializar con 0 completados para cada día
+        };
+        
+        // Calcular el porcentaje de completados para cada día de la semana
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+          const currentDay = new Date(weekStartDate);
+          currentDay.setDate(weekStartDate.getDate() + dayOffset);
+          const dateStr = formatDate(currentDay);
+          
+          // Contar hábitos posibles y completados para ese día
+          let possibleHabits = 0;
+          let completedHabitsCount = 0;
+          
+          habits.forEach(habit => {
+            if (shouldShowHabitForDate(habit, currentDay)) {
+              possibleHabits++;
+              
+              // Verificar si el hábito fue completado
+              if (allWeeksCompletedHabits[dateStr] && allWeeksCompletedHabits[dateStr][habit.id]) {
+                completedHabitsCount++;
+              }
+            }
+          });
+          
+          // Calcular porcentaje de completitud para ese día
+          weekData.data[dayOffset] = possibleHabits > 0 
+            ? Math.round((completedHabitsCount / possibleHabits) * 100) 
+            : 0;
+        }
+        
+        series.push(weekData);
+      });
+
+      // Configuración del gráfico
+      const chartOptions = {
+        chart: {
+          height: 350,
+          type: 'line',
+          toolbar: {
+            show: true,
+            tools: {
+              download: true,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true
+            }
+          },
+          fontFamily: theme.typography.fontFamily,
+          background: 'transparent',
+          dropShadow: {
+            enabled: true,
+            top: 2,
+            left: 2,
+            blur: 4,
+            opacity: 0.15
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 3,
+          lineCap: 'round'
+        },
+        markers: {
+          size: 4,
+          strokeWidth: 2,
+          hover: {
+            size: 7
+          }
+        },
+        xaxis: {
+          categories: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
+          labels: {
+            style: {
+              colors: theme.palette.text.secondary,
+              fontSize: '12px'
+            }
+          },
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          }
+        },
+        yaxis: {
+          min: 0,
+          max: 100,
+          labels: {
+            formatter: (val) => `${val}%`,
+            style: {
+              colors: theme.palette.text.secondary
+            }
+          }
+        },
+        tooltip: {
+          x: {
+            show: true
+          },
+          y: {
+            formatter: val => `${val}%`
+          },
+          theme: theme.palette.mode === 'dark' ? 'dark' : 'light',
+          style: {
+            fontSize: '12px',
+            fontFamily: theme.typography.fontFamily
+          }
+        },
+        grid: {
+          borderColor: theme.palette.divider,
+          strokeDashArray: 5,
+          xaxis: {
+            lines: {
+              show: true
+            }
+          },
+          yaxis: {
+            lines: {
+              show: true
+            }
+          },
+          padding: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 10
+          }
+        },
+        legend: {
+          position: 'left',
+          horizontalAlign: 'left',
+          labels: {
+            colors: theme.palette.text.secondary
+          },
+          fontSize: '13px',
+          itemMargin: {
+            horizontal: 10,
+            vertical: 5
+          },
+          offsetX: 10,
+          offsetY: 5
+        },
+        responsive: [
+          {
+            breakpoint: 600,
+            options: {
+              chart: {
+                height: 240
+              },
+              legend: {
+                show: true,
+                position: 'bottom',
+                horizontalAlign: 'center',
+                offsetY: 5,
+                fontSize: '11px',
+                itemMargin: {
+                  horizontal: 6,
+                  vertical: 3
+                }
+              }
+            }
+          }
+        ],
+        colors: [
+          theme.palette.primary.main,
+          theme.palette.info.main, 
+          theme.palette.success.main, 
+          theme.palette.warning.main,
+          theme.palette.error.main
+        ]
+      };
+
+      setChartData({
+        series,
+        options: chartOptions
+      });
+    }, [userData, habits, allWeeksCompletedHabits, theme]);
+
+    // Si no hay datos, mostrar un mensaje
+    if (chartData.series.length === 0) {
+      return null;
+    }
 
     return (
-      <Box>
-         <Typography variant="h6" gutterBottom sx={{ pl: 1, mb: 2 }}>
-          {title} ({filteredHabits.length})
-        </Typography>
-        {filteredHabits.length > 0 ? (
-          <List disablePadding>
-            {filteredHabits.map((habit) => (
-              <HabitItem key={habit.id} habit={habit} />
-            ))}
-          </List>
-        ) : (
-          <Paper 
-            variant="outlined" 
-            sx={{ 
-              p: 4, 
-              textAlign: 'center', 
-              borderStyle: 'dashed', 
-              borderRadius: 2,
-              bgcolor: alpha(theme.palette.primary.main, 0.03)
-            }}
-          >
-            <AssignmentTurnedInIcon sx={{ fontSize: 50, color: 'text.secondary', opacity: 0.6, mb: 2 }} />
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-              {viewMode === 'today'
-                ? (habits.length === 0 ? 'Aún no has creado ningún hábito.' : 'No hay hábitos programados para este día.')
-                : 'Aún no has creado ningún hábito.'}
-            </Typography>
-            <Button 
-              variant="contained" 
-              startIcon={<AddIcon />}
-              onClick={createNewHabit}
-              size="medium"
-            >
-              Crear Hábito
-            </Button>
-          </Paper>
-        )}
-      </Box>
+      <Card
+        elevation={3}
+        sx={{
+          width: '100%',
+          borderRadius: { xs: 2, sm: 3 },
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+          }
+        }}
+      >
+        <Box
+          sx={{
+            p: { xs: 2, sm: 3 },
+            background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+            borderBottom: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Avatar
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 }
+                }}
+              >
+                <ShowChartIcon />
+              </Avatar>
+              <Box>
+                <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                  Evolución Semanal
+                </Typography>
+                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                  Comparativa de las últimas 5 semanas
+                </Typography>
+              </Box>
+            </Box>
+          </Stack>
+        </Box>
+        
+        <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', height: isMobile ? 300 : 400 }}>
+          <ReactApexChart
+            options={chartData.options}
+            series={chartData.series}
+            type="line"
+            height={isMobile ? 240 : 350}
+          />
+        </Box>
+      </Card>
     );
   };
 
   return (
     <Layout title="Seguimiento de Hábitos">
-       <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}> {/* Ajusta maxWidth según necesidad */}
-        <Stack spacing={3}>
-          {/* Panel de Control (Stats y Navegación) */}
-          <ControlPanel />
+      <GlobalStyles />
+      <Box sx={{ 
+        maxWidth: { xs: 1200, md: 1400, lg: 1600 }, 
+        mx: 'auto', 
+        width: '100%',
+        px: { xs: 1, sm: 2, md: 3 },
+        py: { xs: 2, md: 3 },
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+        pb: { xs: 10, sm: 8 }
+      }}>
+        {/* Navegador de Semanas */}
+        <WeekNavigator />
+        
+        {/* Tarjetas de Estadísticas */}
+        <StatCards />
 
-          {/* Lista de Hábitos */}
-          <HabitsListPanel />
-          
-        </Stack>
-      </Container>
+        {/* Panel del Calendario */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minHeight: { xs: '500px', sm: '550px', md: '600px' },
+          mb: { xs: 4, sm: 2 }
+        }}>
+          <CalendarPanel />
+        </Box>
+
+        {/* Gráfico de Evolución de Hábitos */}
+        <WeeklyEvolutionChart />
+      </Box>
 
       {/* Botón Flotante para añadir */}
       <Fab 
@@ -726,7 +1994,8 @@ const Habits = () => {
         sx={{
           position: 'fixed',
           bottom: { xs: 70, sm: 30 }, // Ajustar posición para evitar barra inferior en móvil
-          right: { xs: 16, sm: 30 }
+          right: { xs: 16, sm: 30 },
+          boxShadow: 6
         }}
       >
         <AddIcon />

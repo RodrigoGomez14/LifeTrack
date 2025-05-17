@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AppBar as MuiAppBar, 
   Toolbar, 
@@ -7,27 +7,23 @@ import {
   Box, 
   alpha, 
   Avatar, 
-  Badge, 
   Menu,
   MenuItem,
   Stack,
-  Chip,
   Button,
   Tooltip,
   Divider,
   useMediaQuery,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Paper
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
-import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { formatAmount } from '../../utils';
@@ -42,6 +38,8 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SpeedIcon from '@mui/icons-material/Speed';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ScienceIcon from '@mui/icons-material/Science';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
 const AppBar = ({ toggleDrawer, title }) => {
   const theme = useTheme();
@@ -62,15 +60,21 @@ const AppBar = ({ toggleDrawer, title }) => {
   
   // Estados para menús
   const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
-  const [notificationsMenuAnchor, setNotificationsMenuAnchor] = useState(null);
   const [quickActionMenuAnchor, setQuickActionMenuAnchor] = useState(null);
+  
+  // Estado para cotizacion del dólar
+  const [dollarRate, setDollarRate] = useState({ buy: 1250, sell: 1300 });
+  const [rateChange, setRateChange] = useState(1.5); // Porcentaje de cambio respecto a ayer
+  
+  // Simular obtención de cotización del dólar
+  useEffect(() => {
+    // En un caso real, aquí habría una llamada a una API para obtener la cotización actualizada
+    // setDollarRate({ buy: valorActualizado, sell: valorActualizado });
+  }, []);
   
   // Funciones para manejar apertura/cierre de menús
   const handleOpenProfileMenu = (event) => setProfileMenuAnchor(event.currentTarget);
   const handleCloseProfileMenu = () => setProfileMenuAnchor(null);
-  
-  const handleOpenNotificationsMenu = (event) => setNotificationsMenuAnchor(event.currentTarget);
-  const handleCloseNotificationsMenu = () => setNotificationsMenuAnchor(null);
   
   const handleOpenQuickActionMenu = (event) => setQuickActionMenuAnchor(event.currentTarget);
   const handleCloseQuickActionMenu = () => setQuickActionMenuAnchor(null);
@@ -139,41 +143,29 @@ const AppBar = ({ toggleDrawer, title }) => {
             <MenuIcon />
           </IconButton>
           
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {!isMobile && (
-              <Avatar 
-                sx={{ 
-                  bgcolor: alpha('#fff', 0.2),
-                  width: 32,
-                  height: 32,
-                  mr: 1.5
-                }}
-              >
-                <DashboardOutlinedIcon fontSize="small" />
-              </Avatar>
-            )}
-            <Typography 
-              variant={isMobile ? "subtitle1" : "h5"} 
-              fontWeight="bold"
-              sx={{ 
-                textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                letterSpacing: 0.5,
-                fontSize: { xs: '0.9rem', sm: '1.25rem' }
-              }}
-            >
-              {title || ''}
-            </Typography>
-          </Box>
+          <Typography 
+            variant={isMobile ? "subtitle1" : "h5"} 
+            fontWeight="bold"
+            sx={{ 
+              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+              letterSpacing: 0.5,
+              fontSize: { xs: '0.9rem', sm: '1.25rem' }
+            }}
+          >
+            {title || ''}
+          </Typography>
         </Stack>
         
-        {/* Zona derecha: Acciones rápidas y perfil */}
+        {/* Zona derecha: Información financiera, acciones rápidas y perfil */}
         <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center">
-          {/* Indicador de ahorros solo en desktop */}
+          
+          {/* Información de ahorros mejorada */}
           {!isMobile && userData && (
-            <Box
+            <Paper
+              elevation={0}
               onClick={() => navigate('/Finanzas')}
               sx={{
-                bgcolor: alpha('#fff', 0.1),
+                bgcolor: alpha(theme.palette.primary.dark, 0.4),
                 borderRadius: 2,
                 p: 0.75,
                 mr: 1,
@@ -181,9 +173,9 @@ const AppBar = ({ toggleDrawer, title }) => {
                 position: 'relative',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
-                maxWidth: 160,
+                border: `1px solid ${alpha('#fff', 0.1)}`,
                 '&:hover': {
-                  bgcolor: alpha('#fff', 0.2),
+                  bgcolor: alpha(theme.palette.primary.dark, 0.6),
                   transform: 'translateY(-2px)'
                 }
               }}
@@ -191,19 +183,19 @@ const AppBar = ({ toggleDrawer, title }) => {
               <Stack spacing={0.5}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <AttachMoneyIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />
-                  <Typography variant="body2" fontWeight="medium" color="white" noWrap>
-                    {formatAmount(getSavingsUSD()).replace('$', '')} USD
+                  <Typography variant="body2" fontWeight="bold" color="white" noWrap>
+                    {formatAmount(getSavingsUSD())} USD
                   </Typography>
                 </Stack>
                 
                 <Stack direction="row" spacing={1} alignItems="center">
                   <MonetizationOnIcon sx={{ fontSize: 16, color: theme.palette.primary.light }} />
-                  <Typography variant="body2" fontWeight="medium" color="white" noWrap>
-                    {formatAmount(getSavingsAmount()).replace('$', '')} ARS
+                  <Typography variant="body2" fontWeight="bold" color="white" noWrap>
+                    {formatAmount(getSavingsAmount())} ARS
                   </Typography>
                 </Stack>
               </Stack>
-            </Box>
+            </Paper>
           )}
           
           {/* Versión mobile del indicador de ahorros */}
@@ -217,22 +209,7 @@ const AppBar = ({ toggleDrawer, title }) => {
                   '&:hover': { bgcolor: alpha('#fff', 0.15) }
                 }}
               >
-                <Badge 
-                  badgeContent={
-                    <Typography variant="caption" 
-                      sx={{ 
-                        fontSize: '0.6rem', 
-                        fontWeight: 'bold',
-                        color: 'white'
-                      }}
-                    >
-                      $
-                    </Typography>
-                  } 
-                  color="success"
-                >
-                  <AccountBalanceWalletIcon />
-                </Badge>
+                <AccountBalanceWalletIcon />
               </IconButton>
             </Tooltip>
           )}
@@ -318,22 +295,6 @@ const AppBar = ({ toggleDrawer, title }) => {
             </Menu>
           </Box>
           
-          {/* Notificaciones */}
-          <Tooltip title="Notificaciones">
-            <IconButton 
-              color="inherit" 
-              onClick={handleOpenNotificationsMenu}
-              sx={{ 
-                '&:hover': { bgcolor: alpha('#fff', 0.15) },
-                p: { xs: 0.5, sm: 1 }
-              }}
-            >
-              <Badge badgeContent={3} color="error">
-                <NotificationsOutlinedIcon />
-              </Badge>
-            </IconButton>
-          </Tooltip>
-          
           {/* Perfil de usuario */}
           <Box sx={{ flexGrow: 0, ml: { xs: 0.5, sm: 1 } }}>
             <Tooltip title={firstName ? `Perfil de ${firstName}` : "Abrir menú de perfil"}>
@@ -416,75 +377,6 @@ const AppBar = ({ toggleDrawer, title }) => {
           </Box>
         </Stack>
       </Toolbar>
-      
-      {/* Menú de notificaciones */}
-      <Menu
-        anchorEl={notificationsMenuAnchor}
-        open={Boolean(notificationsMenuAnchor)}
-        onClose={handleCloseNotificationsMenu}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        PaperProps={{
-          sx: {
-            borderRadius: 2,
-            width: { xs: '90vw', sm: 320 },
-            maxWidth: 320,
-            maxHeight: 400
-          }
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Typography variant="subtitle1" fontWeight="bold">
-            {firstName ? `Notificaciones de ${firstName}` : 'Notificaciones'}
-          </Typography>
-        </Box>
-        <Divider />
-        
-        <MenuItem sx={{ borderRadius: 1, mb: 0.5 }}>
-          <Box>
-            <Typography variant="body2" fontWeight="medium">
-              Pago de tarjeta pendiente
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Tu tarjeta Visa vence en 3 días
-            </Typography>
-          </Box>
-        </MenuItem>
-        
-        <MenuItem sx={{ borderRadius: 1, mb: 0.5 }}>
-          <Box>
-            <Typography variant="body2" fontWeight="medium">
-              Ahorro mensual completado
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Has alcanzado tu meta de ahorro mensual
-            </Typography>
-          </Box>
-        </MenuItem>
-        
-        <MenuItem sx={{ borderRadius: 1 }}>
-          <Box>
-            <Typography variant="body2" fontWeight="medium">
-              Recordatorio de riego
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Tus plantas necesitan agua hoy
-            </Typography>
-          </Box>
-        </MenuItem>
-        
-        <Divider sx={{ my: 1 }} />
-        
-        <Box sx={{ textAlign: 'center' }}>
-          <Button 
-            size="small" 
-            sx={{ fontSize: '0.75rem' }}
-            onClick={handleCloseNotificationsMenu}
-          >
-            Ver todas
-          </Button>
-        </Box>
-      </Menu>
     </MuiAppBar>
   );
 };
