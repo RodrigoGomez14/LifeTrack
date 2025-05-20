@@ -750,28 +750,92 @@ const Habits = () => {
     );
   };
 
+  // Función auxiliar para crear los componentes de cabecera
+  const CustomHeader = ({ date, label }) => {
+    // Determinar si es el día actual
+    const isCurrentDay = isToday(date);
+    const dayOfWeek = date.getDay();
+    const dayDate = date.getDate();
+    
+    // Nombres de días en español abreviados
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    
+    return (
+      <div 
+        style={{ 
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: isCurrentDay ? theme.palette.primary.main : 'transparent',
+          boxShadow: isCurrentDay ? `0 3px 10px ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
+          borderRadius: '10px 10px 0 0',
+          position: 'relative',
+          padding: '8px 0',
+          margin: 0,
+          transition: 'all 0.2s ease-in-out',
+        }}
+      >
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            py: 1.5,
+            width: '100%',
+          }}
+        >
+          <Typography 
+            variant="subtitle1" 
+            sx={{ 
+              fontWeight: 'bold',
+              color: isCurrentDay ? theme.palette.common.white : theme.palette.text.secondary,
+              fontSize: '0.85rem',
+              lineHeight: 1,
+              mb: 0.5,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}
+          >
+            {dayNames[dayOfWeek]}
+          </Typography>
+          
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              fontWeight: 'bold',
+              color: isCurrentDay ? theme.palette.common.white : theme.palette.text.primary,
+              fontSize: '1.2rem',
+              lineHeight: 1
+            }}
+          >
+            {dayDate}
+          </Typography>
+        </Box>
+      </div>
+    );
+  };
+
   // Estilos para personalizar el calendario
   const calendarStyles = {
-    height: '100%', // Usar 100% de la altura disponible en lugar de una altura fija
-    minHeight: '500px',
     position: 'relative',
     '.rbc-toolbar': {
       display: 'none'
     },
     '.rbc-header': {
-      padding: '12px 8px',
-      fontWeight: 'bold',
+      padding: 0,
+      fontWeight: 'normal',
       fontSize: '1rem',
-      textTransform: 'uppercase',
-      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-      color: theme.palette.primary.dark,
-      borderTopLeftRadius: 8,
-      borderTopRightRadius: 8,
-      letterSpacing: '0.5px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+      backgroundColor: 'transparent',
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      boxShadow: 'none',
+      overflow: 'hidden',
     },
     '.rbc-header + .rbc-header': {
-      borderLeft: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+      borderLeft: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
     },
     '.rbc-time-header': {
       display: 'none'
@@ -785,15 +849,16 @@ const Habits = () => {
       overflow: 'hidden',
       boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
       backgroundColor: alpha(theme.palette.background.paper, 0.95),
-      height: '100%' // Asegurar que la vista ocupa toda la altura
     },
     '.rbc-month-row, .rbc-time-row': {
-      minHeight: '120px' // Celdas más altas pero no tan altas para evitar problemas de espacio
+      minHeight: 'auto',
     },
     '.rbc-day-bg': {
       transition: 'all 0.3s ease',
       backgroundColor: 'white', // Fondo blanco para mejor contraste
       border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+      margin: '0 2px', // Agregar margen horizontal entre los días
+      borderRadius: '0 0 8px 8px', // Redondear las esquinas inferiores
     },
     '.rbc-day-bg:hover': {
       backgroundColor: alpha(theme.palette.background.default, 0.5)
@@ -862,6 +927,17 @@ const Habits = () => {
     '.rbc-off-range': {
       color: alpha(theme.palette.text.disabled, 0.6)
     },
+    // Establecer un espacio entre los días en la vista de semana
+    '.rbc-time-view .rbc-day-slot': {
+      margin: '0 2px',
+    },
+    '.rbc-time-header-content .rbc-header': {
+      margin: '0 2px',
+    },
+    // Añadir espacio entre las filas del calendario
+    '.rbc-row': {
+      marginBottom: '2px',
+    }
   };
 
   // Estilos globales para el calendario
@@ -877,7 +953,6 @@ const Habits = () => {
         },
         '.habits-calendar .rbc-day-bg': {
           overflow: 'auto !important',
-          maxHeight: '150px !important',
           msOverflowStyle: 'none !important',
           scrollbarWidth: 'thin !important',
           '&::-webkit-scrollbar': {
@@ -899,7 +974,6 @@ const Habits = () => {
         },
         '.habits-calendar .rbc-month-row': {
           overflow: 'visible !important',
-          minHeight: '120px !important'
         },
         '.habits-calendar .rbc-off-range': {
           opacity: '0.6 !important'
@@ -912,13 +986,42 @@ const Habits = () => {
           flex: '1 !important',
           display: 'flex !important',
           flexDirection: 'column !important',
-          minHeight: '500px !important'
         },
         '.habits-calendar .rbc-calendar': {
-          height: '100% !important',
-          minHeight: '500px !important',
           display: 'flex !important',
           flexDirection: 'column !important'
+        },
+        // Restaurar y mejorar estilos para el encabezado
+        '.habits-calendar .rbc-header': {
+          padding: '0 !important',
+          position: 'relative !important',
+          height: 'auto !important',
+          width: '100% !important'
+        },
+        '.habits-calendar .rbc-header > *': {
+          width: '100% !important',
+          height: '100% !important'
+        },
+        '.habits-calendar .rbc-row-content': {
+          marginTop: '12px !important' // Aumentar margen superior
+        },
+        '.habits-calendar .rbc-header > span': {
+          display: 'none !important' // Ocultar texto original del header
+        },
+        '.habits-calendar .rbc-row.rbc-month-header': {
+          marginBottom: '10px !important', // Aumentar margen inferior
+        },
+        '.habits-calendar .rbc-header + .rbc-header': {
+          borderLeftWidth: '2px !important',
+          borderLeftColor: 'rgba(0,0,0,0.04) !important'
+        },
+        '.habits-calendar .rbc-time-view': {
+          border: '1px solid #ddd !important',
+          borderRadius: '12px !important',
+          overflow: 'hidden !important'
+        },
+        '.habits-calendar .rbc-time-header-content .rbc-header.rbc-today': {
+          backgroundColor: 'transparent !important'
         }
       }}
     />
@@ -976,12 +1079,13 @@ const Habits = () => {
           transition: 'all 0.3s ease',
           '&:hover': {
             boxShadow: { xs: theme.shadows[3], sm: theme.shadows[6] },
-          }
+          },
+          bgcolor: '#1a1a1a' // Fondo oscuro para mejor contraste
         }}
       >
         <Box sx={{ 
           p: { xs: 2, sm: 2.5 }, 
-          bgcolor: 'background.paper',
+          bgcolor: 'rgba(0,0,0,0.8)',
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`
         }}>
           <Stack 
@@ -994,13 +1098,13 @@ const Habits = () => {
               <IconButton 
                 onClick={() => handleNavigate('PREV')} 
                 size="small" 
-                color="primary"
                 sx={{
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  bgcolor: alpha(theme.palette.common.white, 0.15),
+                  color: theme.palette.common.white,
                   width: 36,
                   height: 36,
                   '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.2),
+                    bgcolor: alpha(theme.palette.common.white, 0.25),
                   }
                 }}
               >
@@ -1014,7 +1118,7 @@ const Habits = () => {
               flexDirection: 'column',
               alignItems: 'center'
             }}>
-              <Typography variant={isMobile ? "h6" : "h5"} fontWeight="bold" color="primary.dark" align="center">
+              <Typography variant={isMobile ? "h6" : "h5"} fontWeight="bold" color="common.white" align="center">
                 {formatWeekRangeDisplay(currentWeek)}
               </Typography>
               
@@ -1023,12 +1127,13 @@ const Habits = () => {
                 <Chip
                   label={`${weeksInPast} ${weeksInPast === 1 ? 'semana' : 'semanas'} atrás`}
                   size="small"
-                  color="primary"
                   variant="outlined"
                   sx={{ 
                     mt: 0.5, 
                     fontSize: '0.75rem',
                     height: 22,
+                    color: 'white',
+                    borderColor: alpha(theme.palette.common.white, 0.5),
                     '& .MuiChip-label': { px: 1 }
                   }}
                 />
@@ -1053,16 +1158,15 @@ const Habits = () => {
               <span>
                 <IconButton 
                   onClick={() => handleNavigate('NEXT')} 
-                  size="small" 
-                  color="primary"
+                  size="small"
                   disabled={nextDisabled}
                   sx={{
-                    bgcolor: alpha(theme.palette.primary.main, nextDisabled ? 0.05 : 0.1),
-                    color: nextDisabled ? alpha(theme.palette.primary.main, 0.4) : theme.palette.primary.main,
+                    bgcolor: alpha(theme.palette.common.white, nextDisabled ? 0.05 : 0.15),
+                    color: nextDisabled ? alpha(theme.palette.common.white, 0.4) : theme.palette.common.white,
                     width: 36,
                     height: 36,
                     '&:hover': {
-                      bgcolor: nextDisabled ? alpha(theme.palette.primary.main, 0.05) : alpha(theme.palette.primary.main, 0.2),
+                      bgcolor: nextDisabled ? alpha(theme.palette.common.white, 0.05) : alpha(theme.palette.common.white, 0.25),
                     }
                   }}
                 >
@@ -1072,24 +1176,29 @@ const Habits = () => {
             </Tooltip>
           </Stack>
           
-                      {!isCurrentWeek && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                <Button 
-                  variant="contained" 
-                  size="small" 
-                  onClick={() => handleNavigate('TODAY')} 
-                  startIcon={<CalendarTodayIcon />}
-                  sx={{ 
-                    borderRadius: 2,
-                    py: 0.5,
-                    px: 2,
-                    boxShadow: 2
-                  }}
-                >
-                  Ir a semana actual
-                </Button>
-              </Box>
-            )}
+          {!isCurrentWeek && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button 
+                variant="contained" 
+                size="small" 
+                onClick={() => handleNavigate('TODAY')} 
+                startIcon={<CalendarTodayIcon />}
+                sx={{ 
+                  borderRadius: 2,
+                  py: 0.5,
+                  px: 2,
+                  boxShadow: 2,
+                  bgcolor: alpha(theme.palette.common.white, 0.15),
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.common.white, 0.25),
+                  }
+                }}
+              >
+                Ir a semana actual
+              </Button>
+            </Box>
+          )}
         </Box>
       </Card>
     );
@@ -1189,6 +1298,118 @@ const Habits = () => {
                   mb: 2
                 }}
               />
+              
+              {/* Mini gráfico de progreso semanal */}
+              <Box sx={{ mt: 1, mb: 1, height: 80 }}>
+                {allWeeksCompletedHabits && Object.keys(allWeeksCompletedHabits).length > 0 && (
+                  <ReactApexChart
+                    options={{
+                      chart: {
+                        type: 'line',
+                        toolbar: { show: false },
+                        sparkline: { enabled: true },
+                      },
+                      stroke: {
+                        curve: 'smooth',
+                        width: 3,
+                      },
+                      colors: [theme.palette.primary.main],
+                      tooltip: {
+                        fixed: { enabled: false },
+                        x: { show: false },
+                        y: {
+                          formatter: (val) => `${val}%`,
+                          title: { formatter: () => 'Progreso:' },
+                        },
+                        marker: { show: false },
+                        theme: 'dark',
+                        style: {
+                          fontSize: '12px',
+                          fontFamily: theme.typography.fontFamily
+                        },
+                        background: 'rgba(0, 0, 0, 0.85)',
+                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                          const value = series[seriesIndex][dataPointIndex];
+                          const date = w.globals.categoryLabels[dataPointIndex];
+                          return (
+                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
+                            `<span style="font-weight: bold;">${date}</span><br/>` + 
+                            `<span>Progreso: <span style="color: #5c9eff; font-weight: bold;">${value}%</span></span>` +
+                            '</div>'
+                          );
+                        }
+                      },
+                      xaxis: {
+                        categories: (() => {
+                          // Obtener las últimas 5 semanas
+                          const weekLabels = [];
+                          const currentDate = new Date();
+                          for (let i = 4; i >= 0; i--) {
+                            const weekStart = new Date(currentDate);
+                            weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
+                            // Formatear como "DD/MM"
+                            const monthDay = `${weekStart.getDate().toString().padStart(2, '0')}/${(weekStart.getMonth() + 1).toString().padStart(2, '0')}`;
+                            weekLabels.push(monthDay);
+                          }
+                          return weekLabels;
+                        })(),
+                      }
+                    }}
+                    series={[{
+                      name: 'Progreso',
+                      data: (() => {
+                        // Calcular el progreso semanal para las últimas 5 semanas
+                        const weeklyData = [];
+                        const currentDate = new Date();
+                        
+                        for (let i = 4; i >= 0; i--) {
+                          // Fecha de inicio para esta semana
+                          const weekStart = new Date(currentDate);
+                          weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
+                          
+                          // Fecha de fin para esta semana
+                          const weekEnd = new Date(weekStart);
+                          weekEnd.setDate(weekStart.getDate() + 6);
+                          
+                          // Inicializar contadores
+                          let totalPossible = 0;
+                          let totalCompleted = 0;
+                          
+                          // Para cada día de la semana
+                          const dayIterator = new Date(weekStart);
+                          while (dayIterator <= weekEnd) {
+                            const dateStr = formatDate(dayIterator);
+                            
+                            // Contar hábitos posibles y completados para este día
+                            habits.forEach(habit => {
+                              if (shouldShowHabitForDate(habit, dayIterator)) {
+                                totalPossible++;
+                                if (allWeeksCompletedHabits[dateStr] && allWeeksCompletedHabits[dateStr][habit.id]) {
+                                  totalCompleted++;
+                                }
+                              }
+                            });
+                            
+                            // Avanzar al siguiente día
+                            dayIterator.setDate(dayIterator.getDate() + 1);
+                          }
+                          
+                          // Calcular el porcentaje para esta semana
+                          const weeklyPercentage = totalPossible > 0
+                            ? Math.round((totalCompleted / totalPossible) * 100)
+                            : 0;
+                          
+                          weeklyData.push(weeklyPercentage);
+                        }
+                        
+                        return weeklyData;
+                      })()
+                    }]}
+                    type="line"
+                    height={80}
+                  />
+                )}
+              </Box>
               
               <Box sx={{ mt: 'auto', pt: 1 }}>
                 <Typography 
@@ -1589,8 +1810,6 @@ const Habits = () => {
         sx={{
           width: '100%',
           height: 'auto',
-          minHeight: '500px',
-          flex: 1,
           display: 'flex',
           flexDirection: 'column',
           borderRadius: { xs: 2, sm: 3 },
@@ -1632,7 +1851,7 @@ const Habits = () => {
           </Stack>
         </Box>
         
-        <Box sx={{ flex: 1, p: { xs: 1, sm: 2 }, bgcolor: 'background.paper' }} className="habits-calendar">
+        <Box sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'background.paper' }} className="habits-calendar">
           <Calendar
             localizer={localizer}
             events={habitEvents}
@@ -1644,7 +1863,8 @@ const Habits = () => {
             components={{
               event: HabitEvent,
               toolbar: () => null,
-              dateCellWrapper: DayStatsWrapper
+              dateCellWrapper: DayStatsWrapper,
+              header: CustomHeader
             }}
             messages={{
               today: 'Hoy',
@@ -1976,7 +2196,6 @@ const Habits = () => {
         <Box sx={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          minHeight: { xs: '500px', sm: '550px', md: '600px' },
           mb: { xs: 4, sm: 2 }
         }}>
           <CalendarPanel />

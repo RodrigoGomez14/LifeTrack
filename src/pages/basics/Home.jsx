@@ -810,111 +810,155 @@ const Home = () => {
               
               <Box sx={{ 
                 p: { xs: 2, sm: 3 }, 
-                bgcolor: 'background.paper', 
+                bgcolor: theme.palette.common.black, 
                 display: 'flex', 
                 flexDirection: 'column', 
-                height: '100%', 
-                justifyContent: 'center' 
+                height: '100%'
               }}>
-                {/* Combined container with centered balance and progress chart */}
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center'
-                }}>
-                  {/* Monto principal */}
-                  <Box sx={{ textAlign: 'center', mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                      Balance Total
-                    </Typography>
-                    <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
-                      color: getBalance() >= 0 ? theme.palette.success.main : theme.palette.error.main,
-                      letterSpacing: '-0.5px'
-                    }}>
-                      {formatAmount(getBalance())}
-                    </Typography>
-                    
-                    <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
-                      USD {formatAmount(getBalance() / (dollarRate?.venta || 1))}
-                    </Typography>
-                  </Box>
-                  
-                  {/* Circular progress indicator */}
-                  <Box sx={{ 
-                    height: 160, 
-                    width: '100%', 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center' 
+                {/* Monto principal */}
+                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Balance Total
+                  </Typography>
+                  <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                    color: getBalance() >= 0 ? theme.palette.success.main : theme.palette.error.main,
+                    letterSpacing: '-0.5px'
                   }}>
-                    <ReactApexChart 
-                      options={{
-                        chart: {
-                          type: 'radialBar',
-                          offsetY: 0,
-                          offsetX: 0,
-                          sparkline: {
-                            enabled: true
-                          }
+                    {formatAmount(getBalance())}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                    USD {formatAmount(getBalance() / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                {/* Mini gráfico de balance */}
+                <Box sx={{ mt: 1, mb: 1.5, height: 80, width: '100%' }}>
+                  <ReactApexChart
+                    options={{
+                      chart: {
+                        type: 'line',
+                        toolbar: { show: false },
+                        sparkline: { enabled: true },
+                      },
+                      stroke: {
+                        curve: 'smooth',
+                        width: 3,
+                      },
+                      colors: [getBalance() >= 0 ? theme.palette.success.main : theme.palette.error.main],
+                      tooltip: {
+                        fixed: { enabled: false },
+                        x: { show: false },
+                        y: {
+                          formatter: (val) => formatAmount(val),
+                          title: { formatter: () => 'Balance:' },
                         },
-                        plotOptions: {
-                          radialBar: {
-                            startAngle: 0,
-                            endAngle: 360,
-                            track: {
-                              background: alpha(theme.palette.grey[500], 0.15),
-                              strokeWidth: '97%',
-                              margin: 5,
-                              dropShadow: {
-                                enabled: false
-                              }
-                            },
-                            dataLabels: {
-                              name: {
-                                show: false
-                              },
-                              value: {
-                                show: true,
-                                offsetY: 0,
-                                fontSize: '22px',
-                                fontWeight: 'bold',
-                                formatter: function (val) {
-                                  return Math.round(val) + '%';
-                                },
-                                color: isOverBudget ? theme.palette.error.main : budgetProgress > 80 ? theme.palette.warning.main : theme.palette.success.main
-                              }
-                            },
-                            hollow: {
-                              margin: 0,
-                              size: '65%'
-                            }
-                          }
+                        marker: { show: false },
+                        theme: 'dark',
+                        style: {
+                          fontSize: '12px',
+                          fontFamily: theme.typography.fontFamily
                         },
-                        fill: {
-                          type: 'gradient',
-                          gradient: {
-                            shade: 'light',
-                            type: 'horizontal',
-                            shadeIntensity: 0.5,
-                            gradientToColors: [isOverBudget ? theme.palette.error.light : budgetProgress > 80 ? theme.palette.warning.light : theme.palette.success.light],
-                            inverseColors: true,
-                            opacityFrom: 1,
-                            opacityTo: 1,
-                            stops: [0, 100]
-                          }
-                        },
-                        colors: [isOverBudget ? theme.palette.error.main : budgetProgress > 80 ? theme.palette.warning.main : theme.palette.success.main],
-                        labels: ['Gastado'],
-                        stroke: {
-                          lineCap: 'round'
+                        background: 'rgba(0, 0, 0, 0.85)',
+                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                          const value = series[seriesIndex][dataPointIndex];
+                          const date = w.globals.categoryLabels[dataPointIndex];
+                          return (
+                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
+                            `<span style="font-weight: bold;">${date}</span><br/>` + 
+                            `<span>Balance: <span style="color: ${value >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">${formatAmount(value)}</span></span>` +
+                            '</div>'
+                          );
                         }
-                      }}
-                      series={[Math.min(budgetProgress, 100)]}
-                      type="radialBar"
-                      height={160}
-                    />
-                  </Box>
+                      },
+                      xaxis: {
+                        categories: labels,
+                      }
+                    }}
+                    series={[{
+                      name: 'Balance',
+                      data: balance
+                    }]}
+                    type="line"
+                    height={80}
+                  />
+                </Box>
+                
+                {/* Circular progress indicator */}
+                <Box sx={{ 
+                  height: 160, 
+                  width: '100%', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  mt: 1
+                }}>
+                  <ReactApexChart 
+                    options={{
+                      chart: {
+                        type: 'radialBar',
+                        offsetY: 0,
+                        offsetX: 0,
+                        sparkline: {
+                          enabled: true
+                        }
+                      },
+                      plotOptions: {
+                        radialBar: {
+                          startAngle: 0,
+                          endAngle: 360,
+                          track: {
+                            background: alpha(theme.palette.grey[500], 0.15),
+                            strokeWidth: '97%',
+                            margin: 5,
+                            dropShadow: {
+                              enabled: false
+                            }
+                          },
+                          dataLabels: {
+                            name: {
+                              show: false
+                            },
+                            value: {
+                              show: true,
+                              offsetY: 0,
+                              fontSize: '22px',
+                              fontWeight: 'bold',
+                              formatter: function (val) {
+                                return Math.round(val) + '%';
+                              },
+                              color: isOverBudget ? theme.palette.error.main : budgetProgress > 80 ? theme.palette.warning.main : theme.palette.success.main
+                            }
+                          },
+                          hollow: {
+                            margin: 0,
+                            size: '65%'
+                          }
+                        }
+                      },
+                      fill: {
+                        type: 'gradient',
+                        gradient: {
+                          shade: 'light',
+                          type: 'horizontal',
+                          shadeIntensity: 0.5,
+                          gradientToColors: [isOverBudget ? theme.palette.error.light : budgetProgress > 80 ? theme.palette.warning.light : theme.palette.success.light],
+                          inverseColors: true,
+                          opacityFrom: 1,
+                          opacityTo: 1,
+                          stops: [0, 100]
+                        }
+                      },
+                      colors: [isOverBudget ? theme.palette.error.main : budgetProgress > 80 ? theme.palette.warning.main : theme.palette.success.main],
+                      labels: ['Gastado'],
+                      stroke: {
+                        lineCap: 'round'
+                      }
+                    }}
+                    series={[Math.min(budgetProgress, 100)]}
+                    type="radialBar"
+                    height={160}
+                  />
                 </Box>
               </Box>
             </Card>
@@ -980,6 +1024,58 @@ const Home = () => {
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
                     USD {formatAmount(getIncomeTotal() / (dollarRate?.venta || 1))}
                   </Typography>
+                </Box>
+                
+                {/* Mini gráfico de ingresos */}
+                <Box sx={{ mt: 1, mb: 1.5, height: 80, width: '100%' }}>
+                  <ReactApexChart
+                    options={{
+                      chart: {
+                        type: 'line',
+                        toolbar: { show: false },
+                        sparkline: { enabled: true },
+                      },
+                      stroke: {
+                        curve: 'smooth',
+                        width: 3,
+                      },
+                      colors: [theme.palette.success.main],
+                      tooltip: {
+                        fixed: { enabled: false },
+                        x: { show: false },
+                        y: {
+                          formatter: (val) => formatAmount(val),
+                          title: { formatter: () => 'Ingresos:' },
+                        },
+                        marker: { show: false },
+                        theme: 'dark',
+                        style: {
+                          fontSize: '12px',
+                          fontFamily: theme.typography.fontFamily
+                        },
+                        background: 'rgba(0, 0, 0, 0.85)',
+                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                          const value = series[seriesIndex][dataPointIndex];
+                          const date = w.globals.categoryLabels[dataPointIndex];
+                          return (
+                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
+                            `<span style="font-weight: bold;">${date}</span><br/>` + 
+                            `<span>Ingresos: <span style="color: #4caf50; font-weight: bold;">${formatAmount(value)}</span></span>` +
+                            '</div>'
+                          );
+                        }
+                      },
+                      xaxis: {
+                        categories: labels,
+                      }
+                    }}
+                    series={[{
+                      name: 'Ingresos',
+                      data: incomes
+                    }]}
+                    type="line"
+                    height={80}
+                  />
                 </Box>
                 
                 {/* Información comparativa */}
@@ -1165,6 +1261,58 @@ const Home = () => {
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
                     USD {formatAmount(getExpenseTotal() / (dollarRate?.venta || 1))}
                   </Typography>
+                </Box>
+                
+                {/* Mini gráfico de gastos */}
+                <Box sx={{ mt: 1, mb: 1.5, height: 80, width: '100%' }}>
+                  <ReactApexChart
+                    options={{
+                      chart: {
+                        type: 'line',
+                        toolbar: { show: false },
+                        sparkline: { enabled: true },
+                      },
+                      stroke: {
+                        curve: 'smooth',
+                        width: 3,
+                      },
+                      colors: [theme.palette.error.main],
+                      tooltip: {
+                        fixed: { enabled: false },
+                        x: { show: false },
+                        y: {
+                          formatter: (val) => formatAmount(val),
+                          title: { formatter: () => 'Gastos:' },
+                        },
+                        marker: { show: false },
+                        theme: 'dark',
+                        style: {
+                          fontSize: '12px',
+                          fontFamily: theme.typography.fontFamily
+                        },
+                        background: 'rgba(0, 0, 0, 0.85)',
+                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                          const value = series[seriesIndex][dataPointIndex];
+                          const date = w.globals.categoryLabels[dataPointIndex];
+                          return (
+                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
+                            `<span style="font-weight: bold;">${date}</span><br/>` + 
+                            `<span>Gastos: <span style="color: #f44336; font-weight: bold;">${formatAmount(value)}</span></span>` +
+                            '</div>'
+                          );
+                        }
+                      },
+                      xaxis: {
+                        categories: labels,
+                      }
+                    }}
+                    series={[{
+                      name: 'Gastos',
+                      data: expenses
+                    }]}
+                    type="line"
+                    height={80}
+                  />
                 </Box>
                 
                 {/* Información comparativa */}
