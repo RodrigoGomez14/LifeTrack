@@ -208,6 +208,20 @@ const Habits = () => {
     let habitStats = {};
     let dayStats = {};
     
+    // Determinar hasta qué día debemos considerar para las estadísticas
+    // Si estamos viendo la semana actual, solo contar hasta hoy
+    // Si estamos viendo una semana pasada, contar todos los días
+    const currentToday = new Date();
+    const isCurrentWeek = 
+      start.getFullYear() === currentToday.getFullYear() &&
+      start.getMonth() === currentToday.getMonth() &&
+      Math.abs(start.getDate() - currentToday.getDate()) < 7;
+    
+    // Establecer el límite hasta donde contar los hábitos para estadísticas
+    const statisticsEndDate = isCurrentWeek 
+      ? new Date(Math.min(end.getTime(), currentToday.getTime())) // El menor entre fin de semana y hoy
+      : new Date(end); // Toda la semana si es una semana pasada
+    
     // Para cada día de la semana
     const currentDate = new Date(start);
     while (currentDate <= end) {
@@ -229,7 +243,11 @@ const Habits = () => {
         if (shouldShowHabitForDate(habit, currentDate)) {
           // Incrementar el contador total de hábitos para este día
           dayStats[dateStr].total++;
-          totalPossible++;
+          
+          // Solo contabilizar para estadísticas semanales si no es un día futuro
+          if (currentDate <= statisticsEndDate) {
+            totalPossible++;
+          }
           
           // Inicializar estadísticas para este hábito si no existen
           if (!habitStats[habit.id]) {
@@ -243,14 +261,21 @@ const Habits = () => {
             };
           }
           
-          habitStats[habit.id].possibleDays++;
+          // Solo contabilizar días posibles hasta la fecha actual
+          if (currentDate <= statisticsEndDate) {
+            habitStats[habit.id].possibleDays++;
+          }
           
           // Verificar si el hábito fue completado este día
           const isCompleted = completedHabits[dateStr] && completedHabits[dateStr][habit.id];
           if (isCompleted) {
             dayStats[dateStr].completed++;
-            totalCompletions++;
-            habitStats[habit.id].completedDays++;
+            
+            // Solo contabilizar completados hasta la fecha actual
+            if (currentDate <= statisticsEndDate) {
+              totalCompletions++;
+              habitStats[habit.id].completedDays++;
+            }
           }
           
           // Crear evento para el calendario
