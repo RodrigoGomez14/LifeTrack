@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
 import { 
   Grid, 
@@ -9,7 +9,6 @@ import {
   CardContent, 
   CardMedia, 
   CardActionArea, 
-  Fab, 
   Chip,
   Paper,
   TextField,
@@ -23,9 +22,8 @@ import {
   ListItemText,
   Avatar,
   Stack,
-  Backdrop,
-  Zoom,
-  Container
+  Container,
+  LinearProgress
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -34,37 +32,144 @@ import SearchIcon from '@mui/icons-material/Search';
 import ForestIcon from '@mui/icons-material/Forest';
 import GrassIcon from '@mui/icons-material/Grass';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
-import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import SpaIcon from '@mui/icons-material/Spa';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import ScienceIcon from '@mui/icons-material/Science';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import EventIcon from '@mui/icons-material/Event';
 import OpacityIcon from '@mui/icons-material/Opacity';
-import ContentCutIcon from '@mui/icons-material/ContentCut';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CloseIcon from '@mui/icons-material/Close';
 import { useTheme } from '@mui/material/styles';
 import HistoryIcon from '@mui/icons-material/History';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ScaleIcon from '@mui/icons-material/Scale';
+import ParkIcon from '@mui/icons-material/Park';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 const PlantsList = () => {
   const { userData } = useStore();
   const theme = useTheme();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPlant, setSelectedPlant] = useState(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [currentPlantId, setCurrentPlantId] = useState(null);
-  const [showDetailBackdrop, setShowDetailBackdrop] = useState(false);
-  const [detailPlant, setDetailPlant] = useState(null);
-  const [sort, setSortMethod] = useState('name');
   
-  // Debugging userData structure
-  console.log("userData:", userData);
-  console.log("userData?.plants:", userData?.plants);
-  
+  // Función para calcular días entre fechas
+  const calculateDaysBetween = (startDateStr, endDateStr = null) => {
+    if (!startDateStr) return null;
+    
+    const startParts = startDateStr.split('/');
+    if (startParts.length !== 3) return null;
+    
+    const startDate = new Date(parseInt(startParts[2]), parseInt(startParts[1]) - 1, parseInt(startParts[0]));
+    
+    let endDate;
+    if (endDateStr) {
+      const endParts = endDateStr.split('/');
+      if (endParts.length === 3) {
+        endDate = new Date(parseInt(endParts[2]), parseInt(endParts[1]) - 1, parseInt(endParts[0]));
+      } else {
+        endDate = new Date();
+      }
+    } else {
+      endDate = new Date();
+    }
+    
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return null;
+    }
+
+    const diffTime = Math.abs(endDate - startDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  };
+
+  // Función para calcular días en cada etapa
+  const calculateDaysInStage = (plant, stageName) => {
+    if (stageName === 'Germinacion' && plant.birthDate) {
+      if (plant.inicioVegetativo) {
+        return calculateDaysBetween(plant.birthDate, plant.inicioVegetativo);
+      } else if (plant.etapa === 'Germinacion') {
+        return calculateDaysBetween(plant.birthDate);
+      }
+    } else if (stageName === 'Vegetativo' && plant.inicioVegetativo) {
+      if (plant.inicioFloracion) {
+        return calculateDaysBetween(plant.inicioVegetativo, plant.inicioFloracion);
+      } else if (plant.etapa === 'Vegetativo') {
+        return calculateDaysBetween(plant.inicioVegetativo);
+      }
+    } else if (stageName === 'Floracion' && plant.inicioFloracion) {
+      if (plant.finishDate) {
+        return calculateDaysBetween(plant.inicioFloracion, plant.finishDate);
+      } else if (plant.etapa === 'Floracion') {
+        return calculateDaysBetween(plant.inicioFloracion);
+      }
+    } else if (stageName === 'Secado' && plant.finishDate) {
+      if (plant.finalSecado) {
+        return calculateDaysBetween(plant.finishDate, plant.finalSecado);
+      } else if (plant.etapa === 'Secado') {
+        return calculateDaysBetween(plant.finishDate);
+      }
+    }
+    return null;
+  };
+
+  // Función para calcular días totales de vida
+  const calculateTotalLifeDays = (plant) => {
+    let totalDays = 0;
+    
+    const germinacionDays = calculateDaysInStage(plant, 'Germinacion');
+    if (germinacionDays) totalDays += germinacionDays;
+    
+    const vegetativoDays = calculateDaysInStage(plant, 'Vegetativo');
+    if (vegetativoDays) totalDays += vegetativoDays;
+    
+    const floracionDays = calculateDaysInStage(plant, 'Floracion');
+    if (floracionDays) totalDays += floracionDays;
+    
+    const secadoDays = calculateDaysInStage(plant, 'Secado');
+    if (secadoDays) totalDays += secadoDays;
+    
+    return totalDays > 0 ? totalDays : null;
+  };
+
+  // Función para obtener el ícono de etapa
+  const getStageIcon = (stage) => {
+    switch(stage) {
+      case 'Germinacion':
+        return <SpaIcon fontSize="small" />;
+      case 'Vegetativo':
+        return <GrassIcon fontSize="small" />;
+      case 'Floracion':
+        return <LocalFloristIcon fontSize="small" />;
+      case 'Secado':
+        return <ParkIcon fontSize="small" />;
+      case 'Enfrascado':
+        return <ForestIcon fontSize="small" />;
+      default:
+        return <ForestIcon fontSize="small" />;
+    }
+  };
+
+  // Función para obtener el color de etapa
+  const getStageColor = (stage) => {
+    switch(stage) {
+      case 'Germinacion':
+        return theme.palette.info.main;
+      case 'Vegetativo':
+        return theme.palette.success.main;
+      case 'Floracion':
+        return theme.palette.warning.main;
+      case 'Secado':
+        return theme.palette.error.main;
+      case 'Enfrascado':
+        return theme.palette.secondary.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
+
   // Filtrar plantas según término de búsqueda
   const filteredPlants = userData?.plants?.active 
     ? Object.entries(userData.plants.active)
@@ -72,11 +177,10 @@ const PlantsList = () => {
       .sort((a, b) => a[1].name.localeCompare(b[1].name))
     : [];
 
-  // Variable para plantas archivadas - mejorar acceso a los datos
+  // Variable para plantas archivadas
   const archivedPlants = (() => {
     if (!userData?.plants) return [];
     
-    // Intentar acceder a history directamente
     if (userData.plants.history && typeof userData.plants.history === 'object') {
       return Object.entries(userData.plants.history)
         .filter(([key, plant]) => 
@@ -89,47 +193,8 @@ const PlantsList = () => {
         });
     }
     
-    // Intentar con "archived" como alternativa
-    if (userData.plants.archived && typeof userData.plants.archived === 'object') {
-      return Object.entries(userData.plants.archived)
-        .filter(([key, plant]) => 
-          plant && typeof plant === 'object' && 
-          (!searchTerm || (plant.name && plant.name.toLowerCase().includes(searchTerm.toLowerCase())))
-        )
-        .sort((a, b) => {
-          if (a[1]?.name && b[1]?.name) return a[1].name.localeCompare(b[1].name);
-          return 0;
-        });
-    }
-    
-    // Buscar en posibles propiedades alternativas
-    for (const key in userData.plants) {
-      if (key !== 'active' && typeof userData.plants[key] === 'object') {
-        console.log(`Revisando propiedad alternativa: ${key}`);
-        const entries = Object.entries(userData.plants[key]);
-        // Revisar si esta propiedad contiene plantas archivadas
-        for (const [id, possiblePlant] of entries) {
-          if (possiblePlant && typeof possiblePlant === 'object' && possiblePlant.finishDate) {
-            console.log(`Posible colección de plantas archivadas encontrada en: ${key}`);
-            return entries
-              .filter(([_, plant]) => 
-                plant && typeof plant === 'object' && 
-                (!searchTerm || (plant.name && plant.name.toLowerCase().includes(searchTerm.toLowerCase())))
-              )
-              .sort((a, b) => {
-                if (a[1]?.name && b[1]?.name) return a[1].name.localeCompare(b[1].name);
-                return 0;
-              });
-          }
-        }
-      }
-    }
-    
-    console.log("No se encontraron plantas archivadas en ninguna estructura");
     return [];
   })();
-  
-  console.log("Plantas archivadas encontradas:", archivedPlants);
 
   // Función para obtener un ícono aleatorio para las plantas que no tienen imágenes
   const getPlantIcon = (index) => {
@@ -139,25 +204,6 @@ const PlantsList = () => {
       <SpaIcon fontSize="large" />
     ];
     return icons[index % icons.length];
-  };
-
-  // Función para obtener estadísticas de una planta
-  const getPlantStats = (plant) => {
-    const stats = [
-      { 
-        label: 'Riegos', 
-        value: plant.irrigations ? Object.keys(plant.irrigations).length : 0,
-        icon: <WaterDropIcon sx={{ fontSize: 16 }} />,
-        color: theme.palette.info.main
-      },
-      { 
-        label: 'Podas', 
-        value: plant.prunings ? Object.keys(plant.prunings).length : 0,
-        icon: <ScienceIcon sx={{ fontSize: 16 }} />,
-        color: theme.palette.success.main
-      }
-    ];
-    return stats;
   };
 
   // Manejadores para el menú contextual
@@ -181,33 +227,10 @@ const PlantsList = () => {
         break;
       case 'delete':
         // Lógica para eliminar planta (añadir confirmación)
-        // ...
-        break;
-      case 'calendar':
-        navigate(`/PlantaCalendario/?${currentPlantId}`);
-        break;
-      case 'water':
-        navigate(`/NuevoRiego/?${currentPlantId}`);
-        break;
-      case 'prune':
-        navigate(`/NuevaPoda/?${currentPlantId}`);
         break;
       default:
         break;
     }
-  };
-
-  // Manejador para seleccionar planta
-  const handlePlantSelect = (plantId) => {
-    setSelectedPlant(plantId);
-  };
-
-  // Mostrar detalle rápido de planta
-  const handleShowDetail = (event, plant, id) => {
-    event.stopPropagation();
-    event.preventDefault();
-    setDetailPlant({...plant, id});
-    setShowDetailBackdrop(true);
   };
 
   return (
@@ -344,59 +367,54 @@ const PlantsList = () => {
                 justifyContent: 'space-between', 
                 alignItems: 'center'
               }}>
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
-                  fontWeight: 'medium',
-                    color: '#ffffff' 
-                }}
-              >
-                  <ForestIcon sx={{ mr: 1, color: '#ffffff' }} />
-                Plantas Activas 
-                <Chip 
-                  label={filteredPlants.length} 
-                  size="small" 
+                <Typography 
+                  variant="h6" 
                   sx={{ 
-                    ml: 1, 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    fontWeight: 'medium',
+                    color: '#ffffff' 
+                  }}
+                >
+                  <ForestIcon sx={{ mr: 1, color: '#ffffff' }} />
+                  Plantas Activas 
+                  <Chip 
+                    label={filteredPlants.length} 
+                    size="small" 
+                    sx={{ 
+                      ml: 1, 
                       bgcolor: alpha('#ffffff', 0.2),
                       color: '#ffffff',
-                    fontWeight: 'bold'
-                  }} 
-                />
-              </Typography>
-            </Box>
+                      fontWeight: 'bold'
+                    }} 
+                  />
+                </Typography>
+              </Box>
             </Card>
             
             {filteredPlants.length > 0 ? (
               <Grid container spacing={3}>
                 {filteredPlants.map(([id, plant], index) => {
-                  const isSelected = selectedPlant === id;
-                  const plantStats = getPlantStats(plant);
                   const hasImage = plant.images && Object.keys(plant.images).length > 0;
+                  const totalLifeDays = calculateTotalLifeDays(plant);
+                  const currentStageDays = calculateDaysInStage(plant, plant.etapa);
+                  const stageColor = getStageColor(plant.etapa);
                   
                   return (
                     <Grid item xs={12} sm={6} md={4} key={id}>
                       <Card 
-                        elevation={isSelected ? 3 : 1}
-                        onClick={() => handlePlantSelect(id)}
+                        elevation={2}
                         sx={{ 
                           borderRadius: 3,
                           position: 'relative',
                           height: '100%',
                           transition: 'all 0.3s ease',
-                          transform: isSelected ? 'translateY(-4px)' : 'none',
                           cursor: 'pointer',
-                          border: isSelected 
-                            ? `2px solid ${theme.palette.primary.main}`
-                            : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                          boxShadow: isSelected 
-                            ? `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}` 
-                            : `0 2px 10px ${alpha(theme.palette.common.black, 0.05)}`,
+                          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                          boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.08)}`,
                           '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: `0 10px 20px ${alpha(theme.palette.primary.main, 0.15)}`
+                            transform: 'translateY(-6px)',
+                            boxShadow: `0 12px 24px ${alpha(theme.palette.primary.main, 0.15)}`
                           },
                           overflow: 'hidden'
                         }}
@@ -406,7 +424,7 @@ const PlantsList = () => {
                             size="small" 
                             onClick={(e) => handleOpenMenu(e, id)}
                             sx={{ 
-                              bgcolor: alpha('#ffffff', 0.8),
+                              bgcolor: alpha('#ffffff', 0.9),
                               backdropFilter: 'blur(4px)',
                               '&:hover': {
                                 bgcolor: '#ffffff'
@@ -422,8 +440,9 @@ const PlantsList = () => {
                           to={`/Planta/?${id}`}
                           sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
                         >
+                          {/* Imagen de la planta */}
                           <Box sx={{ 
-                            height: 160, 
+                            height: 180, 
                             display: 'flex', 
                             alignItems: 'center', 
                             justifyContent: 'center',
@@ -435,7 +454,7 @@ const PlantsList = () => {
                             {hasImage ? (
                               <CardMedia
                                 component="img"
-                                height="160"
+                                height="180"
                                 image={plant.profilePhotoUrl || plant.images[Object.keys(plant.images)[0]].url || plant.images[Object.keys(plant.images)[0]].dataUrl}
                                 alt={plant.name}
                                 sx={{ 
@@ -448,20 +467,17 @@ const PlantsList = () => {
                               />
                             ) : getPlantIcon(index)}
                             
+                            {/* Overlay con nombre y etapa */}
                             <Box 
                               sx={{
                                 position: 'absolute',
                                 bottom: 0,
                                 left: 0,
                                 right: 0,
-                                height: '40%',
                                 background: hasImage ? 
-                                  'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
+                                  'linear-gradient(transparent, rgba(0,0,0,0.7))' : 
                                   'transparent',
-                                display: 'flex',
-                                alignItems: 'flex-end',
-                                px: 2,
-                                py: 1,
+                                p: 2,
                                 zIndex: 1
                               }}
                             >
@@ -471,87 +487,177 @@ const PlantsList = () => {
                                 sx={{
                                   color: hasImage ? '#ffffff' : 'text.primary',
                                   textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
-                                  fontWeight: 'medium',
-                                  width: '100%',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
+                                  fontWeight: 'bold',
+                                  mb: 1
                                 }}
                               >
                                 {plant.name}
-                                <IconButton 
-                                  size="small" 
-                                  onClick={(e) => handleShowDetail(e, plant, id)}
-                                  sx={{ 
-                                    color: hasImage ? '#ffffff' : theme.palette.primary.main,
-                                    bgcolor: hasImage ? 
-                                      alpha('#ffffff', 0.2) : 
-                                      alpha(theme.palette.primary.main, 0.1),
-                                    backdropFilter: 'blur(4px)',
-                                    '&:hover': {
-                                      bgcolor: hasImage ? 
-                                        alpha('#ffffff', 0.3) : 
-                                        alpha(theme.palette.primary.main, 0.2)
-                                    }
-                                  }}
-                                >
-                                  <ContentCopyIcon fontSize="small" />
-                                </IconButton>
                               </Typography>
+                              
+                              <Chip
+                                icon={getStageIcon(plant.etapa)}
+                                label={plant.etapa}
+                                size="small"
+                                sx={{
+                                  bgcolor: alpha(stageColor, hasImage ? 0.9 : 0.1),
+                                  color: hasImage ? '#ffffff' : stageColor,
+                                  fontWeight: 'medium',
+                                  border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none'
+                                }}
+                              />
                             </Box>
                           </Box>
                           
-                          <CardContent sx={{ flexGrow: 1, pt: 2 }}>
-                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                              <Chip 
-                                icon={<LocalFloristIcon fontSize="small" />}
-                                label={`${plant.quantity} unid.`} 
-                                size="small" 
-                                sx={{ 
-                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                  color: theme.palette.primary.main,
-                                  borderRadius: 1.5
-                                }}
-                              />
-                              {plant.potVolume && (
-                                <Chip 
-                                  label={`${plant.potVolume}L`} 
-                                  size="small"
-                                  sx={{ 
-                                    bgcolor: alpha(theme.palette.primary.light, 0.2),
-                                    color: theme.palette.primary.dark,
-                                    borderRadius: 1.5
-                                  }}
-                                />
-                              )}
+                          <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
+                            {/* Información básica */}
+                            <Box sx={{ mb: 2 }}>
+                              <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                                {plant.genetic && (
+                                  <Chip 
+                                    label={plant.genetic} 
+                                    size="small"
+                                    sx={{ 
+                                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                      color: theme.palette.secondary.main,
+                                      fontSize: '0.75rem'
+                                    }}
+                                  />
+                                )}
+                                {plant.potVolume && (
+                                  <Chip 
+                                    label={`${plant.potVolume}L`} 
+                                    size="small"
+                                    sx={{ 
+                                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                                      color: theme.palette.info.main,
+                                      fontSize: '0.75rem'
+                                    }}
+                                  />
+                                )}
+                              </Stack>
                             </Box>
                             
-                            <Divider sx={{ my: 1 }} />
+                            <Divider sx={{ my: 2 }} />
                             
-                            <Stack direction="row" spacing={2} justifyContent="space-around" mt={2}>
-                              {plantStats.map((stat, idx) => (
-                                <Box key={idx} sx={{ textAlign: 'center' }}>
-                                  <Avatar 
-                                    sx={{ 
-                                      width: 36, 
-                                      height: 36, 
-                                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                      color: theme.palette.primary.main,
-                                      mb: 0.5,
-                                      mx: 'auto'
-                                    }}
-                                  >
-                                    {stat.icon}
-                                  </Avatar>
-                                  <Typography variant="body2" fontWeight="medium" color={theme.palette.primary.main}>
-                                    {stat.value}
+                            {/* Información de tiempo de vida */}
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <AccessTimeIcon fontSize="small" />
+                                Tiempo de vida
+                              </Typography>
+                              
+                              <Stack direction="row" spacing={2} justifyContent="space-between" sx={{ mb: 1 }}>
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="h6" fontWeight="bold" color={stageColor}>
+                                    {totalLifeDays || 0}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
-                                    {stat.label}
+                                    días totales
                                   </Typography>
                                 </Box>
-                              ))}
-                            </Stack>
+                                
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="h6" fontWeight="bold" color={stageColor}>
+                                    {currentStageDays || 0}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    en {plant.etapa}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                            </Box>
+                            
+                            {/* Información de etapas completadas */}
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <CalendarTodayIcon fontSize="small" />
+                                Etapas completadas
+                              </Typography>
+                              
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                {plant.birthDate && (
+                                  <Chip
+                                    icon={<SpaIcon fontSize="small" />}
+                                    label={`G: ${calculateDaysInStage(plant, 'Germinacion') || 0}d`}
+                                    size="small"
+                                    variant={plant.etapa === 'Germinacion' ? 'filled' : 'outlined'}
+                                    sx={{ 
+                                      fontSize: '0.7rem',
+                                      height: 24,
+                                      bgcolor: plant.etapa === 'Germinacion' ? alpha(theme.palette.info.main, 0.1) : 'transparent',
+                                      color: theme.palette.info.main,
+                                      borderColor: theme.palette.info.main
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.inicioVegetativo && (
+                                  <Chip
+                                    icon={<GrassIcon fontSize="small" />}
+                                    label={`V: ${calculateDaysInStage(plant, 'Vegetativo') || 0}d`}
+                                    size="small"
+                                    variant={plant.etapa === 'Vegetativo' ? 'filled' : 'outlined'}
+                                    sx={{ 
+                                      fontSize: '0.7rem',
+                                      height: 24,
+                                      bgcolor: plant.etapa === 'Vegetativo' ? alpha(theme.palette.success.main, 0.1) : 'transparent',
+                                      color: theme.palette.success.main,
+                                      borderColor: theme.palette.success.main
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.inicioFloracion && (
+                                  <Chip
+                                    icon={<LocalFloristIcon fontSize="small" />}
+                                    label={`F: ${calculateDaysInStage(plant, 'Floracion') || 0}d`}
+                                    size="small"
+                                    variant={plant.etapa === 'Floracion' ? 'filled' : 'outlined'}
+                                    sx={{ 
+                                      fontSize: '0.7rem',
+                                      height: 24,
+                                      bgcolor: plant.etapa === 'Floracion' ? alpha(theme.palette.warning.main, 0.1) : 'transparent',
+                                      color: theme.palette.warning.main,
+                                      borderColor: theme.palette.warning.main
+                                    }}
+                                  />
+                                )}
+                              </Stack>
+                            </Box>
+                            
+                            {/* Información de peso (solo si existe) */}
+                            {(plant.pesoHumedo || plant.pesoSeco) && (
+                              <Box>
+                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <ScaleIcon fontSize="small" />
+                                  Peso registrado
+                                </Typography>
+                                
+                                <Stack direction="row" spacing={2} justifyContent="space-around">
+                                  {plant.pesoHumedo && (
+                                    <Box sx={{ textAlign: 'center' }}>
+                                      <Typography variant="body2" fontWeight="bold" color={theme.palette.warning.main}>
+                                        {plant.pesoHumedo}g
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        húmedo
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                  
+                                  {plant.pesoSeco && (
+                                    <Box sx={{ textAlign: 'center' }}>
+                                      <Typography variant="body2" fontWeight="bold" color={theme.palette.success.main}>
+                                        {plant.pesoSeco}g
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        seco
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                </Stack>
+                              </Box>
+                            )}
                           </CardContent>
                         </CardActionArea>
                       </Card>
@@ -599,7 +705,7 @@ const PlantsList = () => {
               </Box>
             )}
             
-            {/* Sección de Archivo de Plantas - siempre visible */}
+            {/* Sección de Archivo de Plantas */}
             <Card 
               elevation={3} 
               sx={{ 
@@ -646,45 +752,31 @@ const PlantsList = () => {
             {archivedPlants.length > 0 ? (
               <Grid container spacing={3}>
                 {archivedPlants.map(([id, plant], index) => {
-                  if (!plant || typeof plant !== 'object') {
-                    console.log("Datos de planta archivada inválidos:", id, plant);
+                  if (!plant || typeof plant !== 'object' || !plant.name) {
                     return null;
                   }
                   
-                  const isSelected = selectedPlant === id;
-                  const plantStats = getPlantStats(plant);
                   const hasImage = plant.images && Object.keys(plant.images).length > 0;
-                  
-                  // Verificar que la planta tiene datos válidos para mostrar
-                  const hasValidData = plant.name && typeof plant.name === 'string';
-                  if (!hasValidData) {
-                    console.log("Planta sin datos válidos:", id, plant);
-                    return null;
-                  }
+                  const totalLifeDays = calculateTotalLifeDays(plant);
+                  const stageColor = getStageColor(plant.etapa);
                   
                   return (
                     <Grid item xs={12} sm={6} md={4} key={id}>
                       <Card 
-                        elevation={isSelected ? 3 : 1}
-                        onClick={() => handlePlantSelect(id)}
+                        elevation={2}
                         sx={{ 
                           borderRadius: 3,
                           position: 'relative',
                           height: '100%',
                           transition: 'all 0.3s ease',
-                          transform: isSelected ? 'translateY(-4px)' : 'none',
                           cursor: 'pointer',
-                          border: isSelected 
-                            ? `2px solid ${theme.palette.secondary.main}`
-                            : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                          boxShadow: isSelected 
-                            ? `0 10px 20px ${alpha(theme.palette.secondary.main, 0.15)}` 
-                            : `0 2px 10px ${alpha(theme.palette.common.black, 0.05)}`,
+                          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                          boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.05)}`,
                           '&:hover': {
                             transform: 'translateY(-4px)',
                             boxShadow: `0 10px 20px ${alpha(theme.palette.secondary.main, 0.15)}`
                           },
-                          opacity: 0.9,
+                          opacity: 0.95,
                           overflow: 'hidden'
                         }}
                       >
@@ -706,6 +798,7 @@ const PlantsList = () => {
                           to={`/Planta/?${id}`}
                           sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
                         >
+                          {/* Imagen de la planta */}
                           <Box sx={{ 
                             height: 160, 
                             display: 'flex', 
@@ -725,8 +818,7 @@ const PlantsList = () => {
                                   (plant.images && Object.keys(plant.images).length > 0 && 
                                     (plant.images[Object.keys(plant.images)[0]]?.url || 
                                      plant.images[Object.keys(plant.images)[0]]?.dataUrl)
-                                  ) || 
-                                  'https://placehold.co/600x400?text=Planta'
+                                  )
                                 }
                                 alt={plant.name}
                                 sx={{ 
@@ -737,20 +829,17 @@ const PlantsList = () => {
                               />
                             ) : getPlantIcon(index)}
                             
+                            {/* Overlay con nombre */}
                             <Box 
                               sx={{
                                 position: 'absolute',
                                 bottom: 0,
                                 left: 0,
                                 right: 0,
-                                height: '40%',
                                 background: hasImage ? 
                                   'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
                                   'transparent',
-                                display: 'flex',
-                                alignItems: 'flex-end',
-                                px: 2,
-                                py: 1,
+                                p: 2,
                                 zIndex: 1
                               }}
                             >
@@ -760,11 +849,7 @@ const PlantsList = () => {
                                 sx={{
                                   color: hasImage ? '#ffffff' : 'text.primary',
                                   textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
-                                  fontWeight: 'medium',
-                                  width: '100%',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
+                                  fontWeight: 'bold'
                                 }}
                               >
                                 {plant.name}
@@ -772,9 +857,10 @@ const PlantsList = () => {
                             </Box>
                           </Box>
                           
-                          <CardContent sx={{ flexGrow: 1, pt: 2 }}>
-                            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                              {plant.finishDate && (
+                          <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
+                            {/* Información de finalización */}
+                            {plant.finishDate && (
+                              <Box sx={{ mb: 2 }}>
                                 <Chip 
                                   icon={<HistoryIcon fontSize="small" />}
                                   label={`Completada: ${plant.finishDate}`} 
@@ -782,62 +868,83 @@ const PlantsList = () => {
                                   sx={{ 
                                     bgcolor: alpha(theme.palette.secondary.main, 0.1),
                                     color: theme.palette.secondary.main,
-                                    borderRadius: 1.5,
-                                    mb: 1,
-                                    width: '100%'
+                                    fontSize: '0.75rem',
+                                    width: '100%',
+                                    justifyContent: 'flex-start'
                                   }}
                                 />
-                              )}
-                              
-                              {plant.quantity && (
-                                <Chip 
-                                  icon={<LocalFloristIcon fontSize="small" />}
-                                  label={`${plant.quantity} unid.`} 
-                                  size="small" 
-                                  sx={{ 
-                                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                                    color: theme.palette.secondary.main,
-                                    borderRadius: 1.5
-                                  }}
-                                />
-                              )}
-                              
-                              {plant.genetic && (
-                                <Chip 
-                                  label={plant.genetic} 
+                              </Box>
+                            )}
+                            
+                            {/* Información básica */}
+                            <Box sx={{ mb: 2 }}>
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                {plant.genetic && (
+                                  <Chip 
+                                    label={plant.genetic} 
+                                    size="small"
+                                    sx={{ 
+                                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                      color: theme.palette.secondary.main,
+                                      fontSize: '0.75rem'
+                                    }}
+                                  />
+                                )}
+                                
+                                <Chip
+                                  icon={getStageIcon(plant.etapa)}
+                                  label={plant.etapa}
                                   size="small"
-                                  sx={{ 
-                                    bgcolor: alpha(theme.palette.secondary.light, 0.2),
-                                    color: theme.palette.secondary.dark,
-                                    borderRadius: 1.5
+                                  sx={{
+                                    bgcolor: alpha(stageColor, 0.1),
+                                    color: stageColor,
+                                    fontSize: '0.75rem'
                                   }}
                                 />
-                              )}
+                              </Stack>
                             </Box>
                             
-                            {plant.wetFlowersWeight && (
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                  Cosecha:
+                            <Divider sx={{ my: 2 }} />
+                            
+                            {/* Información de tiempo total */}
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <AccessTimeIcon fontSize="small" />
+                                Ciclo completo
+                              </Typography>
+                              
+                              <Typography variant="h6" fontWeight="bold" color={theme.palette.secondary.main} sx={{ textAlign: 'center' }}>
+                                {totalLifeDays || 0} días
+                              </Typography>
+                            </Box>
+                            
+                            {/* Información de peso final */}
+                            {(plant.pesoHumedo || plant.pesoSeco) && (
+                              <Box>
+                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <ScaleIcon fontSize="small" />
+                                  Cosecha final
                                 </Typography>
+                                
                                 <Stack direction="row" spacing={2} justifyContent="space-around">
-                                  {plant.wetFlowersWeight && (
+                                  {plant.pesoHumedo && (
                                     <Box sx={{ textAlign: 'center' }}>
-                                      <Typography variant="body2" fontWeight="medium" color={theme.palette.secondary.main}>
-                                        {plant.wetFlowersWeight}g
+                                      <Typography variant="body2" fontWeight="bold" color={theme.palette.warning.main}>
+                                        {plant.pesoHumedo}g
                                       </Typography>
                                       <Typography variant="caption" color="text.secondary">
-                                        Flores húmedas
+                                        húmedo
                                       </Typography>
                                     </Box>
                                   )}
-                                  {plant.dryFlowersWeight && (
+                                  
+                                  {plant.pesoSeco && (
                                     <Box sx={{ textAlign: 'center' }}>
-                                      <Typography variant="body2" fontWeight="medium" color={theme.palette.secondary.main}>
-                                        {plant.dryFlowersWeight}g
+                                      <Typography variant="body2" fontWeight="bold" color={theme.palette.success.main}>
+                                        {plant.pesoSeco}g
                                       </Typography>
                                       <Typography variant="caption" color="text.secondary">
-                                        Flores secas
+                                        seco
                                       </Typography>
                                     </Box>
                                   )}
@@ -912,35 +1019,7 @@ const PlantsList = () => {
         )}
       </Container>
       
-      {/* Componente de depuración solo visible en desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
-        <Box sx={{ 
-          position: 'fixed', 
-          bottom: 20, 
-          right: 20, 
-          zIndex: 9999,
-          maxWidth: 350,
-          maxHeight: 400,
-          overflow: 'auto',
-          p: 2,
-          borderRadius: 2,
-          bgcolor: 'rgba(0,0,0,0.8)',
-          color: 'white',
-          backdropFilter: 'blur(8px)',
-          display: 'none', // Inicialmente oculto, cambiar a 'block' para activar
-        }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Debug Data:</Typography>
-          <pre style={{ fontSize: '10px', whiteSpace: 'pre-wrap' }}>
-            {JSON.stringify({ 
-              userData: userData,
-              archivedPlants: archivedPlants,
-              filteredPlants: filteredPlants
-            }, null, 2)}
-          </pre>
-        </Box>
-      )}
-      
-      {/* Menú contextual para opciones de planta */}
+      {/* Menú contextual simplificado */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -950,7 +1029,7 @@ const PlantsList = () => {
         PaperProps={{
           elevation: 3,
           sx: {
-            minWidth: 200,
+            minWidth: 180,
             borderRadius: 2,
             overflow: 'visible',
             mt: 1,
@@ -975,24 +1054,6 @@ const PlantsList = () => {
           </ListItemIcon>
           <ListItemText>Editar planta</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => handleOptionSelect('calendar')}>
-          <ListItemIcon>
-            <EventIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
-          </ListItemIcon>
-          <ListItemText>Ver calendario</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => handleOptionSelect('water')}>
-          <ListItemIcon>
-            <OpacityIcon fontSize="small" color="info" />
-          </ListItemIcon>
-          <ListItemText>Registrar riego</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => handleOptionSelect('prune')}>
-          <ListItemIcon>
-            <ContentCutIcon fontSize="small" color="success" />
-          </ListItemIcon>
-          <ListItemText>Registrar poda</ListItemText>
-        </MenuItem>
         <Divider />
         <MenuItem onClick={() => handleOptionSelect('delete')} sx={{ color: theme.palette.error.main }}>
           <ListItemIcon>
@@ -1001,76 +1062,6 @@ const PlantsList = () => {
           <ListItemText>Eliminar</ListItemText>
         </MenuItem>
       </Menu>
-      
-      {/* Backdrop para vista rápida */}
-      <Backdrop
-        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={showDetailBackdrop}
-        onClick={() => setShowDetailBackdrop(false)}
-      >
-        {detailPlant && (
-          <Zoom in={showDetailBackdrop}>
-            <Paper
-              elevation={4}
-              sx={{
-                width: { xs: '90%', sm: '70%', md: '50%' },
-                maxWidth: 500,
-                maxHeight: '80vh',
-                overflow: 'auto',
-                borderRadius: 2,
-                p: 3
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5" component="h2">
-                  {detailPlant.name}
-                </Typography>
-                <IconButton onClick={() => setShowDetailBackdrop(false)}>
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-              
-              <Divider sx={{ mb: 2 }} />
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Información General
-                  </Typography>
-                  <Box sx={{ mt: 1 }}>
-                    <Chip 
-                      icon={<LocalFloristIcon fontSize="small" />}
-                      label={`${detailPlant.quantity} unidades`} 
-                      size="small" 
-                      sx={{ mr: 1, mb: 1, bgcolor: alpha(theme.palette.primary.main, 0.1) }}
-                    />
-                    {detailPlant.potVolume && (
-                      <Chip 
-                        label={`Maceta de ${detailPlant.potVolume}L`} 
-                        size="small"
-                        sx={{ mr: 1, mb: 1, bgcolor: alpha(theme.palette.primary.light, 0.2) }}
-                      />
-                    )}
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} sx={{ mt: 1 }}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    component={Link}
-                    to={`/Planta/?${detailPlant.id}`}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Ver detalles completos
-                  </Button>
-                </Grid>
-              </Grid>
-            </Paper>
-          </Zoom>
-        )}
-      </Backdrop>
     </Layout>
   );
 };

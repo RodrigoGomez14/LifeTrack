@@ -29,6 +29,9 @@ import {
   ListItemIcon,
   ListItemButton,
   Skeleton,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
 } from '@mui/material';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -57,6 +60,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Global } from '@emotion/react';
 import ReactApexChart from 'react-apexcharts';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import FlashOnIcon from '@mui/icons-material/FlashOn';
 
 // Configurar locale de moment
 moment.locale('es');
@@ -222,6 +227,18 @@ const Habits = () => {
       ? new Date(Math.min(end.getTime(), currentToday.getTime())) // El menor entre fin de semana y hoy
       : new Date(end); // Toda la semana si es una semana pasada
     
+    // Definir orden de colores para clasificación
+    const colorOrder = {
+      'primary': 0,
+      'secondary': 1,
+      'success': 2,
+      'info': 3,
+      'warning': 4,
+      'error': 5,
+      'inherit': 6,
+      'default': 7
+    };
+
     // Para cada día de la semana
     const currentDate = new Date(start);
     while (currentDate <= end) {
@@ -306,6 +323,26 @@ const Habits = () => {
       // Avanzar al siguiente día
       currentDate.setDate(currentDate.getDate() + 1);
     }
+    
+    // Ordenar eventos por color dentro de cada día
+    events.sort((a, b) => {
+      // Primero ordenar por fecha para mantener agrupación por día
+      const dateCompare = a.start.getTime() - b.start.getTime();
+      if (dateCompare !== 0) return dateCompare;
+      
+      // Luego ordenar por color dentro del mismo día
+      const colorA = a.resource.habit.color || 'primary';
+      const colorB = b.resource.habit.color || 'primary';
+      const orderA = colorOrder[colorA] !== undefined ? colorOrder[colorA] : 999;
+      const orderB = colorOrder[colorB] !== undefined ? colorOrder[colorB] : 999;
+      
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      
+      // Si tienen el mismo color, ordenar alfabéticamente por nombre
+      return a.resource.habit.name.localeCompare(b.resource.habit.name);
+    });
     
     // Calcular porcentajes para hábitos
     Object.keys(habitStats).forEach(habitId => {

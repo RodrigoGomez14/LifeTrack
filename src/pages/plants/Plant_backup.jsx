@@ -122,7 +122,6 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { Global } from '@emotion/react';
 import 'moment/locale/es';
 import SaveIcon from '@mui/icons-material/Save';
-import ScienceIcon from '@mui/icons-material/Science';
 
 moment.locale("es");
 
@@ -641,7 +640,7 @@ const Plant = () => {
         color: '#ff6f00', // Orange
         isWeight: true,
         weightType: 'humedo',
-        hasInput: !plant.pesoHumedo, // Permitir input si no hay peso registrado, sin importar si está archivada
+        hasInput: !plant.isArchived && !plant.pesoHumedo,
         inputValue: pesoHumedoInput,
         setInputValue: setPesoHumedoInput,
         onSave: handleSavePesoHumedo,
@@ -658,7 +657,7 @@ const Plant = () => {
         color: '#2e7d32', // Dark green
         isWeight: true,
         weightType: 'seco',
-        hasInput: !plant.pesoSeco, // Permitir input si no hay peso registrado, sin importar si está archivada
+        hasInput: !plant.isArchived && !plant.pesoSeco,
         inputValue: pesoSecoInput,
         setInputValue: setPesoSecoInput,
         onSave: handleSavePesoSeco,
@@ -728,199 +727,130 @@ const Plant = () => {
   const EventDetails = ({ event }) => {
     if (!event) return null;
     
-    const getEventIcon = () => {
-      switch (event.resourceType) {
-        case 'Riego':
-          return <WaterDropIcon sx={{ fontSize: 28 }} />;
-        case 'Insecticida':
-          return <BugReportIcon sx={{ fontSize: 28 }} />;
-        case 'Poda':
-          return <ContentCutIcon sx={{ fontSize: 28 }} />;
-        case 'Transplante':
-          return <SwapHorizIcon sx={{ fontSize: 28 }} />;
-        case 'Foto':
-          return <PhotoCameraIcon sx={{ fontSize: 28 }} />;
-        case 'Log':
-          return <NoteAltIcon sx={{ fontSize: 28 }} />;
-        case 'Etapa':
-          if (event.stageType === 'Germinacion') return <SpaIcon sx={{ fontSize: 28 }} />;
-          if (event.stageType === 'Vegetativo') return <GrassIcon sx={{ fontSize: 28 }} />;
-          if (event.stageType === 'Floracion') return <LocalFloristIcon sx={{ fontSize: 28 }} />;
-          return <LocalFloristIcon sx={{ fontSize: 28 }} />;
-        default:
-          return <InfoIcon sx={{ fontSize: 28 }} />;
-      }
-    };
-
     const getEventDetails = () => {
       if (event.resourceType === 'Etapa') {
         return (
-          <Box sx={{ textAlign: 'center', py: 2 }}>
-            <Typography variant="h6" color="text.secondary">
-              Cambio de etapa de crecimiento registrado
-            </Typography>
-          </Box>
-        );
-      }
-
-      switch (event.resourceType) {
-        case 'Riego':
-          return (
-            <Box>
-              {/* Información principal */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: 2,
-                p: 3,
-                bgcolor: alpha(theme.palette.info.main, 0.05),
-                borderRadius: 3,
-                border: `2px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                mb: 3
-              }}>
-                <OpacityIcon sx={{ color: theme.palette.info.main, fontSize: 32 }} />
-                <Typography variant="h4" fontWeight="bold" color={theme.palette.info.main}>
-                  {event.details.quantity} ml
+          <Box sx={{ mt: 2 }}>
+            <Card variant="outlined" sx={{ 
+              p: 2, 
+              borderRadius: 2,
+              boxShadow: `0 4px 12px ${alpha(event.color, 0.15)}`,
+              bgcolor: alpha(event.color, 0.05),
+              borderColor: event.color
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Avatar sx={{ bgcolor: event.color, mr: 2 }}>
+                  {event.stageType === 'Germinacion' && <SpaIcon />}
+                  {event.stageType === 'Vegetativo' && <GrassIcon />}
+                  {event.stageType === 'Floracion' && <LocalFloristIcon />}
+                </Avatar>
+                <Typography variant="h6" sx={{ color: event.color, fontWeight: 'bold' }}>
+                  {event.details.type}
                 </Typography>
               </Box>
               
-              {/* Aditivos si existen */}
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1 }}>
+                Fecha:
+              </Typography>
+              <Typography variant="body1" fontWeight="medium">
+                {convertToDetailedDate(event.details.date)}
+              </Typography>
+            </Card>
+          </Box>
+        );
+      }
+      switch (event.resourceType) {
+        case 'Riego':
+          return (
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.info.main, 0.1), borderRadius: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Fecha:</strong> {convertToDetailedDate(event.details.date)}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Cantidad:</strong> {event.details.quantity} ml
+              </Typography>
+              
               {event.details.aditives && event.details.aditives.length > 0 && (
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <ScienceIcon sx={{ color: theme.palette.success.main }} />
-                    Aditivos utilizados
+                <>
+                  <Typography variant="body1" gutterBottom>
+                    <strong>Aditivos:</strong>
                   </Typography>
-                  
-                  <Stack spacing={1.5}>
+                  <Box sx={{ ml: 2 }}>
                     {event.details.aditives.map((aditivo, index) => (
-                      <Box 
-                        key={index} 
-                        sx={{ 
-                          p: 2, 
-                          bgcolor: alpha(theme.palette.success.main, 0.05),
-                          borderRadius: 2,
-                          border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
-                        }}
-                      >
-                        <Typography variant="body1" fontWeight="medium">
-                          {aditivo.name}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Dosis: {aditivo.dosis} ml
-                        </Typography>
+                      <Box key={index} sx={{ mt: 0.5 }}>
+                        • {aditivo.name}: {aditivo.dosis} ml
                       </Box>
                     ))}
-                  </Stack>
-                </Box>
+                  </Box>
+                </>
               )}
             </Box>
           );
           
         case 'Insecticida':
           return (
-            <Box>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <ScienceIcon sx={{ color: theme.palette.error.main, fontSize: 32, mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">Producto</Typography>
-                    <Typography variant="h6" fontWeight="bold" color={theme.palette.error.main}>
-                      {event.details.product}
-                    </Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <FlashOnIcon sx={{ color: theme.palette.error.main, fontSize: 32, mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">Método</Typography>
-                    <Typography variant="h6" fontWeight="bold" color={theme.palette.error.main}>
-                      {event.details.appMethod}
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.error.main, 0.1), borderRadius: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Fecha:</strong> {convertToDetailedDate(event.details.date)}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Producto:</strong> {event.details.product}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Método de aplicación:</strong> {event.details.appMethod}
+              </Typography>
             </Box>
           );
           
         case 'Poda':
           return (
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: 2,
-              p: 3,
-              bgcolor: alpha(theme.palette.success.main, 0.05),
-              borderRadius: 3,
-              border: `2px solid ${alpha(theme.palette.success.main, 0.2)}`
-            }}>
-              <ContentCutIcon sx={{ color: theme.palette.success.main, fontSize: 32 }} />
-              <Typography variant="h5" fontWeight="bold" color={theme.palette.success.main}>
-                {event.details.type}
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.success.main, 0.1), borderRadius: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Fecha:</strong> {convertToDetailedDate(event.details.date)}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Tipo de poda:</strong> {event.details.type}
               </Typography>
             </Box>
           );
           
         case 'Transplante':
           return (
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: 3,
-              p: 3,
-              bgcolor: alpha(theme.palette.warning.main, 0.05),
-              borderRadius: 3,
-              border: `2px solid ${alpha(theme.palette.warning.main, 0.2)}`
-            }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary">Maceta anterior</Typography>
-                <Typography variant="h4" fontWeight="bold" color={theme.palette.warning.main}>
-                  {event.details.previousPot}L
-                </Typography>
-              </Box>
-              
-              <ArrowForwardIcon sx={{ color: theme.palette.warning.main, fontSize: 40 }} />
-              
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary">Nueva maceta</Typography>
-                <Typography variant="h4" fontWeight="bold" color={theme.palette.warning.main}>
-                  {event.details.newPot}L
-                </Typography>
-              </Box>
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.warning.main, 0.1), borderRadius: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Fecha:</strong> {convertToDetailedDate(event.details.date)}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Tamaño anterior:</strong> {event.details.previousPot}L
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Nuevo tamaño:</strong> {event.details.newPot}L
+              </Typography>
             </Box>
           );
         
         case 'Foto':
           return (
-            <Box>
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.secondary.main, 0.1), borderRadius: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Fecha:</strong> {convertToDetailedDate(event.details.date)}
+              </Typography>
+              
               {event.details.description && (
-                <Box sx={{ mb: 3, textAlign: 'center' }}>
-                  <Typography variant="h6" color="text.primary">
-                    {event.details.description}
-                  </Typography>
-                </Box>
+                <Typography variant="body1" gutterBottom>
+                  <strong>Descripción:</strong> {event.details.description}
+                </Typography>
               )}
               
-              <Box sx={{ 
-                textAlign: 'center',
-                p: 2,
-                bgcolor: alpha(theme.palette.secondary.main, 0.05),
-                borderRadius: 3,
-                border: `2px solid ${alpha(theme.palette.secondary.main, 0.2)}`
-              }}>
+              <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <img 
-                  src={event.imageUrl} 
+                    src={event.imageUrl} 
                   alt="Foto de la planta" 
                   style={{ 
                     maxWidth: '100%', 
-                    maxHeight: '400px', 
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                    objectFit: 'cover'
+                    maxHeight: '300px', 
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                   }} 
                 />
               </Box>
@@ -929,13 +859,12 @@ const Plant = () => {
           
         case 'Log':
           return (
-            <Box sx={{ 
-              p: 3,
-              bgcolor: alpha('#9c27b0', 0.05),
-              borderRadius: 3,
-              border: `2px solid ${alpha('#9c27b0', 0.2)}`
-            }}>
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '1.1rem' }}>
+            <Box sx={{ p: 2, bgcolor: alpha('#9c27b0', 0.1), borderRadius: 2 }}>
+              <Typography variant="body1" gutterBottom>
+                <strong>Fecha:</strong> {convertToDetailedDate(event.details.date)}
+                    </Typography>
+              
+              <Typography variant="body1" sx={{ mt: 2, whiteSpace: 'pre-wrap' }}>
                 {event.details.description}
               </Typography>
             </Box>
@@ -2040,9 +1969,7 @@ const Plant = () => {
     setSavingPesoHumedo(true);
     try {
       const plantId = checkSearch(location.search);
-      const dbPath = plant.isArchived 
-        ? `${auth.currentUser.uid}/plants/history/${plantId}`
-        : `${auth.currentUser.uid}/plants/active/${plantId}`;
+      const dbPath = `${auth.currentUser.uid}/plants/active/${plantId}`;
       
       await database.ref(dbPath).update({
         pesoHumedo: parseFloat(pesoHumedoInput)
@@ -2140,7 +2067,7 @@ const Plant = () => {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
               <Typography variant="body1">
-                Esta planta se encuentra archivada. Solo se pueden registrar los pesos húmedo y seco.
+                Esta planta se encuentra archivada y no puede ser modificada
               </Typography>
             </Box>
           </Alert>
@@ -2288,6 +2215,119 @@ const Plant = () => {
                       </Typography>
                     </Box>
                   </ListItem>
+                  
+                  {/* Peso húmedo - Solo mostrar si la planta ha sido cosechada (tiene finishDate) */}
+                  {plant.finishDate && (
+                    <ListItem 
+                      divider
+                      sx={{ 
+                        py: 1.8, 
+                        px: 3,
+                        borderLeft: `4px solid transparent`,
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.warning.main, 0.03),
+                          borderLeft: `4px solid ${theme.palette.warning.main}`
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1" color="text.secondary">Peso húmedo (cosecha)</Typography>
+                        {plant.isArchived || plant.pesoHumedo ? (
+                          <Typography variant="subtitle1" fontWeight="medium">
+                            {plant.pesoHumedo ? `${plant.pesoHumedo}g` : 'No registrado'}
+                          </Typography>
+                        ) : (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TextField
+                              size="small"
+                              type="number"
+                              placeholder="Peso en gramos"
+                              value={pesoHumedoInput}
+                              onChange={(e) => setPesoHumedoInput(e.target.value)}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">g</InputAdornment>,
+                                inputProps: { min: 0, step: 0.1 }
+                              }}
+                              sx={{ width: 140 }}
+                            />
+                            <Button
+                              variant="contained"
+                              size="small"
+                              onClick={handleSavePesoHumedo}
+                              disabled={!pesoHumedoInput || parseFloat(pesoHumedoInput) <= 0 || savingPesoHumedo}
+                              startIcon={savingPesoHumedo ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                              sx={{
+                                bgcolor: theme.palette.warning.main,
+                                '&:hover': {
+                                  bgcolor: theme.palette.warning.dark
+                                },
+                                minWidth: 'auto',
+                                px: 1.5
+                              }}
+                            >
+                              {savingPesoHumedo ? '' : 'Guardar'}
+                            </Button>
+                          </Box>
+                        )}
+                      </Box>
+                    </ListItem>
+                  )}
+                  
+                  {/* Peso seco - Solo mostrar si la planta ha sido enfrascada */}
+                  {plant.etapa === 'Enfrascado' && (
+                    <ListItem 
+                      sx={{ 
+                        py: 1.8, 
+                        px: 3,
+                        borderLeft: `4px solid transparent`,
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.success.main, 0.03),
+                          borderLeft: `4px solid ${theme.palette.success.main}`
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1" color="text.secondary">Peso seco (final)</Typography>
+                        {plant.isArchived || plant.pesoSeco ? (
+                          <Typography variant="subtitle1" fontWeight="medium">
+                            {plant.pesoSeco ? `${plant.pesoSeco}g` : 'No registrado'}
+                          </Typography>
+                        ) : (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TextField
+                              size="small"
+                              type="number"
+                              placeholder="Peso en gramos"
+                              value={pesoSecoInput}
+                              onChange={(e) => setPesoSecoInput(e.target.value)}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">g</InputAdornment>,
+                                inputProps: { min: 0, step: 0.1 }
+                              }}
+                              sx={{ width: 140 }}
+                            />
+                            <Button
+                              variant="contained"
+                              size="small"
+                              onClick={handleSavePesoSeco}
+                              disabled={!pesoSecoInput || parseFloat(pesoSecoInput) <= 0 || savingPesoSeco}
+                              startIcon={savingPesoSeco ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                              sx={{
+                                bgcolor: theme.palette.success.main,
+                                '&:hover': {
+                                  bgcolor: theme.palette.success.dark
+                                },
+                                minWidth: 'auto',
+                                px: 1.5
+                              }}
+                            >
+                              {savingPesoSeco ? '' : 'Guardar'}
+                            </Button>
+                          </Box>
+                        )}
+                      </Box>
+                    </ListItem>
+                  )}
                 </List>
               </CardContent>
             </Card>
@@ -3214,151 +3254,98 @@ const Plant = () => {
       <Dialog 
         open={openCalendarModal} 
         onClose={() => setOpenCalendarModal(false)}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
-        TransitionComponent={Fade}
-        transitionDuration={400}
+          TransitionComponent={Fade}
+          transitionDuration={300}
         PaperProps={{
           sx: {
-            borderRadius: 4,
-            boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
-            overflow: 'hidden',
-            bgcolor: theme.palette.background.paper,
-            maxHeight: '90vh'
-          }
-        }}
-      >
-        {selectedEvent && (
-          <>
-            {/* Header del modal */}
-            <Box sx={{ 
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
+            borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+              bgcolor: theme.palette.background.paper
+            }
+          }}
+        >
+          {selectedEvent && (
+            <>
               <Box sx={{ 
-                p: 3, 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                background: `linear-gradient(135deg, ${selectedEvent.color} 0%, ${alpha(selectedEvent.color, 0.8)} 100%)`,
-                color: '#ffffff',
-                boxShadow: `0 8px 32px ${alpha(selectedEvent.color, 0.4)}`,
-                position: 'relative'
+                position: 'relative',
+            overflow: 'hidden'
               }}>
-                {/* Patrón de fondo decorativo */}
-                <Box sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  opacity: 0.1,
-                  backgroundImage: `radial-gradient(circle at 20% 50%, white 1px, transparent 1px), 
-                                   radial-gradient(circle at 80% 50%, white 1px, transparent 1px)`,
-                  backgroundSize: '30px 30px'
-                }} />
-                
-                <Stack direction="row" spacing={2.5} alignItems="center" sx={{ position: 'relative', zIndex: 1 }}>
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: alpha('#ffffff', 0.25), 
-                      color: '#ffffff',
-                      width: 64,
-                      height: 64,
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                      border: `3px solid ${alpha('#ffffff', 0.3)}`
+                <Box sx={{ 
+                  p: 2.5, 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: `linear-gradient(135deg, ${selectedEvent.color} 0%, ${alpha(selectedEvent.color, 0.8)} 100%)`,
+                  color: '#ffffff',
+                  boxShadow: `0 4px 20px ${alpha(selectedEvent.color, 0.5)}`
+                }}>
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: alpha('#ffffff', 0.2), 
+                        color: '#ffffff',
+                        width: 40,
+                        height: 40,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                      }}
+                    >
+                      {selectedEvent.icon === 'water' && <WaterDropIcon />}
+                      {selectedEvent.icon === 'bug' && <BugReportIcon />}
+                      {selectedEvent.icon === 'cut' && <ContentCutIcon />}
+                      {selectedEvent.icon === 'swap' && <SwapHorizIcon />}
+                      {selectedEvent.icon === 'photo' && <PhotoCameraIcon />}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
+                        {selectedEvent.title}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: alpha('#ffffff', 0.9) }}>
+                        {convertToDetailedDate(selectedEvent.details.date)}
+                      </Typography>
+                    </Box>
+                  </Stack>
+          <IconButton
+            onClick={() => setOpenCalendarModal(false)}
+                    size="small"
+            sx={{
+                      color: 'white',
+                      bgcolor: alpha('#ffffff', 0.15),
+              '&:hover': {
+                        bgcolor: alpha('#ffffff', 0.25)
+                      },
+                      transition: 'all 0.2s ease',
+                      backdropFilter: 'blur(4px)'
                     }}
                   >
-                    {selectedEvent.icon === 'water' && <WaterDropIcon sx={{ fontSize: 32 }} />}
-                    {selectedEvent.icon === 'bug' && <BugReportIcon sx={{ fontSize: 32 }} />}
-                    {selectedEvent.icon === 'cut' && <ContentCutIcon sx={{ fontSize: 32 }} />}
-                    {selectedEvent.icon === 'swap' && <SwapHorizIcon sx={{ fontSize: 32 }} />}
-                    {selectedEvent.icon === 'photo' && <PhotoCameraIcon sx={{ fontSize: 32 }} />}
-                    {selectedEvent.icon === 'note' && <NoteAltIcon sx={{ fontSize: 32 }} />}
-                    {selectedEvent.resourceType === 'Etapa' && (
-                      <>
-                        {selectedEvent.stageType === 'Germinacion' && <SpaIcon sx={{ fontSize: 32 }} />}
-                        {selectedEvent.stageType === 'Vegetativo' && <GrassIcon sx={{ fontSize: 32 }} />}
-                        {selectedEvent.stageType === 'Floracion' && <LocalFloristIcon sx={{ fontSize: 32 }} />}
-                      </>
-                    )}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h4" sx={{ 
-                      fontWeight: 'bold', 
-                      color: '#ffffff',
-                      textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                      mb: 0.5
-                    }}>
-                      {selectedEvent.resourceType}
-                    </Typography>
-                    <Typography variant="h6" sx={{ 
-                      color: alpha('#ffffff', 0.95),
-                      fontWeight: 'medium',
-                      textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                    }}>
-                      {convertToDetailedDate(selectedEvent.details.date)}
-                    </Typography>
-                  </Box>
-                </Stack>
+                    <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
                 
-                <IconButton
-                  onClick={() => setOpenCalendarModal(false)}
-                  size="large"
-                  sx={{
-                    color: 'white',
-                    bgcolor: alpha('#ffffff', 0.15),
-                    backdropFilter: 'blur(8px)',
-                    border: `1px solid ${alpha('#ffffff', 0.2)}`,
-                    '&:hover': {
-                      bgcolor: alpha('#ffffff', 0.25),
-                      transform: 'scale(1.05)'
+                <DialogContent 
+                  sx={{ 
+                    p: 0,
+                    '&::-webkit-scrollbar': {
+                      width: '8px'
                     },
-                    transition: 'all 0.2s ease',
-                    position: 'relative',
-                    zIndex: 1
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: alpha(selectedEvent.color, 0.2),
+                      borderRadius: '4px'
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      backgroundColor: alpha(selectedEvent.color, 0.05)
+                    }
                   }}
                 >
-                  <CloseIcon />
-                </IconButton>
+                  <Box sx={{ p: 3 }}>
+                    <EventDetails event={selectedEvent} />
               </Box>
-              
-              {/* Línea decorativa */}
-              <Box sx={{
-                height: 4,
-                background: `linear-gradient(90deg, 
-                  ${alpha(selectedEvent.color, 0.8)} 0%, 
-                  ${selectedEvent.color} 50%, 
-                  ${alpha(selectedEvent.color, 0.8)} 100%)`
-              }} />
+                </DialogContent>
             </Box>
-            
-            {/* Contenido del modal */}
-            <DialogContent 
-              sx={{ 
-                p: 0,
-                bgcolor: theme.palette.background.default,
-                '&::-webkit-scrollbar': {
-                  width: '8px'
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  backgroundColor: alpha(selectedEvent.color, 0.3),
-                  borderRadius: '4px',
-                  '&:hover': {
-                    backgroundColor: alpha(selectedEvent.color, 0.5)
-                  }
-                },
-                '&::-webkit-scrollbar-track': {
-                  backgroundColor: alpha(selectedEvent.color, 0.05)
-                }
-              }}
-            >
-              <Box sx={{ p: 4 }}>
-                <EventDetails event={selectedEvent} />
-              </Box>
-            </DialogContent>
-          </>
-        )}
+            </>
+          )}
       </Dialog>
     </Box>
 

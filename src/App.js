@@ -31,7 +31,6 @@ import NewCard from './pages/finances/NewCard';
 import EditCard from './pages/finances/EditCard';
 import UpdateCardDates from './pages/finances/UpdateCardDates.jsx';
 import { ColorModeContext } from './utils';
-import PlantCalendar from './pages/plants/PlantCalendar';
 import Configuracion from './pages/basics/Configuracion';
 import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
@@ -378,7 +377,6 @@ function App() {
           <Route path="/register" element={<Login />} />
           <Route path="/Plantas" element={<PrivateRoute><PlantsList /></PrivateRoute>} />
           <Route path="/Planta" element={<PrivateRoute><Plant /></PrivateRoute>} />
-          <Route path="/PlantaCalendario" element={<PrivateRoute><PlantCalendar /></PrivateRoute>} />
           <Route path="/NuevaPlanta" element={<PrivateRoute><NewPlant /></PrivateRoute>} />
           <Route path="/NuevoRiego" element={<PrivateRoute><NewIrrigation /></PrivateRoute>} />
           <Route path="/NuevaPoda" element={<PrivateRoute><NewPruning /></PrivateRoute>} />

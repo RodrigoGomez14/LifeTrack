@@ -9,7 +9,6 @@ import {
   CardContent,
   Typography,
   alpha,
-  Divider,
   IconButton,
   Paper,
   Fade,
@@ -22,6 +21,8 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  Container,
+  CardHeader
 } from "@mui/material";
 import { database, auth, storage } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -36,6 +37,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SaveIcon from '@mui/icons-material/Save';
+import InfoIcon from '@mui/icons-material/Info';
 
 // Variables globales para estado y progreso
 let IS_UPLOADING = false;
@@ -51,7 +54,6 @@ let heic2any;
 try {
   heic2any = require('heic2any');
 } catch (e) {
-  console.log("heic2any no está disponible, se intentará cargar dinámicamente si es necesario");
 }
 
 const VisuallyHiddenInput = styled('input')({
@@ -157,71 +159,81 @@ const createGlobalDialog = (theme) => {
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.85);
-          backdrop-filter: blur(8px);
+          background-color: rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(4px);
           z-index: 9999;
           display: flex;
           align-items: center;
-          justify-content: center;">
+          justify-content: center;
+          padding: 20px;
+          box-sizing: border-box;">
           <div class="dialog-content" style="
             width: 100%;
-            max-width: 450px;
+            max-width: 480px;
+            background: white;
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);">
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;">
             <div class="dialog-header" style="
-              padding: 16px;
-              background: linear-gradient(135deg, #3f51b5 0%, #2196f3 100%);
+              padding: 24px;
+              background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
               color: white;
               text-align: center;">
-              <h3 id="upload-dialog-title" style="margin: 0; font-weight: bold; font-size: 18px;">
+              <h3 id="upload-dialog-title" style="
+                margin: 0; 
+                font-weight: 600; 
+                font-size: 20px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 Subiendo Imágenes
               </h3>
             </div>
-            <div class="dialog-body" style="padding: 32px; text-align: center;">
-              <div class="spinner" style="
+            <div class="dialog-body" style="
+              padding: 32px 24px; 
+              text-align: center;
+              background: white;">
+              <div class="spinner-container" style="
                 margin-bottom: 24px;
-                height: 70px;
-                width: 70px;
-                animation: rotate 2s linear infinite;
-                margin-left: auto;
-                margin-right: auto;">
-                <svg style="height: 100%; width: 100%;" viewBox="0 0 50 50">
-                  <circle style="
-                    stroke-dasharray: 150, 200;
-                    stroke-dashoffset: -10;
-                    stroke-linecap: round;
-                    stroke: #3f51b5;
-                    fill: none;
-                    stroke-width: 4;
-                    animation: dash 1.5s ease-in-out infinite;"
-                    cx="25" cy="25" r="20">
-                  </circle>
-                </svg>
+                display: flex;
+                justify-content: center;">
+                <div class="spinner" style="
+                  height: 60px;
+                  width: 60px;
+                  border: 4px solid #e3f2fd;
+                  border-top: 4px solid #1976d2;
+                  border-radius: 50%;
+                  animation: spin 1s linear infinite;">
+                </div>
               </div>
-              <h4 id="upload-status" style="margin: 0 0 16px 0; font-size: 22px; color: #333;">
+              <h4 id="upload-status" style="
+                margin: 0 0 16px 0; 
+                font-size: 18px; 
+                color: #1a1a1a;
+                font-weight: 500;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 ${progress.isComplete ? 'Subida Completada' : 'Subiendo imágenes...'}
               </h4>
               <div id="progress-count" style="
-                font-size: 16px; 
-                color: #555; 
-                margin-bottom: 16px;
-                font-weight: bold;">
+                font-size: 14px; 
+                color: #666; 
+                margin-bottom: 20px;
+                font-weight: 500;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 Progreso: ${progress.current} de ${progress.total} imágenes
               </div>
               
               <div class="progress-bar-container" style="
                 width: 100%;
-                height: 10px;
+                height: 8px;
                 background-color: #e0e0e0;
-                border-radius: 5px;
+                border-radius: 4px;
                 overflow: hidden;
-                margin-bottom: 20px;">
+                margin-bottom: 16px;">
                 <div id="progress-bar" style="
                   width: ${progress.percentComplete}%;
                   height: 100%;
-                  background-color: #4caf50;
-                  border-radius: 5px;
+                  background: linear-gradient(90deg, #4caf50 0%, #66bb6a 100%);
+                  border-radius: 4px;
                   transition: width 0.3s ease-in-out;">
                 </div>
               </div>
@@ -231,37 +243,84 @@ const createGlobalDialog = (theme) => {
                 justify-content: space-between;
                 margin-bottom: 24px;
                 color: #666;
-                font-size: 14px;">
+                font-size: 12px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 <span>0%</span>
-                <span style="font-weight: bold; color: #3f51b5;">${progress.percentComplete}%</span>
+                <span style="font-weight: 600; color: #1976d2;">${progress.percentComplete}%</span>
                 <span>100%</span>
               </div>
               
-              <div style="
-                background-color: #fff9c4;
-                border-left: 4px solid #fbc02d;
+              <div class="warning-box" style="
+                background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+                border: 1px solid #ffb74d;
+                border-radius: 8px;
                 padding: 16px;
                 text-align: left;
-                margin-bottom: 16px;
-                border-radius: 4px;">
-                <p style="margin: 0; font-size: 14px; color: #5d4037;">
-                  Por favor espera mientras se suben las imágenes.
-                </p>
-                <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: bold; color: #5d4037;">
-                  No cierres ni recargues esta página.
+                margin-bottom: 16px;">
+                <div style="
+                  display: flex;
+                  align-items: center;
+                  margin-bottom: 8px;">
+                  <span style="
+                    color: #f57c00;
+                    font-size: 18px;
+                    margin-right: 8px;">⚠️</span>
+                  <span style="
+                    font-weight: 600;
+                    color: #e65100;
+                    font-size: 14px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    Importante
+                  </span>
+                </div>
+                <p style="
+                  margin: 0; 
+                  font-size: 13px; 
+                  color: #bf360c;
+                  line-height: 1.4;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Por favor espera mientras se suben las imágenes.<br>
+                  <strong>No cierres ni recargues esta página.</strong>
                 </p>
               </div>
+              
+              ${progress.isComplete ? `
+                <div class="success-message" style="
+                  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+                  border: 1px solid #4caf50;
+                  border-radius: 8px;
+                  padding: 16px;
+                  text-align: center;">
+                  <span style="color: #2e7d32; font-size: 18px; margin-right: 8px;">✅</span>
+                  <span style="
+                    color: #1b5e20;
+                    font-weight: 600;
+                    font-size: 14px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    ¡Todas las imágenes se subieron correctamente!
+                  </span>
+                </div>
+              ` : ''}
             </div>
           </div>
         </div>
         <style>
-          @keyframes rotate {
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
-          @keyframes dash {
-            0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
-            50% { stroke-dasharray: 89, 200; stroke-dashoffset: -35; }
-            100% { stroke-dasharray: 89, 200; stroke-dashoffset: -124; }
+          @keyframes slideIn {
+            from {
+              opacity: 0;
+              transform: translateY(-20px) scale(0.95);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          .upload-dialog * {
+            box-sizing: border-box;
           }
         </style>
       `;
@@ -274,6 +333,7 @@ const createGlobalDialog = (theme) => {
       const countEl = uploadDialogContainer.querySelector('#progress-count');
       const barEl = uploadDialogContainer.querySelector('#progress-bar');
       const percentEl = uploadDialogContainer.querySelector('#progress-percent');
+      const dialogBodyEl = uploadDialogContainer.querySelector('.dialog-body');
       
       if (statusEl) {
         statusEl.textContent = progress.isComplete ? 'Subida Completada' : 'Subiendo imágenes...';
@@ -291,6 +351,33 @@ const createGlobalDialog = (theme) => {
         const percentValueEl = percentEl.querySelector('span:nth-child(2)');
         if (percentValueEl) {
           percentValueEl.textContent = `${progress.percentComplete}%`;
+        }
+      }
+      
+      // Agregar mensaje de éxito cuando se complete
+      if (progress.isComplete && dialogBodyEl) {
+        let successMessage = dialogBodyEl.querySelector('.success-message');
+        if (!successMessage) {
+          const successHTML = `
+            <div class="success-message" style="
+              background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+              border: 1px solid #4caf50;
+              border-radius: 8px;
+              padding: 16px;
+              text-align: center;
+              margin-top: 16px;
+              animation: slideIn 0.3s ease-out;">
+              <span style="color: #2e7d32; font-size: 18px; margin-right: 8px;">✅</span>
+              <span style="
+                color: #1b5e20;
+                font-weight: 600;
+                font-size: 14px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                ¡Todas las imágenes se subieron correctamente!
+              </span>
+            </div>
+          `;
+          dialogBodyEl.insertAdjacentHTML('beforeend', successHTML);
         }
       }
     };
@@ -700,267 +787,349 @@ const NewPhoto = () => {
     e.stopPropagation();
   };
 
+  const isFormValid = selectedImages.length > 0;
+
   return (
     <Layout title="Nueva Foto">
-      <Box sx={{ 
-        maxWidth: 800, 
-        mx: 'auto', 
-        p: { xs: 2, md: 0 },
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 70px)',
-        position: 'relative'
-      }}>
-        <Card elevation={3} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-          <Box sx={{ 
-            p: 3, 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-            color: '#ffffff'
-          }}>
-            <CollectionsIcon fontSize="large" sx={{ color: '#ffffff' }} />
-            <Box>
-              <Typography variant="h5" component="h1" sx={{ color: '#ffffff' }}>
-                Añadir Fotos
-              </Typography>
-              <Typography variant="body2" sx={{ color: alpha('#ffffff', 0.8) }}>
-                Sube hasta 10 fotos a la vez (incluye soporte para HEIC)
-              </Typography>
-            </Box>
-          </Box>
-          
-          <CardContent sx={{ p: 3 }}>
-            <Grid container spacing={3}>
-              {selectedImages.length < MAX_IMAGES && (
-                <Grid item xs={12}>
-                  <DropZone
-                    isDragActive={isDragActive}
-                    onClick={handleAreaClick}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <AddPhotoAlternateIcon 
-                      sx={{ 
-                        fontSize: 60, 
-                        color: isDragActive ? theme.palette.success.main : alpha(theme.palette.text.secondary, 0.4),
-                        mb: 2 
-                      }} 
-                    />
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
-                      Arrastra y suelta imágenes
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      o haz clic para seleccionar
-                    </Typography>
-                    <Stack direction="row" spacing={1} justifyContent="center" sx={{ mb: 2 }}>
-                      <Chip 
-                        label={`${selectedImages.length}/${MAX_IMAGES} imágenes`} 
-                        color={selectedImages.length > 0 ? "primary" : "default"}
-                        variant={selectedImages.length > 0 ? "filled" : "outlined"}
-                      />
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                      Tamaño máximo: 10MB por imagen - Formatos: JPG, PNG, GIF, HEIC
-                    </Typography>
-                    <Button
-                      component="label"
-                      variant="outlined"
-                      startIcon={<CloudUploadIcon />}
-                      disabled={isProcessingFile || IS_UPLOADING}
-                      onClick={handleSelectButtonClick}
-                      sx={{ 
-                        borderColor: theme.palette.success.main,
-                        color: theme.palette.success.main,
-                        '&:hover': { 
-                          borderColor: theme.palette.success.dark,
-                          bgcolor: alpha(theme.palette.success.main, 0.05)
-                        },
-                        ...(isProcessingFile && {
-                          opacity: 0.7,
-                          cursor: 'not-allowed'
-                        })
-                      }}
-                    >
-                      {isProcessingFile ? 'Procesando...' : 'Seleccionar Imágenes'}
-                      <VisuallyHiddenInput 
-                        type="file" 
-                        accept="image/*,.heic,.HEIC" 
-                        onChange={handleImageChange}
-                        ref={fileInputRef}
-                        multiple 
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </Button>
-                  </DropZone>
-                </Grid>
-              )}
-              
-              {imagePreviews.length > 0 && (
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Imágenes seleccionadas: {selectedImages.length}
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {imagePreviews.map((preview, index) => (
-                      <Grid item xs={6} sm={4} md={3} key={index}>
-                        <Paper 
-                          elevation={2} 
-                          sx={{ 
-                            p: 1, 
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            position: 'relative',
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Box sx={{ position: 'relative' }}>
-                            <img 
-                              src={preview} 
-                              alt={`Vista previa ${index + 1}`} 
-                              style={{ 
-                                width: '100%', 
-                                height: '150px', 
-                                objectFit: 'cover',
-                                borderRadius: '4px',
-                                display: 'block'
-                              }} 
-                            />
-                            
-                            <IconButton
-                              aria-label="eliminar imagen"
-                              size="small"
-                              onClick={() => handleRemoveImage(index)}
+      <Container maxWidth="lg">
+        <Box sx={{ py: 3, mt: 4 }}>
+          <Grid container spacing={3}>
+            {/* Información de las fotos */}
+            <Grid item xs={12}>
+              <Card 
+                elevation={3} 
+                sx={{ 
+                  borderRadius: 3, 
+                  overflow: 'hidden',
+                  height: 'fit-content'
+                }}
+              >
+                <CardHeader
+                  title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <PhotoCameraIcon sx={{ color: '#ffffff' }} />
+                      <Typography variant="h6" fontWeight="medium">
+                        Información de las Fotos
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{
+                    background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
+                    color: '#ffffff',
+                    py: 2
+                  }}
+                />
+                <CardContent sx={{ p: 3 }}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+                        <DatePicker
+                          label="Fecha de las fotos"
+                          value={photoDate}
+                          onChange={(newValue) => setPhotoDate(newValue)}
+                          renderInput={(params) => (
+                            <TextField 
+                              {...params} 
+                              fullWidth
                               sx={{
-                                position: 'absolute',
-                                top: 4,
-                                right: 4,
-                                bgcolor: alpha(theme.palette.background.paper, 0.7),
-                                '&:hover': {
-                                  bgcolor: alpha(theme.palette.error.main, 0.1),
-                                  color: theme.palette.error.main
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2
                                 }
                               }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
-                              mt: 1, 
-                              display: 'block', 
-                              textAlign: 'center',
-                              color: theme.palette.text.secondary 
-                            }}
-                          >
-                            Foto {index + 1}
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Grid>
-              )}
-              
-              <Grid item xs={12}>
-                <Divider sx={{ my: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    INFORMACIÓN
-                  </Typography>
-                </Divider>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
-                  <DatePicker
-                    label="Fecha de las fotos"
-                    value={photoDate}
-                    onChange={(date) => setPhotoDate(date)}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        variant: 'outlined',
-                      }
-                    }}
-                  />
-                </LocalizationProvider>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  label="Descripción (opcional)"
-                  placeholder="Ej: Primeras hojas, Crecimiento, etc."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  fullWidth
-                  multiline
-                  rows={3}
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Collapse in={!!error}>
-                  <Alert 
-                    severity="error" 
-                    sx={{ mb: 2 }} 
-                    onClose={() => setError(null)}
-                    action={
-                      <Button 
-                        color="error" 
-                        size="small" 
-                        onClick={() => setError(null)}
+                            />
+                          )}
+                        />
+                      </LocalizationProvider>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Paper 
+                        elevation={1}
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          height: 'fit-content'
+                        }}
                       >
-                        Reintentar
-                      </Button>
-                    }
-                  >
-                    {error}
-                  </Alert>
-                </Collapse>
-              </Grid>
-              
-              <Grid item xs={12} sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => navigate(`/Planta/?${plantId}`)}
-                    disabled={IS_UPLOADING}
-                  >
-                    Cancelar
-                  </Button>
-                  
-                  <Button 
-                    variant="contained"
-                    startIcon={IS_UPLOADING ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
-                    onClick={handleUploadPhotos}
-                    disabled={selectedImages.length === 0 || IS_UPLOADING}
-                    sx={{
-                      bgcolor: theme.palette.secondary.main,
-                      color: '#ffffff',
-                      boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.3)}`,
-                      '&:hover': {
-                        bgcolor: theme.palette.secondary.dark,
-                        boxShadow: `0 6px 16px ${alpha(theme.palette.secondary.main, 0.4)}`
-                      }
-                    }}
-                  >
-                    {IS_UPLOADING 
-                      ? `Subiendo...` 
-                      : `Subir ${selectedImages.length > 1 ? selectedImages.length + ' Fotos' : 'Foto'}`}
-                  </Button>
-                </Box>
-              </Grid>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <InfoIcon sx={{ color: theme.palette.info.main, fontSize: 20 }} />
+                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                            Estado actual
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1}>
+                          <Chip 
+                            label={`${selectedImages.length}/${MAX_IMAGES} fotos`} 
+                            color={selectedImages.length > 0 ? "primary" : "default"}
+                            variant={selectedImages.length > 0 ? "filled" : "outlined"}
+                            size="small"
+                          />
+                          {selectedImages.length >= MAX_IMAGES && (
+                            <Chip 
+                              label="Máximo alcanzado" 
+                              color="warning"
+                              size="small"
+                            />
+                          )}
+                        </Stack>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        label="Descripción (opcional)"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        fullWidth
+                        multiline
+                        rows={3}
+                        placeholder="Ej: Primeras hojas, Crecimiento, Floración, etc."
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2
+                          }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
             </Grid>
-          </CardContent>
-        </Card>
-      </Box>
+
+            {/* Selección de imágenes */}
+            <Grid item xs={12}>
+              <Card 
+                elevation={3} 
+                sx={{ 
+                  borderRadius: 3, 
+                  overflow: 'hidden'
+                }}
+              >
+                <CardHeader
+                  title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <CollectionsIcon sx={{ color: '#ffffff' }} />
+                      <Typography variant="h6" fontWeight="medium">
+                        Seleccionar Imágenes
+                      </Typography>
+                    </Box>
+                  }
+                  subheader={
+                    <Typography variant="body2" sx={{ color: alpha('#ffffff', 0.9), mt: 0.5 }}>
+                      Sube hasta 10 fotos a la vez (incluye soporte para HEIC)
+                    </Typography>
+                  }
+                  sx={{
+                    background: `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.dark} 100%)`,
+                    color: '#ffffff',
+                    py: 2,
+                    '& .MuiCardHeader-subheader': {
+                      color: alpha('#ffffff', 0.9)
+                    }
+                  }}
+                />
+                <CardContent sx={{ p: 3 }}>
+                  {selectedImages.length < MAX_IMAGES && (
+                    <Box sx={{ mb: 3 }}>
+                      <DropZone
+                        isDragActive={isDragActive}
+                        onClick={handleAreaClick}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                      >
+                        <AddPhotoAlternateIcon 
+                          sx={{ 
+                            fontSize: 60, 
+                            color: isDragActive ? theme.palette.success.main : alpha(theme.palette.text.secondary, 0.4),
+                            mb: 2 
+                          }} 
+                        />
+                        <Typography variant="h6" color="text.secondary" gutterBottom>
+                          Arrastra y suelta imágenes
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          o haz clic para seleccionar
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                          Tamaño máximo: 10MB por imagen - Formatos: JPG, PNG, GIF, HEIC
+                        </Typography>
+                        <Button
+                          component="label"
+                          variant="outlined"
+                          startIcon={<CloudUploadIcon />}
+                          disabled={isProcessingFile || IS_UPLOADING}
+                          onClick={handleSelectButtonClick}
+                          sx={{ 
+                            borderColor: theme.palette.success.main,
+                            color: theme.palette.success.main,
+                            '&:hover': { 
+                              borderColor: theme.palette.success.dark,
+                              bgcolor: alpha(theme.palette.success.main, 0.05)
+                            },
+                            ...(isProcessingFile && {
+                              opacity: 0.7,
+                              cursor: 'not-allowed'
+                            })
+                          }}
+                        >
+                          {isProcessingFile ? 'Procesando...' : 'Seleccionar Imágenes'}
+                          <VisuallyHiddenInput 
+                            type="file" 
+                            accept="image/*,.heic,.HEIC" 
+                            onChange={handleImageChange}
+                            ref={fileInputRef}
+                            multiple 
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </Button>
+                      </DropZone>
+                    </Box>
+                  )}
+                  
+                  {imagePreviews.length > 0 && (
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom fontWeight="medium" sx={{ mb: 2 }}>
+                        Imágenes seleccionadas ({selectedImages.length})
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {imagePreviews.map((preview, index) => (
+                          <Grid item xs={6} sm={4} md={3} key={index}>
+                            <Paper 
+                              elevation={2} 
+                              sx={{ 
+                                p: 1, 
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                position: 'relative',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                border: `1px solid ${alpha(theme.palette.secondary.main, 0.3)}`
+                              }}
+                            >
+                              <Box sx={{ position: 'relative' }}>
+                                <img 
+                                  src={preview} 
+                                  alt={`Vista previa ${index + 1}`} 
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '150px', 
+                                    objectFit: 'cover',
+                                    borderRadius: '4px',
+                                    display: 'block'
+                                  }} 
+                                />
+                                
+                                <IconButton
+                                  aria-label="eliminar imagen"
+                                  size="small"
+                                  onClick={() => handleRemoveImage(index)}
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 4,
+                                    right: 4,
+                                    bgcolor: alpha(theme.palette.background.paper, 0.7),
+                                    '&:hover': {
+                                      bgcolor: alpha(theme.palette.error.main, 0.1),
+                                      color: theme.palette.error.main
+                                    }
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  mt: 1, 
+                                  display: 'block', 
+                                  textAlign: 'center',
+                                  color: theme.palette.text.secondary 
+                                }}
+                              >
+                                Foto {index + 1}
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                  )}
+
+                  {error && (
+                    <Box sx={{ mt: 3 }}>
+                      <Collapse in={!!error}>
+                        <Alert 
+                          severity="error" 
+                          onClose={() => setError(null)}
+                          action={
+                            <Button 
+                              color="error" 
+                              size="small" 
+                              onClick={() => setError(null)}
+                            >
+                              Reintentar
+                            </Button>
+                          }
+                        >
+                          {error}
+                        </Alert>
+                      </Collapse>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Botones de acción */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate(`/Planta/?${plantId}`)}
+                  disabled={IS_UPLOADING}
+                  sx={{
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: 2
+                  }}
+                >
+                  Cancelar
+                </Button>
+                
+                <Button 
+                  variant="contained"
+                  color="secondary"
+                  startIcon={IS_UPLOADING ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                  onClick={handleUploadPhotos}
+                  disabled={!isFormValid || IS_UPLOADING}
+                  size="large"
+                  sx={{
+                    py: 1.5,
+                    px: 4,
+                    borderRadius: 2,
+                    fontWeight: 'bold',
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                    '&:hover': {
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.secondary.main, 0.4)}`,
+                      transform: 'translateY(-2px)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {IS_UPLOADING 
+                    ? `Subiendo...` 
+                    : `Subir ${selectedImages.length > 1 ? selectedImages.length + ' Fotos' : 'Foto'}`}
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+      </Container>
     </Layout>
   );
 };

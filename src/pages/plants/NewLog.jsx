@@ -9,13 +9,15 @@ import {
   CardContent,
   Typography,
   alpha,
-  Divider
+  Container,
+  CardHeader
 } from "@mui/material";
 import { database, auth } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import { useTheme } from '@mui/material/styles';
 import NoteAltIcon from '@mui/icons-material/NoteAlt';
+import SaveIcon from '@mui/icons-material/Save';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
@@ -57,97 +59,144 @@ const NewLog = () => {
     navigate(`/Planta/?${checkSearch(location.search)}`);
   };
 
+  const isFormValid = description.trim().length > 0;
+
   return (
     <Layout title="Nuevo Registro">
-      <Box sx={{ 
-        maxWidth: 600, 
-        mx: 'auto', 
-        p: { xs: 2, md: 0 },
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 70px)'
-      }}>
-        <Card elevation={3} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-          <Box sx={{ 
-            p: 3, 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2,
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-            color: '#ffffff'
-          }}>
-            <NoteAltIcon fontSize="large" sx={{ color: '#ffffff' }} />
-            <Typography variant="h5" component="h1" sx={{ color: '#ffffff' }}>
-              Añadir Nuevo Registro
-            </Typography>
-          </Box>
-          
-          <CardContent sx={{ p: 3 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
-                  <DatePicker
-                    label="Fecha del registro"
-                    value={logDate}
-                    onChange={(date) => setLogDate(date)}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        variant: 'outlined',
-                      }
-                    }}
-                  />
-                </LocalizationProvider>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Divider sx={{ my: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    DESCRIPCIÓN
-                  </Typography>
-                </Divider>
-              </Grid>
-              
-              <Grid item xs={12}>
-                <TextField
-                  label="Descripción"
-                  placeholder="Escribe los detalles de tu registro aquí..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                  fullWidth
-                  multiline
-                  rows={6}
-                  helperText="Puedes registrar cualquier evento, observación o detalle relevante sobre tu planta"
-                />
-              </Grid>
-              
-              <Grid item xs={12} sx={{ mt: 2 }}>
-                <Button
-                  variant="contained"
-                  onClick={handleNewLog}
-                  disabled={!description.trim()}
-                  fullWidth
-                  size="large"
-                  sx={{ 
-                    bgcolor: '#9c27b0',
+      <Container maxWidth="lg">
+        <Box sx={{ py: 3, mt: 4 }}>
+          <Grid container spacing={3}>
+            {/* Información del registro */}
+            <Grid item xs={12}>
+              <Card 
+                elevation={3} 
+                sx={{ 
+                  borderRadius: 3, 
+                  overflow: 'hidden',
+                  height: 'fit-content'
+                }}
+              >
+                <CardHeader
+                  title={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <NoteAltIcon sx={{ color: '#ffffff' }} />
+                      <Typography variant="h6" fontWeight="medium">
+                        Nuevo Registro
+                      </Typography>
+                    </Box>
+                  }
+                  subheader={
+                    <Typography variant="body2" sx={{ color: alpha('#ffffff', 0.9), mt: 0.5 }}>
+                      Registra observaciones, eventos o detalles importantes sobre tu planta
+                    </Typography>
+                  }
+                  sx={{
+                    background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
                     color: '#ffffff',
-                    py: 1.5,
-                    boxShadow: `0 4px 12px ${alpha('#9c27b0', 0.3)}`,
-                    '&:hover': {
-                      bgcolor: '#7b1fa2',
-                      boxShadow: `0 6px 16px ${alpha('#9c27b0', 0.4)}`
+                    py: 2,
+                    '& .MuiCardHeader-subheader': {
+                      color: alpha('#ffffff', 0.9)
                     }
                   }}
-                >
-                  GUARDAR REGISTRO
-                </Button>
-              </Grid>
+                />
+                <CardContent sx={{ p: 3 }}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+                        <DatePicker
+                          label="Fecha del registro"
+                          value={logDate}
+                          onChange={(newValue) => setLogDate(newValue)}
+                          renderInput={(params) => (
+                            <TextField 
+                              {...params} 
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2
+                                }
+                              }}
+                            />
+                          )}
+                        />
+                      </LocalizationProvider>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Box 
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          height: 'fit-content'
+                        }}
+                      >
+                        <Typography variant="subtitle2" fontWeight="medium" color="info.main" gutterBottom>
+                          💡 Consejos para tu registro
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                          • Estado general de la planta<br/>
+                          • Cambios observados<br/>
+                          • Condiciones ambientales<br/>
+                          • Problemas detectados
+                        </Typography>
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <TextField
+                        label="Descripción del registro"
+                        placeholder="Escribe los detalles de tu registro aquí..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        required
+                        fullWidth
+                        multiline
+                        rows={6}
+                        helperText="Registra cualquier evento, observación o detalle relevante sobre tu planta"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2
+                          }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
             </Grid>
-          </CardContent>
-        </Card>
-      </Box>
+
+            {/* Botón de acción */}
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleNewLog}
+                  disabled={!isFormValid}
+                  startIcon={<SaveIcon />}
+                  size="large"
+                  sx={{
+                    py: 1.5,
+                    px: 4,
+                    borderRadius: 2,
+                    fontWeight: 'bold',
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                    '&:hover': {
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+                      transform: 'translateY(-2px)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  Guardar Registro
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+      </Container>
     </Layout>
   );
 };
