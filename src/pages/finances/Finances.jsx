@@ -1239,7 +1239,372 @@ const Finances = () => {
     );
   };
   
-  // Componente para el panel de detalles de transacciones
+  // Componente para el panel de detalles de transacciones con gráfico integrado
+  const TransactionsPanelWithChart = () => {
+    // Si no hay datos para el mes seleccionado
+    if (!monthlyData) {
+      return (
+        <Card sx={{ 
+          p: 4, 
+          textAlign: 'center', 
+          height: '100%', 
+          borderRadius: 2,
+          bgcolor: theme.palette.background.paper,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+        }}>
+          <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" sx={{ py: 4 }}>
+            <Box
+              sx={{
+                bgcolor: dataType === 'expenses' 
+                  ? `${theme.palette.error.light}50` 
+                  : `${theme.palette.success.light}50`,
+                borderRadius: '50%',
+                p: 2,
+                mb: 2
+              }}
+            >
+              {dataType === 'expenses' 
+                ? <TrendingDownIcon sx={{ fontSize: 40, color: theme.palette.error.main }} />
+                : <TrendingUpIcon sx={{ fontSize: 40, color: theme.palette.success.main }} />
+              }
+            </Box>
+            <Typography variant="h6" color="textSecondary" gutterBottom>
+              No hay datos para {getMonthName(selectedMonth)} {selectedYear}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ maxWidth: '300px', mx: 'auto', mt: 1 }}>
+              No hay registros de {dataType === 'expenses' ? 'gastos' : 'ingresos'} para este período. 
+              Selecciona otro período o agrega nuevas transacciones.
+            </Typography>
+          </Box>
+        </Card>
+      );
+    }
+
+    // Preparar datos para el gráfico de torta (solo top 3 + otros)
+    const preparePieChartData = () => {
+      if (!monthlyData || !monthlyData.sortedCategories || monthlyData.sortedCategories.length === 0) {
+        return { series: [], labels: [], colors: [] };
+      }
+      
+      const top3Categories = monthlyData.sortedCategories.slice(0, 3);
+      const otherCategories = monthlyData.sortedCategories.slice(3);
+      
+      const pieData = [];
+      const pieLabels = [];
+      const pieColors = [];
+      
+      // Agregar las top 3 categorías
+      top3Categories.forEach(([category, data], index) => {
+        pieData.push(data.total);
+        pieLabels.push(category);
+        pieColors.push(getCategoryColor(category, index));
+      });
+      
+      // Agregar "Otras categorías" si hay más de 3
+      if (otherCategories.length > 0) {
+        const otherTotal = otherCategories.reduce((sum, [_, data]) => sum + data.total, 0);
+        pieData.push(otherTotal);
+        pieLabels.push('Otras');
+        pieColors.push(theme.palette.grey[500]);
+      }
+      
+      return { series: pieData, labels: pieLabels, colors: pieColors };
+    };
+
+    const pieChartData = preparePieChartData();
+
+    // Configuración del gráfico de torta
+    const pieOptions = {
+      chart: {
+        type: 'pie',
+        fontFamily: theme.typography.fontFamily,
+        foreColor: theme.palette.text.secondary,
+        toolbar: {
+          show: false
+        }
+      },
+      labels: pieChartData.labels,
+      colors: pieChartData.colors,
+      legend: {
+        show: false
+      },
+      dataLabels: {
+        enabled: false
+      },
+      tooltip: {
+        y: {
+          formatter: function(value) {
+            return formatAmount(value);
+          }
+        }
+      },
+      stroke: {
+        width: 1
+      },
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '0%'
+          }
+        }
+      }
+    };
+    
+    return (
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Card 
+          elevation={1} 
+          sx={{ 
+            mb: 3, 
+            overflow: 'hidden', // Cambiar a auto para permitir scroll si es necesario
+            boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+            borderRadius: 2,
+            position: 'relative',
+            mt: 1,
+            bgcolor: theme.palette.background.paper,
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <Box 
+            sx={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              height: '100px', 
+              background: dataType === 'expenses' 
+                ? `linear-gradient(45deg, ${theme.palette.error.main} 30%, ${theme.palette.error.dark} 90%)`
+                : `linear-gradient(45deg, ${theme.palette.success.main} 30%, ${theme.palette.success.dark} 90%)`,
+              zIndex: 0
+            }} 
+          />
+          
+                    <Box sx={{ position: 'relative', zIndex: 1, p: 3 }}>
+            {/* Fila superior: Total y Distribución */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ color: 'white', mb: 2 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Box sx={{ 
+                      bgcolor: 'rgba(255,255,255,0.2)', 
+                      borderRadius: '50%', 
+                      p: 1,
+                      display: 'flex'
+                    }}>
+                      {dataType === 'expenses' 
+                        ? <TrendingDownIcon sx={{ fontSize: 24 }} />
+                        : <TrendingUpIcon sx={{ fontSize: 24 }} />
+                      }
+                    </Box>
+                    <Typography variant="h5" fontWeight="bold">
+                      {dataType === 'expenses' ? 'Resumen de Gastos' : 'Resumen de Ingresos'}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="subtitle1" sx={{ mt: 1, opacity: 0.9 }}>
+                    {getMonthName(selectedMonth)} {selectedYear}
+                  </Typography>
+                </Box>
+                
+                <Paper elevation={5} sx={{ 
+                  p: 3, 
+                  borderRadius: 2, 
+                  mt: 1,
+                  bgcolor: theme.palette.background.paper,
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.08)'
+                  }
+                }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <Box sx={{ 
+                      bgcolor: dataType === 'expenses' ? theme.palette.error.light : theme.palette.success.light,
+                      color: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main,
+                      borderRadius: '50%',
+                      p: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {dataType === 'expenses' 
+                        ? <AccountBalanceWalletIcon sx={{ fontSize: 40 }} />
+                        : <SavingsIcon sx={{ fontSize: 40 }} />
+                      }
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Total</Typography>
+                      <Typography 
+                        variant="h3" 
+                        color={dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main} 
+                        fontWeight="bold"
+                        sx={{ lineHeight: 1.1 }}
+                      >
+                        {monthlyData.formattedTotal}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        USD {monthlyData.formattedTotalUSD}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  justifyContent: 'center', 
+                  pt: { xs: 2, md: 0 } 
+                }}>
+                  <Card 
+                    elevation={5} 
+                    sx={{ 
+                      p: 2, 
+                      bgcolor: theme.palette.background.paper,
+                      borderRadius: 2,
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: '0 8px 25px rgba(0,0,0,0.08)'
+                      }
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                      <PieChartIcon sx={{ 
+                        color: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main 
+                      }} />
+                      <Typography variant="subtitle1" fontWeight="medium">
+                        Distribución
+                      </Typography>
+                    </Stack>
+                    
+                    {pieChartData.series.length > 0 ? (
+                      <Box>
+                        <ReactApexChart
+                          options={pieOptions}
+                          series={pieChartData.series}
+                          type="pie"
+                          height={200}
+                        />
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                        No hay categorías registradas para este mes
+                      </Typography>
+                    )}
+                  </Card>
+                </Box>
+              </Grid>
+            </Grid>
+
+            {/* Fila inferior: Top Categorías */}
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Card 
+                  elevation={5} 
+                  sx={{ 
+                    p: 3, 
+                    bgcolor: theme.palette.background.paper,
+                    borderRadius: 2,
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.08)'
+                    }
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                    <CategoryIcon sx={{ 
+                      color: dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main 
+                    }} />
+                    <Typography variant="h6" fontWeight="medium">
+                      Top Categorías
+                    </Typography>
+                  </Stack>
+                  
+                  {monthlyData && monthlyData.sortedCategories && monthlyData.sortedCategories.length > 0 ? (
+                    <Stack>
+                      {monthlyData.sortedCategories.slice(0, 3).map(([category, data], index) => {
+                        const categoryColor = getCategoryColor(category, index);
+                        
+                        return (
+                          <Box 
+                            key={index}
+                            sx={{ 
+                              py: 1.5,
+                              transition: 'all 0.2s ease',
+                              width: '100%'
+                            }}
+                          >
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Box
+                                  sx={{ 
+                                    width: 24, 
+                                    height: 24, 
+                                    bgcolor: categoryColor,
+                                    color: 'white',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  {React.cloneElement(getCategoryIcon(category), { fontSize: 'small' })}
+                                </Box>
+                                <Typography variant="body2" fontWeight="medium" sx={{ color: categoryColor }}>
+                                  {category}
+                                </Typography>
+                              </Stack>
+                              <Typography 
+                                variant="subtitle1" 
+                                fontWeight="bold" 
+                                color={categoryColor}
+                              >
+                                {formatAmount(data.total)}
+                              </Typography>
+                            </Stack>
+                            <Box sx={{ width: '100%', bgcolor: alpha(categoryColor, 0.2), borderRadius: 1, height: 6, mb: 0.5 }}>
+                              <Box
+                                sx={{
+                                  width: `${Math.min(data.percentage, 100)}%`,
+                                  bgcolor: categoryColor,
+                                  height: 6,
+                                  borderRadius: 1
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right' }}>
+                              {data.percentage.toFixed(1)}% del total
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                      
+                      {monthlyData.sortedCategories.length > 3 && (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
+                          + {monthlyData.sortedCategories.length - 3} categorías más
+                        </Typography>
+                      )}
+                    </Stack>
+                  ) : (
+                    <Box sx={{ py: 4, textAlign: 'center' }}>
+                      <Typography variant="body1" color="text.secondary">
+                        No hay categorías registradas para este mes
+                      </Typography>
+                    </Box>
+                  )}
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
+        </Card>
+      </Box>
+    );
+  };
+
+  // Componente para el panel de detalles de transacciones (original)
   const TransactionsPanel = () => {
     // Si no hay datos para el mes seleccionado
     if (!monthlyData) {
@@ -2336,7 +2701,7 @@ const Finances = () => {
       <Card 
         elevation={1} 
         sx={{ 
-          height: '100%', 
+          height: '625px', // Altura aumentada para más espacio en el listado
           display: 'flex', 
           flexDirection: 'column',
           borderRadius: 2,
@@ -2395,7 +2760,6 @@ const Finances = () => {
           flexGrow: 1, 
           overflow: 'auto',
           p: 2,
-          height: '460px' // Dejar espacio para la barra de búsqueda y otros elementos
         }}>
           {sortedDates.length === 0 ? (
             <Paper 
@@ -2470,8 +2834,8 @@ const Finances = () => {
         <Grid container spacing={3} sx={{ px: { xs: 2, sm: 2 }, mt: 0 }}>
           {/* Columna izquierda */}
           <Grid item xs={12} md={6}>
-            {/* Panel superior - Resumen de gastos (ahora como panel fijo) */}
-            <TransactionsPanel />
+            {/* Panel superior - Resumen de gastos con gráfico integrado */}
+            <TransactionsPanelWithChart />
             
           </Grid>
           
@@ -2479,524 +2843,9 @@ const Finances = () => {
           <Grid item xs={12} md={6}>
             <TransactionsListPanel />
           </Grid>
+
           
-{/* Nuevas tarjetas de estadísticas basadas en el contenido de Análisis por Categoría */}
-<Grid 
-          container
-          item
-          spacing={{ xs: 2, sm: 2 }} 
-          sx={{ 
-            mb: { xs: 2, sm: 3 }, 
-            mt: { xs: 2, sm: 1 },
-            px: { xs: 0, sm: 0 },
-            justifyContent: 'center'
-          }}
-        >
-          {/* Tarjeta 1: Gráfico de Distribución de Categorías */}
-          <Grid item xs={12} sm={6} md={3} lg={3}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
-                borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
-                  transform: { xs: 'none', sm: 'translateY(-5px)' },
-                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  p: { xs: 2, sm: 2.5 },
-                  background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                  color: 'white',
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white' 
-                    }}
-                  >
-                    <PieChartIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6" fontWeight="bold">
-                      Distribución
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                      Promedio diario: {(() => {
-                        // Calcular promedio diario (sutilmente)
-                        const monthData = userData?.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth];
-                        if (!monthData || !monthData.data) return formatAmount(0);
-                        
-                        const visibleTransactions = monthData.data.filter(t => !t.hiddenFromList && !t.excludeFromTotal);
-                        const total = visibleTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-                        
-                        // Determinar el número de días en el mes actual
-                        const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-                        
-                        // Calcular cuántos días han pasado en el mes actual
-                        const today = new Date();
-                        const isCurrentMonth = selectedMonth === (today.getMonth() + 1) && selectedYear === today.getFullYear();
-                        const daysPassed = isCurrentMonth ? Math.min(today.getDate(), daysInMonth) : daysInMonth;
-                        
-                        // Calcular promedio
-                        const average = total / daysPassed;
-                        return formatAmount(average);
-                      })()}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
-              <CardContent sx={{ p: 2, height: 'calc(100% - 80px)' }}>
-                {(() => {
-                  if (!monthlyData || !monthlyData.sortedCategories || monthlyData.sortedCategories.length === 0) {
-                    return (
-                      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No hay datos disponibles
-                        </Typography>
-                      </Box>
-                    );
-                  }
-                  
-                  // Preparar datos para el gráfico de torta
-                  const top5Categories = monthlyData.sortedCategories.slice(0, 5);
-                  const otherCategories = monthlyData.sortedCategories.slice(5);
-                  
-                  const pieData = [];
-                  const pieLabels = [];
-                  const pieColors = [];
-                  
-                  // Agregar las principales categorías
-                  top5Categories.forEach(([category, data], index) => {
-                    pieData.push(data.total);
-                    pieLabels.push(category);
-                    pieColors.push(getCategoryColor(category, index));
-                  });
-                  
-                  // Agregar "Otras categorías" si hay más de 5
-                  if (otherCategories.length > 0) {
-                    const otherTotal = otherCategories.reduce((sum, [_, data]) => sum + data.total, 0);
-                    pieData.push(otherTotal);
-                    pieLabels.push('Otras');
-                    pieColors.push(theme.palette.grey[500]);
-                  }
-                  
-                  // Configuración del gráfico
-                  const pieOptions = {
-                    chart: {
-                      type: 'pie',
-                      fontFamily: theme.typography.fontFamily,
-                      foreColor: theme.palette.text.secondary,
-                      toolbar: {
-                        show: false
-                      }
-                    },
-                    labels: pieLabels,
-                    colors: pieColors,
-                    legend: {
-                      show: false
-                    },
-                    dataLabels: {
-                      enabled: false
-                    },
-                    tooltip: {
-                      y: {
-                        formatter: function(value) {
-                          return formatAmount(value);
-                        }
-                      }
-                    },
-                    stroke: {
-                      width: 1
-                    },
-                    plotOptions: {
-                      pie: {
-                        donut: {
-                          size: '0%'
-                        }
-                      }
-                    }
-                  };
-                  
-                  return (
-                    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                      <ReactApexChart
-                        options={pieOptions}
-                        series={pieData}
-                        type="pie"
-                        height={180}
-                      />
-                    </Box>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Tarjeta 2: Top Categorías */}
-          <Grid item xs={12} sm={6} md={3} lg={3}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
-                borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
-                  transform: { xs: 'none', sm: 'translateY(-5px)' },
-                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  p: { xs: 2, sm: 2.5 },
-                  background: `linear-gradient(to right, ${theme.palette.secondary.dark}, ${theme.palette.secondary.main})`,
-                  color: 'white',
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white' 
-                    }}
-                  >
-                    <CategoryIcon />
-                  </Avatar>
-                  <Typography variant="h6" fontWeight="bold">
-                    Top Categorías
-                  </Typography>
-                </Stack>
-              </Box>
-              <CardContent sx={{ p: 2 }}>
-                {monthlyData && monthlyData.sortedCategories && monthlyData.sortedCategories.length > 0 ? (
-                  <Box>
-                    {monthlyData.sortedCategories.slice(0, 3).map(([category, data], index) => {
-                      const categoryColor = getCategoryColor(category, index);
-                      
-                      return (
-                        <Box key={index} sx={{ mb: 1.5 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Avatar
-                                sx={{ 
-                                  width: 28, 
-                                  height: 28, 
-                                  bgcolor: `${categoryColor}20`,
-                                  color: categoryColor
-                                }}
-                              >
-                                {getCategoryIcon(category)}
-                              </Avatar>
-                              <Typography variant="body2" fontWeight="medium" sx={{ color: categoryColor }}>
-                                {category}
-                              </Typography>
-                            </Stack>
-                            <Typography 
-                              variant="body2" 
-                              fontWeight="bold" 
-                              color={categoryColor}
-                            >
-                              {formatAmount(data.total)}
-                            </Typography>
-                          </Stack>
-                          <Box sx={{ width: '100%', bgcolor: alpha(theme.palette.primary.main, 0.1), borderRadius: 5, height: 6 }}>
-                            <Box
-                              sx={{
-                                width: `${Math.min(data.percentage, 100)}%`,
-                                bgcolor: categoryColor,
-                                height: 6,
-                                borderRadius: 5
-                              }}
-                            />
-                          </Box>
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-                            {data.percentage.toFixed(1)}%
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                    
-                    {monthlyData.sortedCategories.length > 3 && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
-                        + {monthlyData.sortedCategories.length - 3} categorías más
-                      </Typography>
-                    )}
-                  </Box>
-                ) : (
-                  <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No hay categorías registradas
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Tarjeta 3: Distribución de Transacciones */}
-          <Grid item xs={12} sm={6} md={3} lg={3}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
-                borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
-                  transform: { xs: 'none', sm: 'translateY(-5px)' },
-                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  p: { xs: 2, sm: 2.5 },
-                  background: `linear-gradient(to right, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
-                  color: 'white',
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white' 
-                    }}
-                  >
-                    <EqualizerIcon />
-                  </Avatar>
-                  <Typography variant="h6" fontWeight="bold">
-                    Distribución
-                  </Typography>
-                </Stack>
-              </Box>
-              <CardContent sx={{ p: 2 }}>
-                {(() => {
-                  // Obtener las transacciones del mes
-                  const transactionsData = userData?.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth]?.data || [];
-                  
-                  if (transactionsData.length === 0) {
-                    return (
-                      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No hay transacciones registradas
-                        </Typography>
-                      </Box>
-                    );
-                  }
-                  
-                  // Contar transacciones por categoría
-                  const countByCategory = {};
-                  let totalCount = 0;
-                  
-                  transactionsData.forEach(transaction => {
-                    if (!transaction.hiddenFromList) {
-                      const category = transaction.category || "Sin categoría";
-                      countByCategory[category] = (countByCategory[category] || 0) + 1;
-                      totalCount++;
-                    }
-                  });
-                  
-                  // Ordenar por cantidad de transacciones
-                  const sortedByCount = Object.entries(countByCategory)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 3);
-                  
-                  return sortedByCount.map(([category, count], index) => {
-                    const percentage = totalCount > 0 ? (count / totalCount) * 100 : 0;
-                    const categoryColor = getCategoryColor(category);
-                    
-                    return (
-                      <Box key={index} sx={{ mt: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                          <Typography variant="body2" fontWeight="medium" sx={{ color: categoryColor }}>
-                            {category}
-                          </Typography>
-                          <Chip 
-                            size="small" 
-                            label={`${count} ${count === 1 ? 'tx' : 'tx'}`}
-                            sx={{ 
-                              bgcolor: `${categoryColor}15`,
-                              color: categoryColor,
-                              fontWeight: 'medium',
-                              fontSize: '0.7rem',
-                              height: 20
-                            }} 
-                          />
-                        </Stack>
-                        <Box sx={{ width: '100%', bgcolor: theme.palette.grey[200], borderRadius: 5, height: 6 }}>
-                          <Box
-                            sx={{
-                              width: `${Math.min(percentage, 100)}%`,
-                              bgcolor: categoryColor,
-                              height: 6,
-                              borderRadius: 5
-                            }}
-                          />
-                        </Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-                          {percentage.toFixed(1)}% del total
-                        </Typography>
-                      </Box>
-                    );
-                  });
-                })()}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Tarjeta 4: Promedio por Transacción */}
-          <Grid item xs={12} sm={6} md={3} lg={3}>
-            <Card 
-              elevation={3} 
-              sx={{ 
-                height: '100%', 
-                position: 'relative',
-                transition: 'all 0.3s ease',
-                borderRadius: { xs: 2, sm: 3 },
-                overflow: 'hidden',
-                '&:hover': {
-                  transform: { xs: 'none', sm: 'translateY(-5px)' },
-                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  p: { xs: 2, sm: 2.5 },
-                  background: `linear-gradient(to right, ${theme.palette.warning.dark}, ${theme.palette.warning.main})`,
-                  color: 'white',
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      color: 'white' 
-                    }}
-                  >
-                    <MonetizationOnIcon />
-                  </Avatar>
-                  <Typography variant="h6" fontWeight="bold">
-                    Promedio por Tx
-                  </Typography>
-                </Stack>
-              </Box>
-              <CardContent sx={{ p: 2 }}>
-                {(() => {
-                  // Obtener las transacciones del mes
-                  const transactionsData = userData?.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth]?.data || [];
-                  
-                  if (transactionsData.length === 0) {
-                    return (
-                      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No hay transacciones registradas
-                        </Typography>
-                      </Box>
-                    );
-                  }
-                  
-                  // Calcular promedio por categoría
-                  const avgByCategory = {};
-                  const countByCategory = {};
-                  
-                  transactionsData.forEach(transaction => {
-                    if (!transaction.hiddenFromList) {
-                      const category = transaction.category || "Sin categoría";
-                      const amount = transaction.amount || 0;
-                      
-                      if (!avgByCategory[category]) {
-                        avgByCategory[category] = 0;
-                        countByCategory[category] = 0;
-                      }
-                      
-                      avgByCategory[category] += amount;
-                      countByCategory[category]++;
-                    }
-                  });
-                  
-                  // Calcular el promedio
-                  Object.keys(avgByCategory).forEach(category => {
-                    avgByCategory[category] = countByCategory[category] > 0 
-                      ? avgByCategory[category] / countByCategory[category] 
-                      : 0;
-                  });
-                  
-                  // Ordenar por promedio
-                  const sortedByAvg = Object.entries(avgByCategory)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 3);
-                  
-                  return sortedByAvg.map(([category, avg], index) => {
-                    const categoryColor = getCategoryColor(category);
-                    
-                    // Encontrar el valor máximo para escalar la barra
-                    const maxAvg = sortedByAvg[0][1];
-                    const percentage = maxAvg > 0 ? (avg / maxAvg) * 100 : 0;
-                    
-                    return (
-                      <Box key={index} sx={{ mt: 1.5 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                          <Typography variant="body2" fontWeight="medium" sx={{ color: categoryColor }}>
-                            {category}
-                          </Typography>
-                          <Typography variant="body2" fontWeight="bold" color={categoryColor}>
-                            {formatAmount(avg)}
-                          </Typography>
-                        </Stack>
-                        <Box sx={{ 
-                          p: 1, 
-                          bgcolor: `${categoryColor}15`,
-                          borderRadius: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Box sx={{ 
-                              bgcolor: categoryColor,
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              mr: 1
-                            }} />
-                            <Typography variant="caption" color="text.secondary">
-                              {countByCategory[category]} {countByCategory[category] === 1 ? 'tx' : 'tx'}
-                            </Typography>
-                          </Box>
-                          <Chip 
-                            size="small"
-                            label={`${formatAmount(avg)}/tx`}
-                            sx={{ 
-                              height: 20,
-                              fontSize: '0.7rem',
-                              fontWeight: 'bold',
-                              bgcolor: `${categoryColor}25`,
-                              color: categoryColor
-                            }}
-                          />
-                        </Box>
-                      </Box>
-                    );
-                  });
-                })()}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-          
-                    {/* Tendencias Anuales con nuevo diseño de tarjetas */}
+          {/* Tendencias Anuales con totales integrados */}
           <Grid 
             container
             item
@@ -3008,7 +2857,7 @@ const Finances = () => {
               justifyContent: 'center'
             }}
           >
-            {/* Tarjeta grande: Gráfico de tendencias anuales */}
+            {/* Tarjeta grande: Gráfico de tendencias anuales con totales integrados */}
             <Grid item xs={12}>
               <Card 
                 elevation={3} 
@@ -3045,181 +2894,154 @@ const Finances = () => {
                     </Typography>
                   </Stack>
                 </Box>
-                <CardContent sx={{ p: 2, position: 'relative' }}>
-                  <ReactApexChart
-                    options={areaChartOptions}
-                    series={areaChartSeries}
-                    type="area"
-                    height={350}
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            {/* Tarjeta: Total Gastos */}
-            <Grid item xs={12} sm={4}>
-              <Card 
-                elevation={3} 
-                sx={{ 
-                  height: '100%', 
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  borderRadius: { xs: 2, sm: 3 },
-                  overflow: 'hidden',
-                  '&:hover': {
-                    transform: { xs: 'none', sm: 'translateY(-5px)' },
-                    boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    background: `linear-gradient(to right, ${theme.palette.error.dark}, ${theme.palette.error.main})`,
-                    color: 'white',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white' 
-                      }}
-                    >
-                      <TrendingDownIcon />
-                    </Avatar>
-                    <Typography variant="h6" fontWeight="bold">
-                      Total Gastos Anual
-                    </Typography>
-                  </Stack>
-                </Box>
-                <CardContent sx={{ p: 2, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography variant="h3" color="error.main" fontWeight="bold">
-                    {formatAmount(annualExpenses)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Equivalente en USD: {formatAmount(annualExpenses / (dollarRate?.venta || 1), true)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            {/* Tarjeta: Total Ingresos */}
-            <Grid item xs={12} sm={4}>
-              <Card 
-                elevation={3} 
-                sx={{ 
-                  height: '100%', 
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  borderRadius: { xs: 2, sm: 3 },
-                  overflow: 'hidden',
-                  '&:hover': {
-                    transform: { xs: 'none', sm: 'translateY(-5px)' },
-                    boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    background: `linear-gradient(to right, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
-                    color: 'white',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white' 
-                      }}
-                    >
-                      <TrendingUpIcon />
-                    </Avatar>
-                    <Typography variant="h6" fontWeight="bold">
-                      Total Ingresos Anual
-                    </Typography>
-                  </Stack>
-                </Box>
-                <CardContent sx={{ p: 2, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography variant="h3" color="success.main" fontWeight="bold">
-                    {formatAmount(annualIncomes)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Equivalente en USD: {formatAmount(annualIncomes / (dollarRate?.venta || 1), true)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            {/* Tarjeta: Balance Anual */}
-            <Grid item xs={12} sm={4}>
-              <Card 
-                elevation={3} 
-                sx={{ 
-                  height: '100%', 
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  borderRadius: { xs: 2, sm: 3 },
-                  overflow: 'hidden',
-                  '&:hover': {
-                    transform: { xs: 'none', sm: 'translateY(-5px)' },
-                    boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
-                    color: 'white',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white' 
-                      }}
-                    >
-                      <CompareArrowsIcon />
-                    </Avatar>
-                    <Typography variant="h6" fontWeight="bold">
-                      Balance Anual
-                    </Typography>
-                  </Stack>
-                </Box>
-                <CardContent sx={{ p: 2, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography 
-                    variant="h3" 
-                    color={annualBalance >= 0 ? "success.main" : "error.main"} 
-                    fontWeight="bold"
-                  >
-                    {formatAmount(annualBalance)}
-                  </Typography>
-                  <Box 
-                    sx={{ 
-                      mt: 1, 
-                      px: 2, 
-                      py: 0.5, 
-                      borderRadius: 2, 
-                      bgcolor: annualBalance >= 0 ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
-                      display: 'inline-flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    {annualBalance >= 0 ? 
-                      <TrendingUpIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5 }} /> : 
-                      <TrendingDownIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5 }} />
-                    }
-                    <Typography 
-                      variant="caption" 
-                      color={annualBalance >= 0 ? "success.main" : "error.main"}
-                      fontWeight="medium"
-                    >
-                      {annualBalance >= 0 ? 'Superávit' : 'Déficit'} anual
-                    </Typography>
+                <CardContent sx={{ p: 3, position: 'relative' }}>
+                  {/* Gráfico de tendencias */}
+                  <Box sx={{ mb: 4 }}>
+                    <ReactApexChart
+                      options={areaChartOptions}
+                      series={areaChartSeries}
+                      type="area"
+                      height={350}
+                    />
                   </Box>
+
+                  {/* Totales anuales integrados */}
+                  <Grid container spacing={3}>
+                    {/* Total Gastos */}
+                    <Grid item xs={12} sm={4}>
+                      <Box 
+                        sx={{ 
+                          p: 3, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.error.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.error.main, 0.1),
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                          <Avatar 
+                            sx={{ 
+                              bgcolor: alpha(theme.palette.error.main, 0.1),
+                              color: theme.palette.error.main 
+                            }}
+                          >
+                            <TrendingDownIcon />
+                          </Avatar>
+                          <Typography variant="h6" fontWeight="bold" color="error.main">
+                            Total Gastos
+                          </Typography>
+                        </Stack>
+                        <Typography variant="h4" color="error.main" fontWeight="bold" sx={{ mb: 1 }}>
+                          {formatAmount(annualExpenses)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          USD {formatAmount(annualExpenses / (dollarRate?.venta || 1), true)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    
+                    {/* Total Ingresos */}
+                    <Grid item xs={12} sm={4}>
+                      <Box 
+                        sx={{ 
+                          p: 3, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.success.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.success.main, 0.1),
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                          <Avatar 
+                            sx={{ 
+                              bgcolor: alpha(theme.palette.success.main, 0.1),
+                              color: theme.palette.success.main 
+                            }}
+                          >
+                            <TrendingUpIcon />
+                          </Avatar>
+                          <Typography variant="h6" fontWeight="bold" color="success.main">
+                            Total Ingresos
+                          </Typography>
+                        </Stack>
+                        <Typography variant="h4" color="success.main" fontWeight="bold" sx={{ mb: 1 }}>
+                          {formatAmount(annualIncomes)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          USD {formatAmount(annualIncomes / (dollarRate?.venta || 1), true)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    
+                    {/* Balance Anual */}
+                    <Grid item xs={12} sm={4}>
+                      <Box 
+                        sx={{ 
+                          p: 3, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.info.main, 0.1),
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                          <Avatar 
+                            sx={{ 
+                              bgcolor: alpha(theme.palette.info.main, 0.1),
+                              color: theme.palette.info.main 
+                            }}
+                          >
+                            <CompareArrowsIcon />
+                          </Avatar>
+                          <Typography variant="h6" fontWeight="bold" color="info.main">
+                            Balance Anual
+                          </Typography>
+                        </Stack>
+                        <Typography 
+                          variant="h4" 
+                          color={annualBalance >= 0 ? "success.main" : "error.main"} 
+                          fontWeight="bold"
+                          sx={{ mb: 1 }}
+                        >
+                          {formatAmount(annualBalance)}
+                        </Typography>
+                        <Box 
+                          sx={{ 
+                            px: 2, 
+                            py: 0.5, 
+                            borderRadius: 2, 
+                            bgcolor: annualBalance >= 0 ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.error.main, 0.1),
+                            display: 'inline-flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          {annualBalance >= 0 ? 
+                            <TrendingUpIcon fontSize="small" sx={{ color: theme.palette.success.main, mr: 0.5 }} /> : 
+                            <TrendingDownIcon fontSize="small" sx={{ color: theme.palette.error.main, mr: 0.5 }} />
+                          }
+                          <Typography 
+                            variant="caption" 
+                            color={annualBalance >= 0 ? "success.main" : "error.main"}
+                            fontWeight="medium"
+                          >
+                            {annualBalance >= 0 ? 'Superávit' : 'Déficit'} anual
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             </Grid>
@@ -3237,276 +3059,7 @@ const Finances = () => {
               justifyContent: 'center'
             }}
           >
-            {/* Tarjeta 1: Total Patrimonio */}
-            <Grid item xs={12} sm={6} md={4} lg={4}>
-              <Card 
-                elevation={3} 
-                sx={{ 
-                  height: '100%', 
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  borderRadius: { xs: 2, sm: 3 },
-                  overflow: 'hidden',
-                  '&:hover': {
-                    transform: { xs: 'none', sm: 'translateY(-5px)' },
-                    boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    background: `linear-gradient(to right, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
-                    color: 'white',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white' 
-                      }}
-                    >
-                      <SavingsIcon />
-                    </Avatar>
-                    <Typography variant="h6" fontWeight="bold">
-                      Total Patrimonio
-                    </Typography>
-                  </Stack>
-                </Box>
-                <CardContent sx={{ p: 2, position: 'relative' }}>
-                  {userData && userData.savings ? (
-                    <>
-                      <Typography variant="h3" color="text.primary" fontWeight="bold">
-                        {formatAmount(userData.savings.total || 0)}
-                      </Typography>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Equivalente en USD
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            p: 0.5,
-                            borderRadius: 1,
-                            bgcolor: alpha(theme.palette.success.main, 0.1),
-                          }}
-                        >
-                          <AttachMoneyIcon fontSize="small" sx={{ mr: 0.5, color: theme.palette.success.main }} />
-                          <Typography 
-                            variant="caption" 
-                            fontWeight="medium"
-                            color="success.main"
-                          >
-                            {formatAmount((userData.savings.total || 0) / (dollarRate?.venta || 1), true)}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </>
-                  ) : (
-                    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        No hay datos disponibles
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Tarjeta 2: Ahorros en ARS */}
-            <Grid item xs={12} sm={6} md={4} lg={4}>
-              <Card 
-                elevation={3} 
-                sx={{ 
-                  height: '100%', 
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  borderRadius: { xs: 2, sm: 3 },
-                  overflow: 'hidden',
-                  '&:hover': {
-                    transform: { xs: 'none', sm: 'translateY(-5px)' },
-                    boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                    color: 'white',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white' 
-                      }}
-                    >
-                      <MonetizationOnIcon />
-                    </Avatar>
-                    <Typography variant="h6" fontWeight="bold">
-                      Ahorros en ARS
-                    </Typography>
-                  </Stack>
-                </Box>
-                <CardContent sx={{ p: 2, position: 'relative' }}>
-                  {userData && userData.savings ? (
-                    <>
-                      <Typography variant="h3" color="text.primary" fontWeight="bold">
-                        {formatAmount(userData.savings.amountARS || 0)}
-                      </Typography>
-                      
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Equivalente en USD
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            p: 0.5,
-                            borderRadius: 1,
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          }}
-                        >
-                          <AttachMoneyIcon fontSize="small" sx={{ mr: 0.5, color: theme.palette.primary.main }} />
-                          <Typography 
-                            variant="caption" 
-                            fontWeight="medium"
-                            color="primary.main"
-                          >
-                            {formatAmount((userData.savings.amountARS || 0) / (dollarRate?.venta || 1), true)}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      
-                      {/* Crecimiento en el último período si está disponible */}
-                      {userData.savings.amountARSHistory && Object.keys(userData.savings.amountARSHistory).length > 1 && (
-                        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                          <Chip 
-                            size="small"
-                            icon={<TrendingUpIcon fontSize="small" />}
-                            label="+ 12% este mes"
-                            sx={{ 
-                              bgcolor: alpha(theme.palette.primary.main, 0.1),
-                              color: theme.palette.primary.main,
-                              fontWeight: 'medium',
-                              fontSize: '0.7rem',
-                              height: 24
-                            }}
-                          />
-                        </Box>
-                      )}
-                    </>
-                  ) : (
-                    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        No hay datos disponibles
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Tarjeta 3: Ahorros en USD */}
-            <Grid item xs={12} sm={6} md={4} lg={4}>
-              <Card 
-                elevation={3} 
-                sx={{ 
-                  height: '100%', 
-                  position: 'relative',
-                  transition: 'all 0.3s ease',
-                  borderRadius: { xs: 2, sm: 3 },
-                  overflow: 'hidden',
-                  '&:hover': {
-                    transform: { xs: 'none', sm: 'translateY(-5px)' },
-                    boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
-                    color: 'white',
-                  }}
-                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.2)',
-                        color: 'white' 
-                      }}
-                    >
-                      <AttachMoneyIcon />
-                    </Avatar>
-                    <Typography variant="h6" fontWeight="bold">
-                      Ahorros en USD
-                    </Typography>
-                  </Stack>
-                </Box>
-                <CardContent sx={{ p: 2, position: 'relative' }}>
-                  {userData && userData.savings ? (
-                    <>
-                      <Typography variant="h3" color="text.primary" fontWeight="bold">
-                        {formatAmount(userData.savings.amountUSD || 0, true)}
-                      </Typography>
-                      
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Valor en ARS
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            p: 0.5,
-                            borderRadius: 1,
-                            bgcolor: alpha(theme.palette.info.main, 0.1),
-                          }}
-                        >
-                          <Typography 
-                            variant="caption" 
-                            fontWeight="medium"
-                            color="info.main"
-                          >
-                            {formatAmount((userData.savings.amountUSD || 0) * (dollarRate?.venta || 1))}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      
-                      {/* Info sobre tipo de cambio */}
-                      <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                        <Chip 
-                          size="small"
-                          icon={<CurrencyExchangeIcon fontSize="small" />}
-                          label={`Cotización: $${dollarRate?.venta || '-'}`}
-                          sx={{ 
-                            bgcolor: alpha(theme.palette.info.main, 0.1),
-                            color: theme.palette.info.main,
-                            fontWeight: 'medium',
-                            fontSize: '0.7rem',
-                            height: 24
-                          }}
-                        />
-                      </Box>
-                    </>
-                  ) : (
-                    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        No hay datos disponibles
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Tarjeta 5: Evolución de Ahorros (gráfico) */}
+            {/* Tarjeta: Evolución de Ahorros con resumen integrado */}
             <Grid item xs={12} sm={12} md={12} lg={12}>
               <Card 
                 elevation={3} 
@@ -3539,79 +3092,227 @@ const Finances = () => {
                       <InsightsIcon />
                     </Avatar>
                     <Typography variant="h6" fontWeight="bold">
-                      Evolución Histórica
+                      Evolución Histórica de Ahorros
                     </Typography>
                   </Stack>
                 </Box>
-                                <CardContent sx={{ p: 2, position: 'relative' }}>
-                                    {userData && userData.savings && userData.savings.amountARSHistory && Object.keys(userData.savings.amountARSHistory).length > 0 ? (
-                            <ReactApexChart
-                              options={{
-                                chart: {
-                                  type: 'area',
-                                  height: 250,
-                                  toolbar: { show: false },
-                                  fontFamily: theme.typography.fontFamily,
+                <CardContent sx={{ p: 3, position: 'relative' }}>
+                  {/* Resumen de ahorros actuales */}
+                  <Grid container spacing={3} sx={{ mb: 4 }}>
+                    {/* Ahorros en ARS */}
+                    <Grid item xs={12} sm={6}>
+                      <Box 
+                        sx={{ 
+                          p: 3, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                          <Avatar 
+                            sx={{ 
+                              bgcolor: alpha(theme.palette.primary.main, 0.1),
+                              color: theme.palette.primary.main 
+                            }}
+                          >
+                            <MonetizationOnIcon />
+                          </Avatar>
+                          <Typography variant="h6" fontWeight="bold" color="primary.main">
+                            Ahorros en ARS
+                          </Typography>
+                        </Stack>
+                        {userData && userData.savings ? (
+                          <>
+                            <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ mb: 1 }}>
+                              {formatAmount(userData.savings.amountARS || 0)}
+                            </Typography>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="body2" color="text.secondary">
+                                Equivalente en USD
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  p: 0.5,
+                                  borderRadius: 1,
+                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                }}
+                              >
+                                <AttachMoneyIcon fontSize="small" sx={{ mr: 0.5, color: theme.palette.primary.main }} />
+                                <Typography 
+                                  variant="caption" 
+                                  fontWeight="medium"
+                                  color="primary.main"
+                                >
+                                  {formatAmount((userData.savings.amountARS || 0) / (dollarRate?.venta || 1), true)}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No hay datos disponibles
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
+                    
+                                         {/* Ahorros en USD */}
+                     <Grid item xs={12} sm={6}>
+                       <Box 
+                         sx={{ 
+                           p: 3, 
+                           borderRadius: 2, 
+                           bgcolor: alpha(theme.palette.info.main, 0.05),
+                           border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                           transition: 'all 0.2s ease',
+                           '&:hover': {
+                             bgcolor: alpha(theme.palette.info.main, 0.1),
+                             transform: 'translateY(-2px)'
+                           }
+                         }}
+                       >
+                         <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                           <Stack direction="row" spacing={2} alignItems="center">
+                             <Avatar 
+                               sx={{ 
+                                 bgcolor: alpha(theme.palette.info.main, 0.1),
+                                 color: theme.palette.info.main 
+                               }}
+                             >
+                               <AttachMoneyIcon />
+                             </Avatar>
+                             <Typography variant="h6" fontWeight="bold" color="info.main">
+                               Ahorros en USD
+                             </Typography>
+                           </Stack>
+                           {/* Cotización en la misma línea del título */}
+                           <Chip 
+                             size="small"
+                             icon={<CurrencyExchangeIcon fontSize="small" />}
+                             label={`$${dollarRate?.venta || '-'}`}
+                             sx={{ 
+                               bgcolor: alpha(theme.palette.info.main, 0.1),
+                               color: theme.palette.info.main,
+                               fontWeight: 'medium',
+                               fontSize: '0.7rem',
+                               height: 24
+                             }}
+                           />
+                         </Stack>
+                         {userData && userData.savings ? (
+                           <>
+                             <Typography variant="h4" color="info.main" fontWeight="bold" sx={{ mb: 1 }}>
+                               {formatAmount(userData.savings.amountUSD || 0, true)}
+                             </Typography>
+                             <Stack direction="row" justifyContent="space-between" alignItems="center">
+                               <Typography variant="body2" color="text.secondary">
+                                 Valor en ARS
+                               </Typography>
+                               <Box
+                                 sx={{
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   p: 0.5,
+                                   borderRadius: 1,
+                                   bgcolor: alpha(theme.palette.info.main, 0.1),
+                                 }}
+                               >
+                                 <Typography 
+                                   variant="caption" 
+                                   fontWeight="medium"
+                                   color="info.main"
+                                 >
+                                   {formatAmount((userData.savings.amountUSD || 0) * (dollarRate?.venta || 1))}
+                                 </Typography>
+                               </Box>
+                             </Stack>
+                           </>
+                         ) : (
+                           <Typography variant="body2" color="text.secondary">
+                             No hay datos disponibles
+                           </Typography>
+                         )}
+                       </Box>
+                     </Grid>
+                  </Grid>
+
+                  {/* Gráfico de evolución histórica */}
+                  {userData && userData.savings && userData.savings.amountARSHistory && Object.keys(userData.savings.amountARSHistory).length > 0 ? (
+                    <ReactApexChart
+                      options={{
+                        chart: {
+                          type: 'area',
+                          height: 250,
+                          toolbar: { show: false },
+                          fontFamily: theme.typography.fontFamily,
                         },
                         dataLabels: { enabled: false },
                         stroke: { curve: 'smooth', width: 3 },
-                                                  xaxis: {
-                            type: 'category',
-                            categories: (() => {
-                              // Obtener todas las fechas disponibles
-                              const allDates = Object.keys(userData.savings.amountARSHistory);
+                        xaxis: {
+                          type: 'category',
+                          categories: (() => {
+                            // Obtener todas las fechas disponibles
+                            const allDates = Object.keys(userData.savings.amountARSHistory);
+                            
+                            // Convertir claves a fechas para poder filtrar por los últimos 6 meses
+                            const dateEntries = allDates.map(key => {
+                              // Intentar extraer fecha del registro
+                              let entryDate;
+                              const dateStr = userData.savings.amountARSHistory[key].date;
                               
-                              // Convertir claves a fechas para poder filtrar por los últimos 6 meses
-                              const dateEntries = allDates.map(key => {
-                                // Intentar extraer fecha del registro
-                                let entryDate;
-                                const dateStr = userData.savings.amountARSHistory[key].date;
-                                
-                                if (typeof dateStr === 'string' && dateStr.includes('/')) {
-                                  const [day, month, year] = dateStr.split('/').map(Number);
-                                  entryDate = new Date(year, month - 1, day);
-                                } else {
-                                  // Si no hay fecha en formato estándar, intentar con la clave
-                                  entryDate = new Date(key);
-                                }
-                                
-                                return { 
-                                  key, 
-                                  date: entryDate
-                                };
-                              });
+                              if (typeof dateStr === 'string' && dateStr.includes('/')) {
+                                const [day, month, year] = dateStr.split('/').map(Number);
+                                entryDate = new Date(year, month - 1, day);
+                              } else {
+                                // Si no hay fecha en formato estándar, intentar con la clave
+                                entryDate = new Date(key);
+                              }
                               
-                              // Calcular fecha límite (6 meses atrás desde hoy)
-                              const today = new Date();
-                              const sixMonthsAgo = new Date();
-                              sixMonthsAgo.setMonth(today.getMonth() - 6);
+                              return { 
+                                key, 
+                                date: entryDate
+                              };
+                            });
+                            
+                            // Calcular fecha límite (6 meses atrás desde hoy)
+                            const today = new Date();
+                            const sixMonthsAgo = new Date();
+                            sixMonthsAgo.setMonth(today.getMonth() - 6);
+                            
+                            // Filtrar solo entradas de los últimos 6 meses
+                            const filteredEntries = dateEntries
+                              .filter(entry => !isNaN(entry.date.getTime()) && entry.date >= sixMonthsAgo)
+                              .sort((a, b) => a.date - b.date); // Ordenar cronológicamente
+                            
+                            // Extraer las claves ordenadas
+                            const filteredKeys = filteredEntries.map(entry => entry.key);
+                            
+                            // Convertir fechas a formato legible
+                            return filteredKeys.map(key => {
+                              const dateStr = userData.savings.amountARSHistory[key].date;
                               
-                              // Filtrar solo entradas de los últimos 6 meses
-                              const filteredEntries = dateEntries
-                                .filter(entry => !isNaN(entry.date.getTime()) && entry.date >= sixMonthsAgo)
-                                .sort((a, b) => a.date - b.date); // Ordenar cronológicamente
-                              
-                              // Extraer las claves ordenadas
-                              const filteredKeys = filteredEntries.map(entry => entry.key);
-                              
-                              // Convertir fechas a formato legible
-                              return filteredKeys.map(key => {
-                                const dateStr = userData.savings.amountARSHistory[key].date;
-                                
-                                if (typeof dateStr === 'string' && dateStr.includes('/')) {
-                                  // Extraer mes y año para mostrar "Mes/Año"
-                                  const [day, month, year] = dateStr.split('/').map(Number);
-                                  const monthName = getMonthName(month).substring(0, 3);
-                                  return `${monthName}/${year.toString().slice(2)}`;
-                                }
-                                return dateStr;
-                              });
-                            })(),
-                            labels: { 
-                              style: { colors: theme.palette.text.secondary },
-                              rotate: 0
-                            }
-                          },
+                              if (typeof dateStr === 'string' && dateStr.includes('/')) {
+                                // Extraer mes y año para mostrar "Mes/Año"
+                                const [day, month, year] = dateStr.split('/').map(Number);
+                                const monthName = getMonthName(month).substring(0, 3);
+                                return `${monthName}/${year.toString().slice(2)}`;
+                              }
+                              return dateStr;
+                            });
+                          })(),
+                          labels: { 
+                            style: { colors: theme.palette.text.secondary },
+                            rotate: 0
+                          }
+                        },
                         yaxis: {
                           labels: {
                             formatter: (value) => formatAmount(value),

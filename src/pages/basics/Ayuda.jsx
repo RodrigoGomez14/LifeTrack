@@ -5,32 +5,28 @@ import {
   Container,
   Typography,
   Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Grid,
   Card,
   CardContent,
-  CardMedia,
-  Tabs,
-  Tab,
-  Divider,
+  CardHeader,
+  Button,
+  Stack,
+  Avatar,
+  Chip,
+  Fade,
+  useMediaQuery,
+  IconButton,
+  Collapse,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Alert,
-  Button,
-  Stack,
-  alpha,
-  useMediaQuery
+  Divider
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { useTheme, alpha } from '@mui/material/styles';
 
 // Iconos
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import HomeIcon from '@mui/icons-material/Home';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import BarChartIcon from '@mui/icons-material/BarChart';
@@ -38,776 +34,1014 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import NatureIcon from '@mui/icons-material/Nature';
 import PaletteIcon from '@mui/icons-material/Palette';
 import SettingsIcon from '@mui/icons-material/Settings';
-import SearchIcon from '@mui/icons-material/Search';
-import InfoIcon from '@mui/icons-material/Info';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ImportantDevicesIcon from '@mui/icons-material/ImportantDevices';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import SecurityIcon from '@mui/icons-material/Security';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
 
 function Ayuda() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [activeTab, setActiveTab] = useState(0);
+  const [selectedCategory, setSelectedCategory] = useState('intro');
+  const [expandedSections, setExpandedSections] = useState({});
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
+  const toggleSection = (sectionId) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
   };
 
-  // Componente para secciones de ayuda
-  const HelpSection = ({ title, icon, children }) => (
-    <Accordion 
-      sx={{
-        mt: 2,
-        borderRadius: '8px',
-        '&:before': { display: 'none' },
-        boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.08)}`,
-        overflow: 'hidden',
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        sx={{
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-          '&:hover': {
-            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-          }
-        }}
-      >
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              p: 1,
-              borderRadius: '50%',
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main
-            }}
-          >
-            {icon}
-          </Box>
-          <Typography variant="h6">{title}</Typography>
-        </Stack>
-      </AccordionSummary>
-      <AccordionDetails sx={{ p: 3 }}>
-        {children}
-      </AccordionDetails>
-    </Accordion>
-  );
+  // Categorías de ayuda
+  const helpCategories = [
+    {
+      id: 'intro',
+      title: 'Introducción',
+      icon: <HelpOutlineIcon />,
+      color: theme.palette.primary.main,
+      description: 'Primeros pasos con LifeTrack'
+    },
+    {
+      id: 'finances',
+      title: 'Finanzas',
+      icon: <AccountBalanceWalletIcon />,
+      color: theme.palette.success.main,
+      description: 'Gestión de gastos e ingresos'
+    },
+    {
+      id: 'cards',
+      title: 'Tarjetas',
+      icon: <CreditCardIcon />,
+      color: theme.palette.warning.main,
+      description: 'Control de tarjetas de crédito'
+    },
+    {
+      id: 'habits',
+      title: 'Hábitos',
+      icon: <EmojiEventsIcon />,
+      color: theme.palette.info.main,
+      description: 'Seguimiento de rutinas'
+    },
+    {
+      id: 'plants',
+      title: 'Plantas',
+      icon: <NatureIcon />,
+      color: '#4caf50',
+      description: 'Cuidado de plantas'
+    },
+    {
+      id: 'settings',
+      title: 'Configuración',
+      icon: <SettingsIcon />,
+      color: theme.palette.secondary.main,
+      description: 'Personalización y ajustes'
+    },
+    {
+      id: 'tips',
+      title: 'Consejos',
+      icon: <LightbulbIcon />,
+      color: '#ff9800',
+      description: 'Mejores prácticas'
+    }
+  ];
 
-  // Componente para consejos destacados
-  const TipCard = ({ title, description, icon, color = 'primary' }) => (
+  // Componente para tarjetas de características
+  const FeatureCard = ({ title, description, icon, color, features }) => (
     <Card 
-      elevation={0} 
+      elevation={3}
       sx={{ 
-        display: 'flex', 
-        flexDirection: 'column',
+        borderRadius: 3,
+        overflow: 'hidden',
         height: '100%',
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette[color].main, 0.2)}`,
-        bgcolor: alpha(theme.palette[color].main, 0.05),
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        transition: 'all 0.3s ease',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: `0 8px 16px ${alpha(theme.palette.common.black, 0.1)}`
+          transform: 'translateY(-8px)',
+          boxShadow: `0 12px 24px ${alpha(color, 0.2)}`
         }
       }}
     >
-      <Box p={3}>
-        <Box 
-          sx={{ 
-            display: 'inline-flex',
-            p: 1.5,
-            borderRadius: '50%',
-            bgcolor: alpha(theme.palette[color].main, 0.1),
-            color: theme.palette[color].main,
-            mb: 2
-          }}
-        >
-          {icon}
-        </Box>
-        <Typography variant="h6" gutterBottom fontWeight="bold">
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {description}
-        </Typography>
+      <Box
+        sx={{
+          p: 3,
+          background: `linear-gradient(135deg, ${color} 0%, ${alpha(color, 0.8)} 100%)`,
+          color: 'white'
+        }}
+      >
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Avatar
+            sx={{
+              bgcolor: alpha('#ffffff', 0.2),
+              color: 'white',
+              width: 48,
+              height: 48
+            }}
+          >
+            {icon}
+          </Avatar>
+          <Box>
+            <Typography variant="h6" fontWeight="bold">
+              {title}
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              {description}
+            </Typography>
+          </Box>
+        </Stack>
       </Box>
+      
+      <CardContent sx={{ p: 3 }}>
+        <List disablePadding>
+          {features.map((feature, index) => (
+            <ListItem key={index} disablePadding sx={{ mb: 1 }}>
+              <ListItemIcon sx={{ minWidth: 32 }}>
+                <CheckCircleIcon sx={{ color: color, fontSize: 20 }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary={feature}
+                primaryTypographyProps={{
+                  variant: 'body2',
+                  fontWeight: 'medium'
+                }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </CardContent>
     </Card>
   );
 
-  const renderIntroContent = () => (
-    <>
-      <Typography variant="h5" gutterBottom fontWeight="medium" sx={{ mb: 3 }}>
-        Bienvenido a LifeTrack: Tu asistente personal para finanzas y más
-      </Typography>
-      
-      <Alert 
-        severity="info" 
+  // Componente para secciones expandibles
+  const ExpandableSection = ({ id, title, icon, children, color }) => {
+    const isExpanded = expandedSections[id];
+    
+    return (
+      <Card 
+        elevation={2}
         sx={{ 
-          mb: 4, 
-          borderRadius: 2,
-          '& .MuiAlert-icon': {
-            fontSize: 28
+          borderRadius: 3,
+          overflow: 'hidden',
+          mb: 2,
+          border: `1px solid ${alpha(color, 0.2)}`
+        }}
+      >
+        <CardHeader
+          avatar={
+            <Avatar sx={{ bgcolor: alpha(color, 0.1), color: color }}>
+              {icon}
+            </Avatar>
           }
-        }}
-      >
-        <Typography variant="body1">
-          LifeTrack te ayuda a gestionar tus finanzas personales, controlar tus hábitos y hacer seguimiento de tus actividades diarias en un solo lugar.
-        </Typography>
-      </Alert>
+          title={title}
+          action={
+            <IconButton onClick={() => toggleSection(id)}>
+              {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          }
+          sx={{
+            bgcolor: alpha(color, 0.05),
+            cursor: 'pointer',
+            '&:hover': {
+              bgcolor: alpha(color, 0.1)
+            }
+          }}
+          onClick={() => toggleSection(id)}
+        />
+        <Collapse in={isExpanded}>
+          <CardContent sx={{ p: 3 }}>
+            {children}
+          </CardContent>
+        </Collapse>
+      </Card>
+    );
+  };
 
-      <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-        Características principales:
-      </Typography>
+  // Contenido para cada categoría
+  const renderContent = () => {
+    switch (selectedCategory) {
+      case 'intro':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              {/* Header de bienvenida */}
+              <Card 
+                elevation={4}
+                sx={{ 
+                  borderRadius: 4,
+                  overflow: 'hidden',
+                  mb: 4,
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  color: 'white'
+                }}
+              >
+                <CardContent sx={{ p: 4 }}>
+                  <Stack direction="row" spacing={3} alignItems="center">
+                    <Avatar
+                      sx={{
+                        bgcolor: alpha('#ffffff', 0.2),
+                        color: 'white',
+                        width: 80,
+                        height: 80
+                      }}
+                    >
+                      <RocketLaunchIcon sx={{ fontSize: 40 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                        ¡Bienvenido a LifeTrack!
+                      </Typography>
+                      <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                        Tu asistente personal para finanzas, hábitos y más
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
 
-      <Grid container spacing={3} sx={{ mt: 2, mb: 4 }}>
-        <Grid item xs={12} md={4}>
-          <TipCard 
-            title="Gestión financiera completa" 
-            description="Controla gastos, ingresos, ahorros y tarjetas de crédito en un solo lugar."
-            icon={<MonetizationOnIcon />}
-            color="success"
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TipCard 
-            title="Seguimiento de hábitos" 
-            description="Establece y monitorea hábitos diarios para mejorar tu calidad de vida."
-            icon={<EmojiEventsIcon />}
-            color="info"
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TipCard 
-            title="Personalización completa" 
-            description="Adapta la aplicación a tus necesidades con temas personalizados y configuraciones avanzadas."
-            icon={<PaletteIcon />}
-            color="secondary"
-          />
-        </Grid>
-      </Grid>
+              {/* Características principales */}
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Características principales
+              </Typography>
+              
+              <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12} md={4}>
+                  <FeatureCard
+                    title="Gestión Financiera"
+                    description="Control total de tus finanzas"
+                    icon={<MonetizationOnIcon />}
+                    color={theme.palette.success.main}
+                    features={[
+                      'Registro de gastos e ingresos',
+                      'Control de tarjetas de crédito',
+                      'Seguimiento de ahorros',
+                      'Reportes detallados'
+                    ]}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FeatureCard
+                    title="Seguimiento de Hábitos"
+                    description="Mejora tu calidad de vida"
+                    icon={<EmojiEventsIcon />}
+                    color={theme.palette.info.main}
+                    features={[
+                      'Creación de hábitos personalizados',
+                      'Seguimiento diario',
+                      'Estadísticas de progreso',
+                      'Recordatorios inteligentes'
+                    ]}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FeatureCard
+                    title="Personalización"
+                    description="Adapta la app a tu estilo"
+                    icon={<PaletteIcon />}
+                    color={theme.palette.secondary.main}
+                    features={[
+                      'Temas personalizados',
+                      'Configuración avanzada',
+                      'Interfaz adaptable',
+                      'Modo oscuro/claro'
+                    ]}
+                  />
+                </Grid>
+              </Grid>
 
-      <Typography variant="body1" paragraph>
-        Para comenzar, explora las diferentes secciones de ayuda o navega directamente a las funciones que necesites desde el menú principal.
-      </Typography>
-
-      <Box 
-        sx={{ 
-          borderRadius: 2, 
-          p: 3, 
-          mt: 2,
-          bgcolor: alpha(theme.palette.warning.main, 0.05),
-          border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`
-        }}
-      >
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <LightbulbIcon color="warning" />
-          <Typography variant="h6" color="warning.dark">Consejo rápido</Typography>
-        </Stack>
-        <Typography variant="body2">
-          ¿Primera vez en LifeTrack? Te recomendamos comenzar configurando tus categorías de gastos e ingresos en la sección de Finanzas para obtener informes más precisos desde el principio.
-        </Typography>
-      </Box>
-    </>
-  );
-
-  const renderFinancesContent = () => (
-    <>
-      <Typography variant="h5" gutterBottom fontWeight="medium" sx={{ mb: 3 }}>
-        Gestión de finanzas
-      </Typography>
-
-      <HelpSection 
-        title="Panel de finanzas" 
-        icon={<BarChartIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          El panel de finanzas es tu centro de control financiero. Aquí puedes:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Ver resumen de gastos e ingresos" 
-              secondary="El panel muestra una visión general de tus finanzas del mes actual, con gráficos y totales."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Explorar por categorías" 
-              secondary="Analiza tus gastos e ingresos agrupados por categorías para entender mejor tus hábitos financieros."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Filtrar por período" 
-              secondary="Usa el navegador de tiempo para ver datos de meses anteriores o seleccionar rangos específicos."
-            />
-          </ListItem>
-        </List>
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom sx={{ mt: 2 }}>
-          Consejo profesional:
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Revisa mensualmente la distribución de gastos por categoría para identificar áreas donde puedes reducir gastos y aumentar tus ahorros.
-        </Typography>
-      </HelpSection>
-
-      <HelpSection 
-        title="Registro de gastos e ingresos" 
-        icon={<MonetizationOnIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          Registrar tus transacciones es sencillo y rápido:
-        </Typography>
-        
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={6}>
-            <Card sx={{ bgcolor: alpha(theme.palette.error.main, 0.05), height: '100%' }}>
-              <CardContent>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                  <TrendingDownIcon color="error" />
-                  <Typography variant="h6">Registrar gasto</Typography>
+              {/* Primeros pasos */}
+              <Card elevation={2} sx={{ borderRadius: 3, p: 3, bgcolor: alpha(theme.palette.warning.main, 0.05) }}>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                  <AutoAwesomeIcon sx={{ color: theme.palette.warning.main }} />
+                  <Typography variant="h6" fontWeight="600">
+                    Primeros pasos recomendados
+                  </Typography>
                 </Stack>
-                <List dense>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Chip label="1" size="small" color="warning" />
+                      <Typography variant="body1" fontWeight="medium">
+                        Configura tus categorías de gastos
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Chip label="2" size="small" color="warning" />
+                      <Typography variant="body1" fontWeight="medium">
+                        Registra tus primeros gastos e ingresos
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Chip label="3" size="small" color="warning" />
+                      <Typography variant="body1" fontWeight="medium">
+                        Agrega tus tarjetas de crédito
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Chip label="4" size="small" color="warning" />
+                      <Typography variant="body1" fontWeight="medium">
+                        Crea tus primeros hábitos
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Card>
+            </Box>
+          </Fade>
+        );
+
+      case 'finances':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Gestión de Finanzas
+              </Typography>
+
+              <ExpandableSection
+                id="dashboard"
+                title="Panel de Finanzas"
+                icon={<BarChartIcon />}
+                color={theme.palette.success.main}
+              >
+                <Typography variant="body1" paragraph>
+                  El panel de finanzas es tu centro de control financiero donde puedes:
+                </Typography>
+                <List>
                   <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
                     <ListItemText 
-                      primary="1. Pulsa el botón '+' y selecciona 'Nuevo Gasto'"
+                      primary="Ver resumen mensual"
+                      secondary="Visualiza tus gastos e ingresos del mes actual con gráficos interactivos"
                     />
                   </ListItem>
                   <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
                     <ListItemText 
-                      primary="2. Ingresa monto, fecha y descripción"
+                      primary="Analizar por categorías"
+                      secondary="Entiende mejor tus hábitos financieros con análisis detallados"
                     />
                   </ListItem>
                   <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
                     <ListItemText 
-                      primary="3. Selecciona categoría y subcategoría"
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="4. Elige método de pago (efectivo o tarjeta)"
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="5. Guarda para actualizar automáticamente tus reportes"
+                      primary="Filtrar por períodos"
+                      secondary="Navega entre diferentes meses para comparar tu evolución"
                     />
                   </ListItem>
                 </List>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Card sx={{ bgcolor: alpha(theme.palette.success.main, 0.05), height: '100%' }}>
-              <CardContent>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                  <TrendingUpIcon color="success" />
-                  <Typography variant="h6">Registrar ingreso</Typography>
-                </Stack>
-                <List dense>
+              </ExpandableSection>
+
+              <ExpandableSection
+                id="transactions"
+                title="Registro de Transacciones"
+                icon={<MonetizationOnIcon />}
+                color={theme.palette.primary.main}
+              >
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ bgcolor: alpha(theme.palette.error.main, 0.05), p: 2 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                        <TrendingDownIcon color="error" />
+                        <Typography variant="h6">Registrar Gasto</Typography>
+                      </Stack>
+                      <List dense>
+                        <ListItem>
+                          <ListItemText primary="1. Pulsa '+' → 'Nuevo Gasto'" />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText primary="2. Ingresa monto y descripción" />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText primary="3. Selecciona categoría" />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText primary="4. Elige método de pago" />
+                        </ListItem>
+                      </List>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ bgcolor: alpha(theme.palette.success.main, 0.05), p: 2 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                        <TrendingUpIcon color="success" />
+                        <Typography variant="h6">Registrar Ingreso</Typography>
+                      </Stack>
+                      <List dense>
+                        <ListItem>
+                          <ListItemText primary="1. Pulsa '+' → 'Nuevo Ingreso'" />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText primary="2. Ingresa monto y descripción" />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText primary="3. Selecciona fuente" />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText primary="4. Configura ahorros" />
+                        </ListItem>
+                      </List>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </ExpandableSection>
+
+              <ExpandableSection
+                id="savings"
+                title="Evolución de Ahorros"
+                icon={<AccountBalanceWalletIcon />}
+                color={theme.palette.info.main}
+              >
+                <Typography variant="body1" paragraph>
+                  El seguimiento de ahorros te permite visualizar tu progreso financiero:
+                </Typography>
+                <List>
                   <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
                     <ListItemText 
-                      primary="1. Pulsa el botón '+' y selecciona 'Nuevo Ingreso'"
+                      primary="Gráfico de evolución histórica"
+                      secondary="Visualiza cómo cambian tus ahorros día a día"
                     />
                   </ListItem>
                   <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
                     <ListItemText 
-                      primary="2. Ingresa monto, fecha y descripción"
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="3. Selecciona fuente de ingreso"
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="4. Indica si deseas agregar el monto a tus ahorros"
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="5. Guarda para actualizar automáticamente tus reportes"
+                      primary="Metas de ahorro"
+                      secondary="Establece objetivos y monitorea tu progreso"
                     />
                   </ListItem>
                 </List>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-        
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom>
-          Recomendaciones:
-        </Typography>
-        <List dense>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" fontSize="small" /></ListItemIcon>
-            <ListItemText 
-              primary="Registra las transacciones en el momento" 
-              secondary="Crea el hábito de registrar tus gastos inmediatamente para no olvidarlos."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" fontSize="small" /></ListItemIcon>
-            <ListItemText 
-              primary="Usa categorías específicas" 
-              secondary="Cuanto más específicas sean tus categorías, más útiles serán tus análisis."
-            />
-          </ListItem>
-        </List>
-      </HelpSection>
+              </ExpandableSection>
+            </Box>
+          </Fade>
+        );
 
-      <HelpSection 
-        title="Gestión de tarjetas de crédito" 
-        icon={<CreditCardIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          La sección de tarjetas de crédito te permite gestionar todas tus tarjetas en un solo lugar:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Registrar tarjetas" 
-              secondary="Agrega todas tus tarjetas con su información básica como nombre, límite y fechas de cierre."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Control de gastos por tarjeta" 
-              secondary="Visualiza todos los gastos asociados a cada tarjeta, agrupados por período de facturación."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Gestión de fechas importantes" 
-              secondary="Actualiza las fechas de cierre y vencimiento mensualmente para mantener un control preciso."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Subida de resúmenes" 
-              secondary="Sube los resúmenes de tus tarjetas en formato PDF para tener toda la información en un solo lugar."
-            />
-          </ListItem>
-        </List>
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom sx={{ mt: 2 }}>
-          Consejo profesional:
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Utiliza el botón "Pagar Todas las Tarjetas" cuando llegue el vencimiento para registrar automáticamente los pagos como gastos y mantener tus saldos actualizados.
-        </Typography>
-      </HelpSection>
+      case 'cards':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Gestión de Tarjetas de Crédito
+              </Typography>
 
-      <HelpSection 
-        title="Evolución de ahorros" 
-        icon={<AccountBalanceWalletIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          El seguimiento de ahorros te permite visualizar cómo evolucionan tus finanzas a lo largo del tiempo:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Gráfico de evolución histórica" 
-              secondary="Visualiza cómo tus ahorros han cambiado a lo largo del tiempo, con un balance diario que incluye ingresos y gastos."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Metas de ahorro" 
-              secondary="Establece metas y observa tu progreso en el gráfico para mantenerte motivado."
-            />
-          </ListItem>
-        </List>
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom sx={{ mt: 2 }}>
-          Consejo profesional:
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Revisa la gráfica de evolución mensualmente para identificar tendencias y ajustar tus hábitos de gasto e ingreso según sea necesario.
-        </Typography>
-      </HelpSection>
-    </>
-  );
+              <ExpandableSection
+                id="card-management"
+                title="Administración de Tarjetas"
+                icon={<CreditCardIcon />}
+                color={theme.palette.warning.main}
+              >
+                <Typography variant="body1" paragraph>
+                  Gestiona todas tus tarjetas de crédito en un solo lugar:
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Registro de tarjetas"
+                      secondary="Agrega tarjetas con información básica y límites"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Control de gastos por tarjeta"
+                      secondary="Visualiza gastos agrupados por período de facturación"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Gestión de fechas importantes"
+                      secondary="Actualiza fechas de cierre y vencimiento mensualmente"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Subida de resúmenes PDF"
+                      secondary="Mantén toda la información organizada en un solo lugar"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
 
-  const renderHabitsContent = () => (
-    <>
-      <Typography variant="h5" gutterBottom fontWeight="medium" sx={{ mb: 3 }}>
-        Seguimiento de hábitos
-      </Typography>
+              <Card elevation={2} sx={{ borderRadius: 3, p: 3, bgcolor: alpha(theme.palette.warning.main, 0.05) }}>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                  <TipsAndUpdatesIcon sx={{ color: theme.palette.warning.main }} />
+                  <Typography variant="h6" fontWeight="600">
+                    Consejo Profesional
+                  </Typography>
+                </Stack>
+                <Typography variant="body1">
+                  Utiliza el botón "Pagar Todas las Tarjetas" cuando llegue el vencimiento para registrar automáticamente los pagos como gastos y mantener tus saldos actualizados.
+                </Typography>
+              </Card>
+            </Box>
+          </Fade>
+        );
 
-      <HelpSection 
-        title="Crear y gestionar hábitos" 
-        icon={<FormatListBulletedIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          La sección de hábitos te permite crear y dar seguimiento a hábitos diarios, semanales o mensuales:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Crear nuevos hábitos" 
-              secondary="Define hábitos con nombre, descripción, frecuencia y tipo de seguimiento."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Registrar cumplimiento" 
-              secondary="Marca los hábitos como completados cada día para mantener un registro de tu constancia."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Visualizar estadísticas" 
-              secondary="Revisa tu desempeño con gráficos de frecuencia y rachas de cumplimiento."
-            />
-          </ListItem>
-        </List>
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom sx={{ mt: 2 }}>
-          Consejo profesional:
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Comienza con 2-3 hábitos simples y ve aumentando gradualmente. Es mejor tener consistencia en pocos hábitos que intentar cambiar todo a la vez.
-        </Typography>
-      </HelpSection>
-    </>
-  );
+      case 'habits':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Seguimiento de Hábitos
+              </Typography>
 
-  const renderPlantsContent = () => (
-    <>
-      <Typography variant="h5" gutterBottom fontWeight="medium" sx={{ mb: 3 }}>
-        Cuidado de plantas
-      </Typography>
+              <ExpandableSection
+                id="habit-creation"
+                title="Crear y Gestionar Hábitos"
+                icon={<FormatListBulletedIcon />}
+                color={theme.palette.info.main}
+              >
+                <Typography variant="body1" paragraph>
+                  La sección de hábitos te permite crear y dar seguimiento a rutinas:
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Crear nuevos hábitos"
+                      secondary="Define hábitos con nombre, descripción y frecuencia"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Registrar cumplimiento"
+                      secondary="Marca hábitos como completados para mantener registro"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Visualizar estadísticas"
+                      secondary="Revisa tu desempeño con gráficos y rachas"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
 
-      <HelpSection 
-        title="Gestión de plantas" 
-        icon={<NatureIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          La sección de plantas te permite llevar un registro detallado de tus plantas y sus cuidados:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Registrar plantas" 
-              secondary="Agrega tus plantas con nombre, especie, fecha de adquisición y ubicación."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Calendarios de riego" 
-              secondary="Establece recordatorios de riego basados en las necesidades específicas de cada planta."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Registro de cuidados" 
-              secondary="Documenta riegos, fertilizaciones, trasplantes y otros cuidados para cada planta."
-            />
-          </ListItem>
-        </List>
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom sx={{ mt: 2 }}>
-          Consejo profesional:
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Toma fotos de tus plantas regularmente y agrégalas a su perfil para monitorear visualmente su crecimiento y salud a lo largo del tiempo.
-        </Typography>
-      </HelpSection>
-    </>
-  );
+              <Card elevation={2} sx={{ borderRadius: 3, p: 3, bgcolor: alpha(theme.palette.info.main, 0.05) }}>
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                  <TipsAndUpdatesIcon sx={{ color: theme.palette.info.main }} />
+                  <Typography variant="h6" fontWeight="600">
+                    Consejo Profesional
+                  </Typography>
+                </Stack>
+                <Typography variant="body1">
+                  Comienza con 2-3 hábitos simples y ve aumentando gradualmente. Es mejor tener consistencia en pocos hábitos que intentar cambiar todo a la vez.
+                </Typography>
+              </Card>
+            </Box>
+          </Fade>
+        );
 
-  const renderSettingsContent = () => (
-    <>
-      <Typography variant="h5" gutterBottom fontWeight="medium" sx={{ mb: 3 }}>
-        Configuración y personalización
-      </Typography>
+      case 'plants':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Cuidado de Plantas
+              </Typography>
 
-      <HelpSection 
-        title="Personalización del tema" 
-        icon={<PaletteIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          Personaliza la apariencia de LifeTrack para adaptarla a tus preferencias:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Temas predefinidos" 
-              secondary="Selecciona entre varios temas predefinidos con combinaciones armoniosas de colores."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Modo oscuro/claro" 
-              secondary="Activa el modo oscuro para reducir la fatiga visual en ambientes con poca luz."
-            />
-          </ListItem>
-        </List>
-      </HelpSection>
+              <ExpandableSection
+                id="plant-management"
+                title="Gestión de Plantas"
+                icon={<NatureIcon />}
+                color="#4caf50"
+              >
+                <Typography variant="body1" paragraph>
+                  La sección de plantas te permite llevar un registro detallado:
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Registrar plantas"
+                      secondary="Agrega plantas con nombre, especie y ubicación"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Calendarios de riego"
+                      secondary="Establece recordatorios basados en necesidades específicas"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Registro de cuidados"
+                      secondary="Documenta riegos, fertilizaciones y trasplantes"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
+            </Box>
+          </Fade>
+        );
 
-      <HelpSection 
-        title="Configuración de privacidad" 
-        icon={<FingerprintIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          Gestiona la privacidad y seguridad de tus datos:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Copias de seguridad" 
-              secondary="Configura backups automáticos o crea copias de seguridad manuales para proteger tus datos."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-            <ListItemText 
-              primary="Visibilidad de datos" 
-              secondary="Controla qué información se muestra en cada sección de la aplicación."
-            />
-          </ListItem>
-        </List>
-        <Typography variant="subtitle2" fontWeight="medium" gutterBottom sx={{ mt: 2 }}>
-          Consejo profesional:
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Programa copias de seguridad automáticas semanales para asegurar que nunca pierdas tus datos importantes.
-        </Typography>
-      </HelpSection>
-    </>
-  );
+      case 'settings':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Configuración y Personalización
+              </Typography>
 
-  const renderTipsContent = () => (
-    <>
-      <Typography variant="h5" gutterBottom fontWeight="medium" sx={{ mb: 3 }}>
-        Consejos y mejores prácticas
-      </Typography>
+              <ExpandableSection
+                id="theme-customization"
+                title="Personalización del Tema"
+                icon={<PaletteIcon />}
+                color={theme.palette.secondary.main}
+              >
+                <Typography variant="body1" paragraph>
+                  Personaliza la apariencia de LifeTrack:
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Temas predefinidos"
+                      secondary="Selecciona entre varios temas con combinaciones armoniosas"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Modo oscuro/claro"
+                      secondary="Activa el modo oscuro para reducir fatiga visual"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}>
-          <TipCard 
-            title="Registra a diario" 
-            description="Crea el hábito de registrar tus transacciones diariamente para mantener datos precisos y actualizados."
-            icon={<CheckCircleIcon />}
-            color="success"
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TipCard 
-            title="Revisa semanalmente" 
-            description="Dedica 10 minutos cada semana para revisar tus finanzas y detectar cualquier tendencia negativa a tiempo."
-            icon={<SearchIcon />}
-            color="info"
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TipCard 
-            title="Planifica mensualmente" 
-            description="Al inicio de cada mes, establece un presupuesto por categorías basado en tus datos históricos."
-            icon={<BarChartIcon />}
-            color="primary"
-          />
-        </Grid>
-      </Grid>
+              <ExpandableSection
+                id="privacy-settings"
+                title="Configuración de Privacidad"
+                icon={<SecurityIcon />}
+                color={theme.palette.error.main}
+              >
+                <Typography variant="body1" paragraph>
+                  Gestiona la privacidad y seguridad de tus datos:
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Copias de seguridad"
+                      secondary="Configura backups automáticos para proteger tus datos"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Visibilidad de datos"
+                      secondary="Controla qué información se muestra en cada sección"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
+            </Box>
+          </Fade>
+        );
 
-      <HelpSection 
-        title="Optimización financiera" 
-        icon={<MonetizationOnIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          Aprovecha al máximo las funciones financieras de LifeTrack:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
-            <ListItemText 
-              primary="Categoriza con precisión" 
-              secondary="Cuanto más precisas sean tus categorías, más útiles serán tus análisis y presupuestos."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
-            <ListItemText 
-              primary="Diferencia gastos necesarios y discrecionales" 
-              secondary="Usa subcategorías para diferenciar entre gastos esenciales y opcionales dentro de una misma categoría."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
-            <ListItemText 
-              primary="Analiza tendencias trimestrales" 
-              secondary="Además del análisis mensual, revisa tus finanzas cada trimestre para identificar patrones más amplios."
-            />
-          </ListItem>
-        </List>
-      </HelpSection>
+      case 'tips':
+        return (
+          <Fade in timeout={600}>
+            <Box>
+              <Typography variant="h5" fontWeight="600" sx={{ mb: 3 }}>
+                Consejos y Mejores Prácticas
+              </Typography>
 
-      <HelpSection 
-        title="Desarrollo de hábitos" 
-        icon={<EmojiEventsIcon />}
-      >
-        <Typography variant="body1" paragraph>
-          Maximiza tu éxito en la creación de nuevos hábitos:
-        </Typography>
-        <List>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
-            <ListItemText 
-              primary="Comienza con pequeños pasos" 
-              secondary="Es mejor empezar con versiones simples de hábitos que puedas cumplir consistentemente."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
-            <ListItemText 
-              primary="Vincúlalos a hábitos existentes" 
-              secondary="Asocia nuevos hábitos a rutinas que ya realizas para aumentar la probabilidad de éxito."
-            />
-          </ListItem>
-          <ListItem>
-            <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
-            <ListItemText 
-              primary="Celebra pequeñas victorias" 
-              secondary="Reconoce y celebra cuando mantengas rachas de cumplimiento para reforzar el comportamiento."
-            />
-          </ListItem>
-        </List>
-      </HelpSection>
-    </>
-  );
+              <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12} md={4}>
+                  <Card 
+                    elevation={3}
+                    sx={{ 
+                      borderRadius: 3,
+                      height: '100%',
+                      transition: 'transform 0.3s ease',
+                      '&:hover': { transform: 'translateY(-4px)' }
+                    }}
+                  >
+                    <Box sx={{ p: 3, bgcolor: alpha(theme.palette.success.main, 0.1) }}>
+                      <Avatar sx={{ bgcolor: theme.palette.success.main, mb: 2 }}>
+                        <CheckCircleIcon />
+                      </Avatar>
+                      <Typography variant="h6" fontWeight="bold">
+                        Registra a diario
+                      </Typography>
+                    </Box>
+                    <CardContent>
+                      <Typography variant="body2">
+                        Crea el hábito de registrar tus transacciones diariamente para mantener datos precisos y actualizados.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card 
+                    elevation={3}
+                    sx={{ 
+                      borderRadius: 3,
+                      height: '100%',
+                      transition: 'transform 0.3s ease',
+                      '&:hover': { transform: 'translateY(-4px)' }
+                    }}
+                  >
+                    <Box sx={{ p: 3, bgcolor: alpha(theme.palette.info.main, 0.1) }}>
+                      <Avatar sx={{ bgcolor: theme.palette.info.main, mb: 2 }}>
+                        <SpeedIcon />
+                      </Avatar>
+                      <Typography variant="h6" fontWeight="bold">
+                        Revisa semanalmente
+                      </Typography>
+                    </Box>
+                    <CardContent>
+                      <Typography variant="body2">
+                        Dedica 10 minutos cada semana para revisar tus finanzas y detectar tendencias a tiempo.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card 
+                    elevation={3}
+                    sx={{ 
+                      borderRadius: 3,
+                      height: '100%',
+                      transition: 'transform 0.3s ease',
+                      '&:hover': { transform: 'translateY(-4px)' }
+                    }}
+                  >
+                    <Box sx={{ p: 3, bgcolor: alpha(theme.palette.primary.main, 0.1) }}>
+                      <Avatar sx={{ bgcolor: theme.palette.primary.main, mb: 2 }}>
+                        <BarChartIcon />
+                      </Avatar>
+                      <Typography variant="h6" fontWeight="bold">
+                        Planifica mensualmente
+                      </Typography>
+                    </Box>
+                    <CardContent>
+                      <Typography variant="body2">
+                        Al inicio de cada mes, establece un presupuesto por categorías basado en tus datos históricos.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
 
-  const tabContent = [
-    { label: 'Introducción', icon: <HelpOutlineIcon />, content: renderIntroContent() },
-    { label: 'Finanzas', icon: <AccountBalanceWalletIcon />, content: renderFinancesContent() },
-    { label: 'Hábitos', icon: <FormatListBulletedIcon />, content: renderHabitsContent() },
-    { label: 'Plantas', icon: <NatureIcon />, content: renderPlantsContent() },
-    { label: 'Configuración', icon: <SettingsIcon />, content: renderSettingsContent() },
-    { label: 'Consejos', icon: <LightbulbIcon />, content: renderTipsContent() },
-  ];
+              <ExpandableSection
+                id="financial-optimization"
+                title="Optimización Financiera"
+                icon={<MonetizationOnIcon />}
+                color={theme.palette.success.main}
+              >
+                <List>
+                  <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Categoriza con precisión"
+                      secondary="Cuanto más precisas sean tus categorías, más útiles serán tus análisis"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Diferencia gastos necesarios y discrecionales"
+                      secondary="Usa subcategorías para diferenciar gastos esenciales y opcionales"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Analiza tendencias trimestrales"
+                      secondary="Revisa tus finanzas cada trimestre para identificar patrones amplios"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
+
+              <ExpandableSection
+                id="habit-development"
+                title="Desarrollo de Hábitos"
+                icon={<EmojiEventsIcon />}
+                color={theme.palette.info.main}
+              >
+                <List>
+                  <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Comienza con pequeños pasos"
+                      secondary="Es mejor empezar con versiones simples que puedas cumplir consistentemente"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Vincúlalos a hábitos existentes"
+                      secondary="Asocia nuevos hábitos a rutinas que ya realizas"
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon><InfoIcon color="info" /></ListItemIcon>
+                    <ListItemText 
+                      primary="Celebra pequeñas victorias"
+                      secondary="Reconoce y celebra rachas de cumplimiento para reforzar el comportamiento"
+                    />
+                  </ListItem>
+                </List>
+              </ExpandableSection>
+            </Box>
+          </Fade>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <Layout title="Ayuda">
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Paper 
-          elevation={0}
+    <Layout title="Centro de Ayuda">
+      <Container maxWidth={false} sx={{ py: 3, px: { xs: 2, sm: 3, md: 4 } }}>
+        {/* Header principal */}
+        <Card 
+          elevation={4}
           sx={{ 
-            p: 3, 
-            mb: 4, 
-            borderRadius: 2, 
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            alignItems: { xs: 'center', md: 'flex-start' },
-            gap: 3,
-            backgroundColor: alpha(theme.palette.primary.main, 0.05),
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+            borderRadius: 4,
+            overflow: 'hidden',
+            mb: 4,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+            color: 'white'
           }}
         >
-          <Box 
-            sx={{ 
-              p: 2,
-              borderRadius: '50%',
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 60,
-              height: 60
-            }}
-          >
-            <HelpOutlineIcon sx={{ fontSize: 32 }} />
-          </Box>
-          <Box>
-            <Typography variant="h4" gutterBottom fontWeight="medium">
-              Centro de ayuda de LifeTrack
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Encuentra toda la información que necesitas para aprovechar al máximo LifeTrack. 
-              Selecciona una categoría para comenzar o utiliza la navegación por pestañas.
-            </Typography>
-          </Box>
-        </Paper>
-
-        <Box sx={{ mb: 3 }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange} 
-            variant={isMobile ? "scrollable" : "fullWidth"}
-            scrollButtons={isMobile ? "auto" : false}
-            sx={{ 
-              borderBottom: `1px solid ${theme.palette.divider}`,
-              '& .MuiTab-root': {
-                minHeight: 64,
-                py: 2
-              }
-            }}
-          >
-            {tabContent.map((tab, index) => (
-              <Tab 
-                key={index}
-                label={
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    {tab.icon}
-                    <Box component="span">{tab.label}</Box>
-                  </Stack>
-                } 
+          <CardContent sx={{ p: 4 }}>
+            <Stack direction="row" spacing={3} alignItems="center">
+              <Avatar
                 sx={{
-                  fontWeight: 'medium',
-                  textTransform: 'none',
-                  borderRadius: '8px 8px 0 0',
-                  '&.Mui-selected': {
-                    color: theme.palette.primary.main,
-                    fontWeight: 'bold'
-                  }
+                  bgcolor: alpha('#ffffff', 0.2),
+                  color: 'white',
+                  width: 80,
+                  height: 80
+                }}
+              >
+                <MenuBookIcon sx={{ fontSize: 40 }} />
+              </Avatar>
+              <Box>
+                <Typography variant="h3" fontWeight="bold" sx={{ mb: 1 }}>
+                  Centro de Ayuda
+                </Typography>
+                <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                  Encuentra toda la información que necesitas para aprovechar al máximo LifeTrack
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* Layout de 2 columnas */}
+        <Grid container spacing={4}>
+          {/* Columna izquierda - Navegación */}
+          <Grid item xs={12} md={4} lg={3}>
+            <Card 
+              elevation={2} 
+              sx={{ 
+                borderRadius: 3, 
+                position: 'sticky', 
+                top: 20,
+                height: 'fit-content'
+              }}
+            >
+              <CardHeader
+                title="Categorías"
+                sx={{
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`
                 }}
               />
-            ))}
-          </Tabs>
-        </Box>
+              <CardContent sx={{ p: 0 }}>
+                <List disablePadding>
+                  {helpCategories.map((category) => (
+                    <ListItem
+                      key={category.id}
+                      button
+                      selected={selectedCategory === category.id}
+                      onClick={() => setSelectedCategory(category.id)}
+                      sx={{
+                        py: 2,
+                        px: 3,
+                        borderLeft: selectedCategory === category.id 
+                          ? `4px solid ${category.color}` 
+                          : '4px solid transparent',
+                        '&.Mui-selected': {
+                          bgcolor: alpha(category.color, 0.1),
+                          '&:hover': {
+                            bgcolor: alpha(category.color, 0.15)
+                          }
+                        },
+                        '&:hover': {
+                          bgcolor: alpha(category.color, 0.05)
+                        }
+                      }}
+                    >
+                      <ListItemIcon>
+                        <Avatar 
+                          sx={{ 
+                            bgcolor: selectedCategory === category.id 
+                              ? category.color 
+                              : alpha(category.color, 0.1),
+                            color: selectedCategory === category.id 
+                              ? 'white' 
+                              : category.color,
+                            width: 40,
+                            height: 40
+                          }}
+                        >
+                          {category.icon}
+                        </Avatar>
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={category.title}
+                        secondary={category.description}
+                        primaryTypographyProps={{
+                          fontWeight: selectedCategory === category.id ? 'bold' : 'medium'
+                        }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        <Box sx={{ py: 2 }}>
-          {tabContent[activeTab].content}
-        </Box>
+          {/* Columna derecha - Contenido */}
+          <Grid item xs={12} md={8} lg={9}>
+            <Box sx={{ minHeight: '60vh' }}>
+              {renderContent()}
+            </Box>
+          </Grid>
+        </Grid>
 
-        <Divider sx={{ my: 4 }} />
-
-        <Box sx={{ textAlign: 'center', py: 2 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            ¿No encuentras la respuesta que buscas?
+        {/* Footer de soporte */}
+        <Divider sx={{ my: 6 }} />
+        
+        <Card 
+          elevation={2}
+          sx={{ 
+            borderRadius: 3,
+            textAlign: 'center',
+            p: 4,
+            bgcolor: alpha(theme.palette.info.main, 0.05)
+          }}
+        >
+          <Avatar 
+            sx={{ 
+              bgcolor: theme.palette.info.main,
+              width: 64,
+              height: 64,
+              mx: 'auto',
+              mb: 2
+            }}
+          >
+            <SupportAgentIcon sx={{ fontSize: 32 }} />
+          </Avatar>
+          <Typography variant="h6" fontWeight="600" sx={{ mb: 1 }}>
+            ¿Necesitas más ayuda?
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Si no encuentras la respuesta que buscas, nuestro equipo de soporte está aquí para ayudarte
           </Typography>
           <Button 
             variant="contained" 
-            color="primary" 
-            startIcon={<ImportantDevicesIcon />}
-            sx={{ mt: 1, textTransform: 'none' }}
+            size="large"
+            startIcon={<SupportAgentIcon />}
+            sx={{ 
+              borderRadius: 3,
+              px: 4,
+              py: 1.5
+            }}
           >
-            Contactar soporte técnico
+            Contactar Soporte
           </Button>
-        </Box>
+        </Card>
       </Container>
     </Layout>
   );

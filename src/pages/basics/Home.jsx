@@ -19,6 +19,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Checkbox,
   Avatar,
   LinearProgress,
   Badge,
@@ -34,7 +35,7 @@ import {
   TextField,
   InputAdornment
 } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
 import { formatAmount, getMonthName } from '../../utils';
 import ReactApexChart from 'react-apexcharts';
@@ -84,15 +85,22 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import CategoryIcon from '@mui/icons-material/Category';
 import LaptopIcon from '@mui/icons-material/Laptop';
 import PeopleIcon from '@mui/icons-material/People';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const Home = () => {
   const { userData, dollarRate } = useStore(); 
+  const navigate = useNavigate();
   // Using fixed chart configuration for simplified view
   const [dolarOficial, setDolarOficial] = useState(null);
   const [dolarBlue, setDolarBlue] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
+
+
 
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
@@ -680,6 +688,218 @@ const Home = () => {
   const [formattedArsAmount, setFormattedArsAmount] = useState('');
   const [formattedUsdAmount, setFormattedUsdAmount] = useState('');
 
+  // Funciones auxiliares para obtener estadísticas de hábitos
+  const getHabitsStats = () => {
+    if (!userData?.habits) {
+      return {
+        totalHabits: 0,
+        completedToday: 0,
+        todayCompletion: 0,
+        weeklyCompletion: 0,
+        streak: 0,
+        bestHabit: null,
+        todayHabits: []
+      };
+    }
+
+    const today = new Date();
+    const todayStr = formatDateForHabits(today);
+    
+    // Obtener hábitos activos (excluyendo el nodo "completed")
+    const habits = Object.keys(userData.habits)
+      .filter(key => key !== 'completed')
+      .map(id => ({
+        id,
+        ...userData.habits[id]
+      }));
+
+    // Filtrar hábitos que aplican para hoy
+    const todayHabits = habits.filter(habit => shouldShowHabitForDate(habit, today));
+    
+    // Contar hábitos completados hoy
+    const completedToday = todayHabits.filter(habit => 
+      userData.habits.completed?.[todayStr]?.[habit.id]
+    ).length;
+
+    // Calcular porcentaje de completitud de hoy
+    const todayCompletion = todayHabits.length > 0 
+      ? Math.round((completedToday / todayHabits.length) * 100) 
+      : 0;
+
+    // Calcular estadísticas semanales
+    const weekStats = calculateWeeklyHabitsStats(habits, today);
+
+    // Encontrar el mejor hábito (más consistente en la semana)
+    const bestHabit = findBestHabit(habits, today);
+
+    return {
+      totalHabits: habits.length,
+      completedToday,
+      todayCompletion,
+      weeklyCompletion: weekStats.completion,
+      bestHabit,
+      todayHabits
+    };
+  };
+
+  // Función para formatear fecha para hábitos (YYYY-MM-DD)
+  const formatDateForHabits = (date) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Función para determinar si un hábito aplica para una fecha
+  const shouldShowHabitForDate = (habit, date) => {
+    const dayOfWeek = date.getDay(); // 0: domingo, 1: lunes, ..., 6: sábado
+    const dayOfMonth = date.getDate(); // 1-31
+    const month = date.getMonth() + 1; // 1-12
+    
+    switch (habit.frequency) {
+      case 'daily':
+        return true;
+      case 'weekdays':
+        return dayOfWeek >= 1 && dayOfWeek <= 5; // Lunes a viernes
+      case 'weekends':
+        return dayOfWeek === 0 || dayOfWeek === 6; // Sábado o domingo
+      case 'custom':
+        return Array.isArray(habit.customDays) && habit.customDays.includes(dayOfWeek);
+      case 'monthly':
+        return Array.isArray(habit.monthlyDays) && habit.monthlyDays.includes(dayOfMonth);
+      case 'yearly':
+        return Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
+      default:
+        return true;
+    }
+  };
+
+  // Función para calcular estadísticas semanales
+  const calculateWeeklyHabitsStats = (habits, currentDate) => {
+    if (!userData?.habits?.completed) return { completion: 0 };
+
+    // Obtener el rango de la semana actual (lunes a domingo)
+    const today = new Date(currentDate);
+    const dayOfWeek = today.getDay();
+    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Ajustar para que lunes sea el primer día
+    
+    const weekStart = new Date(today);
+    weekStart.setDate(diff);
+    weekStart.setHours(0, 0, 0, 0);
+
+    let totalPossible = 0;
+    let totalCompleted = 0;
+
+    // Para cada día de la semana hasta hoy
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      
+      if (day > today) break; // No contar días futuros
+
+      const dayStr = formatDateForHabits(day);
+      
+      habits.forEach(habit => {
+        if (shouldShowHabitForDate(habit, day)) {
+          totalPossible++;
+          if (userData.habits.completed[dayStr]?.[habit.id]) {
+            totalCompleted++;
+          }
+        }
+      });
+    }
+
+    return {
+      completion: totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0
+    };
+  };
+
+  // Función para encontrar el mejor hábito
+  const findBestHabit = (habits, currentDate) => {
+    if (!userData?.habits?.completed || habits.length === 0) return null;
+
+    // Obtener el rango de la semana actual (lunes a domingo)
+    const today = new Date(currentDate);
+    const dayOfWeek = today.getDay();
+    const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    
+    const weekStart = new Date(today);
+    weekStart.setDate(diff);
+    weekStart.setHours(0, 0, 0, 0);
+
+    let bestHabit = null;
+    let bestScore = -1;
+
+    habits.forEach(habit => {
+      let possibleDays = 0;
+      let completedDays = 0;
+
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(weekStart);
+        day.setDate(weekStart.getDate() + i);
+        
+        if (day > today) break;
+
+        if (shouldShowHabitForDate(habit, day)) {
+          possibleDays++;
+          const dayStr = formatDateForHabits(day);
+          if (userData.habits.completed[dayStr]?.[habit.id]) {
+            completedDays++;
+          }
+        }
+      }
+
+      if (possibleDays > 0) {
+        const percentage = (completedDays / possibleDays) * 100;
+        const score = percentage * 0.7 + completedDays * 10; // Fórmula ponderada
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestHabit = {
+            ...habit,
+            completedDays,
+            possibleDays,
+            percentage: Math.round(percentage)
+          };
+        }
+      }
+    });
+
+    return bestHabit;
+  };
+
+  // Función para toggle de hábitos
+  const toggleHabitCompletion = async (habitId) => {
+    if (!userData?.habits) return;
+
+    const today = new Date();
+    const todayStr = formatDateForHabits(today);
+    
+    try {
+      // Importar las dependencias de Firebase
+      const { database, auth } = await import('../../firebase');
+      
+      const completedRef = database.ref(`${auth.currentUser.uid}/habits/completed/${todayStr}/${habitId}`);
+      const isCurrentlyCompleted = userData.habits.completed?.[todayStr]?.[habitId];
+      
+      if (isCurrentlyCompleted) {
+        // Desmarcar hábito
+        await completedRef.remove();
+      } else {
+        // Marcar hábito como completado
+        await completedRef.set({ 
+          completedAt: new Date().toISOString(), 
+          habitId 
+        });
+      }
+      
+      // El estado se actualizará automáticamente a través del store
+    } catch (error) {
+      console.error("Error updating habit completion:", error);
+    }
+  };
+
   // Comprobación adicional para evitar errores si userData no está completamente cargado
   if (!userData || !userData.finances || !userData.savings) {
     return (
@@ -743,6 +963,185 @@ const Home = () => {
   // Obtener las principales categorías de ingresos
   const topIncomeCategories = getTopIncomeCategories();
 
+  // Obtener estadísticas de hábitos
+  const habitsStats = getHabitsStats();
+
+  // Función para formatear fecha completa en español
+  const formatFullDate = (dateString) => {
+    if (!dateString) return '-';
+    
+    // Parsear la fecha manualmente para evitar problemas de zona horaria
+    let date;
+    if (typeof dateString === 'string' && dateString.includes('-')) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day); // month - 1 porque los meses en JS son 0-indexed
+    } else {
+      date = new Date(dateString);
+    }
+    
+    if (isNaN(date.getTime())) return '-';
+    
+    const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    
+    const dayName = days[date.getDay()];
+    const dayNumber = date.getDate();
+    const monthName = months[date.getMonth()];
+    
+    return `${dayName} ${dayNumber} de ${monthName}`;
+  };
+
+  // Funciones auxiliares para tarjetas de crédito
+  const getCreditCardsData = () => {
+    if (!userData?.creditCards) {
+      return {
+        totalAmount: 0,
+        cards: [],
+        closingDates: [],
+        dueDates: [],
+        hasStatements: false,
+        statements: {}
+      };
+    }
+
+    // Obtener todas las tarjetas (excluyendo el nodo 'transactions')
+    const cards = Object.keys(userData.creditCards)
+      .filter(key => key !== 'transactions')
+      .map(id => ({
+        id,
+        ...userData.creditCards[id]
+      }));
+
+    // Calcular el total de todas las tarjetas para el mes actual
+    let totalAmount = 0;
+    const closingDates = new Set();
+    const dueDates = new Set();
+    let hasStatements = false;
+    const statements = {};
+
+    cards.forEach(card => {
+      // Calcular total de la tarjeta para el mes actual
+      const cardTotal = getCreditCardTotal(card.id);
+      totalAmount += cardTotal;
+
+      // Obtener fechas de cierre y vencimiento
+      const cardDates = getCreditCardDates(card.id);
+      if (cardDates) {
+        if (cardDates.closingDate) {
+          closingDates.add(formatFullDate(cardDates.closingDate));
+        }
+        if (cardDates.dueDate) {
+          dueDates.add(formatFullDate(cardDates.dueDate));
+        }
+      }
+
+      // Verificar si hay resúmenes disponibles
+      const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+      if (card.statements && card.statements[monthKey]) {
+        hasStatements = true;
+        statements[card.id] = {
+          name: card.name,
+          statement: card.statements[monthKey],
+          total: cardTotal
+        };
+      }
+    });
+
+    return {
+      totalAmount,
+      cards,
+      closingDates: Array.from(closingDates).filter(date => date !== '-'),
+      dueDates: Array.from(dueDates).filter(date => date !== '-'),
+      hasStatements,
+      statements
+    };
+  };
+
+  const getCreditCardTotal = (cardId) => {
+    if (!userData?.creditCards?.transactions?.[cardId]) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Obtener fechas de cierre para determinar el período de facturación
+    const cardDates = getCreditCardDates(cardId);
+    if (!cardDates) return 0;
+
+    const currentClosingDate = new Date(cardDates.closingDate);
+    
+    // Calcular fecha de cierre del mes anterior
+    let prevMonthClosingDate = null;
+    if (cardDates.prevClosingDate) {
+      prevMonthClosingDate = new Date(cardDates.prevClosingDate);
+    } else {
+      // Calcular fecha de cierre del mes anterior
+      const prevMonth = new Date(currentClosingDate);
+      prevMonth.setMonth(prevMonth.getMonth() - 1);
+      prevMonthClosingDate = prevMonth;
+    }
+
+    // Filtrar transacciones del período de facturación actual
+    let total = 0;
+    Object.values(userData.creditCards.transactions[cardId]).forEach(transaction => {
+      const transactionDate = parseDate(transaction.date);
+      if (transactionDate && 
+          transactionDate > prevMonthClosingDate && 
+          transactionDate <= currentClosingDate) {
+        total += transaction.amount || 0;
+      }
+    });
+
+    return total;
+  };
+
+  const getCreditCardDates = (cardId) => {
+    if (!userData?.creditCards?.[cardId]) return null;
+
+    const card = userData.creditCards[cardId];
+    const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+    // Si hay fechas específicas configuradas para este mes, usarlas
+    if (card.dates && card.dates[monthKey]) {
+      return card.dates[monthKey];
+    }
+
+    // Si no, usar las fechas por defecto
+    const closingDay = card.defaultClosingDay || 15;
+    const dueDay = card.defaultDueDay || 10;
+
+    // Fecha de cierre del mes actual
+    const closingDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(closingDay).padStart(2, '0')}`;
+
+    // Fecha de vencimiento (generalmente el mes siguiente)
+    let dueYear = currentYear;
+    let dueMonth = currentMonth + 1;
+    if (dueMonth > 12) {
+      dueMonth = 1;
+      dueYear += 1;
+    }
+    const dueDate = `${dueYear}-${String(dueMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+
+    return { closingDate, dueDate };
+  };
+
+  // Función para ver resúmenes de tarjetas
+  const handleViewStatement = async (cardId, statement) => {
+    try {
+      if (statement.downloadURL) {
+        // Abrir en nueva pestaña para visualizar
+        window.open(statement.downloadURL, '_blank');
+      }
+    } catch (error) {
+      console.error('Error al ver el resumen:', error);
+    }
+  };
+
+
+
+  // Obtener datos de tarjetas de crédito
+  const creditCardsData = getCreditCardsData();
+
   return (
     <Layout title="Home">
       <Box 
@@ -753,6 +1152,7 @@ const Home = () => {
           px: { xs: 1, sm: 2, md: 3 }
         }}
       >
+        {/* Fila superior: Ahorros y Balance */}
         <Grid 
           container 
           spacing={{ xs: 2, sm: 2 }} 
@@ -762,7 +1162,146 @@ const Home = () => {
             justifyContent: 'center'
           }}
         >
-          <Grid item xs={12} sm={6} md={4} lg={4}>
+          {/* Ahorros en ARS */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      width: { xs: 36, sm: 40 },
+                      height: { xs: 36, sm: 40 }
+                    }}
+                  >
+                    <MonetizationOnIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                      Ahorros en ARS
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+              
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Total en ARS
+                  </Typography>
+                  <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                    color: theme.palette.primary.main,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(userData?.savings?.amountARS || 0)}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                    USD {formatAmount((userData?.savings?.amountARS || 0) / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+
+          {/* Ahorros en USD */}
+          <Grid item xs={12} sm={6} md={4}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar
+                      sx={{
+                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        width: { xs: 36, sm: 40 },
+                        height: { xs: 36, sm: 40 }
+                      }}
+                    >
+                      <AttachMoneyIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                        Ahorros en USD
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Chip 
+                    size="small"
+                    icon={<CurrencyExchangeIcon fontSize="small" />}
+                    label={`$${dollarRate?.venta || '-'}`}
+                    sx={{ 
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      fontWeight: 'medium',
+                      fontSize: '0.7rem',
+                      height: 24
+                    }}
+                  />
+                </Stack>
+              </Box>
+              
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Total en USD
+                  </Typography>
+                  <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                    color: theme.palette.info.main,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(userData?.savings?.amountUSD || 0, true)}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                    ARS {formatAmount((userData?.savings?.amountUSD || 0) * (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+
+          {/* Balance Mensual */}
+          <Grid item xs={12} sm={12} md={4}>
             <Card 
               elevation={3} 
               sx={{ 
@@ -801,21 +1340,11 @@ const Home = () => {
                     <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
                       Balance Mensual
                     </Typography>
-                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                      {currentMonthName} {currentYear}
-                    </Typography>
                   </Box>
                 </Stack>
               </Box>
               
-              <Box sx={{ 
-                p: { xs: 2, sm: 3 }, 
-                bgcolor: theme.palette.common.black, 
-                display: 'flex', 
-                flexDirection: 'column', 
-                height: '100%'
-              }}>
-                {/* Monto principal */}
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Box sx={{ mb: 1.5, textAlign: 'center' }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     Balance Total
@@ -831,140 +1360,15 @@ const Home = () => {
                     USD {formatAmount(getBalance() / (dollarRate?.venta || 1))}
                   </Typography>
                 </Box>
-                
-                {/* Mini gráfico de balance */}
-                <Box sx={{ mt: 1, mb: 1.5, height: 80, width: '100%' }}>
-                  <ReactApexChart
-                    options={{
-                      chart: {
-                        type: 'line',
-                        toolbar: { show: false },
-                        sparkline: { enabled: true },
-                      },
-                      stroke: {
-                        curve: 'smooth',
-                        width: 3,
-                      },
-                      colors: [getBalance() >= 0 ? theme.palette.success.main : theme.palette.error.main],
-                      tooltip: {
-                        fixed: { enabled: false },
-                        x: { show: false },
-                        y: {
-                          formatter: (val) => formatAmount(val),
-                          title: { formatter: () => 'Balance:' },
-                        },
-                        marker: { show: false },
-                        theme: 'dark',
-                        style: {
-                          fontSize: '12px',
-                          fontFamily: theme.typography.fontFamily
-                        },
-                        background: 'rgba(0, 0, 0, 0.85)',
-                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-                          const value = series[seriesIndex][dataPointIndex];
-                          const date = w.globals.categoryLabels[dataPointIndex];
-                          return (
-                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
-                            `<span style="font-weight: bold;">${date}</span><br/>` + 
-                            `<span>Balance: <span style="color: ${value >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">${formatAmount(value)}</span></span>` +
-                            '</div>'
-                          );
-                        }
-                      },
-                      xaxis: {
-                        categories: labels,
-                      }
-                    }}
-                    series={[{
-                      name: 'Balance',
-                      data: balance
-                    }]}
-                    type="line"
-                    height={80}
-                  />
-                </Box>
-                
-                {/* Circular progress indicator */}
-                <Box sx={{ 
-                  height: 160, 
-                  width: '100%', 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
-                  mt: 1
-                }}>
-                  <ReactApexChart 
-                    options={{
-                      chart: {
-                        type: 'radialBar',
-                        offsetY: 0,
-                        offsetX: 0,
-                        sparkline: {
-                          enabled: true
-                        }
-                      },
-                      plotOptions: {
-                        radialBar: {
-                          startAngle: 0,
-                          endAngle: 360,
-                          track: {
-                            background: alpha(theme.palette.grey[500], 0.15),
-                            strokeWidth: '97%',
-                            margin: 5,
-                            dropShadow: {
-                              enabled: false
-                            }
-                          },
-                          dataLabels: {
-                            name: {
-                              show: false
-                            },
-                            value: {
-                              show: true,
-                              offsetY: 0,
-                              fontSize: '22px',
-                              fontWeight: 'bold',
-                              formatter: function (val) {
-                                return Math.round(val) + '%';
-                              },
-                              color: isOverBudget ? theme.palette.error.main : budgetProgress > 80 ? theme.palette.warning.main : theme.palette.success.main
-                            }
-                          },
-                          hollow: {
-                            margin: 0,
-                            size: '65%'
-                          }
-                        }
-                      },
-                      fill: {
-                        type: 'gradient',
-                        gradient: {
-                          shade: 'light',
-                          type: 'horizontal',
-                          shadeIntensity: 0.5,
-                          gradientToColors: [isOverBudget ? theme.palette.error.light : budgetProgress > 80 ? theme.palette.warning.light : theme.palette.success.light],
-                          inverseColors: true,
-                          opacityFrom: 1,
-                          opacityTo: 1,
-                          stops: [0, 100]
-                        }
-                      },
-                      colors: [isOverBudget ? theme.palette.error.main : budgetProgress > 80 ? theme.palette.warning.main : theme.palette.success.main],
-                      labels: ['Gastado'],
-                      stroke: {
-                        lineCap: 'round'
-                      }
-                    }}
-                    series={[Math.min(budgetProgress, 100)]}
-                    type="radialBar"
-                    height={160}
-                  />
-                </Box>
               </Box>
             </Card>
           </Grid>
-        
-          <Grid item xs={12} sm={6} md={4} lg={4}>
+        </Grid>
+
+        {/* Fila inferior: Ingresos, Gastos y Tarjetas de Crédito */}
+        <Grid container spacing={{ xs: 2, sm: 3 }}>
+          {/* Ingresos Mensuales */}
+          <Grid item xs={12} md={4}>
             <Card 
               elevation={3} 
               sx={{ 
@@ -999,10 +1403,7 @@ const Home = () => {
                   </Avatar>
                   <Box>
                     <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
-                      Ingresos Mensuales
-                    </Typography>
-                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                      {currentMonthName} {currentYear}
+                      Ingresos {currentMonthName} {currentYear}
                     </Typography>
                   </Box>
                 </Stack>
@@ -1024,58 +1425,6 @@ const Home = () => {
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
                     USD {formatAmount(getIncomeTotal() / (dollarRate?.venta || 1))}
                   </Typography>
-                </Box>
-                
-                {/* Mini gráfico de ingresos */}
-                <Box sx={{ mt: 1, mb: 1.5, height: 80, width: '100%' }}>
-                  <ReactApexChart
-                    options={{
-                      chart: {
-                        type: 'line',
-                        toolbar: { show: false },
-                        sparkline: { enabled: true },
-                      },
-                      stroke: {
-                        curve: 'smooth',
-                        width: 3,
-                      },
-                      colors: [theme.palette.success.main],
-                      tooltip: {
-                        fixed: { enabled: false },
-                        x: { show: false },
-                        y: {
-                          formatter: (val) => formatAmount(val),
-                          title: { formatter: () => 'Ingresos:' },
-                        },
-                        marker: { show: false },
-                        theme: 'dark',
-                        style: {
-                          fontSize: '12px',
-                          fontFamily: theme.typography.fontFamily
-                        },
-                        background: 'rgba(0, 0, 0, 0.85)',
-                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-                          const value = series[seriesIndex][dataPointIndex];
-                          const date = w.globals.categoryLabels[dataPointIndex];
-                          return (
-                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
-                            `<span style="font-weight: bold;">${date}</span><br/>` + 
-                            `<span>Ingresos: <span style="color: #4caf50; font-weight: bold;">${formatAmount(value)}</span></span>` +
-                            '</div>'
-                          );
-                        }
-                      },
-                      xaxis: {
-                        categories: labels,
-                      }
-                    }}
-                    series={[{
-                      name: 'Ingresos',
-                      data: incomes
-                    }]}
-                    type="line"
-                    height={80}
-                  />
                 </Box>
                 
                 {/* Información comparativa */}
@@ -1200,8 +1549,9 @@ const Home = () => {
               </Box>
             </Card>
           </Grid>
-        
-          <Grid item xs={12} sm={6} md={4} lg={4}>
+
+          {/* Gastos Mensuales */}
+          <Grid item xs={12} md={4}>
             <Card 
               elevation={3} 
               sx={{ 
@@ -1261,58 +1611,6 @@ const Home = () => {
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
                     USD {formatAmount(getExpenseTotal() / (dollarRate?.venta || 1))}
                   </Typography>
-                </Box>
-                
-                {/* Mini gráfico de gastos */}
-                <Box sx={{ mt: 1, mb: 1.5, height: 80, width: '100%' }}>
-                  <ReactApexChart
-                    options={{
-                      chart: {
-                        type: 'line',
-                        toolbar: { show: false },
-                        sparkline: { enabled: true },
-                      },
-                      stroke: {
-                        curve: 'smooth',
-                        width: 3,
-                      },
-                      colors: [theme.palette.error.main],
-                      tooltip: {
-                        fixed: { enabled: false },
-                        x: { show: false },
-                        y: {
-                          formatter: (val) => formatAmount(val),
-                          title: { formatter: () => 'Gastos:' },
-                        },
-                        marker: { show: false },
-                        theme: 'dark',
-                        style: {
-                          fontSize: '12px',
-                          fontFamily: theme.typography.fontFamily
-                        },
-                        background: 'rgba(0, 0, 0, 0.85)',
-                        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-                          const value = series[seriesIndex][dataPointIndex];
-                          const date = w.globals.categoryLabels[dataPointIndex];
-                          return (
-                            '<div class="apexcharts-tooltip-box" style="padding: 8px; background: rgba(0, 0, 0, 0.85); color: white; border-radius: 4px; border: none; font-weight: 500;">' +
-                            `<span style="font-weight: bold;">${date}</span><br/>` + 
-                            `<span>Gastos: <span style="color: #f44336; font-weight: bold;">${formatAmount(value)}</span></span>` +
-                            '</div>'
-                          );
-                        }
-                      },
-                      xaxis: {
-                        categories: labels,
-                      }
-                    }}
-                    series={[{
-                      name: 'Gastos',
-                      data: expenses
-                    }]}
-                    type="line"
-                    height={80}
-                  />
                 </Box>
                 
                 {/* Información comparativa */}
@@ -1452,12 +1750,219 @@ const Home = () => {
               </Box>
             </Card>
           </Grid>
+
+          {/* Tarjetas de Crédito */}
+          <Grid item xs={12} md={4}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.warning.dark}, ${theme.palette.warning.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      width: { xs: 36, sm: 40 },
+                      height: { xs: 36, sm: 40 }
+                    }}
+                  >
+                    <CreditCardIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                      Tarjetas de Crédito
+                    </Typography>
+                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                      {currentMonthName} {currentYear}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+              
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                {/* Monto principal */}
+                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Total a Pagar
+                  </Typography>
+                  <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                    color: theme.palette.warning.main,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatAmount(creditCardsData.totalAmount)}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                    USD {formatAmount(creditCardsData.totalAmount / (dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+                
+                {/* Información de fechas */}
+                <Box sx={{ 
+                  p: 1.5, 
+                  bgcolor: alpha(theme.palette.warning.main, 0.1), 
+                  borderRadius: 2,
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+                  mb: 1.5
+                }}>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                      Cierre:
+                    </Typography>
+                    {creditCardsData.closingDates.length > 0 ? (
+                      creditCardsData.closingDates.map((date, index) => (
+                        <Typography key={index} variant="body2" fontWeight="bold" color="text.primary" sx={{ mt: 0.5 }}>
+                          {date}
+                        </Typography>
+                      ))
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No configurado
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                      Vencimiento:
+                    </Typography>
+                    {creditCardsData.dueDates.length > 0 ? (
+                      creditCardsData.dueDates.map((date, index) => (
+                        <Typography key={index} variant="body2" fontWeight="bold" color="text.primary" sx={{ mt: 0.5 }}>
+                          {date}
+                        </Typography>
+                      ))
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No configurado
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+                
+                {/* Resúmenes disponibles como subtarjetas */}
+                <Box sx={{ mt: 0.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  {creditCardsData.hasStatements ? (
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 'medium' }}>
+                        Resúmenes disponibles:
+                      </Typography>
+                      {Object.entries(creditCardsData.statements).map(([cardId, statementData]) => (
+                        <ButtonBase
+                          key={cardId}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewStatement(cardId, statementData.statement);
+                          }}
+                          sx={{ 
+                            p: 1.5,
+                            mb: 1,
+                            width: '100%',
+                            bgcolor: alpha(theme.palette.success.main, 0.08),
+                            borderRadius: 1,
+                            border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: alpha(theme.palette.success.main, 0.15),
+                              borderColor: alpha(theme.palette.success.main, 0.4),
+                              transform: 'translateY(-1px)',
+                            }
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              width: 28,
+                              height: 28,
+                              borderRadius: '50%',
+                              bgcolor: alpha(theme.palette.success.main, 0.2),
+                              flexShrink: 0
+                            }}>
+                              <CreditCardIcon sx={{ fontSize: 14, color: theme.palette.success.main }} />
+                            </Box>
+                            <Box sx={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" color="success.main" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
+                                {statementData.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+                                Resumen {currentMonthName} {currentYear}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'right', flexShrink: 0, ml: 'auto' }}>
+                              <Typography variant="body2" color="text.primary" fontWeight="bold" sx={{ lineHeight: 1.2 }}>
+                                {formatAmount(statementData.total)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+                                USD {formatAmount(statementData.total / (dollarRate?.venta || 1))}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </ButtonBase>
+                      ))}
+                    </Box>
+                  ) : creditCardsData.totalAmount === 0 && creditCardsData.cards.length > 0 ? (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center', 
+                      mt: 1,
+                      p: 1,
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                      borderRadius: 1,
+                      border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                    }}>
+                      <CheckCircleIcon sx={{ fontSize: 16, color: theme.palette.success.main, mr: 0.5 }} />
+                      <Typography variant="body2" color="success.main" fontWeight="medium">
+                        Sin saldo pendiente
+                      </Typography>
+                    </Box>
+                  ) : creditCardsData.cards.length === 0 ? (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      py: 2,
+                      textAlign: 'center'
+                    }}>
+                      <CreditCardIcon sx={{ fontSize: 32, color: theme.palette.grey[400], mb: 1 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        No hay tarjetas registradas
+                      </Typography>
+                    </Box>
+                  ) : null}
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
         </Grid>
         
         {/* Gráfico de evolución financiera */}
         <Card 
           elevation={3} 
           sx={{ 
+            mt: { xs: 3, sm: 4 },
             mb: { xs: 2, sm: 3 },
             borderRadius: { xs: 2, sm: 3 }, 
             overflow: 'hidden',
@@ -1583,55 +2088,6 @@ const Home = () => {
           <Box sx={{ p: { xs: 2, sm: 2.5 }, pt: { xs: 2.5, sm: 3 }, bgcolor: 'background.paper' }}>
             {userData?.savings ? (
               <>
-                {/* Key metrics at the top */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ 
-                      p: 2, 
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                    }}>
-                      <Stack direction="row" spacing={2} alignItems="center">
-                        <Avatar sx={{ bgcolor: theme.palette.primary.main, color: 'white' }}>
-                          <MonetizationOnIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">
-                            Ahorros en ARS
-                          </Typography>
-                          <Typography variant="h5" color="primary.dark" fontWeight="bold">
-                            {formatAmount(userData.savings.amountARS || 0)}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Box>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ 
-                      p: 2, 
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.info.main, 0.1),
-                      border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                    }}>
-                      <Stack direction="row" spacing={2} alignItems="center">
-                        <Avatar sx={{ bgcolor: theme.palette.info.main, color: 'white' }}>
-                          <AttachMoneyIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">
-                            Ahorros en USD
-                          </Typography>
-                          <Typography variant="h5" color="info.dark" fontWeight="bold">
-                            {formatAmount(userData.savings.amountUSD || 0, true)}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Box>
-                  </Grid>
-                </Grid>
-
                 {/* Chart with same structure as Financial Evolution */}
                 <ReactApexChart 
                   options={{
@@ -1940,163 +2396,729 @@ const Home = () => {
         </Card>
 
         
-        {/* Cotizaciones del Dólar */}
-        <Card 
-          elevation={3} 
+        {/* Sección de Hábitos */}
+        <Grid 
+          container 
+          spacing={{ xs: 2, sm: 2 }} 
           sx={{ 
-            mb: { xs: 2, sm: 3 },
-            borderRadius: { xs: 2, sm: 3 }, 
-            overflow: 'hidden',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: { xs: 'none', sm: 'translateY(-5px)' },
-              boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
-            }
+            mb: { xs: 2, sm: 3 }, 
+            mt: { xs: 2, sm: 3 },
+            justifyContent: 'center'
           }}
         >
-          <Box
-            sx={{
-              p: { xs: 2, sm: 3 },
-              background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
-              borderBottom: `1px solid ${theme.palette.divider}`
-            }}
-          >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Avatar
+          {/* Resumen de Hábitos de Hoy */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+              onClick={() => navigate('/habits')}
+            >
+              <Box
                 sx={{
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  width: { xs: 36, sm: 40 },
-                  height: { xs: 36, sm: 40 }
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
                 }}
               >
-                <CurrencyExchangeIcon />
-              </Avatar>
-              <Box>
-                <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
-                  Cotizaciones del Dólar
-                </Typography>
-                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                  Valores actualizados
-                </Typography>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      width: { xs: 36, sm: 40 },
+                      height: { xs: 36, sm: 40 }
+                    }}
+                  >
+                    <CheckCircleIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                      Hábitos de Hoy
+                    </Typography>
+                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                      Progreso diario
+                    </Typography>
+                  </Box>
+                </Stack>
               </Box>
-            </Stack>
-          </Box>
-          
-          <Box sx={{ p: { xs: 2, sm: 2.5 }, pt: { xs: 2.5, sm: 3 } }}>
-            {dolarOficial && dolarBlue ? (
-              <Grid container spacing={3}>
-                {/* Dólar Oficial */}
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                    height: '100%'
+              
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Completados hoy
+                  </Typography>
+                  <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                    color: habitsStats.todayCompletion >= 80 ? theme.palette.success.main : 
+                           habitsStats.todayCompletion >= 50 ? theme.palette.warning.main : 
+                           theme.palette.error.main,
+                    letterSpacing: '-0.5px'
                   }}>
-                    <Typography variant="h6" color="primary.dark" fontWeight="bold" gutterBottom>
-                      Dólar Oficial
-                    </Typography>
-                    
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Compra
-                        </Typography>
-                        <Typography variant="h5" color="primary.dark" fontWeight="bold">
-                          $ {dolarOficial.value_buy.toFixed(2)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Venta
-                        </Typography>
-                        <Typography variant="h5" color="primary.dark" fontWeight="bold">
-                          $ {dolarOficial.value_sell.toFixed(2)}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                    
-                  </Box>
-                </Grid>
-                
-                {/* Dólar Blue */}
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.info.main, 0.1),
-                    border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                    height: '100%'
-                  }}>
-                    <Typography variant="h6" color="info.dark" fontWeight="bold" gutterBottom>
-                      Dólar Blue
-                    </Typography>
-                    
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Compra
-                        </Typography>
-                        <Typography variant="h5" color="info.dark" fontWeight="bold">
-                          $ {dolarBlue.value_buy.toFixed(2)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Venta
-                        </Typography>
-                        <Typography variant="h5" color="info.dark" fontWeight="bold">
-                          $ {dolarBlue.value_sell.toFixed(2)}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                    
-                  </Box>
-                </Grid>
-                
-                {/* Brecha */}
-                <Grid item xs={12}>
-                  <Box sx={{ 
-                    p: 2, 
-                    mt: 1,
-                    borderRadius: 2,
+                    {habitsStats.completedToday}/{habitsStats.todayHabits.length}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                    {habitsStats.todayCompletion}% completado
+                  </Typography>
+                </Box>
+
+                <LinearProgress 
+                  variant="determinate" 
+                  value={habitsStats.todayCompletion} 
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
                     bgcolor: alpha(theme.palette.grey[500], 0.1),
-                    border: `1px solid ${alpha(theme.palette.grey[500], 0.2)}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: habitsStats.todayCompletion >= 80 ? theme.palette.success.main : 
+                               habitsStats.todayCompletion >= 50 ? theme.palette.warning.main : 
+                               theme.palette.error.main
+                    },
+                    mb: 2
+                  }}
+                />
+
+                <Box sx={{ mt: 'auto', pt: 1 }}>
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    {habitsStats.totalHabits} hábitos activos
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+
+          {/* Progreso Semanal */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+              onClick={() => navigate('/habits')}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      width: { xs: 36, sm: 40 },
+                      height: { xs: 36, sm: 40 }
+                    }}
+                  >
+                    <CalendarViewWeekIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                      Progreso Semanal
+                    </Typography>
+                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                      Esta semana
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+              
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Completitud semanal
+                  </Typography>
+                  <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                    color: theme.palette.info.main,
+                    letterSpacing: '-0.5px'
                   }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <CompareArrowsIcon color="action" sx={{ mr: 1 }} />
-                      <Typography variant="body1" fontWeight="medium">
-                        Brecha cambiaria
+                    {habitsStats.weeklyCompletion}%
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                    {habitsStats.weeklyCompletion >= 80 ? 'Excelente' : 
+                     habitsStats.weeklyCompletion >= 60 ? 'Muy bien' : 
+                     habitsStats.weeklyCompletion >= 40 ? 'Regular' : 'Necesita mejorar'}
+                  </Typography>
+                </Box>
+
+                <LinearProgress 
+                  variant="determinate" 
+                  value={habitsStats.weeklyCompletion} 
+                  color="info"
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
+                    bgcolor: alpha(theme.palette.info.main, 0.1),
+                    mb: 2
+                  }}
+                />
+
+                <Box sx={{ mt: 'auto', pt: 1 }}>
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Lunes a {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][new Date().getDay()]}
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+
+          {/* Mejor Hábito */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+              onClick={() => navigate('/habits')}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      color: 'white',
+                      width: { xs: 36, sm: 40 },
+                      height: { xs: 36, sm: 40 }
+                    }}
+                  >
+                    <StarIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                      Mejor Hábito
+                    </Typography>
+                    <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                      Más consistente
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+              
+              <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                {habitsStats.bestHabit ? (
+                  <>
+                    <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        {habitsStats.bestHabit.name}
+                      </Typography>
+                      <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
+                        color: theme.palette.primary.main,
+                        letterSpacing: '-0.5px'
+                      }}>
+                        {habitsStats.bestHabit.percentage}%
+                      </Typography>
+                      
+                      <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
+                        {habitsStats.bestHabit.completedDays} de {habitsStats.bestHabit.possibleDays} días
                       </Typography>
                     </Box>
-                    <Chip 
-                      label={`${Math.round(((dolarBlue.value_sell / dolarOficial.value_sell) - 1) * 100)}%`}
+
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={habitsStats.bestHabit.percentage} 
                       color="primary"
-                      sx={{ fontWeight: 'bold' }}
+                      sx={{
+                        height: 8,
+                        borderRadius: 4,
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        mb: 2
+                      }}
                     />
+                  </>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 3 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      Sin datos suficientes
+                    </Typography>
                   </Box>
-                </Grid>
-                
-              </Grid>
-            ) : (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <CurrencyExchangeIcon sx={{ fontSize: 60, color: theme.palette.grey[400], mb: 2 }} />
-                <Typography variant="h6" color="text.secondary" gutterBottom>
-                  Cargando cotizaciones
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Consultando la última información disponible del mercado cambiario...
-                </Typography>
-                <LinearProgress sx={{ width: '60%', maxWidth: 300, mx: 'auto', borderRadius: 1 }} />
+                )}
+
+                <Box sx={{ mt: 'auto', pt: 1 }}>
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Esta semana
+                  </Typography>
+                </Box>
               </Box>
-            )}
-          </Box>
-        </Card>
+            </Card>
+          </Grid>
+
+          {/* Hábitos de Hoy - Lista Interactiva */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3} 
+              sx={{ 
+                height: '100%', 
+                position: 'relative',
+                transition: 'all 0.3s ease',
+                borderRadius: { xs: 2, sm: 3 },
+                overflow: 'hidden',
+                '&:hover': {
+                  transform: { xs: 'none', sm: 'translateY(-5px)' },
+                  boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 3 },
+                  background: `linear-gradient(to right, ${theme.palette.secondary.dark}, ${theme.palette.secondary.main})`,
+                  borderBottom: `1px solid ${theme.palette.divider}`
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        width: { xs: 36, sm: 40 },
+                        height: { xs: 36, sm: 40 }
+                      }}
+                    >
+                      <PlaylistAddCheckIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                        Lista de Hoy
+                      </Typography>
+                      <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                        Marca tus hábitos
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Stack>
+              </Box>
+              
+              <Box sx={{ 
+                p: { xs: 1, sm: 2 }, 
+                bgcolor: 'background.paper', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '100%',
+                maxHeight: 300,
+                overflow: 'auto'
+              }}>
+                {habitsStats.todayHabits.length > 0 ? (
+                  <List dense sx={{ py: 0 }}>
+                    {habitsStats.todayHabits.map((habit) => {
+                      const todayStr = formatDateForHabits(new Date());
+                      const isCompleted = userData?.habits?.completed?.[todayStr]?.[habit.id];
+                      
+                      return (
+                        <ListItem 
+                          key={habit.id} 
+                          sx={{ 
+                            px: 1, 
+                            py: 0.5,
+                            borderRadius: 1,
+                            mb: 0.5,
+                            bgcolor: isCompleted ? alpha(theme.palette.success.main, 0.1) : 'transparent',
+                            '&:hover': {
+                              bgcolor: isCompleted ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.grey[500], 0.1)
+                            }
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 36 }}>
+                            <Checkbox
+                              checked={!!isCompleted}
+                              onChange={() => toggleHabitCompletion(habit.id)}
+                              icon={<CheckCircleIcon sx={{ color: theme.palette.grey[400] }} />}
+                              checkedIcon={<CheckCircleIcon sx={{ color: theme.palette.success.main }} />}
+                              size="small"
+                              sx={{ p: 0.5 }}
+                            />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary={habit.name}
+                            primaryTypographyProps={{
+                              variant: 'body2',
+                              sx: {
+                                textDecoration: isCompleted ? 'line-through' : 'none',
+                                color: isCompleted ? theme.palette.text.secondary : theme.palette.text.primary,
+                                fontWeight: isCompleted ? 'normal' : 'medium'
+                              }
+                            }}
+                          />
+                          {habit.color && (
+                            <Box 
+                              sx={{ 
+                                width: 8, 
+                                height: 8, 
+                                borderRadius: '50%', 
+                                bgcolor: theme.palette[habit.color]?.main || theme.palette.primary.main,
+                                ml: 1
+                              }} 
+                            />
+                          )}
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                ) : (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    py: 4,
+                    textAlign: 'center'
+                  }}>
+                    <PlaylistAddCheckIcon sx={{ fontSize: 48, color: theme.palette.grey[400], mb: 1 }} />
+                    <Typography variant="body2" color="text.secondary">
+                      No hay hábitos para hoy
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                      ¡Disfruta tu día libre!
+                    </Typography>
+                  </Box>
+                )}
+
+                {habitsStats.todayHabits.length > 0 && (
+                  <Box sx={{ mt: 'auto', pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={habitsStats.todayCompletion} 
+                      sx={{
+                        height: 6,
+                        borderRadius: 3,
+                        bgcolor: alpha(theme.palette.grey[500], 0.1),
+                        '& .MuiLinearProgress-bar': {
+                          bgcolor: habitsStats.todayCompletion >= 80 ? theme.palette.success.main : 
+                                   habitsStats.todayCompletion >= 50 ? theme.palette.warning.main : 
+                                   theme.palette.error.main
+                        }
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}>
+                      {habitsStats.todayCompletion}% completado
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Cotizaciones del Dólar */}
+        <Grid 
+          container 
+          spacing={{ xs: 2, sm: 2 }} 
+          sx={{ 
+            mb: { xs: 2, sm: 3 }, 
+            mt: { xs: 2, sm: 3 },
+            justifyContent: 'center'
+          }}
+        >
+          {dolarOficial && dolarBlue ? (
+            <>
+              {/* Dólar Oficial */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card 
+                  elevation={3} 
+                  sx={{ 
+                    height: '100%', 
+                    position: 'relative',
+                    transition: 'all 0.3s ease',
+                    borderRadius: { xs: 2, sm: 3 },
+                    overflow: 'hidden',
+                    '&:hover': {
+                      transform: { xs: 'none', sm: 'translateY(-5px)' },
+                      boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      p: { xs: 2, sm: 3 },
+                      background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                      borderBottom: `1px solid ${theme.palette.divider}`
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar
+                        sx={{
+                          bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          width: { xs: 36, sm: 40 },
+                          height: { xs: 36, sm: 40 }
+                        }}
+                      >
+                        <CurrencyExchangeIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                          Dólar Oficial
+                        </Typography>
+                        <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                          Banco Central
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                  
+                  <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            Compra
+                          </Typography>
+                          <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                            color: theme.palette.primary.main,
+                            letterSpacing: '-0.5px'
+                          }}>
+                            ${dolarOficial.value_buy.toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            Venta
+                          </Typography>
+                          <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                            color: theme.palette.primary.main,
+                            letterSpacing: '-0.5px'
+                          }}>
+                            ${dolarOficial.value_sell.toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Card>
+              </Grid>
+
+              {/* Dólar Blue */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Card 
+                  elevation={3} 
+                  sx={{ 
+                    height: '100%', 
+                    position: 'relative',
+                    transition: 'all 0.3s ease',
+                    borderRadius: { xs: 2, sm: 3 },
+                    overflow: 'hidden',
+                    '&:hover': {
+                      transform: { xs: 'none', sm: 'translateY(-5px)' },
+                      boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      p: { xs: 2, sm: 3 },
+                      background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
+                      borderBottom: `1px solid ${theme.palette.divider}`
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar
+                        sx={{
+                          bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          width: { xs: 36, sm: 40 },
+                          height: { xs: 36, sm: 40 }
+                        }}
+                      >
+                        <CurrencyExchangeIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                          Dólar Blue
+                        </Typography>
+                        <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                          Mercado paralelo
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                  
+                  <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            Compra
+                          </Typography>
+                          <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                            color: theme.palette.info.main,
+                            letterSpacing: '-0.5px'
+                          }}>
+                            ${dolarBlue.value_buy.toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                            Venta
+                          </Typography>
+                          <Typography variant={isMobile ? "h5" : "h4"} fontWeight="bold" sx={{ 
+                            color: theme.palette.info.main,
+                            letterSpacing: '-0.5px'
+                          }}>
+                            ${dolarBlue.value_sell.toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Card>
+              </Grid>
+
+              {/* Brecha Cambiaria */}
+              <Grid item xs={12} sm={12} md={4}>
+                <Card 
+                  elevation={3} 
+                  sx={{ 
+                    height: '100%', 
+                    position: 'relative',
+                    transition: 'all 0.3s ease',
+                    borderRadius: { xs: 2, sm: 3 },
+                    overflow: 'hidden',
+                    '&:hover': {
+                      transform: { xs: 'none', sm: 'translateY(-5px)' },
+                      boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      p: { xs: 2, sm: 3 },
+                      background: `linear-gradient(to right, ${theme.palette.warning.dark}, ${theme.palette.warning.main})`,
+                      borderBottom: `1px solid ${theme.palette.divider}`
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Avatar
+                        sx={{
+                          bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          width: { xs: 36, sm: 40 },
+                          height: { xs: 36, sm: 40 }
+                        }}
+                      >
+                        <CompareArrowsIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                          Brecha Cambiaria
+                        </Typography>
+                        <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                          Diferencia Blue vs Oficial
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                  
+                  <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant={isMobile ? "h3" : "h2"} fontWeight="bold" sx={{ 
+                        color: theme.palette.warning.main,
+                        letterSpacing: '-0.5px'
+                      }}>
+                        {Math.round(((dolarBlue.value_sell / dolarOficial.value_sell) - 1) * 100)}%
+                      </Typography>
+                      
+                    </Box>
+                  </Box>
+                </Card>
+              </Grid>
+            </>
+          ) : (
+            <Grid item xs={12}>
+              <Card 
+                elevation={3} 
+                sx={{ 
+                  borderRadius: { xs: 2, sm: 3 },
+                  overflow: 'hidden'
+                }}
+              >
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <CurrencyExchangeIcon sx={{ fontSize: 60, color: theme.palette.grey[400], mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Cargando cotizaciones
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Consultando la última información disponible del mercado cambiario...
+                  </Typography>
+                  <LinearProgress sx={{ width: '60%', maxWidth: 300, mx: 'auto', borderRadius: 1 }} />
+                </Box>
+              </Card>
+            </Grid>
+          )}
+        </Grid>
+
+        {/* SpeedDial para acciones rápidas */}
+        <SpeedDial
+          ariaLabel="Acciones rápidas"
+          sx={{ 
+            position: 'fixed', 
+            bottom: 24, 
+            right: 24 
+          }}
+          icon={<SpeedDialIcon />}
+          onOpen={handleOpenSpeedDial}
+          onClose={handleCloseSpeedDial}
+        >
+          <SpeedDialAction
+            key="nuevoHabito"
+            icon={<PlaylistAddCheckIcon />}
+            tooltipTitle="Nuevo Hábito"
+            onClick={() => navigate('/NuevoHabito')}
+          />
+          <SpeedDialAction
+            key="nuevoGasto"
+            icon={<TrendingDownIcon />}
+            tooltipTitle="Nuevo Gasto"
+            onClick={() => navigate('/NuevoGasto')}
+          />
+          <SpeedDialAction
+            key="nuevoIngreso"
+            icon={<TrendingUpIcon />}
+            tooltipTitle="Nuevo Ingreso"
+            onClick={() => navigate('/NuevoIngreso')}
+          />
+        </SpeedDial>
+
 
 
       </Box>

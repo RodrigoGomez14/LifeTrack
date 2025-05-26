@@ -35,7 +35,11 @@ import {
   FormControl,
   Select,
   InputAdornment,
-  InputLabel
+  InputLabel,
+  Fade,
+  Slide,
+  Zoom,
+  useMediaQuery
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -54,7 +58,14 @@ import {
   Receipt as ReceiptIcon,
   CreditCard as CreditCardIcon,
   Check as CheckIcon,
-  // ... existing icons ...
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  AccountBalance as AccountBalanceIcon,
+  Schedule as ScheduleIcon,
+  Warning as WarningIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DateRangeIcon from '@mui/icons-material/DateRange';
@@ -82,8 +93,6 @@ import CreditCardMovements from './CreditCardMovements';
 
 // Configurar dayjs para usar español globalmente
 dayjs.locale('es');
-
-// Configurar worker de PDF.js
 
 // Función auxiliar para formatear fechas en un formato amigable, consistente con Finances.jsx
 function obtenerFechaFormateada(dateStr) {
@@ -175,6 +184,7 @@ const CreditCards = () => {
   const { userData } = useStore();
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   // Estados para navegación y tarjetas
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -200,15 +210,12 @@ const CreditCards = () => {
   const [uploading, setUploading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
 
-  // Estados para el diálogo de actualización de fechas
-  const [updateDatesDialogOpen, setUpdateDatesDialogOpen] = useState(false);
-  const [updateCardId, setUpdateCardId] = useState(null);
-  const [updateCardData, setUpdateCardData] = useState(null);
+  // Estados para la actualización de fechas integrada
   const [closingDate, setClosingDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [updateError, setUpdateError] = useState('');
-  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [datesConfigured, setDatesConfigured] = useState(false);
 
   // Estado para el diálogo de pago de tarjetas
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -388,6 +395,13 @@ const CreditCards = () => {
     }
   }, [selectedCard, allCardTransactions]);
 
+  // Cargar fechas cuando cambie la tarjeta seleccionada o el período
+  useEffect(() => {
+    if (selectedCard) {
+      loadCardDates();
+    }
+  }, [selectedCard, selectedMonth, selectedYear, userData]);
+
   const handleCardSelect = (cardId) => {
     setSelectedCard(cardId);
   };
@@ -406,9 +420,6 @@ const CreditCards = () => {
     switch (option) {
       case 'edit':
         navigate(`/EditarTarjeta/${activeCardId}`);
-        break;
-      case 'update-dates':
-        handleOpenUpdateDatesDialog(activeCardId);
         break;
       case 'delete':
         // Aquí iría la lógica para eliminar la tarjeta
@@ -641,55 +652,7 @@ const CreditCards = () => {
   useEffect(() => {
     console.log('Mes o año cambiado, reiniciando estado de verificación');
     setPaymentStatusChecked(false);
-    // Ya no necesitamos modificar paymentDisabled aquí, ya que se determina directamente en el botón
-    // setPaymentDisabled(true); // Bloquear el botón por defecto hasta que se verifique
   }, [selectedMonth, selectedYear]);
-
-  // Efecto adicional para forzar la verificación del botón cuando se detecta una incoherencia
-  // Este efecto ya no es necesario ya que el estado del botón se controla directamente
-  /* useEffect(() => {
-    // Verificar si estamos en el mes anterior al actual
-    const today = new Date();
-    const currentMonth = today.getMonth() + 1;
-    const currentYear = today.getFullYear();
-    
-    // Calcular el mes anterior
-    let prevMonth = currentMonth - 1;
-    let prevYear = currentYear;
-    if (prevMonth === 0) {
-      prevMonth = 12;
-      prevYear = currentYear - 1;
-    }
-    
-    // Si estamos en el mes anterior y no está pagado
-    if (selectedYear === prevYear && selectedMonth === prevMonth) {
-      if (!areCardsActuallyPaid()) {
-        // Verificar si al menos una tarjeta ha superado su fecha de vencimiento
-        let anyCardPastDueDate = false;
-        
-        for (const card of cards) {
-          const cardDates = getCardDates(card.id);
-          if (cardDates && cardDates.dueDate) {
-            const dueDate = new Date(cardDates.dueDate);
-            if (today > dueDate) {
-              anyCardPastDueDate = true;
-              break;
-            }
-          }
-        }
-        
-        // Si hay incoherencia (tarjeta vencida pero botón deshabilitado), corregir
-        if (anyCardPastDueDate && paymentDisabled && paymentStatusChecked) {
-          console.log("⚠️ CORRECCIÓN: Se detectó una incoherencia - Activando botón de pago");
-          setPaymentDisabled(false);
-        }
-      }
-    }
-  }, [paymentStatusChecked, paymentDisabled, cards, selectedMonth, selectedYear]); */
-  // Nota: No incluimos areCardsActuallyPaid en las dependencias para evitar el error
-  // "Cannot access 'areCardsActuallyPaid' before initialization" y ciclos de renderizado.
-  // Como areCardsActuallyPaid es una función interna que depende del estado, incluirla en
-  // las dependencias causaría múltiples re-renders innecesarios.
 
   // Función para verificar directamente en Firebase si el mes ya ha sido pagado
   const checkMonthPaymentStatus = async () => {
@@ -795,8 +758,6 @@ const CreditCards = () => {
         shouldBeEnabled
       });
       
-      // Ya no necesitamos modificar paymentDisabled aquí
-      // setPaymentDisabled(!shouldBeEnabled);
       setPaymentStatusChecked(true);
       
       return allCardsPaid;
@@ -828,16 +789,7 @@ const CreditCards = () => {
       return false;
     }
     return true;
-    // Ya no necesitamos abrir el diálogo porque la funcionalidad está integrada
-    // setUploadDialogOpen(true);
-    // setSelectedFile(null);
   };
-
-  // Esta función ya no es necesaria
-  // const handleCloseUploadDialog = () => {
-  //   setUploadDialogOpen(false);
-  //   setSelectedFile(null);
-  // };
 
   // Subir archivo PDF
   const handleUploadStatement = async () => {
@@ -922,8 +874,6 @@ const CreditCards = () => {
       setCardStatements(updatedCardStatements);
       
       showAlert('Resumen subido correctamente', 'success');
-      // Ya no es necesario cerrar el diálogo
-      // setUploadDialogOpen(false);
       setSelectedFile(null);
     } catch (error) {
       console.error('Error al subir el resumen:', error);
@@ -1228,30 +1178,6 @@ const CreditCards = () => {
   };
 
   // FUNCIONALIDAD DE ACTUALIZACIÓN DE FECHAS INTEGRADA
-  
-  // Abrir diálogo de actualización de fechas
-  const handleOpenUpdateDatesDialog = (cardId) => {
-    if (!cardId || !userData?.creditCards?.[cardId]) {
-      showAlert('No se pudo encontrar la tarjeta seleccionada', 'error');
-      return;
-    }
-    
-    setUpdateCardId(cardId);
-    setUpdateCardData(userData.creditCards[cardId]);
-    setUpdateDatesDialogOpen(true);
-    loadCardDates(cardId);
-  };
-  
-  // Cerrar diálogo de actualización de fechas
-  const handleCloseUpdateDatesDialog = () => {
-    setUpdateDatesDialogOpen(false);
-    setClosingDate('');
-    setDueDate('');
-    setUpdateCardId(null);
-    setUpdateCardData(null);
-    setUpdateError('');
-    setSaving(false);
-  };
 
   // Función para verificar si una fecha está fuera del límite permitido (1 mes)
   const isDateBeyondLimit = (date) => {
@@ -1292,11 +1218,11 @@ const CreditCards = () => {
   };
 
   // Verificar si un mes ya tiene fechas configuradas (tanto cierre como vencimiento)
-  const isMonthAlreadyConfigured = (cardId, year, month) => {
-    if (!userData?.creditCards?.[cardId] || !userData.creditCards[cardId].dates) return false;
+  const isMonthAlreadyConfigured = (year, month) => {
+    if (!selectedCard || !userData?.creditCards?.[selectedCard] || !userData.creditCards[selectedCard].dates) return false;
     
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-    const card = userData.creditCards[cardId];
+    const card = userData.creditCards[selectedCard];
     
     // Verificar si existen ambas fechas para este mes
     return card.dates[monthKey] && 
@@ -1307,15 +1233,22 @@ const CreditCards = () => {
   };
 
   // Cargar fechas de la tarjeta seleccionada
-  const loadCardDates = (cardId) => {
-    if (!cardId || !userData?.creditCards?.[cardId]) return;
+  const loadCardDates = () => {
+    if (!selectedCard || !userData?.creditCards?.[selectedCard]) {
+      setDatesConfigured(false);
+      return;
+    }
     
-    const card = userData.creditCards[cardId];
+    const card = userData.creditCards[selectedCard];
     
     // Consultar las fechas para el mes y año seleccionados
     const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     if (card.dates && card.dates[monthKey]) {
       const monthData = card.dates[monthKey];
+      
+      // Verificar si ambas fechas están configuradas para este mes específico
+      const hasConfiguredDates = monthData.closingDate && monthData.dueDate;
+      setDatesConfigured(hasConfiguredDates);
       
       if (monthData.closingDate) {
         setClosingDate(monthData.closingDate);
@@ -1347,6 +1280,9 @@ const CreditCards = () => {
         setDueDate('');
       }
     } else {
+      // No hay fechas para este mes, mostrar configuración
+      setDatesConfigured(false);
+      
       // No hay fechas para este mes, usar valores por defecto
       if (card.defaultClosingDay) {
         const day = String(card.defaultClosingDay).padStart(2, '0');
@@ -1465,21 +1401,17 @@ const CreditCards = () => {
       const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
       
       // Actualizar las fechas en Firebase
-      await database.ref(`${auth.currentUser.uid}/creditCards/${updateCardId}/dates/${monthKey}`).update({
+      await database.ref(`${auth.currentUser.uid}/creditCards/${selectedCard}/dates/${monthKey}`).update({
         closingDate: closingDate,
         dueDate: dueDate
       });
       
+      // Marcar las fechas como configuradas
+      setDatesConfigured(true);
+      
       // Mostrar mensaje de éxito
-      setUpdateSuccess(true);
       showAlert('Fechas actualizadas correctamente', 'success');
       
-      // Cerrar el diálogo después de 1.5 segundos
-      setTimeout(() => {
-        handleCloseUpdateDatesDialog();
-        // Recargar la página para reflejar los cambios
-        window.location.reload();
-      }, 1500);
     } catch (error) {
       console.error('Error al actualizar las fechas:', error);
       setUpdateError('Error al actualizar las fechas. Inténtalo de nuevo.');
@@ -1490,1531 +1422,1146 @@ const CreditCards = () => {
 
   return (
     <Layout title="Tarjetas de Crédito">
-      <Box 
-        sx={{ 
-          minHeight: '100vh',
-          width: '100%',
-          position: 'relative',
-          pt: 0,
-          pb: 4,
-          margin: 0,
-          maxWidth: 'none'
-        }}
-      >
-        {/* Navegador mensual optimizado para UX/UI */}
-        <Paper
-          elevation={3}
-          sx={{
-            mb: 3,
-            borderRadius: { xs: '0 0 16px 16px', sm: '0 0 20px 20px' },
-            overflow: 'hidden',
-            boxShadow: `0 6px 24px ${alpha(theme.palette.primary.main, 0.18)}`,
-            position: 'sticky',
-            top: {
-              xs: 56, // Altura del AppBar en móviles
-              sm: 64  // Altura del AppBar en escritorio
-            },
-            zIndex: 10,
-            border: 'none',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.25)}`
-            }
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+                {/* Navegador de mes mejorado */}
+        <Card 
+          elevation={2}
+          sx={{ 
+            mb: 4, 
+            mt: 4,
+            borderRadius: 3,
+            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
           }}
         >
-          {/* Barra principal con información del contexto actual */}
-          <Box
-            sx={{
-              background: `linear-gradient(90deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-              py: 1.5,
-              px: { xs: 1.5, sm: 2.5 },
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1
-            }}
-          >
-            {/* Fila 1: Navegación principal */}
-            <Box 
-              sx={{
-                display: 'flex', 
-                flexDirection: { xs: 'column', md: 'row' },
-                justifyContent: 'space-between',
-                alignItems: { xs: 'center', md: 'center' },
-                gap: { xs: 2, md: 0 },
-                width: '100%'
-              }}
-            >
-              {/* Indicador contextual del período seleccionado */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar
-                  sx={{
-                    bgcolor: alpha(theme.palette.background.paper, 0.2),
-                    color: theme.palette.common.white,
-                    width: 40,
-                    height: 40
-                  }}
-                >
-                  <CalendarTodayIcon />
-                </Avatar>
-                <Box>
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    color="white"
-                    sx={{ 
-                      lineHeight: 1.2,
-                      textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                      letterSpacing: '0.5px'
-                    }}
-                  >
-                    {getMonthName(selectedMonth)} {selectedYear}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      color: alpha(theme.palette.common.white, 0.85),
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      fontWeight: 500
-                    }}
-                  >
-                    <PaymentIcon fontSize="inherit" /> 
-                    {cards.length} {cards.length === 1 ? 'tarjeta' : 'tarjetas'} • Total: {formatAmount(getAllCardsTotal())}
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Controles de navegación rápida */}
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  size="small"
-                  startIcon={<TodayIcon />}
-                  onClick={() => {
-                    const now = new Date();
-                    setSelectedMonth(now.getMonth() + 1);
-                    setSelectedYear(now.getFullYear());
-                  }}
-                  sx={{
-                    bgcolor: alpha(theme.palette.background.paper, 0.25),
-                    color: theme.palette.common.white,
-                    backdropFilter: 'blur(4px)',
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 'medium',
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.background.paper, 0.35),
-                    }
-                  }}
-                >
-                  Mes actual
-                </Button>
-              </Box>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6" fontWeight="600" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CalendarTodayIcon color="primary" />
+                Seleccionar Período
+              </Typography>
+              
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<TodayIcon />}
+                onClick={() => {
+                  const now = new Date();
+                  setSelectedMonth(now.getMonth() + 1);
+                  setSelectedYear(now.getFullYear());
+                }}
+                sx={{ borderRadius: 2 }}
+              >
+                Mes actual
+              </Button>
             </Box>
-
-            {/* Fila 2: Selección detallada de mes y año */}
-            <Box
-              sx={{
-                mt: { xs: 1, md: 2 },
-                bgcolor: alpha(theme.palette.background.paper, 0.12),
-                borderRadius: 3,
-                p: 0.75,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backdropFilter: 'blur(5px)'
-              }}
-            >
-              {/* Selector de mes táctil y accesible */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center',
-                width: '100%',
-                position: 'relative' 
-              }}>
-                <Tooltip title="Mes anterior" arrow placement="top">
-                  <span>
-                    <IconButton
-                      onClick={() => {
-                        if (selectedMonth === 1) {
-                          setSelectedMonth(12);
-                          setSelectedYear(selectedYear - 1);
-                        } else {
-                          setSelectedMonth(selectedMonth - 1);
-                        }
-                      }}
-                      color="inherit"
-                      size="small"
-                      aria-label="Mes anterior"
-                      disabled={selectedMonth === new Date().getMonth() + 1 && selectedYear === new Date().getFullYear()}
-                      sx={{
-                        color: theme.palette.common.white,
-                        '&:hover': { 
-                          bgcolor: alpha(theme.palette.background.paper, 0.25),
-                          transform: 'scale(1.1)'
-                        },
-                        transition: 'all 0.2s ease',
-                        '&.Mui-disabled': {
-                          color: alpha(theme.palette.common.white, 0.4),
-                          opacity: 0.5
-                        }
-                      }}
-                    >
-                      <ChevronLeftIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-
-                <Box
-                  sx={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    mx: 1,
-                    display: 'flex',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    spacing={0.5}
-                    sx={{
-                      px: 1,
-                      transition: 'transform 0.3s ease-in-out',
-                      '& > *': {
-                        minWidth: { xs: 'auto', sm: 40 }
-                      }
-                    }}
-                  >
-                    {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((month, idx) => {
-                      const isActive = selectedMonth === idx + 1;
-                      const isVisible = 
-                        idx === selectedMonth - 3 ||
-                        idx === selectedMonth - 2 ||
-                        idx === selectedMonth - 1 ||
-                        idx === selectedMonth - 1 + 1 ||
-                        idx === selectedMonth - 1 + 2;
-                      
-                      // Verificar si este mes está más allá del límite de 1 mes
-                      // Solo aplicamos la restricción para meses futuros
-                      const thisMonthDate = new Date(selectedYear, idx, 1);
-                      const today = new Date();
-                      const currentMonth = today.getMonth();
-                      const currentYear = today.getFullYear();
-                      
-                      // Solo verificar meses futuros, no restringir meses pasados
-                      let isBeyondLimit = false;
-                      
-                      // Si es un mes futuro (este año o posterior)
-                      if (thisMonthDate.getFullYear() > currentYear || 
-                          (thisMonthDate.getFullYear() === currentYear && idx > currentMonth + 1)) {
-                        isBeyondLimit = true;
-                      }
-                      
-                      return (
-                        <Button
-                          key={idx}
-                          onClick={() => setSelectedMonth(idx + 1)}
-                          aria-label={`Mes de ${month}`}
-                          aria-current={isActive ? 'date' : undefined}
-                          disabled={isBeyondLimit}
-                          sx={{
-                            py: 0.75,
-                            px: { xs: 1, sm: 1.5 },
-                            minWidth: { xs: 32, sm: 36 },
-                            color: isActive ? theme.palette.primary.dark : alpha(theme.palette.common.white, 0.85),
-                            bgcolor: isActive ? alpha(theme.palette.common.white, 0.9) : 'transparent',
-                            fontWeight: isActive ? 'bold' : 'medium',
-                            borderRadius: 1.5,
-                            fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                            transition: 'all 0.2s ease',
-                            opacity: isVisible ? (isBeyondLimit ? 0.5 : 1) : { xs: 0, sm: 0.5 },
-                            display: { xs: isVisible ? 'flex' : 'none', sm: 'flex' },
-                            '&:hover': {
-                              bgcolor: isActive 
-                                ? alpha(theme.palette.common.white, 0.9)
-                                : alpha(theme.palette.common.white, 0.15),
-                              transform: isBeyondLimit ? 'none' : 'translateY(-2px)'
-                            },
-                            pointerEvents: isVisible && !isBeyondLimit ? 'auto' : { xs: 'none', sm: 'auto' },
-                            textTransform: 'none',
-                            '&.Mui-disabled': {
-                              color: alpha(theme.palette.common.white, 0.4),
-                              pointerEvents: 'none'
-                            }
-                          }}
-                        >
-                          {month}
-                          {isActive && (
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                bottom: 0,
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: 4,
-                                height: 4,
-                                borderRadius: '50%',
-                                bgcolor: theme.palette.primary.dark,
-                                mt: 0.5
-                              }}
-                            />
-                          )}
-                        </Button>
-                      );
-                    })}
-                  </Stack>
-                </Box>
-
-                <Tooltip title="Mes siguiente" arrow placement="top">
-                  <span>
-                    <IconButton
-                      onClick={() => {
-                        // Calcular el próximo mes
-                        const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
-                        const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
-                        
-                        // Obtener el mes actual
-                        const today = new Date();
-                        const currentMonth = today.getMonth() + 1; // 1-12 (formato)
-                        const currentYear = today.getFullYear();
-                        
-                        // Verificar si estamos intentando ir a un mes futuro más allá del límite
-                        const isFutureLimitExceeded = 
-                          (nextYear > currentYear) || 
-                          (nextYear === currentYear && nextMonth > currentMonth + 1);
-                        
-                        // Si excede el límite y estamos en un año anterior, ir al mes actual del año actual
-                        if (isFutureLimitExceeded && selectedYear < currentYear) {
-                          setSelectedMonth(currentMonth);
-                          setSelectedYear(currentYear);
-                        } 
-                        // Si no excede el límite o estamos navegando normalmente, avanzar un mes
-                        else if (!isFutureLimitExceeded) {
-                          if (selectedMonth === 12) {
-                            setSelectedMonth(1);
-                            setSelectedYear(selectedYear + 1);
-                          } else {
-                            setSelectedMonth(selectedMonth + 1);
-                          }
-                        }
-                        // Si excede el límite y estamos en el año actual, no hacer nada (botón debería estar deshabilitado)
-                      }}
-                      color="inherit"
-                      size="small"
-                      aria-label="Mes siguiente"
-                      disabled={(() => {
-                        // Verificar si el próximo mes estaría más allá del límite de 1 mes
-                        const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
-                        const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
-                        
-                        // Obtener el mes actual
-                        const today = new Date();
-                        const currentMonth = today.getMonth() + 1; // 1-12
-                        const currentYear = today.getFullYear();
-                        
-                        // Permitir navegación normal en años pasados, excepto si navegamos al año actual
-                        // a un mes más allá del límite permitido
-                        if (selectedYear < currentYear && nextYear < currentYear) {
-                          return false;
-                        }
-                        
-                        // Si navegaríamos al año actual o posterior, verificar el límite de meses
-                        if (nextYear === currentYear && nextMonth <= currentMonth + 1) {
-                          return false;
-                        }
-                        
-                        // En cualquier otro caso, deshabilitar
-                        return true;
-                      })()}
-                      sx={{
-                        color: theme.palette.common.white,
-                        '&:hover': { 
-                          bgcolor: alpha(theme.palette.background.paper, 0.25),
-                          transform: 'scale(1.1)'
-                        },
-                        transition: 'all 0.2s ease',
-                        '&.Mui-disabled': {
-                          color: alpha(theme.palette.common.white, 0.4),
-                          opacity: 0.5
-                        }
-                      }}
-                    >
-                      <ChevronRightIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                
-                {/* Selector de año intuitivo */}
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    borderLeft: `1px solid ${alpha(theme.palette.common.white, 0.2)}`,
-                    ml: 1.5,
-                    pl: 1.5
-                  }}
-                >
+            
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <IconButton
-                    size="small"
-                    onClick={() => setSelectedYear(selectedYear - 1)}
-                    aria-label="Año anterior"
-                    sx={{ 
-                      color: theme.palette.common.white,
-                      '&:hover': { 
-                        bgcolor: alpha(theme.palette.background.paper, 0.25)
+                    onClick={() => {
+                      if (selectedMonth === 1) {
+                        setSelectedMonth(12);
+                        setSelectedYear(selectedYear - 1);
+                      } else {
+                        setSelectedMonth(selectedMonth - 1);
                       }
                     }}
+                    sx={{ 
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                    }}
                   >
-                    <KeyboardArrowLeftIcon fontSize="small" />
+                    <ChevronLeftIcon />
                   </IconButton>
                   
-                  <Tooltip title="Seleccionar año" arrow>
-                    <Box
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Año ${selectedYear}`}
-                      onClick={() => {
-                        // Aquí podría abrirse un selector de año más avanzado
-                        const currentYear = new Date().getFullYear();
-                        setSelectedYear(currentYear);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const currentYear = new Date().getFullYear();
-                          setSelectedYear(currentYear);
-                        }
-                      }}
-                      sx={{
-                        bgcolor: alpha(theme.palette.common.white, 0.15),
-                        py: 0.5,
-                        px: 1.5,
-                        borderRadius: 2,
-                        minWidth: 60,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        userSelect: 'none',
-                        mx: 0.5,
-                        '&:hover': {
-                          bgcolor: alpha(theme.palette.common.white, 0.25),
-                          transform: 'translateY(-2px)'
-                        },
-                        '&:focus-visible': {
-                          outline: `2px solid ${alpha(theme.palette.common.white, 0.5)}`,
-                          outlineOffset: 2
-                        }
-                      }}
-                    >
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        color={theme.palette.common.white}
-                      >
-                        {selectedYear}
-                      </Typography>
-                    </Box>
-                  </Tooltip>
-                  
-                  <Tooltip title="Año siguiente" arrow>
-                    <span>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          const nextYear = selectedYear + 1;
-                          const today = new Date();
-                          const currentMonth = today.getMonth() + 1; // 1-12
-                          const currentYear = today.getFullYear();
-                          
-                          // Si el año al que vamos es el actual o futuro Y el mes seleccionado
-                          // está más allá del límite, ajustamos al mes actual
-                          if (nextYear >= currentYear && selectedMonth > currentMonth + 1) {
-                            setSelectedMonth(currentMonth);
-                          }
-                          
-                          setSelectedYear(nextYear);
-                        }}
-                        aria-label="Año siguiente"
-                        disabled={selectedYear >= new Date().getFullYear()}
-                        sx={{ 
-                          color: theme.palette.common.white,
-                          '&:hover': { 
-                            bgcolor: alpha(theme.palette.background.paper, 0.25)
-                          },
-                          '&.Mui-disabled': {
-                            color: alpha(theme.palette.common.white, 0.4),
-                            opacity: 0.5
-                          }
-                        }}
-                      >
-                        <KeyboardArrowRightIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        </Paper>
-          
-        {/* Total combinado de todas las tarjetas - Diseño mejorado con gradiente */}
-        {cards.length > 0 && (
-          <Grid item xs={12} sx={{ mb: 3, mt: 5 }}>
-            <Card 
-              elevation={3}
-              sx={{ 
-                borderRadius: 3,
-                overflow: 'hidden',
-                boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}`,
-                mx: { xs: 2, sm: 2 },
-                bgcolor: theme.palette.background.paper
-              }}
-            >
-              <Box sx={{ 
-                p: 2.5, 
-                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                color: theme.palette.primary.contrastText,
-              }}>
-                <Box 
-                  sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    justifyContent: 'space-between',
-                    alignItems: { xs: 'flex-start', sm: 'center' },
-                    gap: 2
-                  }}
-                >
-                  <Box>
-                    <Typography variant="h6" fontWeight="bold" color={theme.palette.primary.contrastText}>
-                      Total de todas las tarjetas
-                    </Typography>
-                    <Typography variant="h3" fontWeight="bold" color={theme.palette.primary.contrastText}>
-                      {formatAmount(getAllCardsTotal())}
+                  <Box sx={{ flex: 1, mx: 2 }}>
+                    <Typography variant="h5" fontWeight="600" align="center">
+                      {getMonthName(selectedMonth)} {selectedYear}
                     </Typography>
                   </Box>
                   
-                  <Button
-                    variant="contained"
-                    color="success"
-                    startIcon={<PaymentIcon />}
-                    onClick={handlePayCreditCard}
-                    disabled={(() => {
-                      // Deshabilitar si es un mes futuro
-                      if (isFutureMonth()) return true;
+                  <IconButton
+                    onClick={() => {
+                      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+                      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
                       
-                      // Deshabilitar si ya está pagado
-                      if (areCardsActuallyPaid()) return true;
-                      
-                      // Deshabilitar si no hay gastos
-                      if (getAllCardsTotal() <= 0) return true;
-
-                      // Lógica existente para mes anterior y vencimiento
                       const today = new Date();
                       const currentMonth = today.getMonth() + 1;
                       const currentYear = today.getFullYear();
-                      let prevMonth = currentMonth - 1;
-                      let prevYear = currentYear;
-                      if (prevMonth === 0) {
-                        prevMonth = 12;
-                        prevYear = currentYear - 1;
-                      }
-                      if (selectedYear === prevYear && selectedMonth === prevMonth) {
-                        let anyCardPastDueDate = false;
-                        for (const card of cards) {
-                          const cardDates = getCardDates(card.id);
-                          if (cardDates && cardDates.dueDate) {
-                            const dueDate = new Date(cardDates.dueDate);
-                            if (today > dueDate) {
-                              anyCardPastDueDate = true;
-                              break;
-                            }
-                          }
-                        }
-                        return !anyCardPastDueDate; // Habilitar solo si hay vencidas
-                      }
                       
-                      // Deshabilitar en cualquier otro caso (mes actual, meses pasados no vencidos)
-                      return true;
-                    })()}
-                    sx={{ 
-                      mt: { xs: 2, sm: 0 },
-                      px: 3,
-                      py: 1.2,
-                      borderRadius: 2,
-                      boxShadow: `0 4px 10px ${alpha(theme.palette.common.black, 0.15)}`,
-                      bgcolor: theme.palette.background.paper,
-                      color: theme.palette.primary.main,
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.background.paper, 0.9),
-                        transform: 'translateY(-2px)',
-                        boxShadow: `0 8px 20px ${alpha(theme.palette.common.black, 0.2)}`
-                      },
-                      '&.Mui-disabled': {
-                        bgcolor: alpha(theme.palette.background.paper, 0.5),
-                        color: alpha(theme.palette.text.primary, 0.3)
+                      const isFutureLimitExceeded = 
+                        (nextYear > currentYear) || 
+                        (nextYear === currentYear && nextMonth > currentMonth + 1);
+                      
+                      if (!isFutureLimitExceeded) {
+                        setSelectedMonth(nextMonth);
+                        setSelectedYear(nextYear);
                       }
                     }}
-                  >
-                    {(() => {
-                      // Texto para mes futuro
-                      if (isFutureMonth()) {
-                        return 'Mes Futuro';
-                      }
-
-                      // Texto si ya está pagado
-                      if (areCardsActuallyPaid()) {
-                        return 'Tarjeta Pagada';
-                      }
-                      
-                      // Texto si no hay gastos
-                      if (getAllCardsTotal() <= 0) {
-                        return 'Sin Gastos';
-                      }
-
-                      // Lógica existente para mes anterior y vencimiento
+                    disabled={(() => {
+                      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+                      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
                       const today = new Date();
                       const currentMonth = today.getMonth() + 1;
                       const currentYear = today.getFullYear();
-                      let prevMonth = currentMonth - 1;
-                      let prevYear = currentYear;
-                      if (prevMonth === 0) {
-                        prevMonth = 12;
-                        prevYear = currentYear - 1;
-                      }
-                      if (selectedYear === prevYear && selectedMonth === prevMonth) {
-                        let anyCardPastDueDate = false;
-                        for (const card of cards) {
-                          const cardDates = getCardDates(card.id);
-                          if (cardDates && cardDates.dueDate) {
-                            const dueDate = new Date(cardDates.dueDate);
-                            if (today > dueDate) {
-                              anyCardPastDueDate = true;
-                              break;
-                            }
-                          }
-                        }
-                        if (anyCardPastDueDate) {
-                          return 'Pagar Tarjetas Vencidas';
-                        } else {
-                          return 'Esperar Vencimiento'; // Texto cuando aún no vence
-                        }
-                      }
                       
-                      // Texto por defecto para otros casos (mes actual, meses pasados no vencidos)
-                      return 'Pago No Disponible';
+                      return (nextYear > currentYear) || 
+                             (nextYear === currentYear && nextMonth > currentMonth + 1);
                     })()}
-                  </Button>
-                </Box>
-              </Box>
-              
-              {/* Selector de tarjetas mejorado */}
-              <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`, mt: 2 }}>
-                <Typography variant="subtitle2" fontWeight="medium" sx={{ mb: 2, color: alpha(theme.palette.text.primary, 0.7) }}>
-                  Selecciona una tarjeta:
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, mt: 2 }}>
-                  {cards.map(card => {
-                    const isSelected = selectedCard === card.id;
-                    const cardTotal = getCardTotal(card.id);
-                    const isPending = !isCardPaid(card.id);
-                    const cardType = card.name.toLowerCase().includes('visa') ? 'visa' : 
-                                   card.name.toLowerCase().includes('master') ? 'mastercard' : 'credit-card';
-                    
-                    return (
-                      <Box
-                        key={card.id}
-                        onClick={() => handleCardSelect(card.id)}
-                        sx={{
-                          mt: 1,
-                          minWidth: 200,
-                          borderRadius: 2,
-                          overflow: 'hidden',
-                          boxShadow: isSelected 
-                            ? `0 8px 16px ${alpha(theme.palette.primary.main, 0.25)}` 
-                            : `0 2px 8px ${alpha(theme.palette.common.black, 0.08)}`,
-                          transition: 'all 0.3s ease',
-                          transform: isSelected ? 'translateY(-4px)' : 'none',
-                          cursor: 'pointer',
-                          border: isSelected 
-                            ? `2px solid ${theme.palette.primary.main}`
-                            : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                          position: 'relative',
-                          '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.2)}`
-                          }
-                        }}
-                      >
-                        {/* Indicador de seleccionada */}
-                        {isSelected && (
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              top: 10,
-                              left: 10,
-                              width: 20,
-                              height: 20,
-                              borderRadius: '50%',
-                              bgcolor: theme.palette.primary.main,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              zIndex: 2
-                            }}
-                          >
-                            <CheckIcon sx={{ color: 'white', fontSize: 16 }} />
-                          </Box>
-                        )}
-                        
-                        {/* Gradiente de fondo según tipo de tarjeta */}
-                        <Box
-                          sx={{
-                            p: 2,
-                            background: cardType === 'visa' 
-                              ? 'linear-gradient(135deg, #1a237e 0%, #303f9f 100%)' 
-                              : cardType === 'mastercard'
-                                ? 'linear-gradient(135deg, #b71c1c 0%, #e53935 100%)'
-                                : 'linear-gradient(135deg, #455a64 0%, #78909c 100%)',
-                            color: 'white',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          {/* Patrón de fondo */}
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              opacity: 0.15,
-                              background: 'radial-gradient(circle, transparent 20%, black 20%, black 21%, transparent 21%), radial-gradient(circle, transparent 20%, black 20%, black 21%, transparent 21%)',
-                              backgroundSize: '12px 12px',
-                              backgroundPosition: '0 0, 6px 6px'
-                            }}
-                          />
-                          
-                          {/* Ícono de tipo de tarjeta en lugar de imagen */}
-                          <Box display="flex" alignItems="center" mb={1.5}>
-                            {cardType === 'visa' ? (
-                              <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>VISA</Typography>
-                            ) : cardType === 'mastercard' ? (
-                              <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>MASTER</Typography>
-                            ) : (
-                              <CreditCardIcon sx={{ fontSize: 24 }} />
-                            )}
-                          </Box>
-                          
-                          {/* Número de tarjeta con últimos 4 dígitos */}
-                          <Typography 
-                            variant="body2" 
-                            fontWeight="medium" 
-                            sx={{ 
-                              mb: 1.5, 
-                              fontFamily: 'monospace', 
-                              letterSpacing: 1,
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                          >
-                            **** **** **** {card.lastFourDigits || '0000'}
-                          </Typography>
-                          
-                        </Box>
-                        
-                        <Box sx={{ p: 2, bgcolor: theme.palette.background.paper }}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Typography variant="subtitle2" color="text.secondary">
-                              Total:
-                            </Typography>
-                            <Typography variant="subtitle1" fontWeight="bold" color={isPending ? "error.main" : "success.main"}>
-                              {formatAmount(cardTotal)}
-                            </Typography>
-                          </Box>
-                          
-                          {/* Etiqueta de estado */}
-                          <Box mt={1} display="flex" justifyContent="flex-end">
-                            <Chip 
-                              label={isPending ? "Pendiente" : "Pagada"}
-                              size="small"
-                              color={isPending ? "error" : "success"}
-                              variant={isPending ? "filled" : "outlined"}
-                              sx={{ 
-                                height: 24, 
-                                fontWeight: 'medium',
-                                fontSize: '0.7rem'
-                              }}
-                            />
-                          </Box>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </Box>
-            </Card>
-          </Grid>
-        )}
-        
-        <Grid container spacing={3} sx={{ px: { xs: 2, sm: 2 }, mt: 0 }}>
-          {/* Panel con detalles de la tarjeta seleccionada */}
-          <Grid item xs={12} md={12}>
-            {cards.length > 0 ? (
-              <Card elevation={3} sx={{ 
-                borderRadius: 3,
-                boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`,
-                border: 'none',
-                overflow: 'hidden'
-              }}>
-                <CardHeader
-                  title={
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Avatar
-                        sx={{
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          color: theme.palette.primary.main
-                        }}
-                      >
-                        <CreditCardIcon />
-                      </Avatar>
-                      <Typography variant="h6" fontWeight="bold">
-                        {selectedCard ? cards.find(card => card.id === selectedCard)?.name : 'Selecciona una tarjeta'}
-                      </Typography>
-                    </Stack>
-                  }
-                  action={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      {/* Quitamos el selector de tarjeta */}
-                      {selectedCard && (
-                        <>
-                          {/* Quitamos el botón de subir resumen */}
-                          <Tooltip title="Opciones de tarjeta">
-                            <IconButton 
-                              color="inherit"
-                              onClick={(e) => handleOpenMenu(e, selectedCard)}
-                              sx={{ 
-                                color: 'white',
-                                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
-                              }}
-                            >
-                              <MoreVertIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </>
-                      )}
-                    </Box>
-                  }
-                  sx={{
-                    p: 2.5,
-                    pb: 1.5,
-                    borderBottom: `1px solid ${theme.palette.divider}`,
-                    bgcolor: theme.palette.primary.main,
-                    color: theme.palette.primary.contrastText,
-                    '& .MuiTypography-root': {
-                      color: theme.palette.primary.contrastText
-                    },
-                    '& .MuiAvatar-root': {
-                      bgcolor: alpha(theme.palette.common.white, 0.2),
-                      color: theme.palette.primary.contrastText
-                    }
-                  }}
-                />
-                
-                <CardContent sx={{ p: 2.5 }}>
-                  {/* Información de la tarjeta */}
-                  {selectedCard ? (
-                    <>
-                      <Box mb={3}>
-                        {cards.find(card => card.id === selectedCard) && (
-                          <>
-                            <Grid container spacing={2} mt={1}>
-                              <Grid item xs={12} sm={4}>
-                                <Card 
-                                  elevation={3} 
-                                  sx={{ 
-                                    p: 0, 
-                                    borderRadius: 3,
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    border: 'none',
-                                    bgcolor: theme.palette.background.paper,
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                      transform: 'translateY(-4px)',
-                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    }
-                                  }}
-                                >
-                                  <Box sx={{ 
-                                    p: 2,
-                                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                  }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <CalendarTodayIcon fontSize="small" />
-                                      <Typography variant="body2" fontWeight="medium">
-                                        Cierre
-                                      </Typography>
-                                    </Stack>
-                                    <Tooltip title="Fecha en que la tarjeta cierra el período actual" arrow>
-                                      <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
-                                        <DateRangeIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Box>
-                                  <Box sx={{ 
-                                    p: 2, 
-                                    bgcolor: theme.palette.background.paper,
-                                    borderLeft: `4px solid ${theme.palette.primary.main}`
-                                  }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="h6" fontWeight="medium">
-                                        {(() => {
-                                          // Si hay fechas específicas para este mes en la tarjeta, mostrarlas
-                                          const card = cards.find(c => c.id === selectedCard);
-                                          const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-                                          
-                                          // Solo mostrar la fecha si está explícitamente configurada
-                                          if (card?.dates && card.dates[currentMonth]?.closingDate) {
-                                            return obtenerFechaFormateada(card.dates[currentMonth].closingDate);
-                                          }
-                                          
-                                          // De lo contrario, mostrar como no establecido
-                                          return 'No establecido';
-                                        })()}
-                                    </Typography>
-                                      {(() => {
-                                        // Verificar si las fechas no están configuradas
-                                        const card = cards.find(c => c.id === selectedCard);
-                                        const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-                                        const fechasNoConfiguradas = !(card?.dates && card.dates[currentMonth]?.closingDate);
-                                        
-                                        if (fechasNoConfiguradas) {
-                                          return (
-                                            <Tooltip title="Actualizar fechas">
-                                              <IconButton 
-                                                size="small"
-                                                color="primary"
-                                                onClick={() => handleOpenUpdateDatesDialog(selectedCard)}
-                                                sx={{ ml: 1 }}
-                                              >
-                                                <DateRangeIcon fontSize="small" />
-                                              </IconButton>
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </Box>
-                                    {getCardDates()?.closingDate && (
-                                      <Typography variant="caption" color="textSecondary">
-                                        {new Date() > new Date(getCardDates().closingDate) 
-                                          ? 'Período cerrado' 
-                                          : 'Período activo'}
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                </Card>
-                              </Grid>
-                              
-                              <Grid item xs={12} sm={4}>
-                                <Card 
-                                  elevation={2} 
-                                  sx={{ 
-                                    p: 0, 
-                                    borderRadius: 3,
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                      transform: 'translateY(-4px)',
-                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    }
-                                  }}
-                                >
-                                  <Box sx={{ 
-                                    p: 2,
-                                    background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                  }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <PaymentIcon fontSize="small" />
-                                      <Typography variant="body2" fontWeight="medium">
-                                        Vencimiento
-                                      </Typography>
-                                    </Stack>
-                                    <Tooltip title="Fecha límite para pagar la tarjeta sin intereses" arrow>
-                                      <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
-                                        <DateRangeIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Box>
-                                  <Box sx={{ 
-                                    p: 2,
-                                    borderLeft: `4px solid ${theme.palette.error.main}`
-                                  }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="h6" fontWeight="medium">
-                                        {(() => {
-                                          // Si hay fechas específicas para este mes en la tarjeta, mostrarlas
-                                          const card = cards.find(c => c.id === selectedCard);
-                                          const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-                                          
-                                          // Solo mostrar la fecha si está explícitamente configurada
-                                          if (card?.dates && card.dates[currentMonth]?.dueDate) {
-                                            return obtenerFechaFormateada(card.dates[currentMonth].dueDate);
-                                          }
-                                          
-                                          // De lo contrario, mostrar como no establecido
-                                          return 'No establecido';
-                                        })()}
-                                    </Typography>
-                                      {(() => {
-                                        // Verificar si las fechas no están configuradas
-                                        const card = cards.find(c => c.id === selectedCard);
-                                        const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-                                        const fechasNoConfiguradas = !(card?.dates && card.dates[currentMonth]?.dueDate);
-                                        
-                                        if (fechasNoConfiguradas) {
-                                          return (
-                                            <Tooltip title="Actualizar fechas">
-                                              <IconButton 
-                                                size="small"
-                                                color="error"
-                                                onClick={() => handleOpenUpdateDatesDialog(selectedCard)}
-                                                sx={{ ml: 1 }}
-                                              >
-                                                <DateRangeIcon fontSize="small" />
-                                              </IconButton>
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </Box>
-                                    {getCardDates()?.dueDate && (
-                                      <>
-                                        {(() => {
-                                          const today = new Date();
-                                          const closingDate = getCardDates()?.closingDate ? new Date(getCardDates().closingDate) : null;
-                                          const dueDate = getCardDates()?.dueDate ? new Date(getCardDates().dueDate) : null;
-                                          
-                                          // Si la tarjeta ya está pagada, no mostrar ninguna leyenda
-                                          if (isCardPaid(selectedCard)) {
-                                            return null; // No mostrar leyenda si ya está pagada
-                                          }
-                                          
-                                          // Verificar si las fechas están configuradas explícitamente
-                                          const card = cards.find(c => c.id === selectedCard);
-                                          const currentMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-                                          const fechasConfiguradas = card?.dates && card.dates[currentMonth]?.closingDate && card.dates[currentMonth]?.dueDate;
-                                          
-                                          // Si las fechas no están configuradas, no mostrar leyendas
-                                          if (!fechasConfiguradas) {
-                                            return null;
-                                          }
-                                          
-                                          // Solo mostrar leyenda si no está pagada y las fechas están configuradas
-                                          if (dueDate && today > dueDate) {
-                                            return (
-                                              <Typography variant="caption" 
-                                                sx={{ 
-                                                  display: 'inline-flex', 
-                                                  alignItems: 'center',
-                                                  color: theme.palette.error.main
-                                                }}
-                                              >
-                                                ¡Atención! Fecha vencida
-                                              </Typography>
-                                            );
-                                          } else if (closingDate && today > closingDate) {
-                                            return (
-                                              <Typography variant="caption" 
-                                                sx={{ 
-                                                  display: 'inline-flex', 
-                                                  alignItems: 'center',
-                                                  color: theme.palette.warning.main
-                                                }}
-                                              >
-                                                En plazo para pago
-                                              </Typography>
-                                            );
-                                          } else {
-                                            return (
-                                              <Typography variant="caption" 
-                                                sx={{ 
-                                                  display: 'inline-flex', 
-                                                  alignItems: 'center',
-                                                  color: theme.palette.success.main
-                                                }}
-                                              >
-                                                Período activo
-                                              </Typography>
-                                            );
-                                          }
-                                        })()}
-                                      </>
-                                    )}
-                                  </Box>
-                                </Card>
-                              </Grid>
-                              
-                              <Grid item xs={12} sm={4}>
-                                <Card 
-                                  elevation={2} 
-                                  sx={{ 
-                                    p: 0, 
-                                    borderRadius: 3,
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                      transform: 'translateY(-4px)',
-                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    }
-                                  }}
-                                >
-                                  <Box sx={{ 
-                                    p: 2,
-                                    background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                  }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <ReceiptIcon fontSize="small" />
-                                      <Typography variant="body2" fontWeight="medium">
-                                        Total del Mes
-                                      </Typography>
-                                    </Stack>
-                                    <Tooltip title="Monto total a pagar de esta tarjeta" arrow>
-                                      <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
-                                        <PaymentIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Box>
-                                  <Box sx={{ 
-                                    p: 2,
-                                    borderLeft: `4px solid ${theme.palette.warning.main}`,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 0.5
-                                  }}>
-                                    <Typography variant="h6" fontWeight="medium">
-                                      {formatAmount(getCardTotal())}
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      {getCardTotal() > 0 ? (
-                                        isCardPaid(selectedCard) ? (
-                                          <Chip 
-                                            label="Pagado" 
-                                            size="small" 
-                                            color="success" 
-                                            variant="outlined" 
-                                            icon={<CheckCircleIcon sx={{ fontSize: '0.8rem' }} />}
-                                            sx={{ height: 24 }}
-                                          />
-                                        ) : (
-                                          <Chip 
-                                            label="Pendiente" 
-                                            size="small" 
-                                            color="warning" 
-                                            variant="outlined" 
-                                            sx={{ height: 24 }}
-                                          />
-                                        )
-                                      ) : (
-                                        <Chip 
-                                          label="Sin gastos" 
-                                          size="small" 
-                                          color="info" 
-                                          variant="outlined"
-                                          sx={{ height: 24 }}
-                                        />
-                                      )}
-                                    </Box>
-                                  </Box>
-                                </Card>
-                              </Grid>
-                            </Grid>
-                            
-                            {/* Bloque "Resumen del Mes" movido aquí */}
-                            <Box mt={3}>
-                              <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
-                                Resumen del Mes
-                              </Typography>
-                              
-                              {/* Mostrar PDF si existe */}
-                              {userData?.creditCards?.[selectedCard]?.statements?.[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`] ? (
-                                <Paper 
-                                  variant="outlined" 
-                                  sx={{ 
-                                    p: 2, 
-                                    borderRadius: 2, 
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 2
-                                  }}
-                                >
-                                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                                    <Box display="flex" alignItems="center">
-                                      <PictureAsPdfIcon color="error" sx={{ mr: 2 }} />
-                                      <Box>
-                                        <Typography variant="body1" fontWeight="medium">
-                                          {userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].fileName}
-                                        </Typography>
-                                        <Typography variant="body2" color="textSecondary">
-                                          Subido el {new Date(userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].uploadDate).toLocaleDateString()}
-                                        </Typography>
-                                      </Box>
-                                    </Box>
-                                    <Box display="flex" gap={1}>
-                                      <Button
-                                        variant="contained"
-                                        color="primary"
-                                        startIcon={<DownloadIcon />}
-                                        onClick={() => handleDownloadStatement(userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
-                                        sx={{
-                                          px: 3,
-                                          py: 1.2,
-                                          borderRadius: 2,
-                                          boxShadow: `0 4px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
-                                          '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: `0 6px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                                          }
-                                        }}
-                                      >
-                                        Descargar PDF
-                                      </Button>
-                                      
-                                      {/* Link directo al PDF usando la URL almacenada */}
-                                      <Link
-                                        href={userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].downloadURL}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{ textDecoration: 'none' }}
-                                      >
-                                        <Button
-                                          variant="outlined"
-                                          color="primary"
-                                          endIcon={<ArrowRightAltIcon />}
-                                          sx={{
-                                            px: 3,
-                                            py: 1.2,
-                                            borderRadius: 2,
-                                            '&:hover': {
-                                              bgcolor: alpha(theme.palette.primary.main, 0.05)
-                                            }
-                                          }}
-                                        >
-                                          Ver en navegador
-                                        </Button>
-                                      </Link>
-                                    </Box>
-                                  </Box>
-                                  
-                                  {/* Reemplazar visualizador de PDF con tarjeta informativa */}
-                                  <Paper
-                                    elevation={0}
-                                    sx={{
-                                      mt: 2,
-                                      p: 3,
-                                      borderRadius: 2,
-                                      bgcolor: alpha(theme.palette.info.main, 0.05),
-                                      border: `1px dashed ${alpha(theme.palette.info.main, 0.3)}`,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 2
-                                    }}
-                                  >
-                                    <Box sx={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      bgcolor: alpha(theme.palette.info.main, 0.1),
-                                      width: 40,
-                                      height: 40,
-                                      borderRadius: '50%'
-                                    }}>
-                                      <InsertDriveFileIcon color="info" />
-                                    </Box>
-                                    <Box>
-                                      <Typography variant="subtitle1" color="info.main" gutterBottom>
-                                        Resumen disponible para descargar
-                                      </Typography>
-                                      <Typography variant="body2" color="text.secondary">
-                                        Puedes descargar el PDF o abrirlo directamente en tu navegador para visualizarlo.
-                                      </Typography>
-                                    </Box>
-                                  </Paper>
-                                </Paper>
-                              ) : (
-                                <Paper 
-                                  variant="outlined" 
-                                  sx={{ 
-                                    p: 3, 
-                                    borderRadius: 2, 
-                                    borderStyle: 'dashed',
-                                    bgcolor: theme.palette.background.paper
-                                  }}
-                                >
-                                  {uploading ? (
-                                    // Estado de carga
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                      <CircularProgress size={40} />
-                                      <Typography variant="body2" color="textSecondary">
-                                        Subiendo archivo...
-                                      </Typography>
-                                    </Box>
-                                  ) : selectedFile ? (
-                                    // Archivo seleccionado
-                                    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
-                                      <Box sx={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center',
-                                        width: 50,
-                                        height: 50,
-                                        borderRadius: '50%',
-                                        bgcolor: alpha(theme.palette.error.main, 0.1),
-                                        mb: 1
-                                      }}>
-                                        <PictureAsPdfIcon sx={{ fontSize: 28, color: theme.palette.error.main }} />
-                                      </Box>
-                                      <Typography variant="subtitle2" align="center" sx={{ wordBreak: 'break-all' }}>
-                                        {selectedFile.name}
-                                      </Typography>
-                                      <Typography variant="body2" color="textSecondary">
-                                        {(selectedFile.size / 1024).toFixed(2)} KB
-                                      </Typography>
-                                      <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                                        <Button
-                                          size="small"
-                                          color="error"
-                                          variant="outlined"
-                                          onClick={() => setSelectedFile(null)}
-                                        >
-                                          Cambiar archivo
-                                        </Button>
-                                        <Button 
-                                          onClick={handleUploadStatement} 
-                                          variant="contained" 
-                                          color="primary"
-                                          disabled={uploading}
-                                          startIcon={<UploadFileIcon />}
-                                        >
-                                          Subir Resumen
-                                        </Button>
-                                      </Box>
-                                    </Box>
-                                  ) : (
-                                    // Seleccionar archivo
-                                    <>
-                                      <input
-                                        type="file"
-                                        accept="application/pdf"
-                                        style={{ display: 'none' }}
-                                        id="pdf-file-input-inline"
-                                        onChange={(e) => {
-                                          // Primero verificamos que podamos proceder (hay una tarjeta seleccionada)
-                                          if (handleOpenUploadDialog()) {
-                                            handleFileChange(e);
-                                          }
-                                        }}
-                                        disabled={uploading}
-                                      />
-                                      <Box sx={{ 
-                                        display: 'flex', 
-                                        flexDirection: 'column', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center',
-                                        gap: 2
-                                      }}>
-                                        <InsertDriveFileIcon sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 1 }} />
-                                        <Typography variant="h6" color="textSecondary">
-                                          No hay resumen disponible
-                                        </Typography>
-                                        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                                          Sube el resumen de tu tarjeta para {getMonthName(selectedMonth)} {selectedYear}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                          <label htmlFor="pdf-file-input-inline">
-                                            <Button
-                                              variant="contained"
-                                              component="span"
-                                              color="primary"
-                                              startIcon={<UploadFileIcon />}
-                                              disabled={uploading}
-                                              sx={{ px: 3, py: 1 }}
-                                            >
-                                              Seleccionar archivo PDF
-                                            </Button>
-                                          </label>
-                                          <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
-                                            Sólo se aceptan archivos PDF. Tamaño máximo: 10MB.
-                                          </Typography>
-                                        </Box>
-                                      </Box>
-                                    </>
-                                  )}
-                                </Paper>
-                              )}
-                            </Box>
-                            
-                            {/* Bloque "Movimientos del periodo" ahora viene después */}
-                            <Grid container spacing={2} mt={3}> {/* Ajustado mt a 3 para consistencia */}
-                              <Grid item xs={12}>
-                                <Card 
-                                  elevation={2} 
-                                      sx={{ 
-                                    p: 0, 
-                                    borderRadius: 3,
-                                    overflow: 'hidden',
-                                    height: '100%',
-                                    transition: 'transform 0.3s ease',
-                                    '&:hover': {
-                                      transform: 'translateY(-4px)',
-                                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    }
-                                  }}
-                                >
-                                  <Box sx={{ 
-                                    p: 2,
-                                    background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.info.dark} 100%)`,
-                                    color: 'white',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                  }}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <CreditCardIcon fontSize="small" />
-                                      <Typography variant="body2" fontWeight="medium">
-                                        Movimientos del Periodo
-                                        </Typography>
-                                    </Stack>
-                                    <Tooltip title="Detalle de transacciones de este periodo" arrow>
-                                      <IconButton size="small" sx={{ color: 'white', opacity: 0.8 }}>
-                                        <ReceiptIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                      </Box>
-                                  <Box sx={{ 
-                                    p: 2,
-                                    borderLeft: `4px solid ${theme.palette.info.main}`,
-                                        display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 0.5,
-                                    maxHeight: '600px', // Limit height to show approx 5-6 days
-                                    overflow: 'auto'
-                                  }}>
-                                    {transactions.length > 0 ? (
-                                      <CreditCardMovements 
-                                        transactions={allCardTransactions[selectedCard] || []} 
-                                        loading={false}
-                                      />
-                                    ) : (
-                                      <Box sx={{ textAlign: 'center', py: 2 }}>
-                                        <Typography variant="body2" color="textSecondary">
-                                          No hay movimientos registrados en este periodo
-                                        </Typography>
-                                      </Box>
-                                    )}
-                                        </Box>
-                                </Card>
-                              </Grid>
-                            </Grid>
-                          </>
-                        )}
-                      </Box>
-                    </>
-                  ) : (
-                    <Paper 
-                      elevation={0} 
-                      variant="outlined" 
-                      sx={{ 
-                        p: 3, 
-                        textAlign: 'center',
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderStyle: 'dashed',
-                        borderRadius: 1,
-                        border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`
+                    sx={{ 
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                    }}
+                  >
+                    <ChevronRightIcon />
+                  </IconButton>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+        {/* Resumen total y botón de pago */}
+        {cards.length > 0 && (
+          <Card 
+            elevation={3}
+            sx={{ 
+              mb: 4, 
+              borderRadius: 3,
+              background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+              color: 'white'
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Grid container spacing={3} alignItems="center">
+                <Grid item xs={12} md={8}>
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <Avatar
+                      sx={{
+                        bgcolor: alpha(theme.palette.common.white, 0.2),
+                        width: 48,
+                        height: 48
                       }}
                     >
-                      <CreditCardIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, mb: 2 }} />
-                      <Typography variant="h6" color="textSecondary" paragraph>
-                        Selecciona una tarjeta o añade una nueva
+                      <PaymentIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h6" fontWeight="bold">
+                        Total a Pagar
                       </Typography>
-                      <Button
-                        variant="contained"
-                        onClick={() => navigate('/NuevaTarjeta')}
-                        startIcon={<AddIcon />}
+                      <Typography variant="h4" fontWeight="bold">
+                        {formatAmount(getAllCardsTotal())}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        {cards.length} {cards.length === 1 ? 'tarjeta' : 'tarjetas'} • {getMonthName(selectedMonth)} {selectedYear}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      startIcon={<PaymentIcon />}
+                      onClick={handlePayCreditCard}
+                      disabled={(() => {
+                        if (isFutureMonth()) return true;
+                        if (areCardsActuallyPaid()) return true;
+                        if (getAllCardsTotal() <= 0) return true;
+
+                        const today = new Date();
+                        const currentMonth = today.getMonth() + 1;
+                        const currentYear = today.getFullYear();
+                        let prevMonth = currentMonth - 1;
+                        let prevYear = currentYear;
+                        if (prevMonth === 0) {
+                          prevMonth = 12;
+                          prevYear = currentYear - 1;
+                        }
+                        if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                          let anyCardPastDueDate = false;
+                          for (const card of cards) {
+                            const cardDates = getCardDates(card.id);
+                            if (cardDates && cardDates.dueDate) {
+                              const dueDate = new Date(cardDates.dueDate);
+                              if (today > dueDate) {
+                                anyCardPastDueDate = true;
+                                break;
+                              }
+                            }
+                          }
+                          return !anyCardPastDueDate;
+                        }
+                        
+                        return true;
+                      })()}
+                        sx={{ 
+                          px: 4,
+                          py: 1.5,
+                          borderRadius: 3,
+                          bgcolor: areCardsActuallyPaid() 
+                            ? theme.palette.grey[800]
+                            : theme.palette.common.white,
+                          color: areCardsActuallyPaid() 
+                            ? theme.palette.common.white
+                            : theme.palette.success.main,
+                          fontWeight: 'bold',
+                          '&:hover': {
+                            bgcolor: areCardsActuallyPaid() 
+                              ? theme.palette.grey[900]
+                              : alpha(theme.palette.common.white, 0.9),
+                            transform: 'translateY(-2px)',
+                            boxShadow: theme.shadows[8]
+                          },
+                          '&.Mui-disabled': {
+                            bgcolor: areCardsActuallyPaid() 
+                              ? theme.palette.grey[800]
+                              : alpha(theme.palette.common.white, 0.3),
+                            color: areCardsActuallyPaid() 
+                              ? alpha(theme.palette.common.white, 0.7)
+                              : alpha(theme.palette.common.white, 0.7)
+                          }
+                        }}
                       >
-                        Añadir Tarjeta
+                        {(() => {
+                          if (isFutureMonth()) return 'Mes Futuro';
+                          if (areCardsActuallyPaid()) return 'Ya Pagado';
+                          if (getAllCardsTotal() <= 0) return 'Sin Gastos';
+
+                          const today = new Date();
+                          const currentMonth = today.getMonth() + 1;
+                          const currentYear = today.getFullYear();
+                          let prevMonth = currentMonth - 1;
+                          let prevYear = currentYear;
+                          if (prevMonth === 0) {
+                            prevMonth = 12;
+                            prevYear = currentYear - 1;
+                          }
+                          if (selectedYear === prevYear && selectedMonth === prevMonth) {
+                            let anyCardPastDueDate = false;
+                            for (const card of cards) {
+                              const cardDates = getCardDates(card.id);
+                              if (cardDates && cardDates.dueDate) {
+                                const dueDate = new Date(cardDates.dueDate);
+                                if (today > dueDate) {
+                                  anyCardPastDueDate = true;
+                                  break;
+                                }
+                              }
+                            }
+                            return anyCardPastDueDate ? 'Pagar Tarjetas' : 'Esperar Vencimiento';
+                          }
+                          
+                          return 'No Disponible';
+                        })()}
                       </Button>
-                    </Paper>
-                  )}
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+        )}
+
+        {cards.length > 0 ? (
+          /* Grid de tarjetas en 2 columnas */
+          <Grid container spacing={3}>
+            {/* Columna izquierda - Selector de tarjetas */}
+            <Grid item xs={12} lg={5}>
+              <Card elevation={2} sx={{ borderRadius: 3, mb: 3 }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight="600" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CreditCardIcon color="primary" />
+                    Selecciona una tarjeta
+                  </Typography>
+                  
+                  <Grid container spacing={2}>
+                    {cards.map(card => {
+                      const isSelected = selectedCard === card.id;
+                      const cardTotal = getCardTotal(card.id);
+                      const isPaid = isCardPaid(card.id);
+                      const cardType = card.name.toLowerCase().includes('visa') ? 'visa' : 
+                                     card.name.toLowerCase().includes('master') ? 'mastercard' : 'credit-card';
+                      
+                      return (
+                        <Grid item xs={12} key={card.id}>
+                          <Card
+                            onClick={() => handleCardSelect(card.id)}
+                            sx={{
+                              cursor: 'pointer',
+                              borderRadius: 3,
+                              transition: 'all 0.3s ease',
+                              transform: isSelected ? 'translateY(-8px)' : 'none',
+                              boxShadow: isSelected 
+                                ? `0 12px 24px ${alpha(theme.palette.primary.main, 0.3)}` 
+                                : theme.shadows[2],
+                              border: isSelected 
+                                ? `2px solid ${theme.palette.primary.main}`
+                                : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                              position: 'relative',
+                              overflow: 'hidden',
+                              '&:hover': {
+                                transform: 'translateY(-4px)',
+                                boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.2)}`
+                              }
+                            }}
+                          >
+                            {/* Indicador de selección */}
+                            {isSelected && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 12,
+                                  right: 12,
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: '50%',
+                                  bgcolor: theme.palette.primary.main,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  zIndex: 2
+                                }}
+                              >
+                                <CheckIcon sx={{ color: 'white', fontSize: 16 }} />
+                              </Box>
+                            )}
+                            
+                            {/* Header de la tarjeta */}
+                            <Box
+                              sx={{
+                                p: 2.5,
+                                background: cardType === 'visa' 
+                                  ? 'linear-gradient(135deg, #1a237e 0%, #303f9f 100%)' 
+                                  : cardType === 'mastercard'
+                                    ? 'linear-gradient(135deg, #b71c1c 0%, #e53935 100%)'
+                                    : 'linear-gradient(135deg, #455a64 0%, #78909c 100%)',
+                                color: 'white',
+                                position: 'relative'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                                <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>
+                                  {cardType === 'visa' ? 'VISA' : cardType === 'mastercard' ? 'MASTER' : 'CARD'}
+                                </Typography>
+                                <IconButton 
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenMenu(e, card.id);
+                                  }}
+                                  sx={{ color: 'white', opacity: 0.8 }}
+                                >
+                                  <MoreVertIcon />
+                                </IconButton>
+                              </Box>
+                              
+                              <Typography 
+                                variant="body1" 
+                                fontWeight="medium" 
+                                sx={{ 
+                                  fontFamily: 'monospace', 
+                                  letterSpacing: 2,
+                                  mb: 1
+                                }}
+                              >
+                                **** **** **** {card.lastFourDigits || '0000'}
+                              </Typography>
+                              
+                              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                {card.name}
+                              </Typography>
+                            </Box>
+                            
+                            {/* Información de la tarjeta */}
+                            <CardContent sx={{ p: 2.5 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Total del período:
+                                </Typography>
+                                <Typography variant="h6" fontWeight="bold" color={cardTotal > 0 ? "text.primary" : "text.secondary"}>
+                                  {formatAmount(cardTotal)}
+                                </Typography>
+                              </Box>
+                              
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Estado:
+                                </Typography>
+                                <Chip 
+                                  label={isPaid ? "Pagada" : cardTotal > 0 ? "Pendiente" : "Sin gastos"}
+                                  size="small"
+                                  color={isPaid ? "success" : cardTotal > 0 ? "warning" : "default"}
+                                  variant={isPaid ? "filled" : "outlined"}
+                                  sx={{ fontWeight: 'medium' }}
+                                />
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
                 </CardContent>
               </Card>
-            ) : (
-              <Paper 
-                elevation={0} 
-                variant="outlined" 
-                sx={{ 
-                  p: 3, 
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderStyle: 'dashed',
-                  borderRadius: 1,
-                  border: `1px solid ${alpha(theme.palette.text.primary, 0.12)}`
-                }}
-              >
-                <CreditCardIcon sx={{ fontSize: 60, color: theme.palette.text.secondary, mb: 2 }} />
-                <Typography variant="h6" color="textSecondary" paragraph>
-                  Selecciona una tarjeta o añade una nueva
-                </Typography>
-                <Button
-                  variant="contained"
-                  onClick={() => navigate('/NuevaTarjeta')}
-                  startIcon={<AddIcon />}
-                >
-                  Añadir Tarjeta
-                </Button>
-              </Paper>
-            )}
-          </Grid>
-        </Grid>
-      </Box>
+            </Grid>
+
+            {/* Columna derecha - Detalles de la tarjeta seleccionada */}
+            {selectedCard && (
+              <Grid item xs={12} lg={7}>
+                <Fade in timeout={600}>
+                  <Box>
+                    {/* Header de la tarjeta seleccionada */}
+                    <Card 
+                      elevation={3} 
+                      sx={{ 
+                        mb: 3,
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: { xs: 'none', sm: 'translateY(-2px)' },
+                          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+                        }
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                          borderBottom: `1px solid ${theme.palette.divider}`
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Avatar
+                            sx={{
+                              bgcolor: 'rgba(255, 255, 255, 0.2)',
+                              color: 'white',
+                              width: { xs: 40, sm: 48 },
+                              height: { xs: 40, sm: 48 }
+                            }}
+                          >
+                            <CreditCardIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant={isMobile ? "h6" : "h5"} fontWeight="bold" color="white">
+                              {cards.find(card => card.id === selectedCard)?.name}
+                            </Typography>
+                            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                              Detalles del período {getMonthName(selectedMonth)} {selectedYear}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    </Card>
+
+                    {/* Configuración de fechas integrada */}
+                    {!datesConfigured && (
+                      <Card 
+                        elevation={3} 
+                        sx={{ 
+                          mb: 3,
+                          borderRadius: 3,
+                          overflow: 'hidden',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: { xs: 'none', sm: 'translateY(-2px)' },
+                            boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+                          }
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            p: 3,
+                            background: `linear-gradient(to right, ${theme.palette.warning.dark}, ${theme.palette.warning.main})`,
+                            borderBottom: `1px solid ${theme.palette.divider}`
+                          }}
+                        >
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar
+                              sx={{
+                                bgcolor: 'rgba(255, 255, 255, 0.2)',
+                                color: 'white',
+                                width: { xs: 36, sm: 40 },
+                                height: { xs: 36, sm: 40 }
+                              }}
+                            >
+                              <CalendarTodayIcon />
+                            </Avatar>
+                            <Box>
+                              <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                                Configuración de Fechas
+                              </Typography>
+                              <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                                Configura las fechas de cierre y vencimiento
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </Box>
+                        
+                        <CardContent sx={{ p: 3 }}>
+                          {updateError && (
+                            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+                              {updateError}
+                            </Alert>
+                          )}
+                          
+                          <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                              <Card 
+                                elevation={1} 
+                                sx={{ 
+                                  borderRadius: 2,
+                                  border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                                  height: '100%',
+                                  transition: 'all 0.3s ease',
+                                  '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                                }}
+                              >
+                                <CardContent sx={{ p: 3 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+                                    <CalendarTodayIcon color="primary" fontSize="small" />
+                                    <Typography variant="h6" color="primary" fontWeight="bold">
+                                      Fecha de Cierre
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                                    La fecha de cierre es cuando finaliza el período de facturación.
+                                  </Typography>
+                                  
+                                  <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+                                    <DatePicker
+                                      label="Seleccionar fecha de cierre"
+                                      value={closingDate ? dayjs(closingDate) : null}
+                                      onChange={handleClosingDateChange}
+                                      views={['year', 'month', 'day']}
+                                      format="DD/MM/YYYY"
+                                      shouldDisableDate={shouldDisableClosingDate}
+                                      slotProps={{
+                                        textField: {
+                                          fullWidth: true,
+                                          required: true,
+                                          error: !closingDate,
+                                          helperText: !closingDate ? 'Fecha requerida' : '',
+                                          sx: { mt: 1 }
+                                        }
+                                      }}
+                                    />
+                                  </LocalizationProvider>
+                                  
+                                  {closingDate && (
+                                    <Alert severity="success" sx={{ mt: 2, borderRadius: 2 }}>
+                                      <Typography variant="body2">
+                                        {dayjs(closingDate).locale('es').format('DD [de] MMMM [de] YYYY')}
+                                      </Typography>
+                                    </Alert>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                            
+                            <Grid item xs={12} md={6}>
+                              <Card 
+                                elevation={1} 
+                                sx={{ 
+                                  borderRadius: 2,
+                                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                                  height: '100%',
+                                  transition: 'all 0.3s ease',
+                                  '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                                }}
+                              >
+                                <CardContent sx={{ p: 3 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+                                    <PaymentIcon color="error" fontSize="small" />
+                                    <Typography variant="h6" color="error" fontWeight="bold">
+                                      Fecha de Vencimiento
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                                    Es el día límite para realizar el pago sin intereses.
+                                  </Typography>
+                                  
+                                  <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+                                    <DatePicker
+                                      label="Seleccionar fecha de vencimiento"
+                                      value={dueDate ? dayjs(dueDate) : null}
+                                      onChange={handleDueDateChange}
+                                      views={['year', 'month', 'day']}
+                                      format="DD/MM/YYYY"
+                                      shouldDisableDate={shouldDisableDueDate}
+                                      slotProps={{
+                                        textField: {
+                                          fullWidth: true,
+                                          required: true,
+                                          error: !dueDate,
+                                          helperText: !dueDate ? 'Fecha requerida' : 'Debe ser posterior al cierre',
+                                          sx: { mt: 1 }
+                                        }
+                                      }}
+                                    />
+                                  </LocalizationProvider>
+                                  
+                                  {dueDate && (
+                                    <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
+                                      <Typography variant="body2">
+                                        {dayjs(dueDate).locale('es').format('DD [de] MMMM [de] YYYY')}
+                                      </Typography>
+                                    </Alert>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                            
+                            <Grid item xs={12}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Alert severity="info" sx={{ flex: 1, mr: 2, borderRadius: 2 }}>
+                                  <Typography variant="body2">
+                                    Solo puedes configurar fechas hasta un máximo de 1 mes en el futuro.
+                                  </Typography>
+                                </Alert>
+                                
+                                <Button
+                                  variant="contained"
+                                  onClick={handleUpdateDates}
+                                  disabled={saving || !closingDate || !dueDate}
+                                  startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                                  sx={{ 
+                                    borderRadius: 2,
+                                    px: 4,
+                                    py: 1.2,
+                                    minWidth: 160
+                                  }}
+                                >
+                                  {saving ? 'Guardando...' : 'Guardar Fechas'}
+                                </Button>
+                              </Box>
+                            </Grid>
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Información de estado */}
+                    <Card 
+                      elevation={3} 
+                      sx={{ 
+                        mb: 3,
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: { xs: 'none', sm: 'translateY(-2px)' },
+                          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+                        }
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: `linear-gradient(to right, ${theme.palette.info.dark}, ${theme.palette.info.main})`,
+                          borderBottom: `1px solid ${theme.palette.divider}`
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Avatar
+                            sx={{
+                              bgcolor: 'rgba(255, 255, 255, 0.2)',
+                              color: 'white',
+                              width: { xs: 36, sm: 40 },
+                              height: { xs: 36, sm: 40 }
+                            }}
+                          >
+                            <InfoIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                              Estado de la Tarjeta
+                            </Typography>
+                            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                              Información de fechas y montos
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                      
+                      <CardContent sx={{ p: 3 }}>
+                        <Grid container spacing={3}>
+                        <Grid item xs={12} md={4}>
+                          <Card 
+                            elevation={1} 
+                            sx={{ 
+                              borderRadius: 2,
+                              border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                              transition: 'all 0.3s ease',
+                              '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                            }}
+                          >
+                            <CardContent sx={{ p: 2.5 }}>
+                              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                                <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), width: 40, height: 40 }}>
+                                  <CalendarTodayIcon color="primary" fontSize="small" />
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="subtitle2" fontWeight="600" color="primary">
+                                    Fecha de Cierre
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Fin del período
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              
+                              <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                                  {closingDate ? dayjs(closingDate).locale('es').format('DD [de] MMMM') : 'No configurado'}
+                              </Typography>
+                              
+                                {closingDate && (
+                                  <Chip 
+                                    label={new Date() <= new Date(closingDate) ? "Período activo" : "Período cerrado"}
+                                    size="small"
+                                    color={new Date() <= new Date(closingDate) ? "success" : "default"}
+                                    variant="outlined"
+                                  />
+                                )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={4}>
+                          <Card 
+                            elevation={1} 
+                            sx={{ 
+                              borderRadius: 2,
+                              border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                              transition: 'all 0.3s ease',
+                              '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                            }}
+                          >
+                            <CardContent sx={{ p: 2.5 }}>
+                              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                                <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), width: 40, height: 40 }}>
+                                  <PaymentIcon color="error" fontSize="small" />
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="subtitle2" fontWeight="600" color="error">
+                                    Fecha de Vencimiento
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Límite de pago
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              
+                              <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                                  {dueDate ? dayjs(dueDate).locale('es').format('DD [de] MMMM') : 'No configurado'}
+                              </Typography>
+                              
+                                {dueDate && !isCardPaid(selectedCard) && (() => {
+                                const today = new Date();
+                                  const dueDateObj = new Date(dueDate);
+                                  const isOverdue = today > dueDateObj;
+                                  const isNearDue = !isOverdue && (dueDateObj - today) / (1000 * 60 * 60 * 24) <= 7;
+                                
+                                if (isOverdue) {
+                                  return (
+                                    <Chip 
+                                      label="Vencida"
+                                      size="small"
+                                      color="error"
+                                      variant="filled"
+                                      icon={<WarningIcon />}
+                                    />
+                                  );
+                                } else if (isNearDue) {
+                                  return (
+                                    <Chip 
+                                      label="Próximo a vencer"
+                                      size="small"
+                                      color="warning"
+                                      variant="outlined"
+                                      icon={<AccessTimeIcon />}
+                                    />
+                                  );
+                                } else {
+                                  return (
+                                    <Chip 
+                                      label="En plazo"
+                                      size="small"
+                                      color="success"
+                                      variant="outlined"
+                                      icon={<CheckCircleOutlineIcon />}
+                                    />
+                                  );
+                                }
+                              })()}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                        
+                        <Grid item xs={12} md={4}>
+                          <Card 
+                            elevation={1} 
+                            sx={{ 
+                              borderRadius: 2,
+                              border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+                              transition: 'all 0.3s ease',
+                              '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] }
+                            }}
+                          >
+                            <CardContent sx={{ p: 2.5 }}>
+                              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                                <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), width: 40, height: 40 }}>
+                                  <AccountBalanceIcon color="warning" fontSize="small" />
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="subtitle2" fontWeight="600" color="warning.main">
+                                    Total del Período
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Monto a pagar
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              
+                              <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                                {formatAmount(getCardTotal())}
+                              </Typography>
+                              
+                              <Chip 
+                                label={
+                                  getCardTotal() > 0 
+                                    ? isCardPaid(selectedCard) 
+                                      ? "Pagado" 
+                                      : "Pendiente"
+                                    : "Sin gastos"
+                                }
+                                size="small"
+                                color={
+                                  getCardTotal() > 0 
+                                    ? isCardPaid(selectedCard) 
+                                      ? "success" 
+                                      : "warning"
+                                    : "default"
+                                }
+                                variant={
+                                  getCardTotal() > 0 && isCardPaid(selectedCard) 
+                                    ? "filled" 
+                                    : "outlined"
+                                }
+                                icon={
+                                  getCardTotal() > 0 
+                                    ? isCardPaid(selectedCard) 
+                                      ? <CheckCircleIcon />
+                                      : <ScheduleIcon />
+                                    : <InfoIcon />
+                                }
+                              />
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      </Grid>
+                      </CardContent>
+                    </Card>
+
+                      {/* Resumen del mes */}
+                    <Card 
+                      elevation={3} 
+                      sx={{ 
+                        mb: 3,
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: { xs: 'none', sm: 'translateY(-2px)' },
+                          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+                        }
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: `linear-gradient(to right, ${theme.palette.secondary.dark}, ${theme.palette.secondary.main})`,
+                          borderBottom: `1px solid ${theme.palette.divider}`
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Avatar
+                            sx={{
+                              bgcolor: 'rgba(255, 255, 255, 0.2)',
+                              color: 'white',
+                              width: { xs: 36, sm: 40 },
+                              height: { xs: 36, sm: 40 }
+                            }}
+                          >
+                            <ReceiptIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                          Resumen del Mes
+                        </Typography>
+                            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                              Estado de cuenta y documentos
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                      
+                      <CardContent sx={{ p: 3 }}>
+                        {userData?.creditCards?.[selectedCard]?.statements?.[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`] ? (
+                          <Card elevation={1} sx={{ borderRadius: 2, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                            <CardContent sx={{ p: 3 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                                <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
+                                    <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), width: 48, height: 48 }}>
+                                      <PictureAsPdfIcon color="error" />
+                                    </Avatar>
+                                    <Box>
+                                      <Typography variant="subtitle1" fontWeight="600">
+                                        {userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].fileName}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        Subido el {new Date(userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].uploadDate).toLocaleDateString()}
+                                      </Typography>
+                                    </Box>
+                                  </Stack>
+                                
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flexShrink: 0 }}>
+                                    <Button
+                                      variant="contained"
+                                      startIcon={<DownloadIcon />}
+                                      onClick={() => handleDownloadStatement(userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`])}
+                                      sx={{ borderRadius: 2 }}
+                                    >
+                                      Descargar
+                                    </Button>
+                                    
+                                    <Button
+                                      variant="outlined"
+                                      endIcon={<ArrowRightAltIcon />}
+                                      component={Link}
+                                      href={userData.creditCards[selectedCard].statements[`${selectedYear}-${String(selectedMonth).padStart(2, '0')}`].downloadURL}
+                                      target="_blank"
+                                      sx={{ borderRadius: 2 }}
+                                    >
+                                      Ver
+                                    </Button>
+                                  </Stack>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card 
+                            elevation={1} 
+                            sx={{ 
+                              borderRadius: 2, 
+                              border: `2px dashed ${alpha(theme.palette.divider, 0.3)}`,
+                              bgcolor: alpha(theme.palette.background.paper, 0.5)
+                            }}
+                          >
+                            <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                              {uploading ? (
+                                <Box>
+                                  <CircularProgress size={48} sx={{ mb: 2 }} />
+                                  <Typography variant="h6" color="text.secondary">
+                                    Subiendo archivo...
+                                  </Typography>
+                                </Box>
+                              ) : selectedFile ? (
+                                <Box>
+                                  <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), width: 64, height: 64, mx: 'auto', mb: 2 }}>
+                                    <PictureAsPdfIcon sx={{ fontSize: 32, color: theme.palette.error.main }} />
+                                  </Avatar>
+                                  <Typography variant="h6" sx={{ mb: 1 }}>
+                                    {selectedFile.name}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                                    {(selectedFile.size / 1024).toFixed(2)} KB
+                                  </Typography>
+                                  <Stack direction="row" spacing={2} justifyContent="center">
+                                    <Button
+                                      variant="outlined"
+                                      onClick={() => setSelectedFile(null)}
+                                    >
+                                      Cambiar
+                                    </Button>
+                                    <Button 
+                                      variant="contained"
+                                      startIcon={<UploadFileIcon />}
+                                      onClick={handleUploadStatement} 
+                                      disabled={uploading}
+                                    >
+                                      Subir Resumen
+                                    </Button>
+                                  </Stack>
+                                </Box>
+                              ) : (
+                                <Box>
+                                  <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    style={{ display: 'none' }}
+                                    id="pdf-file-input"
+                                    onChange={(e) => {
+                                      if (handleOpenUploadDialog()) {
+                                        handleFileChange(e);
+                                      }
+                                    }}
+                                  />
+                                  
+                                  <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), width: 64, height: 64, mx: 'auto', mb: 2 }}>
+                                    <InsertDriveFileIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
+                                  </Avatar>
+                                  
+                                  <Typography variant="h6" sx={{ mb: 1 }}>
+                                    No hay resumen disponible
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                                    Sube el resumen de tu tarjeta para {getMonthName(selectedMonth)} {selectedYear}
+                                  </Typography>
+                                  
+                                  <label htmlFor="pdf-file-input">
+                                    <Button
+                                      variant="contained"
+                                      component="span"
+                                      startIcon={<UploadFileIcon />}
+                                      sx={{ borderRadius: 2 }}
+                                    >
+                                      Seleccionar PDF
+                                    </Button>
+                                  </label>
+                                  
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                                    Solo archivos PDF • Máximo 10MB
+                                  </Typography>
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                      {/* Movimientos del período */}
+                    <Card 
+                      elevation={3} 
+                      sx={{ 
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: { xs: 'none', sm: 'translateY(-2px)' },
+                          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
+                        }
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: `linear-gradient(to right, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
+                          borderBottom: `1px solid ${theme.palette.divider}`
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Avatar
+                            sx={{
+                              bgcolor: 'rgba(255, 255, 255, 0.2)',
+                              color: 'white',
+                              width: { xs: 36, sm: 40 },
+                              height: { xs: 36, sm: 40 }
+                            }}
+                          >
+                            <TrendingUpIcon />
+                          </Avatar>
+                      <Box>
+                            <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                          Movimientos del Período
+                        </Typography>
+                            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                              Transacciones registradas
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                      
+                          <CardContent sx={{ p: 0 }}>
+                            {transactions.length > 0 ? (
+                              <CreditCardMovements 
+                                transactions={allCardTransactions[selectedCard] || []} 
+                                loading={isLoadingTransactions}
+                              />
+                            ) : (
+                              <Box sx={{ p: 4, textAlign: 'center' }}>
+                                <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), width: 64, height: 64, mx: 'auto', mb: 2 }}>
+                                  <ReceiptIcon sx={{ fontSize: 32, color: theme.palette.info.main }} />
+                                </Avatar>
+                                <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                                  No hay movimientos
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  No se registraron transacciones en este período
+                                </Typography>
+                              </Box>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Box>
+                  </Fade>
+                </Grid>
+              )}
+            </Grid>
+          ) : (
+            /* Estado vacío cuando no hay tarjetas */
+            <Fade in timeout={800}>
+              <Card elevation={2} sx={{ borderRadius: 3, textAlign: 'center', py: 8 }}>
+                <CardContent>
+                  <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), width: 80, height: 80, mx: 'auto', mb: 3 }}>
+                    <CreditCardIcon sx={{ fontSize: 40, color: theme.palette.primary.main }} />
+                  </Avatar>
+                  
+                  <Typography variant="h5" fontWeight="bold" sx={{ mb: 2 }}>
+                    No tienes tarjetas registradas
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
+                    Comienza agregando tu primera tarjeta de crédito para gestionar tus gastos mensuales
+                  </Typography>
+                  
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<AddIcon />}
+                    onClick={() => navigate('/NuevaTarjeta')}
+                    sx={{ 
+                      borderRadius: 3,
+                      px: 4,
+                      py: 1.5,
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Agregar Primera Tarjeta
+                  </Button>
+                </CardContent>
+              </Card>
+            </Fade>
+          )}
+      </Container>
       
       {/* Menú de opciones para tarjetas */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
         onClose={handleCloseMenu}
+        PaperProps={{
+          sx: { borderRadius: 2, minWidth: 180 }
+        }}
       >
         <MenuItem onClick={() => handleOptionSelect('edit')}>
-          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+          <EditIcon fontSize="small" sx={{ mr: 1.5 }} />
           Editar tarjeta
-        </MenuItem>
-        <MenuItem onClick={() => handleOptionSelect('update-dates')}>
-          <DateRangeIcon fontSize="small" sx={{ mr: 1 }} />
-          Actualizar fechas
         </MenuItem>
       </Menu>
       
@@ -3025,473 +2572,17 @@ const CreditCards = () => {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbarSeverity} 
+          sx={{ width: '100%', borderRadius: 2 }}
+          variant="filled"
+        >
           {snackbarMessage}
         </Alert>
       </Snackbar>
       
-      {/* Diálogo de actualización de fechas de tarjeta */}
-      <Dialog
-        open={updateDatesDialogOpen}
-        onClose={handleCloseUpdateDatesDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 2,
-            bgcolor: '#343434',
-            color: 'white'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          bgcolor: '#474bc2', 
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton 
-              size="small" 
-              onClick={handleCloseUpdateDatesDialog}
-              sx={{ color: 'white', mr: 1 }}
-            >
-              <ChevronRightIcon />
-            </IconButton>
-            <CalendarTodayIcon />
-            <Typography variant="h6">
-              Actualizar Fechas
-            </Typography>
-          </Box>
-        </DialogTitle>
-        
-        <DialogContent sx={{ p: 3, bgcolor: '#343434' }}>
-          {updateError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {updateError}
-            </Alert>
-          )}
-          
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Box 
-                sx={{
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: 'rgba(255,255,255,0.1)',
-                  mb: 2,
-                  display: 'flex',
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  alignItems: { xs: 'flex-start', sm: 'center' },
-                  gap: 2
-                }}
-              >
-                <Typography 
-                  variant="subtitle2" 
-                  fontWeight="medium" 
-                  color="white"
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    gap: 1,
-                    minWidth: 120
-                  }}
-                >
-                  <EventIcon fontSize="small" /> Configura para:
-                </Typography>
-                
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <Select
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        borderRadius: 1,
-                        color: 'white',
-                        '& .MuiSelect-icon': { color: 'white' },
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255,255,255,0.3)',
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'white',
-                        },
-                      }}
-                      MenuProps={{
-                        PaperProps: {
-                          sx: { maxHeight: 300, borderRadius: 1 }
-                        }
-                      }}
-                      displayEmpty
-                      renderValue={(selected) => selected ? getMonthName(selected) : 'Mes'}
-                    >
-                      {Array.from({ length: 12 }, (_, i) => ({
-                        value: i + 1,
-                        label: getMonthName(i + 1)
-                      })).map(month => {
-                        const monthDate = new Date(selectedYear, month.value - 1, 1);
-                        const isDisabled = isDateBeyondLimit(monthDate) || 
-                                        isMonthAlreadyConfigured(updateCardId, selectedYear, month.value);
-                        
-                        return (
-                          <MenuItem 
-                            key={month.value} 
-                            value={month.value}
-                            disabled={isDisabled}
-                            sx={{
-                              opacity: isDisabled ? 0.5 : 1,
-                              '&.Mui-disabled': {
-                                color: 'text.disabled'
-                              }
-                            }}
-                          >
-                            {month.label}
-                            {updateCardId && isMonthAlreadyConfigured(updateCardId, selectedYear, month.value) && 
-                              <Chip 
-                                size="small" 
-                                label="Configurado" 
-                                color="success" 
-                                variant="outlined"
-                                sx={{ ml: 1, height: 20, fontSize: '0.6rem' }}
-                              />
-                            }
-                          </MenuItem>
-                        );
-                      })}
-                    </Select>
-                  </FormControl>
-                  
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
-                    <Select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        borderRadius: 1,
-                        color: 'white',
-                        '& .MuiSelect-icon': { color: 'white' },
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255,255,255,0.3)',
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'white',
-                        },
-                      }}
-                      displayEmpty
-                      renderValue={(selected) => selected || 'Año'}
-                    >
-                      {Array.from(
-                        { length: 5 }, 
-                        (_, i) => new Date().getFullYear() + i - 2
-                      ).map(year => {
-                        const yearLimit = new Date();
-                        yearLimit.setMonth(yearLimit.getMonth() + 3);
-                        const isDisabled = year > yearLimit.getFullYear();
-                        
-                        return (
-                          <MenuItem 
-                            key={year} 
-                            value={year}
-                            disabled={isDisabled}
-                            sx={{
-                              opacity: isDisabled ? 0.5 : 1
-                            }}
-                          >
-                            {year}
-                          </MenuItem>
-                        );
-                      })}
-                    </Select>
-                  </FormControl>
-                </Box>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Box sx={{ 
-                p: 3, 
-                borderRadius: 2, 
-                bgcolor: '#343434',
-                border: '1px solid rgba(255,255,255,0.1)',
-                height: '100%'
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <CalendarTodayIcon sx={{ color: '#5d9cec' }} fontSize="small" />
-                  <Typography variant="h6" sx={{ color: '#5d9cec' }} fontWeight="bold">
-                    Fecha de Cierre
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ 
-                  mb: 3, 
-                  p: 2, 
-                  borderRadius: 2, 
-                  bgcolor: 'rgba(255,255,255,0.1)',
-                }}>
-                  <Typography variant="body2" color="white" sx={{ opacity: 0.8 }}>
-                    La fecha de cierre es cuando finaliza el período de facturación. 
-                    Todas las compras posteriores se incluirán en el próximo mes.
-                  </Typography>
-                </Box>
-                
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-                  <DatePicker
-                    label="Seleccionar fecha de cierre"
-                    value={closingDate ? dayjs(closingDate) : null}
-                    onChange={handleClosingDateChange}
-                    views={['year', 'month', 'day']}
-                    format="DD/MM/YYYY"
-                    shouldDisableDate={shouldDisableClosingDate}
-                    disableFuture={false}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        required: true,
-                        error: !closingDate,
-                        helperText: !closingDate ? 'Fecha requerida para continuar' : '',
-                        margin: "normal",
-                        sx: { 
-                          mt: 1, 
-                          mb: 2,
-                          '& .MuiOutlinedInput-root': {
-                            bgcolor: 'rgba(255,255,255,0.1)',
-                            color: 'white',
-                            '& fieldset': {
-                              borderColor: 'rgba(255,255,255,0.3)',
-                            },
-                            '&:hover fieldset': {
-                              borderColor: 'white',
-                            },
-                          },
-                          '& .MuiInputLabel-root': {
-                            color: 'rgba(255,255,255,0.7)',
-                          },
-                          '& .MuiInputBase-input': {
-                            color: 'white',
-                          },
-                          '& .MuiSvgIcon-root': {
-                            color: 'white',
-                          },
-                        },
-                        InputProps: {
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <CalendarTodayIcon fontSize="small" sx={{ color: '#5d9cec' }} />
-                            </InputAdornment>
-                          ),
-                        }
-                      },
-                      day: {
-                        sx: { 
-                          '&.Mui-selected': {
-                            bgcolor: '#5d9cec',
-                            '&:hover': { bgcolor: '#4a8edb' }
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </LocalizationProvider>
-                
-                {closingDate && (
-                  <Box 
-                    sx={{ 
-                      mt: 3, 
-                      p: 2, 
-                      borderRadius: 2,
-                      bgcolor: 'rgba(93, 156, 236, 0.2)',
-                      border: '1px solid rgba(93, 156, 236, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1
-                    }}
-                  >
-                    <CheckCircleIcon sx={{ color: '#5d9cec' }} fontSize="small" />
-                    <Typography variant="body2" fontWeight="medium" color="white">
-                      {dayjs(closingDate).locale('es').format('DD [de] MMMM [de] YYYY')}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Box sx={{ 
-                p: 3, 
-                borderRadius: 2, 
-                bgcolor: '#343434',
-                border: '1px solid rgba(255,255,255,0.1)',
-                height: '100%'
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <PaymentIcon sx={{ color: '#f06292' }} fontSize="small" />
-                  <Typography variant="h6" sx={{ color: '#f06292' }} fontWeight="bold">
-                    Fecha de Vencimiento
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ 
-                  mb: 3, 
-                  p: 2, 
-                  borderRadius: 2,
-                  bgcolor: 'rgba(255,255,255,0.1)',
-                }}>
-                  <Typography variant="body2" color="white" sx={{ opacity: 0.8 }}>
-                    Es el día límite para realizar el pago de tu tarjeta.
-                    Debes pagar antes de esta fecha para evitar intereses.
-                  </Typography>
-                </Box>
-                
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-                  <DatePicker
-                    label="Seleccionar fecha de vencimiento"
-                    value={dueDate ? dayjs(dueDate) : null}
-                    onChange={handleDueDateChange}
-                    views={['year', 'month', 'day']}
-                    format="DD/MM/YYYY"
-                    shouldDisableDate={shouldDisableDueDate}
-                    disableFuture={false}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        required: true,
-                        error: !dueDate,
-                        helperText: !dueDate ? 'Fecha requerida para continuar' : 'Selecciona una fecha posterior al cierre',
-                        margin: "normal",
-                        sx: { 
-                          mt: 1, 
-                          mb: 2,
-                          '& .MuiOutlinedInput-root': {
-                            bgcolor: 'rgba(255,255,255,0.1)',
-                            color: 'white',
-                            '& fieldset': {
-                              borderColor: 'rgba(255,255,255,0.3)',
-                            },
-                            '&:hover fieldset': {
-                              borderColor: 'white',
-                            },
-                          },
-                          '& .MuiInputLabel-root': {
-                            color: 'rgba(255,255,255,0.7)',
-                          },
-                          '& .MuiInputBase-input': {
-                            color: 'white',
-                          },
-                          '& .MuiSvgIcon-root': {
-                            color: 'white',
-                          },
-                        },
-                        InputProps: {
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <PaymentIcon fontSize="small" sx={{ color: '#f06292' }} />
-                            </InputAdornment>
-                          ),
-                        }
-                      },
-                      day: {
-                        sx: { 
-                          '&.Mui-selected': {
-                            bgcolor: '#f06292',
-                            '&:hover': { bgcolor: '#e45884' }
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </LocalizationProvider>
-                
-                {dueDate && (
-                  <Box 
-                    sx={{ 
-                      mt: 3, 
-                      p: 2, 
-                      borderRadius: 2,
-                      bgcolor: 'rgba(240, 98, 146, 0.2)',
-                      border: '1px solid rgba(240, 98, 146, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1
-                    }}
-                  >
-                    <CheckCircleIcon sx={{ color: '#f06292' }} fontSize="small" />
-                    <Typography variant="body2" fontWeight="medium" color="white">
-                      {dayjs(dueDate).locale('es').format('DD [de] MMMM [de] YYYY')}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Grid>
-          </Grid>
-          
-          <Box sx={{ 
-            p: 2,
-            mt: 2,
-            borderRadius: 2,
-            bgcolor: 'rgba(255,255,255,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            <InfoIcon sx={{ color: 'white' }} fontSize="small" />
-            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-              Solo puedes configurar fechas hasta un máximo de 1 mes en el futuro. 
-              Los meses ya configurados se muestran como deshabilitados.
-            </Typography>
-          </Box>
-        </DialogContent>
-        
-        <DialogActions sx={{ 
-          p: 3, 
-          bgcolor: '#343434',
-          borderTop: '1px solid rgba(255,255,255,0.1)' 
-        }}>
-          <Button
-            variant="outlined"
-            onClick={handleCloseUpdateDatesDialog}
-            sx={{ 
-              borderRadius: 1,
-              px: 3,
-              py: 1.2,
-              textTransform: 'none',
-              fontWeight: 'medium',
-              borderWidth: 1.5,
-              borderColor: 'rgba(255,255,255,0.5)',
-              color: 'white',
-              '&:hover': {
-                borderColor: 'white',
-                bgcolor: 'rgba(255,255,255,0.1)'
-              }
-            }}
-          >
-            Cancelar
-          </Button>
-          
-          <Button
-            variant="contained"
-            onClick={handleUpdateDates}
-            disabled={saving || !closingDate || !dueDate}
-            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-            sx={{ 
-              borderRadius: 1,
-              px: 4,
-              py: 1.2,
-              bgcolor: '#474bc2', // Color del botón como la barra superior
-              textTransform: 'none',
-              fontWeight: 'bold',
-              '&:hover': {
-                bgcolor: '#3a3ea6',
-              },
-              '&.Mui-disabled': {
-                bgcolor: 'rgba(71, 75, 194, 0.5)'
-              }
-            }}
-          >
-            {saving ? 'Guardando...' : 'Guardar Fechas'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      
       
       {/* Diálogo para configurar pagos de tarjetas */}
       <Dialog
@@ -3499,174 +2590,144 @@ const CreditCards = () => {
         onClose={handleClosePaymentDialog}
         fullWidth
         maxWidth="sm"
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
       >
-        <DialogTitle>Configurar Pago de Tarjetas</DialogTitle>
-        <DialogContent>
-          <Box sx={{ my: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PaymentIcon color="primary" />
+            Configurar Pago de Tarjetas
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 2 }}>
+          <Card elevation={1} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
+            <Typography variant="subtitle1" fontWeight="600" sx={{ mb: 1 }}>
               Total de tarjetas: {formatAmount(getAllCardsTotal())}
             </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {getMonthName(selectedMonth)} {selectedYear}
+            </Typography>
+          </Card>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                label="Monto redondeado"
+                type="number"
+                value={roundedAmount}
+                onChange={(e) => {
+                  const newValue = Number(e.target.value);
+                  setRoundedAmount(newValue);
+                  if (paymentAmounts.length > 0) {
+                    const equalAmount = newValue / paymentAmounts.length;
+                    setPaymentAmounts(Array(paymentAmounts.length).fill(equalAmount));
+                  }
+                }}
+                fullWidth
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                }}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+            </Grid>
             
-            <TextField
-              label="Monto redondeado"
-              type="number"
-              value={roundedAmount}
-              onChange={(e) => {
-                const newValue = Number(e.target.value);
-                setRoundedAmount(newValue);
-                // Actualizar los montos individuales proporcionalmente
-                if (paymentAmounts.length > 0) {
-                  const equalAmount = newValue / paymentAmounts.length;
-                  setPaymentAmounts(Array(paymentAmounts.length).fill(equalAmount));
-                }
-              }}
-              fullWidth
-              margin="normal"
-              InputProps={{
-                startAdornment: <InputAdornment position="start">$</InputAdornment>,
-              }}
-            />
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Número de pagos</InputLabel>
+                <Select
+                  value={numberOfPayments}
+                  onChange={handlePaymentCountChange}
+                  label="Número de pagos"
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value={1}>1 pago</MenuItem>
+                  <MenuItem value={2}>2 pagos</MenuItem>
+                  <MenuItem value={3}>3 pagos</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+          
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" fontWeight="600" sx={{ mb: 2 }}>
+              Detalle de pagos:
+            </Typography>
             
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Número de pagos</InputLabel>
-              <Select
-                value={numberOfPayments}
-                onChange={handlePaymentCountChange}
-                label="Número de pagos"
-              >
-                <MenuItem value={1}>1 pago</MenuItem>
-                <MenuItem value={2}>2 pagos</MenuItem>
-                <MenuItem value={3}>3 pagos</MenuItem>
-              </Select>
-            </FormControl>
-            
-            <Box sx={{ mt: 3, mb: 1 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Detalle de pagos:
-              </Typography>
-              <List>
-                {paymentDates.map((date, index) => (
-                  <ListItem key={index} sx={{ py: 1, bgcolor: index % 2 === 0 ? 'rgba(0,0,0,0.03)' : 'transparent', borderRadius: 1 }}>
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid item xs={12} sm={8}>
-                        <ListItemText
-                          primary={`Pago ${index + 1}`}
-                          secondary={`Viernes, ${date.getDate()} de ${getMonthName(date.getMonth() + 1).toLowerCase()} de ${date.getFullYear()}`}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={4}>
-                        <TextField
-                          label="Monto"
-                          type="number"
-                          value={paymentAmounts[index] || 0}
-                          onChange={(e) => handlePaymentAmountChange(index, e.target.value)}
-                          fullWidth
-                          size="small"
-                          InputProps={{
-                            startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                          }}
-                        />
-                      </Grid>
+            <Stack spacing={2}>
+              {paymentDates.map((date, index) => (
+                <Card key={index} elevation={1} sx={{ p: 2, borderRadius: 2 }}>
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={8}>
+                      <Typography variant="subtitle2" fontWeight="600">
+                        Pago {index + 1}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Viernes, {date.getDate()} de {getMonthName(date.getMonth() + 1).toLowerCase()} de {date.getFullYear()}
+                      </Typography>
                     </Grid>
-                  </ListItem>
-                ))}
-              </List>
-              
-              {/* Mostrar el total de los pagos */}
-              {numberOfPayments > 1 && (
-                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="subtitle2">
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        label="Monto"
+                        type="number"
+                        value={paymentAmounts[index] || 0}
+                        onChange={(e) => handlePaymentAmountChange(index, e.target.value)}
+                        fullWidth
+                        size="small"
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Card>
+              ))}
+            </Stack>
+            
+            {numberOfPayments > 1 && (
+              <Card elevation={1} sx={{ p: 2, mt: 2, borderRadius: 2, bgcolor: alpha(theme.palette.success.main, 0.05) }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="subtitle2" fontWeight="600">
                     Total de pagos:
                   </Typography>
-                  <Typography variant="subtitle1" fontWeight="bold">
+                  <Typography variant="h6" fontWeight="bold" color="success.main">
                     {formatAmount(paymentAmounts.reduce((sum, amount) => sum + amount, 0))}
                   </Typography>
                 </Box>
-              )}
-            </Box>
-            
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="body2" color="text.secondary">
-                Los pagos se realizarán en los viernes indicados, y las tarjetas se marcarán como pagadas después de completar todos los pagos.
-              </Typography>
-            </Box>
+              </Card>
+            )}
           </Box>
+          
+          <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
+            <Typography variant="body2">
+              Los pagos se realizarán en los viernes indicados, y las tarjetas se marcarán como pagadas después de completar todos los pagos.
+            </Typography>
+          </Alert>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClosePaymentDialog} color="inherit">
+        
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button 
+            onClick={handleClosePaymentDialog} 
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
             Cancelar
           </Button>
           <Button 
             onClick={processCardPayment} 
             variant="contained" 
-            color="primary"
             startIcon={<PaymentIcon />}
+            sx={{ borderRadius: 2 }}
           >
             Procesar Pagos
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Mensaje si no hay tarjeta seleccionada */}
-      {!selectedCard && cards.length > 0 && (
-        <Card
-          sx={{ 
-            mt: 3, 
-            p: 0,
-            borderRadius: 2,
-            bgcolor: theme.palette.mode === 'dark' ? '#2d2d2d' : 'white',
-            boxShadow: theme.shadows[4],
-            width: '100%',
-            maxWidth: '100%',
-            overflow: 'hidden'
-          }}
-        >
-          <CardContent sx={{ p: 0 }}>
-            <Box sx={{ 
-              p: 2, 
-              backgroundColor: theme.palette.primary.main,
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <ReceiptIcon sx={{ mr: 1 }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  Movimientos del Período
-                </Typography>
-              </Box>
-            </Box>
-            
-            <Box 
-              sx={{ 
-                p: 6, 
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center'
-              }}
-            >
-              <CreditCardIcon sx={{ 
-                fontSize: 80, 
-                color: theme.palette.primary.main, 
-                opacity: 0.7, 
-                mb: 3 
-              }} />
-              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 'medium' }}>
-                Selecciona una tarjeta
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400 }}>
-                Haz clic en una de las tarjetas arriba para ver sus movimientos en este período
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
     </Layout>
   );
 };
 
-export default CreditCards; 
+export default CreditCards;
 

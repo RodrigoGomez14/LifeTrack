@@ -475,7 +475,7 @@ const PlantsList = () => {
                                 left: 0,
                                 right: 0,
                                 background: hasImage ? 
-                                  'linear-gradient(transparent, rgba(0,0,0,0.7))' : 
+                                  'linear-gradient(transparent, rgba(0,0,0,0.8))' : 
                                   'transparent',
                                 p: 2,
                                 zIndex: 1
@@ -488,105 +488,83 @@ const PlantsList = () => {
                                   color: hasImage ? '#ffffff' : 'text.primary',
                                   textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
                                   fontWeight: 'bold',
-                                  mb: 1
+                                  mb: 1.5
                                 }}
                               >
                                 {plant.name}
                               </Typography>
                               
-                              <Chip
-                                icon={getStageIcon(plant.etapa)}
-                                label={plant.etapa}
-                                size="small"
-                                sx={{
-                                  bgcolor: alpha(stageColor, hasImage ? 0.9 : 0.1),
-                                  color: hasImage ? '#ffffff' : stageColor,
-                                  fontWeight: 'medium',
-                                  border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none'
-                                }}
-                              />
-                            </Box>
-                          </Box>
-                          
-                          <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
-                            {/* Información básica */}
-                            <Box sx={{ mb: 2 }}>
-                              <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                              {/* Chips de etapa, genética y volumen de maceta */}
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                <Chip
+                                  icon={getStageIcon(plant.etapa)}
+                                  label={plant.etapa}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: alpha(stageColor, hasImage ? 0.9 : 0.1),
+                                    color: hasImage ? '#ffffff' : stageColor,
+                                    fontWeight: 'medium',
+                                    border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none',
+                                    fontSize: '0.75rem'
+                                  }}
+                                />
+                                
                                 {plant.genetic && (
                                   <Chip 
                                     label={plant.genetic} 
                                     size="small"
                                     sx={{ 
-                                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                                      color: theme.palette.secondary.main,
-                                      fontSize: '0.75rem'
+                                      bgcolor: hasImage ? alpha('#ffffff', 0.2) : alpha(theme.palette.secondary.main, 0.1),
+                                      color: hasImage ? '#ffffff' : theme.palette.secondary.main,
+                                      fontSize: '0.7rem',
+                                      border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none',
+                                      fontWeight: 'medium'
                                     }}
                                   />
                                 )}
+                                
                                 {plant.potVolume && (
                                   <Chip 
                                     label={`${plant.potVolume}L`} 
                                     size="small"
                                     sx={{ 
-                                      bgcolor: alpha(theme.palette.info.main, 0.1),
-                                      color: theme.palette.info.main,
-                                      fontSize: '0.75rem'
+                                      bgcolor: hasImage ? alpha('#ffffff', 0.2) : alpha(theme.palette.info.main, 0.1),
+                                      color: hasImage ? '#ffffff' : theme.palette.info.main,
+                                      fontSize: '0.7rem',
+                                      border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none',
+                                      fontWeight: 'medium'
                                     }}
                                   />
                                 )}
                               </Stack>
                             </Box>
-                            
-                            <Divider sx={{ my: 2 }} />
-                            
-                            {/* Información de tiempo de vida */}
+                          </Box>
+                          
+                          <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
+                            {/* Información de etapas */}
                             <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <AccessTimeIcon fontSize="small" />
-                                Tiempo de vida
-                              </Typography>
-                              
-                              <Stack direction="row" spacing={2} justifyContent="space-between" sx={{ mb: 1 }}>
-                                <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h6" fontWeight="bold" color={stageColor}>
-                                    {totalLifeDays || 0}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    días totales
-                                  </Typography>
-                                </Box>
-                                
-                                <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h6" fontWeight="bold" color={stageColor}>
-                                    {currentStageDays || 0}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    en {plant.etapa}
-                                  </Typography>
-                                </Box>
-                              </Stack>
-                            </Box>
-                            
-                            {/* Información de etapas completadas */}
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 'medium' }}>
                                 <CalendarTodayIcon fontSize="small" />
-                                Etapas completadas
+                                Etapas
                               </Typography>
                               
-                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                              <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
                                 {plant.birthDate && (
                                   <Chip
                                     icon={<SpaIcon fontSize="small" />}
                                     label={`G: ${calculateDaysInStage(plant, 'Germinacion') || 0}d`}
-                                    size="small"
+                                    size="medium"
                                     variant={plant.etapa === 'Germinacion' ? 'filled' : 'outlined'}
                                     sx={{ 
-                                      fontSize: '0.7rem',
-                                      height: 24,
-                                      bgcolor: plant.etapa === 'Germinacion' ? alpha(theme.palette.info.main, 0.1) : 'transparent',
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: plant.etapa === 'Germinacion' ? alpha(theme.palette.info.main, 0.15) : 'transparent',
                                       color: theme.palette.info.main,
-                                      borderColor: theme.palette.info.main
+                                      borderColor: theme.palette.info.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
                                     }}
                                   />
                                 )}
@@ -595,14 +573,18 @@ const PlantsList = () => {
                                   <Chip
                                     icon={<GrassIcon fontSize="small" />}
                                     label={`V: ${calculateDaysInStage(plant, 'Vegetativo') || 0}d`}
-                                    size="small"
+                                    size="medium"
                                     variant={plant.etapa === 'Vegetativo' ? 'filled' : 'outlined'}
                                     sx={{ 
-                                      fontSize: '0.7rem',
-                                      height: 24,
-                                      bgcolor: plant.etapa === 'Vegetativo' ? alpha(theme.palette.success.main, 0.1) : 'transparent',
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: plant.etapa === 'Vegetativo' ? alpha(theme.palette.success.main, 0.15) : 'transparent',
                                       color: theme.palette.success.main,
-                                      borderColor: theme.palette.success.main
+                                      borderColor: theme.palette.success.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
                                     }}
                                   />
                                 )}
@@ -611,14 +593,38 @@ const PlantsList = () => {
                                   <Chip
                                     icon={<LocalFloristIcon fontSize="small" />}
                                     label={`F: ${calculateDaysInStage(plant, 'Floracion') || 0}d`}
-                                    size="small"
+                                    size="medium"
                                     variant={plant.etapa === 'Floracion' ? 'filled' : 'outlined'}
                                     sx={{ 
-                                      fontSize: '0.7rem',
-                                      height: 24,
-                                      bgcolor: plant.etapa === 'Floracion' ? alpha(theme.palette.warning.main, 0.1) : 'transparent',
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: plant.etapa === 'Floracion' ? alpha(theme.palette.warning.main, 0.15) : 'transparent',
                                       color: theme.palette.warning.main,
-                                      borderColor: theme.palette.warning.main
+                                      borderColor: theme.palette.warning.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.finishDate && (
+                                  <Chip
+                                    icon={<ParkIcon fontSize="small" />}
+                                    label={`S: ${calculateDaysInStage(plant, 'Secado') || 0}d`}
+                                    size="medium"
+                                    variant={plant.etapa === 'Secado' ? 'filled' : 'outlined'}
+                                    sx={{ 
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: plant.etapa === 'Secado' ? alpha(theme.palette.error.main, 0.15) : 'transparent',
+                                      color: theme.palette.error.main,
+                                      borderColor: theme.palette.error.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
                                     }}
                                   />
                                 )}
@@ -628,6 +634,7 @@ const PlantsList = () => {
                             {/* Información de peso (solo si existe) */}
                             {(plant.pesoHumedo || plant.pesoSeco) && (
                               <Box>
+                                <Divider sx={{ my: 2 }} />
                                 <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   <ScaleIcon fontSize="small" />
                                   Peso registrado
@@ -829,7 +836,7 @@ const PlantsList = () => {
                               />
                             ) : getPlantIcon(index)}
                             
-                            {/* Overlay con nombre */}
+                            {/* Overlay con nombre y etapa */}
                             <Box 
                               sx={{
                                 position: 'absolute',
@@ -837,7 +844,7 @@ const PlantsList = () => {
                                 left: 0,
                                 right: 0,
                                 background: hasImage ? 
-                                  'linear-gradient(transparent, rgba(0,0,0,0.6))' : 
+                                  'linear-gradient(transparent, rgba(0,0,0,0.8))' : 
                                   'transparent',
                                 p: 2,
                                 zIndex: 1
@@ -849,11 +856,56 @@ const PlantsList = () => {
                                 sx={{
                                   color: hasImage ? '#ffffff' : 'text.primary',
                                   textShadow: hasImage ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
-                                  fontWeight: 'bold'
+                                  fontWeight: 'bold',
+                                  mb: 1.5
                                 }}
                               >
                                 {plant.name}
                               </Typography>
+                              
+                              {/* Chips de etapa, genética y volumen de maceta */}
+                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                <Chip
+                                  icon={getStageIcon(plant.etapa)}
+                                  label={plant.etapa}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: alpha(stageColor, hasImage ? 0.9 : 0.1),
+                                    color: hasImage ? '#ffffff' : stageColor,
+                                    fontWeight: 'medium',
+                                    border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none',
+                                    fontSize: '0.75rem'
+                                  }}
+                                />
+                                
+                                {plant.genetic && (
+                                  <Chip 
+                                    label={plant.genetic} 
+                                    size="small"
+                                    sx={{ 
+                                      bgcolor: hasImage ? alpha('#ffffff', 0.2) : alpha(theme.palette.secondary.main, 0.1),
+                                      color: hasImage ? '#ffffff' : theme.palette.secondary.main,
+                                      fontSize: '0.7rem',
+                                      border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none',
+                                      fontWeight: 'medium'
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.potVolume && (
+                                  <Chip 
+                                    label={`${plant.potVolume}L`} 
+                                    size="small"
+                                    sx={{ 
+                                      bgcolor: hasImage ? alpha('#ffffff', 0.2) : alpha(theme.palette.info.main, 0.1),
+                                      color: hasImage ? '#ffffff' : theme.palette.info.main,
+                                      fontSize: '0.7rem',
+                                      border: hasImage ? `1px solid ${alpha('#ffffff', 0.3)}` : 'none',
+                                      fontWeight: 'medium'
+                                    }}
+                                  />
+                                )}
+                              </Stack>
                             </Box>
                           </Box>
                           
@@ -863,7 +915,7 @@ const PlantsList = () => {
                               <Box sx={{ mb: 2 }}>
                                 <Chip 
                                   icon={<HistoryIcon fontSize="small" />}
-                                  label={`Completada: ${plant.finishDate}`} 
+                                  label={`Cosechada: ${plant.finishDate}`} 
                                   size="small" 
                                   sx={{ 
                                     bgcolor: alpha(theme.palette.secondary.main, 0.1),
@@ -876,39 +928,9 @@ const PlantsList = () => {
                               </Box>
                             )}
                             
-                            {/* Información básica */}
-                            <Box sx={{ mb: 2 }}>
-                              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                                {plant.genetic && (
-                                  <Chip 
-                                    label={plant.genetic} 
-                                    size="small"
-                                    sx={{ 
-                                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                                      color: theme.palette.secondary.main,
-                                      fontSize: '0.75rem'
-                                    }}
-                                  />
-                                )}
-                                
-                                <Chip
-                                  icon={getStageIcon(plant.etapa)}
-                                  label={plant.etapa}
-                                  size="small"
-                                  sx={{
-                                    bgcolor: alpha(stageColor, 0.1),
-                                    color: stageColor,
-                                    fontSize: '0.75rem'
-                                  }}
-                                />
-                              </Stack>
-                            </Box>
-                            
-                            <Divider sx={{ my: 2 }} />
-                            
                             {/* Información de tiempo total */}
                             <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 'medium' }}>
                                 <AccessTimeIcon fontSize="small" />
                                 Ciclo completo
                               </Typography>
@@ -918,37 +940,107 @@ const PlantsList = () => {
                               </Typography>
                             </Box>
                             
-                            {/* Información de peso final */}
-                            {(plant.pesoHumedo || plant.pesoSeco) && (
+                            <Divider sx={{ my: 2 }} />
+                            
+                            {/* Información de etapas */}
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 'medium' }}>
+                                <CalendarTodayIcon fontSize="small" />
+                                Etapas
+                              </Typography>
+                              
+                              <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+                                {plant.birthDate && (
+                                  <Chip
+                                    icon={<SpaIcon fontSize="small" />}
+                                    label={`G: ${calculateDaysInStage(plant, 'Germinacion') || 0}d`}
+                                    size="medium"
+                                    sx={{ 
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                                      color: theme.palette.info.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.inicioVegetativo && (
+                                  <Chip
+                                    icon={<GrassIcon fontSize="small" />}
+                                    label={`V: ${calculateDaysInStage(plant, 'Vegetativo') || 0}d`}
+                                    size="medium"
+                                    sx={{ 
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                                      color: theme.palette.success.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.inicioFloracion && (
+                                  <Chip
+                                    icon={<LocalFloristIcon fontSize="small" />}
+                                    label={`F: ${calculateDaysInStage(plant, 'Floracion') || 0}d`}
+                                    size="medium"
+                                    sx={{ 
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                                      color: theme.palette.warning.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
+                                    }}
+                                  />
+                                )}
+                                
+                                {plant.finishDate && (
+                                  <Chip
+                                    icon={<ParkIcon fontSize="small" />}
+                                    label={`S: ${calculateDaysInStage(plant, 'Secado') || 0}d`}
+                                    size="medium"
+                                    sx={{ 
+                                      fontSize: '0.8rem',
+                                      height: 32,
+                                      bgcolor: alpha(theme.palette.error.main, 0.1),
+                                      color: theme.palette.error.main,
+                                      fontWeight: 'medium',
+                                      '& .MuiChip-icon': {
+                                        fontSize: '1rem'
+                                      }
+                                    }}
+                                  />
+                                )}
+                              </Stack>
+                            </Box>
+                            
+                            {/* Información de peso seco únicamente */}
+                            {plant.pesoSeco && (
                               <Box>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle1" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 'medium' }}>
                                   <ScaleIcon fontSize="small" />
-                                  Cosecha final
+                                  Peso seco
                                 </Typography>
                                 
-                                <Stack direction="row" spacing={2} justifyContent="space-around">
-                                  {plant.pesoHumedo && (
-                                    <Box sx={{ textAlign: 'center' }}>
-                                      <Typography variant="body2" fontWeight="bold" color={theme.palette.warning.main}>
-                                        {plant.pesoHumedo}g
-                                      </Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        húmedo
-                                      </Typography>
-                                    </Box>
-                                  )}
-                                  
-                                  {plant.pesoSeco && (
-                                    <Box sx={{ textAlign: 'center' }}>
-                                      <Typography variant="body2" fontWeight="bold" color={theme.palette.success.main}>
-                                        {plant.pesoSeco}g
-                                      </Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        seco
-                                      </Typography>
-                                    </Box>
-                                  )}
-                                </Stack>
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="h5" fontWeight="bold" color={theme.palette.success.main}>
+                                    {plant.pesoSeco}g
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    cosecha final
+                                  </Typography>
+                                </Box>
                               </Box>
                             )}
                           </CardContent>

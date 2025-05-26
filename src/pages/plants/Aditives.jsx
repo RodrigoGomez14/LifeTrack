@@ -22,7 +22,11 @@ import {
   List,
   ListItem,
   ListItemText,
-  Avatar
+  Avatar,
+  CardHeader,
+  IconButton,
+  Tooltip,
+  Badge
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
@@ -31,6 +35,9 @@ import ScienceIcon from '@mui/icons-material/Science';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
 import { useTheme } from '@mui/material/styles';
 
 const Aditives = () => {
@@ -42,330 +49,565 @@ const Aditives = () => {
     setTabValue(newValue);
   };
 
+  // Obtener conteos para los badges
+  const fertilizantesCount = userData?.plants?.aditives?.fertilizantes 
+    ? Object.keys(userData.plants.aditives.fertilizantes).length 
+    : 0;
+  
+  const insecticidasCount = userData?.plants?.aditives?.insecticidas 
+    ? Object.keys(userData.plants.aditives.insecticidas).length 
+    : 0;
+
   // Componente personalizado para mostrar un aditivo con mejoras visuales
-  const EnhancedAditiveAccordion = ({ aditive }) => {
+  const EnhancedAditiveAccordion = ({ aditive, type }) => {
+    const isInsecticide = type === 'insecticida';
+    // Usar siempre el color primario del tema (mismo que el header)
+    const primaryColor = theme.palette.primary.main;
+    const secondaryColor = theme.palette.primary.light;
+    
     return (
       <Accordion 
         sx={{ 
-          borderRadius: 2, 
+          borderRadius: 3, 
           overflow: 'hidden',
           '&:before': { display: 'none' },
-          boxShadow: `0 2px 8px ${alpha(theme.palette.common.black, 0.07)}`,
+          boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.08)}`,
           width: '100%',
-          bgcolor: '#2c2c2c'
+          border: `1px solid ${alpha(primaryColor, 0.2)}`,
+          mb: 2,
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            transform: 'translateY(-2px)',
+            boxShadow: `0 8px 24px ${alpha(primaryColor, 0.15)}`
+          }
         }}
       >
         <AccordionSummary
-          expandIcon={<ExpandMoreIcon sx={{ color: '#fff' }} />}
+          expandIcon={<ExpandMoreIcon sx={{ color: '#ffffff' }} />}
           sx={{
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff',
-            minHeight: 56,
+            minHeight: 64,
             '& .MuiAccordionSummary-content': {
-              margin: '12px 0'
-            }
+              margin: '16px 0',
+              alignItems: 'center'
+            },
+            transition: 'all 0.3s ease'
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
             <Avatar 
               sx={{ 
-                bgcolor: alpha('#ffffff', 0.2),
+                bgcolor: alpha('#ffffff', 0.25),
                 color: '#ffffff',
-                width: 36,
-                height: 36,
+                width: 48,
+                height: 48,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
               }}
             >
-              <ScienceIcon />
+              {isInsecticide ? <BugReportIcon sx={{ fontSize: 24 }} /> : <ScienceIcon sx={{ fontSize: 24 }} />}
             </Avatar>
-            <Box>
-              <Typography variant="subtitle1" fontWeight="medium" color="inherit">
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="h6" fontWeight="bold" color="inherit" sx={{ mb: 0.5 }}>
                 {aditive.name}
               </Typography>
-              <Typography variant="caption" color={alpha('#ffffff', 0.85)}>
-                {aditive.brand} • {aditive.type}
-              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Chip 
+                  label={aditive.brand} 
+                  size="small"
+                  sx={{ 
+                    bgcolor: alpha('#ffffff', 0.2),
+                    color: '#ffffff',
+                    fontWeight: 'medium',
+                    fontSize: '0.75rem'
+                  }}
+                />
+                <Chip 
+                  label={aditive.type} 
+                  size="small"
+                  sx={{ 
+                    bgcolor: alpha('#ffffff', 0.15),
+                    color: '#ffffff',
+                    fontWeight: 'medium',
+                    fontSize: '0.75rem'
+                  }}
+                />
+              </Stack>
             </Box>
+
           </Box>
         </AccordionSummary>
+        
         <AccordionDetails sx={{ p: 0 }}>
-          <Box sx={{ p: 2, bgcolor: '#2c2c2c' }}>
-            <Typography variant="subtitle2" color="#ffffff" gutterBottom sx={{ pl: 2 }}>
-              Dosis:
-            </Typography>
-            
-            <List disablePadding>
-              {aditive.dosis && aditive.dosis.map((dosis, index) => (
-                <ListItem 
-                  key={index}
-                  divider={index < aditive.dosis.length - 1}
-                  sx={{ 
-                    py: 2, 
-                    px: 2,
-                    borderRadius: index === aditive.dosis.length - 1 ? '0 0 8px 8px' : 0,
-                    position: 'relative',
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.15)
-                    },
-                    borderLeft: `4px solid ${
-                      tabValue === 0 
-                        ? theme.palette.primary.main 
-                        : theme.palette.error.main
-                    }`,
-                    borderBottom: index < aditive.dosis.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-                    transition: 'all 0.2s ease',
-                    bgcolor: alpha(
-                      tabValue === 0 ? theme.palette.primary.main : theme.palette.error.main, 
-                      0.05
-                    )
-                  }}
-                >
-                  <Grid container alignItems="center" spacing={2}>
-                    <Grid item xs={12} sm={4}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar 
-                          sx={{ 
-                            width: 32, 
-                            height: 32,
-                            bgcolor: alpha(
-                              tabValue === 0 ? theme.palette.primary.main : theme.palette.error.main, 
-                              0.2
-                            ),
-                            color: tabValue === 0 ? theme.palette.primary.main : theme.palette.error.main
-                          }}
-                        >
-                          {dosis.name.charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" color="rgba(255, 255, 255, 0.6)" fontSize="0.75rem">
-                            Etapa:
-                          </Typography>
-                          <Typography variant="body1" fontWeight="medium" color="#ffffff">
-                            {dosis.name}
-                          </Typography>
+          <Box sx={{ 
+            bgcolor: alpha(primaryColor, 0.02),
+            borderTop: `1px solid ${alpha(primaryColor, 0.1)}`
+          }}>
+            {aditive.dosis && aditive.dosis.length > 0 ? (
+              <List disablePadding>
+                {aditive.dosis.map((dosis, index) => (
+                  <ListItem 
+                    key={index}
+                    divider={index < aditive.dosis.length - 1}
+                    sx={{ 
+                      py: 3, 
+                      px: 3,
+                      position: 'relative',
+                      '&:hover': {
+                        bgcolor: alpha(primaryColor, 0.05)
+                      },
+                      borderLeft: `4px solid ${primaryColor}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <Grid container alignItems="center" spacing={3}>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar 
+                            sx={{ 
+                              width: 40, 
+                              height: 40,
+                              bgcolor: alpha(primaryColor, 0.15),
+                              color: primaryColor,
+                              fontWeight: 'bold',
+                              fontSize: '1.1rem'
+                            }}
+                          >
+                            {dosis.name.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                              Etapa de crecimiento
+                            </Typography>
+                            <Typography variant="h6" fontWeight="bold" color="text.primary">
+                              {dosis.name}
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
+                      </Grid>
+                      
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ 
+                          textAlign: { xs: 'left', sm: 'center' },
+                          mt: { xs: 2, sm: 0 }
+                        }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                            Dosificación recomendada
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, justifyContent: { xs: 'flex-start', sm: 'center' } }}>
+                            <Typography variant="h4" fontWeight="bold" color={primaryColor}>
+                              {dosis.quantity}
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary" fontWeight="medium">
+                              {dosis.measure}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grid>
+                      
+
                     </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        alignItems: { xs: 'flex-start', sm: 'center' },
-                        mt: { xs: 1, sm: 0 }
-                      }}>
-                        <Typography variant="body2" color="rgba(255, 255, 255, 0.6)" fontSize="0.75rem">
-                          Cantidad:
-                        </Typography>
-                        <Typography variant="h6" fontWeight="medium" color="#ffffff">
-                          {dosis.quantity} <Typography component="span" variant="caption" color="rgba(255, 255, 255, 0.7)">{dosis.measure}</Typography>
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={4} sx={{ 
-                      display: 'flex', 
-                      justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-                      mt: { xs: 1, sm: 0 } 
-                    }}>
-                      <Chip 
-                        label={`${dosis.quantity} ${dosis.measure}`}
-                        size="medium"
-                        icon={
-                          tabValue === 0 
-                            ? <ScienceIcon fontSize="small" /> 
-                            : <BugReportIcon fontSize="small" />
-                        }
-                        sx={{ 
-                          bgcolor: alpha(
-                            tabValue === 0 ? theme.palette.primary.main : theme.palette.error.main, 
-                            0.15
-                          ),
-                          color: tabValue === 0 ? theme.palette.primary.main : theme.palette.error.main,
-                          fontWeight: 'medium',
-                          '& .MuiChip-icon': {
-                            color: 'inherit'
-                          },
-                          px: 1,
-                          borderRadius: '16px'
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
-                </ListItem>
-              ))}
-            </List>
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <Typography variant="body1" color="text.secondary">
+                  No hay dosis configuradas para este {isInsecticide ? 'insecticida' : 'fertilizante'}
+                </Typography>
+              </Box>
+            )}
           </Box>
         </AccordionDetails>
       </Accordion>
     );
   };
 
-  return (
-    <Layout title="Aditivos">
+  // Componente para estado vacío
+  const EmptyState = ({ type }) => {
+    const isInsecticide = type === 'insecticida';
+    const icon = isInsecticide ? <BugReportIcon /> : <LocalFloristIcon />;
+    const title = isInsecticide ? 'No hay insecticidas registrados' : 'No hay fertilizantes registrados';
+    const description = isInsecticide 
+      ? 'Agrega tu primer insecticida para comenzar a hacer seguimiento de tratamientos'
+      : 'Agrega tu primer fertilizante para comenzar a hacer seguimiento de nutrición';
+    const buttonText = isInsecticide ? 'Agregar Insecticida' : 'Agregar Fertilizante';
+    // Usar siempre el color primario del tema (mismo que el header)
+    const color = theme.palette.primary.main;
+
+    return (
       <Box 
         sx={{ 
-          minHeight: '100vh',
-          width: '100%',
-          pt: 2,
-          pb: 4
+          textAlign: 'center', 
+          p: 6,
+          bgcolor: alpha(theme.palette.background.paper, 0.5),
+          borderRadius: 3,
+          border: `2px dashed ${alpha(color, 0.3)}`,
+          backdropFilter: 'blur(8px)',
+          boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.03)}`
         }}
       >
-        <Container maxWidth={false} sx={{ px: { xs: 1, sm: 2 } }}>
-          <Paper 
-            elevation={3}
+        <Avatar
+          sx={{
+            width: 80,
+            height: 80,
+            bgcolor: alpha(color, 0.1),
+            color: alpha(color, 0.7),
+            mx: 'auto',
+            mb: 3
+          }}
+        >
+          {React.cloneElement(icon, { sx: { fontSize: 40 } })}
+        </Avatar>
+        
+        <Typography variant="h5" color="text.primary" gutterBottom fontWeight="medium">
+          {title}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" paragraph sx={{ maxWidth: 400, mx: 'auto', lineHeight: 1.6 }}>
+          {description}
+        </Typography>
+        
+        <Button 
+          variant="contained" 
+          startIcon={<AddIcon />}
+          component={Link}
+          to="/NuevoAditivo"
+          size="large"
+          sx={{
+            bgcolor: color,
+            color: '#ffffff',
+            borderRadius: 3,
+            px: 4,
+            py: 1.5,
+            boxShadow: `0 6px 16px ${alpha(color, 0.3)}`,
+            '&:hover': {
+              bgcolor: alpha(color, 0.9),
+              transform: 'translateY(-2px)',
+              boxShadow: `0 8px 20px ${alpha(color, 0.4)}`
+            },
+            transition: 'all 0.3s ease',
+            fontWeight: 600,
+            fontSize: '1rem'
+          }}
+        >
+          {buttonText}
+        </Button>
+      </Box>
+    );
+  };
+
+  return (
+    <Layout title="Aditivos">
+      <Container maxWidth="lg" sx={{ py: 2 }}>
+        {/* Header principal */}
+        <Box sx={{ mb: 4, mt: { xs: 6, sm: 8 } }}>
+          <Card 
+            elevation={4} 
             sx={{ 
-              borderRadius: 3,
+              borderRadius: 4, 
               overflow: 'hidden',
               mb: 4,
-              mt: { xs: 6, sm: 8 },
-              width: '100%'
+              position: 'relative',
+              minHeight: '140px',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+              color: '#ffffff'
             }}
           >
-            <Tabs 
-              value={tabValue} 
-              onChange={handleChange}
-              variant="fullWidth"
-              textColor="inherit"
-              sx={{ 
-                '& .Mui-selected': {
-                  color: tabValue === 0 ? '#4caf50' : '#f44336' 
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: tabValue === 0 ? '#4caf50' : '#f44336'
-                },
-                '& .MuiTab-root': {
-                  py: 2,
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    color: 'rgba(255, 255, 255, 0.9)'
-                  },
-                  '&.Mui-selected': {
-                    color: tabValue === 0 ? '#4caf50' : '#f44336'
-                  }
-                }
-              }}
-            >
-              <Tab 
-                label="FERTILIZANTES" 
-                icon={<LocalFloristIcon />} 
-                iconPosition="start"
-                sx={{ color: 'white' }}
-              />
-              <Tab 
-                label="INSECTICIDAS" 
-                icon={<BugReportIcon />}
-                iconPosition="start"
-                sx={{ color: 'white' }}
-              />
-            </Tabs>
+            {/* Overlay decorativo */}
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.dark, 0.2)} 100%)`,
+              backdropFilter: 'blur(1px)'
+            }} />
             
-            <Box sx={{ p: 2, minHeight: '300px' }}>
-              {tabValue === 0 ? (
-                <>
-                  {userData?.plants?.aditives?.fertilizantes && Object.keys(userData.plants.aditives.fertilizantes).length > 0 ? (
-                    <Stack spacing={2}>
-                      {Object.keys(userData.plants.aditives.fertilizantes).map(fertilizante => (
-                        <EnhancedAditiveAccordion 
-                          key={fertilizante} 
-                          aditive={userData.plants.aditives.fertilizantes[fertilizante]} 
-                        />
-                      ))}
-                    </Stack>
-                  ) : (
-                    <Box 
+            <CardContent sx={{ p: 4, position: 'relative', zIndex: 1, minHeight: '140px', display: 'flex', alignItems: 'center' }}>
+              <Box sx={{ width: '100%' }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'space-between',
+                  gap: { xs: 2, md: 3 }
+                }}>
+                  {/* Título y descripción */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar 
                       sx={{ 
-                        textAlign: 'center', 
-                        p: 4,
-                        bgcolor: alpha(theme.palette.background.paper, 0.5),
-                        borderRadius: 2,
-                        border: `1px dashed ${alpha(theme.palette.divider, 0.8)}`,
+                        bgcolor: alpha('#ffffff', 0.2), 
+                        color: '#ffffff',
+                        width: 64,
+                        height: 64,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                       }}
                     >
-                      <LocalFloristIcon sx={{ fontSize: 60, color: alpha(theme.palette.secondary.main, 0.2), mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
-                        No hay fertilizantes registrados
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        Agrega tu primer fertilizante para comenzar a hacer seguimiento
-                      </Typography>
-                      <Button 
-                        variant="contained" 
-                        startIcon={<AddIcon />}
-                        component={Link}
-                        to="/NuevoAditivo"
-                        sx={{
-                          bgcolor: theme.palette.secondary.main,
-                          color: '#ffffff',
-                          borderRadius: 8,
-                          px: 3,
-                          py: 1,
-                          boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.25)}`,
-                          '&:hover': {
-                            bgcolor: theme.palette.secondary.dark
-                          }
+                      <ScienceIcon sx={{ fontSize: 32 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography 
+                        variant="h3" 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                          fontSize: { xs: '2rem', md: '2.5rem' },
+                          lineHeight: 1.1,
+                          mb: 1
                         }}
                       >
-                        Agregar Fertilizante
-                      </Button>
+                        Aditivos
+                      </Typography>
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          opacity: 0.9,
+                          textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                          fontWeight: 'normal'
+                        }}
+                      >
+                        Gestiona fertilizantes e insecticidas
+                      </Typography>
                     </Box>
-                  )}
-                </>
+                  </Box>
+                  
+                  {/* Estadísticas */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 3,
+                    alignItems: 'center'
+                  }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h4" fontWeight="bold" sx={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                        {fertilizantesCount}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Fertilizantes
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ 
+                      width: '1px', 
+                      height: '40px', 
+                      bgcolor: alpha('#ffffff', 0.3)
+                    }} />
+                    
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h4" fontWeight="bold" sx={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                        {insecticidasCount}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        Insecticidas
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* Navegación con tabs mejorada */}
+        <Paper 
+          elevation={3}
+          sx={{ 
+            borderRadius: 3,
+            overflow: 'hidden',
+            mb: 4,
+            boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.08)}`
+          }}
+        >
+          <Tabs 
+            value={tabValue} 
+            onChange={handleChange}
+            variant="fullWidth"
+            textColor="inherit"
+            sx={{ 
+              bgcolor: theme.palette.background.paper,
+              '& .MuiTab-root': {
+                py: 3,
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                color: 'text.secondary',
+                transition: 'all 0.3s ease',
+                minHeight: 80,
+                '&:hover': {
+                  color: 'text.primary',
+                  bgcolor: alpha(theme.palette.primary.main, 0.05)
+                },
+                '&.Mui-selected': {
+                  color: theme.palette.primary.main,
+                  bgcolor: alpha(theme.palette.primary.main, 0.05)
+                }
+              },
+              '& .MuiTabs-indicator': {
+                height: 4,
+                borderRadius: '2px 2px 0 0',
+                backgroundColor: theme.palette.primary.main
+              }
+            }}
+          >
+            <Tab 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <LocalFloristIcon sx={{ fontSize: 28 }} />
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Fertilizantes
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Nutrición de plantas
+                    </Typography>
+                  </Box>
+
+                </Box>
+              }
+            />
+            <Tab 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <BugReportIcon sx={{ fontSize: 28 }} />
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Insecticidas
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Control de plagas
+                    </Typography>
+                  </Box>
+
+                </Box>
+              }
+            />
+          </Tabs>
+        </Paper>
+
+        {/* Contenido principal */}
+        <Box sx={{ minHeight: '400px' }}>
+          {tabValue === 0 ? (
+            // Fertilizantes
+            <>
+              {userData?.plants?.aditives?.fertilizantes && Object.keys(userData.plants.aditives.fertilizantes).length > 0 ? (
+                <Box>
+                  {/* Header de sección */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 3
+                  }}>
+                    <Box>
+                      <Typography variant="h5" fontWeight="bold" color="text.primary" gutterBottom>
+                        Fertilizantes registrados
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        {Object.keys(userData.plants.aditives.fertilizantes).length} fertilizante{Object.keys(userData.plants.aditives.fertilizantes).length !== 1 ? 's' : ''} disponible{Object.keys(userData.plants.aditives.fertilizantes).length !== 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                    
+                    <Button 
+                      variant="contained" 
+                      startIcon={<AddIcon />}
+                      component={Link}
+                      to="/NuevoAditivo"
+                      sx={{
+                        bgcolor: theme.palette.primary.main,
+                        color: '#ffffff',
+                        borderRadius: 2,
+                        px: 3,
+                        py: 1.5,
+                        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                        '&:hover': {
+                          bgcolor: theme.palette.primary.dark,
+                          transform: 'translateY(-2px)',
+                          boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`
+                        },
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Nuevo Fertilizante
+                    </Button>
+                  </Box>
+                  
+                  {/* Lista de fertilizantes */}
+                  <Stack spacing={0}>
+                    {Object.keys(userData.plants.aditives.fertilizantes).map(fertilizante => (
+                      <EnhancedAditiveAccordion 
+                        key={fertilizante} 
+                        aditive={userData.plants.aditives.fertilizantes[fertilizante]}
+                        type="fertilizante"
+                      />
+                    ))}
+                  </Stack>
+                </Box>
               ) : (
-                <>
-                  {userData?.plants?.aditives?.insecticidas && Object.keys(userData.plants.aditives.insecticidas).length > 0 ? (
-                    <Stack spacing={2}>
-                      {Object.keys(userData.plants.aditives.insecticidas).map(insecticida => (
-                        <EnhancedAditiveAccordion 
-                          key={insecticida} 
-                          aditive={userData.plants.aditives.insecticidas[insecticida]} 
-                        />
-                      ))}
-                    </Stack>
-                  ) : (
-                    <Box 
-                      sx={{ 
-                        textAlign: 'center', 
-                        p: 4,
-                        bgcolor: alpha(theme.palette.background.paper, 0.5),
+                <EmptyState type="fertilizante" />
+              )}
+            </>
+          ) : (
+            // Insecticidas
+            <>
+              {userData?.plants?.aditives?.insecticidas && Object.keys(userData.plants.aditives.insecticidas).length > 0 ? (
+                <Box>
+                  {/* Header de sección */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 3
+                  }}>
+                    <Box>
+                      <Typography variant="h5" fontWeight="bold" color="text.primary" gutterBottom>
+                        Insecticidas registrados
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        {Object.keys(userData.plants.aditives.insecticidas).length} insecticida{Object.keys(userData.plants.aditives.insecticidas).length !== 1 ? 's' : ''} disponible{Object.keys(userData.plants.aditives.insecticidas).length !== 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                    
+                    <Button 
+                      variant="contained" 
+                      startIcon={<AddIcon />}
+                      component={Link}
+                      to="/NuevoAditivo"
+                      sx={{
+                        bgcolor: theme.palette.primary.main,
+                        color: '#ffffff',
                         borderRadius: 2,
-                        border: `1px dashed ${alpha(theme.palette.divider, 0.8)}`,
+                        px: 3,
+                        py: 1.5,
+                        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
+                        '&:hover': {
+                          bgcolor: theme.palette.primary.dark,
+                          transform: 'translateY(-2px)',
+                          boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`
+                        },
+                        transition: 'all 0.3s ease'
                       }}
                     >
-                      <BugReportIcon sx={{ fontSize: 60, color: alpha(theme.palette.secondary.main, 0.2), mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
-                        No hay insecticidas registrados
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        Agrega tu primer insecticida para comenzar a hacer seguimiento
-                      </Typography>
-                      <Button 
-                        variant="contained" 
-                        startIcon={<AddIcon />}
-                        component={Link}
-                        to="/NuevoAditivo"
-                        sx={{
-                          bgcolor: theme.palette.secondary.main,
-                          color: '#ffffff',
-                          borderRadius: 8,
-                          px: 3,
-                          py: 1,
-                          boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.25)}`,
-                          '&:hover': {
-                            bgcolor: theme.palette.secondary.dark
-                          }
-                        }}
-                      >
-                        Agregar Insecticida
-                      </Button>
-                    </Box>
-                  )}
-                </>
+                      Nuevo Insecticida
+                    </Button>
+                  </Box>
+                  
+                  {/* Lista de insecticidas */}
+                  <Stack spacing={0}>
+                    {Object.keys(userData.plants.aditives.insecticidas).map(insecticida => (
+                      <EnhancedAditiveAccordion 
+                        key={insecticida} 
+                        aditive={userData.plants.aditives.insecticidas[insecticida]}
+                        type="insecticida"
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              ) : (
+                <EmptyState type="insecticida" />
               )}
-            </Box>
-          </Paper>
-        </Container>
-      </Box>
+            </>
+          )}
+        </Box>
+      </Container>
     </Layout>
   );
 };

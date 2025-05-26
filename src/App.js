@@ -36,6 +36,7 @@ import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
 import NewPhoto from './pages/plants/NewPhoto.jsx';
 import NewLog from './pages/plants/NewLog.jsx';
+import Timeline from './pages/plants/Timeline.jsx';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
@@ -386,6 +387,7 @@ function App() {
           <Route path="/NuevoAditivo" element={<PrivateRoute><NewAditive /></PrivateRoute>} />
           <Route path="/NuevaFoto" element={<PrivateRoute><NewPhoto /></PrivateRoute>} />
           <Route path="/NuevoLog" element={<PrivateRoute><NewLog /></PrivateRoute>} />
+          <Route path="/LineaTiempo" element={<PrivateRoute><Timeline /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

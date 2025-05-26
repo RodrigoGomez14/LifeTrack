@@ -123,6 +123,8 @@ import { Global } from '@emotion/react';
 import 'moment/locale/es';
 import SaveIcon from '@mui/icons-material/Save';
 import ScienceIcon from '@mui/icons-material/Science';
+import ShieldIcon from '@mui/icons-material/Shield';
+import TimelineIcon from '@mui/icons-material/Timeline';
 
 moment.locale("es");
 
@@ -213,17 +215,7 @@ const Plant = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [speedDialOpen, setSpeedDialOpen] = useState(false);
   const [highlightedTab, setHighlightedTab] = useState(null);
-  const [filters, setFilters] = useState({
-    Riego: true,
-    Insecticida: true,
-    Poda: true,
-    Transplante: true,
-    Foto: true,
-    Log: true,
-    Etapa: true
-  });
-  const [showFilters, setShowFilters] = useState(false);
-  const [filteredEvents, setFilteredEvents] = useState([]);
+
   
   // Estados para los inputs de peso
   const [pesoHumedoInput, setPesoHumedoInput] = useState('');
@@ -392,7 +384,7 @@ const Plant = () => {
     if (plant) {
       generateEvents();
     }
-  }, [plant]);
+  }, [plant, theme.palette]);
 
   const generateEvents = () => {
     const newEvents = [];
@@ -584,10 +576,6 @@ const Plant = () => {
     newEvents.sort((a, b) => a.start - b.start);
 
     setEvents(newEvents);
-    
-    // Generar eventos filtrados
-    const filtered = newEvents.filter(event => filters[event.resourceType]);
-    setFilteredEvents(filtered);
   };
 
   const handleTabChange = (event, newValue) => {
@@ -821,27 +809,100 @@ const Plant = () => {
         case 'Insecticida':
           return (
             <Box>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <ScienceIcon sx={{ color: theme.palette.error.main, fontSize: 32, mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">Producto</Typography>
-                    <Typography variant="h6" fontWeight="bold" color={theme.palette.error.main}>
+              {/* Información principal destacada - similar al riego */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: 2,
+                p: 3,
+                bgcolor: alpha(theme.palette.error.main, 0.05),
+                borderRadius: 3,
+                border: `2px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                mb: 3
+              }}>
+                <BugReportIcon sx={{ color: theme.palette.error.main, fontSize: 32 }} />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" fontWeight="bold" color={theme.palette.error.main}>
+                    {event.details.treatmentType || 'Tratamiento'}
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Método: {event.details.appMethod || 'No especificado'}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              {/* Insecticidas utilizados - similar a los aditivos del riego */}
+              {event.details.insecticides && event.details.insecticides.length > 0 && (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ScienceIcon sx={{ color: theme.palette.error.main }} />
+                    Insecticidas utilizados
+                  </Typography>
+                  
+                  <Stack spacing={1.5}>
+                    {event.details.insecticides.map((insecticide, index) => (
+                      <Box 
+                        key={index} 
+                        sx={{ 
+                          p: 2, 
+                          bgcolor: alpha(theme.palette.error.main, 0.05),
+                          borderRadius: 2,
+                          border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`
+                        }}
+                      >
+                        <Typography variant="body1" fontWeight="medium">
+                          {insecticide.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Dosis: {insecticide.dosis}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* Compatibilidad hacia atrás para formato antiguo */}
+              {event.details.product && !event.details.insecticides && (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ScienceIcon sx={{ color: theme.palette.error.main }} />
+                    Producto utilizado
+                  </Typography>
+                  
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: alpha(theme.palette.error.main, 0.05),
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`
+                  }}>
+                    <Typography variant="body1" fontWeight="medium">
                       {event.details.product}
                     </Typography>
                   </Box>
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <FlashOnIcon sx={{ color: theme.palette.error.main, fontSize: 32, mb: 1 }} />
-                    <Typography variant="body2" color="text.secondary">Método</Typography>
-                    <Typography variant="h6" fontWeight="bold" color={theme.palette.error.main}>
-                      {event.details.appMethod}
+                </Box>
+              )}
+
+              {/* Notas adicionales si existen */}
+              {event.details.notes && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <NoteAltIcon sx={{ color: theme.palette.info.main }} />
+                    Notas adicionales
+                  </Typography>
+                  <Box sx={{ 
+                    p: 2,
+                    bgcolor: alpha(theme.palette.info.main, 0.05),
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`
+                  }}>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                      {event.details.notes}
                     </Typography>
                   </Box>
-                </Grid>
-              </Grid>
+                </Box>
+              )}
             </Box>
           );
           
@@ -1002,21 +1063,7 @@ const Plant = () => {
     }
   };
 
-  // Añadir efecto para filtrar eventos cuando cambien los filtros
-  useEffect(() => {
-    if (events.length > 0) {
-      const filtered = events.filter(event => filters[event.resourceType]);
-      setFilteredEvents(filtered);
-    }
-  }, [filters, events]);
 
-  // Función para alternar los filtros
-  const toggleFilter = (type) => {
-    setFilters(prev => ({
-      ...prev,
-      [type]: !prev[type]
-    }));
-  };
 
   // Modificar el componente EventComponent para manejar eventos de etapa
   const EventComponent = ({ event }) => {
@@ -1402,96 +1449,7 @@ const Plant = () => {
     );
   };
 
-  // Actualizar la función useEffect para cargar los logs
-  useEffect(() => {
-    if (plant && plant.id) {
-      const fetchDataFromDb = (path, type, color) => {
-        const dbRef = ref(database, `${path}/${userData.uid}/${plant.id}`);
-        
-        onValue(dbRef, (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            const formattedEvents = Object.keys(data).map(key => {
-              const item = data[key];
-              
-              // Para manejar correctamente las fechas de distintos tipos de eventos
-              let eventDate = new Date(item.date.split('/').reverse().join('-') + 'T12:00:00');
-              
-              // Variables para manejar información específica según el tipo
-              let title = type;
-              let description = '';
-              
-              // Configurar información según el tipo de evento
-              switch (type) {
-                case 'Riego':
-                  title = `${item.quantity} ml`;
-                  description = item.aditives && item.aditives.length > 0 
-                    ? `Con ${item.aditives.length} aditivo${item.aditives.length > 1 ? 's' : ''}` 
-                    : 'Sin aditivos';
-        break;
-                case 'Insecticida':
-                  title = item.product;
-                  description = `Aplicación: ${item.appMethod}`;
-        break;
-                case 'Poda':
-                  title = item.type;
-                  description = 'Poda';
-        break;
-                case 'Transplante':
-                  title = `${item.previousPot}L → ${item.newPot}L`;
-                  description = 'Cambio de maceta';
-        break;
-                case 'Foto':
-                  title = 'Nueva foto';
-                  description = item.description || 'Sin descripción';
-                  break;
-                case 'Log':
-                  title = 'Registro';
-                  // Truncar descripción si es muy larga
-                  description = item.description 
-                    ? (item.description.length > 60 
-                      ? item.description.substring(0, 55) + '...' 
-                      : item.description)
-                    : 'Sin descripción';
-        break;
-      default:
-                  break;
-              }
-              
-              return {
-                id: `${type}-${key}`,
-                title,
-                description,
-                start: eventDate,
-                end: eventDate,
-                color,
-                resourceType: type,
-                details: item,
-                imageUrl: item.imageUrl || null
-              };
-            });
-            
-            setEvents(prev => {
-              // Filtrar eventos anteriores del mismo tipo y añadir nuevos
-              const filteredPrev = prev.filter(e => e.resourceType !== type);
-              return [...filteredPrev, ...formattedEvents];
-            });
-          }
-        });
-      };
-      
-      // Limpiar eventos antes de obtener nuevos datos
-      setEvents([]);
-      
-      // Obtener datos de todos los tipos de eventos
-      fetchDataFromDb('riegos', 'Riego', '#2196f3');
-      fetchDataFromDb('insecticides', 'Insecticida', '#f44336');
-      fetchDataFromDb('podas', 'Poda', '#4caf50');
-      fetchDataFromDb('transplantes', 'Transplante', '#ff9800');
-      fetchDataFromDb('photos', 'Foto', '#9e9e9e');
-      fetchDataFromDb('logs', 'Log', '#9c27b0');
-    }
-  }, [plant, userData.uid]);
+
 
   // Función para manejar cuando se selecciona un día
   const handleSelectSlot = (slotInfo) => {
@@ -1581,10 +1539,86 @@ const Plant = () => {
         return calculateDaysBetween(plant.inicioVegetativo);
       }
     } else if (stageName === 'Floracion' && plant.inicioFloracion) {
-      // Si está en floración, calcular días desde el inicio hasta hoy
-      return calculateDaysBetween(plant.inicioFloracion);
+      if (plant.finishDate) {
+        // Si ya fue cosechada, calcular días que estuvo en floración
+        return calculateDaysBetween(plant.inicioFloracion, plant.finishDate);
+      } else {
+        // Si sigue en floración, calcular días desde el inicio hasta hoy
+        return calculateDaysBetween(plant.inicioFloracion);
+      }
     }
     return null;
+  };
+
+  // Función para obtener la fecha de finalización de cada etapa
+  const getStageEndDate = (stageName) => {
+    switch (stageName) {
+      case 'Germinacion':
+        return plant.inicioVegetativo || null;
+      case 'Vegetativo':
+        return plant.inicioFloracion || null;
+      case 'Floracion':
+        return plant.finishDate || null;
+      case 'Secado':
+        return plant.finalSecado || null;
+      default:
+        return null;
+    }
+  };
+
+  // Función para obtener información completa de cada etapa
+  const getStageInfo = (stageName) => {
+    let startDate = null;
+    let endDate = null;
+    let duration = null;
+    let isActive = false;
+    let isCompleted = false;
+
+    switch (stageName) {
+      case 'Germinacion':
+        startDate = plant.birthDate;
+        endDate = plant.inicioVegetativo;
+        isActive = plant.etapa === 'Germinacion';
+        isCompleted = !!plant.inicioVegetativo;
+        break;
+      case 'Vegetativo':
+        startDate = plant.inicioVegetativo;
+        endDate = plant.inicioFloracion;
+        isActive = plant.etapa === 'Vegetativo';
+        isCompleted = !!plant.inicioFloracion;
+        break;
+      case 'Floracion':
+        startDate = plant.inicioFloracion;
+        endDate = plant.finishDate;
+        isActive = plant.etapa === 'Floracion';
+        isCompleted = !!plant.finishDate;
+        break;
+      case 'Secado':
+        startDate = plant.finishDate;
+        endDate = plant.finalSecado;
+        isActive = plant.etapa === 'Secado';
+        isCompleted = !!plant.finalSecado;
+        break;
+      case 'Enfrascado':
+        startDate = plant.finalSecado || plant.inicioEnfrascado;
+        endDate = null; // Etapa final
+        isActive = plant.etapa === 'Enfrascado';
+        isCompleted = plant.etapa === 'Enfrascado';
+        break;
+    }
+
+    if (startDate) {
+      duration = calculateDaysInStage(stageName);
+    }
+
+    return {
+      startDate,
+      endDate,
+      duration,
+      isActive,
+      isCompleted,
+      hasStarted: !!startDate
+    };
   };
   
   // Manejador para cambiar la etapa de la planta
@@ -1957,7 +1991,7 @@ const Plant = () => {
     return calculateDaysBetween(plant.finishDate);
   };
 
-  // Estilos globales para las animaciones
+  // Estilos globales para las animaciones y línea de tiempo
   const GlobalStyles = () => {
     return (
       <Global
@@ -2014,11 +2048,14 @@ const Plant = () => {
           // Ocultar específicamente la cabecera del calendario
           '.rbc-month-view > .rbc-row.rbc-month-header': {
             display: 'none !important'
-          }
+          },
+
         }}
       />
     );
   };
+
+
 
   // Early return if plant is not loaded yet
   if (!plant) {
@@ -2146,155 +2183,192 @@ const Plant = () => {
           </Alert>
         )}
 
-        {/* Sección de estadísticas y datos detallados */}
-        <Grid container spacing={3} sx={{ mb: 4, mt: plant.isArchived ? 0 : 3 }}>
-          {/* Panel de información principal */}
-          <Grid item xs={12} md={6}>
-            <Card 
-              elevation={3} 
-                    sx={{ 
-                borderRadius: 3, 
-                overflow: 'hidden',
-                height: '100%'
-              }}
-            >
-              <CardHeader
-                title={
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <LocalFloristIcon sx={{ color: '#ffffff' }} />
-                    <Typography variant="h6" fontWeight="medium">
-                      Datos de la planta
-                    </Typography>
-                  </Stack>
-                }
-                      sx={{ 
-                  p: 2,
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                  background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-                  color: '#ffffff',
-                  '& .MuiTypography-root': {
-                    color: '#ffffff'
-                  }
-                }}
-              />
-              <CardContent sx={{ p: 0 }}>
-                <List disablePadding>
-                  <ListItem 
-                    divider
-                    sx={{ 
-                      py: 1.8, 
-                      px: 3,
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                      <Typography variant="subtitle1" color="text.secondary">Genética</Typography>
-                      <Typography variant="subtitle1" fontWeight="medium">
-                        {plant.genetic || 'No especificada'}
-                      </Typography>
-                    </Box>
-                  </ListItem>
-                  
-                  <ListItem 
-                    divider
-                    sx={{ 
-                      py: 1.8, 
-                      px: 3,
-                      borderLeft: `4px solid transparent`,
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.03),
-                        borderLeft: `4px solid ${theme.palette.primary.main}`
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                      <Typography variant="subtitle1" color="text.secondary">Foto de perfil</Typography>
-                      <Button
-                        variant="outlined"
-                      size="small"
-                        startIcon={<AddAPhotoIcon />}
-                        onClick={() => setShowProfilePhotoSelector(true)}
-                      sx={{ 
-                          borderColor: theme.palette.primary.main,
-                          color: theme.palette.primary.main,
-                          '&:hover': {
-                            bgcolor: alpha(theme.palette.primary.main, 0.05),
-                            borderColor: theme.palette.primary.dark
-                          }
-                        }}
-                      >
-                        {plant.profilePhotoUrl ? 'Cambiar' : 'Seleccionar'}
-                      </Button>
-                    </Box>
-                  </ListItem>
-                  
-                  <ListItem 
-                    divider
-                      sx={{ 
-                      py: 1.8, 
-                      px: 3,
-                      borderLeft: `4px solid transparent`,
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.03),
-                        borderLeft: `4px solid ${theme.palette.primary.main}`
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                      <Typography variant="subtitle1" color="text.secondary">Fecha de nacimiento</Typography>
-                      <Typography variant="subtitle1" fontWeight="medium">
-                        {plant.birthDate ? convertToDetailedDate(plant.birthDate) : 'No especificada'}
-                    </Typography>
-                  </Box>
-                  </ListItem>
-                  
-                  {!plant.isArchived && (
-                    <ListItem 
-                      divider
-                      sx={{ 
-                        py: 1.8, 
-                        px: 3,
-                        borderLeft: `4px solid transparent`,
-                        '&:hover': {
-                          bgcolor: alpha(theme.palette.primary.main, 0.03),
-                          borderLeft: `4px solid ${theme.palette.primary.main}`
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                        <Typography variant="subtitle1" color="text.secondary">Días de vida</Typography>
-                        <Typography variant="subtitle1" fontWeight="medium">
-                          {calculateLifeDays() || 'No disponible'}
-                        </Typography>
-                      </Box>
-                    </ListItem>
-                  )}
-                  
-                  <ListItem 
-                    divider
-                      sx={{ 
-                      py: 1.8, 
-                      px: 3,
-                      borderLeft: `4px solid transparent`,
-                      '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.03),
-                        borderLeft: `4px solid ${theme.palette.primary.main}`
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                      <Typography variant="subtitle1" color="text.secondary">Volumen de maceta</Typography>
-                      <Typography variant="subtitle1" fontWeight="medium">
-                        {plant.potVolume ? `${plant.potVolume}L` : 'No especificado'}
-                      </Typography>
-                    </Box>
-                  </ListItem>
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
+        {/* Header principal con foto de perfil como fondo */}
+        <Card 
+          elevation={4} 
+          sx={{ 
+            borderRadius: 4, 
+            overflow: 'hidden',
+            mb: 4,
+            mt: plant.isArchived ? 0 : 3,
+            position: 'relative',
+            minHeight: '180px',
+            background: plant.profilePhotoUrl 
+              ? `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.85)} 0%, ${alpha(theme.palette.primary.dark, 0.9)} 100%), url(${plant.profilePhotoUrl})`
+              : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundBlendMode: 'overlay',
+            color: '#ffffff'
+          }}
+        >
+          {/* Overlay adicional para mejor legibilidad */}
+          <Box sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.3)} 0%, ${alpha(theme.palette.primary.dark, 0.4)} 100%)`,
+            backdropFilter: 'blur(1px)'
+          }} />
           
-          {/* Panel de etapa de crecimiento */}
-          <Grid item xs={12} md={6}>
+          {/* Botón para cambiar foto de perfil */}
+          <IconButton
+            onClick={() => setShowProfilePhotoSelector(true)}
+            sx={{
+              position: 'absolute',
+              top: 20,
+              right: 20,
+              bgcolor: alpha('#ffffff', 0.9),
+              color: theme.palette.primary.main,
+              width: 48,
+              height: 48,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              zIndex: 2,
+              '&:hover': {
+                bgcolor: '#ffffff',
+                transform: 'scale(1.1)'
+              },
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <PhotoCameraIcon sx={{ fontSize: '1.4rem' }} />
+          </IconButton>
+          
+          <CardContent sx={{ p: 3, position: 'relative', zIndex: 1, minHeight: '180px', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ width: '100%' }}>
+              {/* Información principal en una sola línea */}
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', md: 'row' },
+                alignItems: { xs: 'flex-start', md: 'center' },
+                justifyContent: 'space-between',
+                gap: { xs: 1, md: 2 }
+              }}>
+                                 {/* Nombre y etapa */}
+                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1.5, sm: 2.5 } }}>
+                   <Typography 
+                     variant="h3" 
+                     sx={{ 
+                       fontWeight: 'bold',
+                       textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                       fontSize: { xs: '2.2rem', md: '2.8rem' },
+                       lineHeight: 1.1
+                     }}
+                   >
+                     {plant.name}
+                   </Typography>
+                   
+                   <Box sx={{ 
+                     display: 'flex', 
+                     alignItems: 'center',
+                     bgcolor: alpha('#ffffff', 0.2),
+                     px: 2,
+                     py: 0.8,
+                     borderRadius: 3,
+                     backdropFilter: 'blur(8px)',
+                     border: `1px solid ${alpha('#ffffff', 0.3)}`
+                   }}>
+                     {etapaIcon}
+                     <Typography 
+                       variant="h6" 
+                       sx={{ 
+                         ml: 0.8, 
+                         fontWeight: 'medium',
+                         textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                         fontSize: '1.1rem'
+                       }}
+                     >
+                       {plant.etapa || 'No especificada'}
+                     </Typography>
+                   </Box>
+                 </Box>
+                
+                                 {/* Datos principales compactos */}
+                 <Box sx={{ 
+                   display: 'flex', 
+                   flexDirection: { xs: 'column', sm: 'row' },
+                   gap: { xs: 1, sm: 3 },
+                   alignItems: { xs: 'flex-start', sm: 'center' }
+                 }}>
+                   {/* Genética */}
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                     <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 'medium' }}>
+                       Genética:
+                     </Typography>
+                     <Typography variant="body1" sx={{ fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                       {plant.genetic || 'No especificada'}
+                     </Typography>
+                   </Box>
+                   
+                   {/* Separador */}
+                   <Box sx={{ 
+                     width: '1px', 
+                     height: '20px', 
+                     bgcolor: alpha('#ffffff', 0.4),
+                     display: { xs: 'none', sm: 'block' }
+                   }} />
+                   
+                   {/* Maceta */}
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                     <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 'medium' }}>
+                       Maceta:
+                     </Typography>
+                     <Typography variant="body1" sx={{ fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                       {plant.potVolume ? `${plant.potVolume}L` : 'No especificado'}
+                     </Typography>
+                   </Box>
+                   
+                   {!plant.isArchived && (
+                     <>
+                       {/* Separador */}
+                       <Box sx={{ 
+                         width: '1px', 
+                         height: '20px', 
+                         bgcolor: alpha('#ffffff', 0.4),
+                         display: { xs: 'none', sm: 'block' }
+                       }} />
+                       
+                       {/* Días de vida */}
+                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                         <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 'medium' }}>
+                           Días:
+                         </Typography>
+                         <Typography variant="body1" sx={{ fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                           {calculateLifeDays() || 'N/A'}
+                         </Typography>
+                       </Box>
+                     </>
+                   )}
+                   
+                   {/* Separador */}
+                   <Box sx={{ 
+                     width: '1px', 
+                     height: '20px', 
+                     bgcolor: alpha('#ffffff', 0.4),
+                     display: { xs: 'none', sm: 'block' }
+                   }} />
+                   
+                   {/* Fecha de nacimiento */}
+                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                     <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 'medium' }}>
+                       Nacimiento:
+                     </Typography>
+                     <Typography variant="body1" sx={{ fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                       {plant.birthDate ? format(new Date(plant.birthDate.split('/').reverse().join('-')), 'dd/MM/yy') : 'N/A'}
+                     </Typography>
+                   </Box>
+                 </Box>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Sección de estadísticas y datos detallados */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Panel de etapa de crecimiento - ahora ocupa todo el ancho */}
+          <Grid item xs={12}>
             <Card 
               elevation={3} 
                         sx={{ 
@@ -2344,75 +2418,127 @@ const Plant = () => {
                   
                   
                   
-                  {/* Sección con las 3 etapas en una fila */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 2, bgcolor: alpha(theme.palette.background.default, 0.5) }}>
-                    {/* Etapa Germinación */}
-                    <Box sx={{ 
-                      flex: 1, 
-                      textAlign: 'center', 
-                      p: 2, 
-                      borderRadius: 2, 
-                      bgcolor: alpha(theme.palette.secondary.main, plant.etapa === 'Germinacion' ? 0.1 : 0.03),
-                      borderLeft: plant.etapa === 'Germinacion' ? `4px solid ${theme.palette.secondary.main}` : 'none'
-                    }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1, color: theme.palette.secondary.main }}>
-                        Germinación
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={plant.birthDate ? 'medium' : 'normal'}>
-                        {plant.birthDate ? convertToDetailedDate(plant.birthDate) : 'No iniciada'}
-                      </Typography>
-                      {plant.birthDate && (
-                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                          {calculateDaysInStage('Germinacion')} días
-                        </Typography>
-                    )}
-                  </Box>
-                  
-                    {/* Etapa Vegetativo */}
-                    <Box sx={{ 
-                      flex: 1, 
-                      textAlign: 'center', 
-                      p: 2, 
-                      borderRadius: 2, 
-                      ml: 1,
-                      bgcolor: alpha(theme.palette.secondary.main, plant.etapa === 'Vegetativo' ? 0.1 : 0.03),
-                      borderLeft: plant.etapa === 'Vegetativo' ? `4px solid ${theme.palette.secondary.main}` : 'none'
-                    }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1, color: theme.palette.secondary.main }}>
-                        Vegetativo
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={plant.inicioVegetativo ? 'medium' : 'normal'}>
-                        {plant.inicioVegetativo ? convertToDetailedDate(plant.inicioVegetativo) : 'No iniciada'}
-                      </Typography>
-                      {plant.inicioVegetativo && (
-                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                          {calculateDaysInStage('Vegetativo')} días
-                        </Typography>
-                      )}
-                        </Box>
-                    
-                    {/* Etapa Floración */}
-                    <Box sx={{ 
-                      flex: 1, 
-                      textAlign: 'center', 
-                      p: 2, 
-                      borderRadius: 2, 
-                      ml: 1,
-                      bgcolor: alpha(theme.palette.secondary.main, plant.etapa === 'Floracion' ? 0.1 : 0.03),
-                      borderLeft: plant.etapa === 'Floracion' ? `4px solid ${theme.palette.secondary.main}` : 'none'
-                    }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1, color: theme.palette.secondary.main }}>
-                        Floración
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" fontWeight={plant.inicioFloracion ? 'medium' : 'normal'}>
-                        {plant.inicioFloracion ? convertToDetailedDate(plant.inicioFloracion) : 'No iniciada'}
-                      </Typography>
-                      {plant.inicioFloracion && (
-                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                          {calculateDaysInStage('Floracion')} días
-                        </Typography>
-                      )}
-                    </Box>
+                  {/* Sección detallada de etapas */}
+                  <Box sx={{ px: 2, py: 2, bgcolor: alpha(theme.palette.background.default, 0.5) }}>
+                    {/* Etapas principales en grid */}
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                      {['Germinacion', 'Vegetativo', 'Floracion'].map((stageName) => {
+                        const stageInfo = getStageInfo(stageName);
+                        const stageColor = stageInfo.isActive 
+                          ? theme.palette.secondary.main 
+                          : stageInfo.isCompleted 
+                            ? theme.palette.success.main 
+                            : theme.palette.grey[400];
+                        
+                        return (
+                          <Grid item xs={12} sm={4} key={stageName}>
+                            <Paper 
+                              elevation={stageInfo.isActive ? 3 : 1}
+                              sx={{ 
+                                p: 2, 
+                                textAlign: 'center',
+                                borderRadius: 2,
+                                bgcolor: alpha(stageColor, stageInfo.isActive ? 0.1 : 0.03),
+                                borderLeft: stageInfo.isActive ? `4px solid ${stageColor}` : 'none',
+                                border: stageInfo.isCompleted && !stageInfo.isActive ? `1px solid ${alpha(theme.palette.success.main, 0.3)}` : 'none',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <Typography 
+                                variant="subtitle2" 
+                                sx={{ 
+                                  mb: 1.5, 
+                                  color: stageColor,
+                                  fontWeight: 'bold',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 0.5
+                                }}
+                              >
+                                {stageName === 'Germinacion' && <SpaIcon fontSize="small" />}
+                                {stageName === 'Vegetativo' && <GrassIcon fontSize="small" />}
+                                {stageName === 'Floracion' && <LocalFloristIcon fontSize="small" />}
+                                {stageName}
+                              </Typography>
+                              
+                              {/* Fecha de inicio */}
+                              <Box sx={{ mb: 1.5 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                                  Inicio
+                                </Typography>
+                                <Typography 
+                                  variant="body2" 
+                                  color="text.primary" 
+                                  fontWeight={stageInfo.hasStarted ? 'medium' : 'normal'}
+                                  sx={{ fontSize: '0.85rem' }}
+                                >
+                                  {stageInfo.startDate ? format(new Date(stageInfo.startDate.split('/').reverse().join('-')), 'dd/MM/yyyy') : 'No iniciada'}
+                                </Typography>
+                              </Box>
+
+                              {/* Duración */}
+                              {stageInfo.duration && (
+                                <Box sx={{ mb: 1.5 }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                                    Duración
+                                  </Typography>
+                                  <Typography variant="body2" color={stageColor} fontWeight="bold">
+                                    {stageInfo.duration} días
+                                  </Typography>
+                                </Box>
+                              )}
+
+                              {/* Fecha de finalización */}
+                              <Box>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium' }}>
+                                  Finalización
+                                </Typography>
+                                <Typography 
+                                  variant="body2" 
+                                  color={stageInfo.endDate ? "text.primary" : "text.secondary"}
+                                  fontWeight={stageInfo.endDate ? 'medium' : 'normal'}
+                                  sx={{ fontSize: '0.85rem' }}
+                                >
+                                  {stageInfo.endDate 
+                                    ? format(new Date(stageInfo.endDate.split('/').reverse().join('-')), 'dd/MM/yyyy')
+                                    : stageInfo.isActive 
+                                      ? 'En curso' 
+                                      : 'Pendiente'
+                                  }
+                                </Typography>
+                              </Box>
+
+                              {/* Indicador de estado */}
+                              {stageInfo.isActive && (
+                                <Chip 
+                                  label="Activa" 
+                                  size="small" 
+                                  sx={{ 
+                                    mt: 1, 
+                                    bgcolor: stageColor, 
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                  }} 
+                                />
+                              )}
+                              {stageInfo.isCompleted && !stageInfo.isActive && (
+                                <Chip 
+                                  label="Completada" 
+                                  size="small" 
+                                  sx={{ 
+                                    mt: 1, 
+                                    bgcolor: theme.palette.success.main, 
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                  }} 
+                                />
+                              )}
+                            </Paper>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
                   </Box>
                   
                   {/* Fecha de la cosecha - Solo visible cuando existe finishDate */}
@@ -2883,298 +3009,206 @@ const Plant = () => {
           id="plant-calendar"
           elevation={3} 
           sx={{ 
-            borderRadius: 3, 
+            borderRadius: 4, 
             overflow: 'hidden', 
             mb: 4,
-            boxShadow: `0 6px 20px ${alpha(theme.palette.common.black, 0.06)}`,
+            boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.08)}`,
             width: '100%'
           }}
         >
           <Box sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column', md: 'row' },
-            justifyContent: 'space-between', 
-            alignItems: { xs: 'flex-start', md: 'center' },
-            p: 2.5, 
-            borderBottom: `1px solid ${theme.palette.divider}`,
+            position: 'relative',
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
             color: '#ffffff',
-            gap: 2
+            overflow: 'hidden'
           }}>
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column',
-              alignItems: { xs: 'flex-start', md: 'flex-start' },
-              width: { xs: '100%', md: 'auto' }
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                <CalendarMonthIcon sx={{ mr: 1.5, color: '#ffffff', fontSize: 28 }} />
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                    fontWeight: 'bold',
-                    color: '#ffffff',
-                    fontSize: { xs: '1.1rem', sm: '1.25rem' }
-                }}
-              >
-                Historial de actividades
-                </Typography>
-              </Box>
-              <Typography 
-                variant="h5" 
-                sx={{ 
-                  fontWeight: 'medium',
-                  color: alpha('#ffffff', 0.95),
-                  fontSize: { xs: '1.4rem', sm: '1.6rem' },
-                  lineHeight: 1.2,
-                  letterSpacing: '-0.01em',
-                  mt: 0.5
-                }}
-              >
-                {viewMode === 'month' 
-                  ? formatMonthDisplay(currentDate) 
-                  : formatDayDisplay(currentDate)
-                }
-              </Typography>
-            </Box>
             
             <Box sx={{ 
               display: 'flex', 
-              flexWrap: 'wrap', 
-              gap: 1.5,
-              width: { xs: '100%', md: 'auto' },
-              justifyContent: { xs: 'space-between', md: 'flex-end' }
+              flexDirection: { xs: 'column', lg: 'row' },
+              justifyContent: 'space-between', 
+              alignItems: { xs: 'flex-start', lg: 'center' },
+              p: 3,
+              position: 'relative',
+              zIndex: 1,
+              gap: { xs: 2, lg: 3 }
             }}>
-              {/* Botones de navegación */}
+              {/* Información del calendario */}
               <Box sx={{ 
                 display: 'flex', 
-                gap: 1,
-                p: 0.5,
-                bgcolor: alpha('#ffffff', 0.1),
-                borderRadius: 2,
-                backdropFilter: 'blur(4px)'
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                gap: { xs: 1, sm: 3 },
+                width: { xs: '100%', lg: 'auto' }
               }}>
-                <Tooltip title="Mes anterior">
-                  <IconButton 
-                    size="medium" 
-                    onClick={() => handleNavigate('PREV')}
-                    sx={{ 
-                      color: '#ffffff', 
-                      bgcolor: alpha('#ffffff', 0.1),
-                      width: 40,
-                      height: 40,
-                      '&:hover': { 
-                        bgcolor: alpha('#ffffff', 0.2),
-                        transform: 'translateY(-2px)'
-                      },
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <ArrowBackIcon />
-                  </IconButton>
-                </Tooltip>
+                {/* Título e ícono */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar sx={{ 
+                    bgcolor: alpha('#ffffff', 0.2), 
+                    color: '#ffffff',
+                    width: 48,
+                    height: 48
+                  }}>
+                    <CalendarMonthIcon sx={{ fontSize: '1.5rem' }} />
+                  </Avatar>
+                  <Box>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        color: '#ffffff',
+                        fontSize: { xs: '1.1rem', sm: '1.25rem' },
+                        textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                        lineHeight: 1.2
+                      }}
+                    >
+                      Historial de actividades
+                    </Typography>
+                  </Box>
+                </Box>
                 
-                <Tooltip title="Hoy">
-                  <IconButton 
-                    size="medium"
-                    onClick={() => handleNavigate('TODAY')}
+                {/* Fecha actual */}
+                <Box sx={{ 
+                  bgcolor: alpha('#ffffff', 0.15),
+                  px: 2.5,
+                  py: 1.5,
+                  borderRadius: 3,
+                  backdropFilter: 'blur(8px)',
+                  border: `1px solid ${alpha('#ffffff', 0.2)}`,
+                  minWidth: { sm: '200px' }
+                }}>
+                  <Typography 
+                    variant="h5" 
                     sx={{ 
-                      color: '#ffffff', 
-                      bgcolor: alpha('#ffffff', 0.15),
-                      width: 40,
-                      height: 40,
-                      '&:hover': { 
-                        bgcolor: alpha('#ffffff', 0.25),
-                        transform: 'translateY(-2px)'
-                      },
-                      transition: 'all 0.2s'
+                      fontWeight: 'bold',
+                      color: '#ffffff',
+                      fontSize: { xs: '1.3rem', sm: '1.5rem' },
+                      lineHeight: 1.2,
+                      letterSpacing: '-0.01em',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                      textAlign: { xs: 'left', sm: 'center' }
                     }}
                   >
-                    <TodayIcon />
-                  </IconButton>
-                </Tooltip>
+                    {formatMonthDisplay(currentDate)}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              {/* Controles de navegación */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: { xs: 'center', lg: 'flex-end' },
+                alignItems: 'center',
+                gap: 2
+              }}>
+                {/* Botón para ir a línea de tiempo */}
+                <Button
+                  variant="contained"
+                  component={Link}
+                  to={`/LineaTiempo/?${checkSearch(location.search)}`}
+                  startIcon={<TimelineIcon />}
+                  sx={{
+                    bgcolor: alpha('#ffffff', 0.9),
+                    color: theme.palette.primary.main,
+                    borderRadius: 3,
+                    px: 3,
+                    py: 1.5,
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    '&:hover': {
+                      bgcolor: '#ffffff',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 16px rgba(0,0,0,0.3)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Ir a línea de tiempo
+                </Button>
                 
-                <Tooltip title="Mes siguiente">
-                  <IconButton 
-                    size="medium"
-                    onClick={() => handleNavigate('NEXT')}
-                    sx={{ 
-                      color: '#ffffff', 
-                      bgcolor: alpha('#ffffff', 0.1),
-                      width: 40,
-                      height: 40,
-                      '&:hover': { 
-                        bgcolor: alpha('#ffffff', 0.2),
-                        transform: 'translateY(-2px)'
-                      },
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <ArrowForwardIcon />
-                  </IconButton>
-                </Tooltip>
+                {/* Botones de navegación */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 0.5,
+                  bgcolor: alpha('#ffffff', 0.15),
+                  borderRadius: 3,
+                  p: 0.5,
+                  backdropFilter: 'blur(8px)',
+                  border: `1px solid ${alpha('#ffffff', 0.2)}`
+                }}>
+                  <Tooltip title="Mes anterior" arrow>
+                    <IconButton 
+                      size="medium" 
+                      onClick={() => handleNavigate('PREV')}
+                      sx={{ 
+                        color: '#ffffff', 
+                        bgcolor: 'transparent',
+                        width: 44,
+                        height: 44,
+                        borderRadius: 2,
+                        '&:hover': { 
+                          bgcolor: alpha('#ffffff', 0.2),
+                          transform: 'scale(1.05)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <ArrowBackIcon sx={{ fontSize: '1.2rem' }} />
+                    </IconButton>
+                  </Tooltip>
+                  
+                  <Tooltip title="Ir a hoy" arrow>
+                    <IconButton 
+                      size="medium"
+                      onClick={() => handleNavigate('TODAY')}
+                      sx={{ 
+                        color: '#ffffff', 
+                        bgcolor: alpha('#ffffff', 0.1),
+                        width: 44,
+                        height: 44,
+                        borderRadius: 2,
+                        '&:hover': { 
+                          bgcolor: alpha('#ffffff', 0.25),
+                          transform: 'scale(1.05)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <TodayIcon sx={{ fontSize: '1.2rem' }} />
+                    </IconButton>
+                  </Tooltip>
+                  
+                  <Tooltip title="Mes siguiente" arrow>
+                    <IconButton 
+                      size="medium"
+                      onClick={() => handleNavigate('NEXT')}
+                      sx={{ 
+                        color: '#ffffff', 
+                        bgcolor: 'transparent',
+                        width: 44,
+                        height: 44,
+                        borderRadius: 2,
+                        '&:hover': { 
+                          bgcolor: alpha('#ffffff', 0.2),
+                          transform: 'scale(1.05)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <ArrowForwardIcon sx={{ fontSize: '1.2rem' }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               </Box>
             </Box>
           </Box>
           
-          {/* Panel de filtros */}
-          <Collapse in={showFilters}>
-            <Box sx={{ 
-              p: 2.5, 
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1.5,
-              bgcolor: alpha(theme.palette.background.paper, 0.95),
-              borderBottom: `1px solid ${theme.palette.divider}`
-            }}>
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  mr: 1, 
-                  alignSelf: 'center',
-                  fontWeight: 'bold'
-                }}
-              >
-                Filtrar por tipo:
-              </Typography>
-              
-              <Chip
-                label="Riegos"
-                icon={<WaterDropIcon />}
-                onClick={() => toggleFilter('Riego')}
-                variant={filters.Riego ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Riego ? '#fff' : theme.palette.info.main,
-                  bgcolor: filters.Riego ? theme.palette.info.main : 'transparent',
-                  borderColor: theme.palette.info.main,
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-              
-              <Chip
-                label="Insecticidas"
-                icon={<BugReportIcon />}
-                onClick={() => toggleFilter('Insecticida')}
-                variant={filters.Insecticida ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Insecticida ? '#fff' : theme.palette.error.main,
-                  bgcolor: filters.Insecticida ? theme.palette.error.main : 'transparent',
-                  borderColor: theme.palette.error.main,
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-              
-              <Chip
-                label="Podas"
-                icon={<ContentCutIcon />}
-                onClick={() => toggleFilter('Poda')}
-                variant={filters.Poda ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Poda ? '#fff' : theme.palette.success.main,
-                  bgcolor: filters.Poda ? theme.palette.success.main : 'transparent',
-                  borderColor: theme.palette.success.main,
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-              
-              <Chip
-                label="Transplantes"
-                icon={<SwapHorizIcon />}
-                onClick={() => toggleFilter('Transplante')}
-                variant={filters.Transplante ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Transplante ? '#fff' : theme.palette.warning.main,
-                  bgcolor: filters.Transplante ? theme.palette.warning.main : 'transparent',
-                  borderColor: theme.palette.warning.main,
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-              
-              <Chip
-                label="Fotos"
-                icon={<PhotoCameraIcon />}
-                onClick={() => toggleFilter('Foto')}
-                variant={filters.Foto ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Foto ? '#fff' : theme.palette.secondary.main,
-                  bgcolor: filters.Foto ? theme.palette.secondary.main : 'transparent',
-                  borderColor: theme.palette.secondary.main,
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-              <Chip
-                label="Logs"
-                icon={<NoteAltIcon />}
-                onClick={() => toggleFilter('Log')}
-                variant={filters.Log ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Log ? '#fff' : '#9c27b0',
-                  bgcolor: filters.Log ? '#9c27b0' : 'transparent',
-                  borderColor: '#9c27b0',
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-              <Chip
-                label="Etapas"
-                icon={<LocalFloristIcon />}
-                onClick={() => toggleFilter('Etapa')}
-                variant={filters.Etapa ? 'filled' : 'outlined'}
-                sx={{ 
-                  color: filters.Etapa ? '#fff' : theme.palette.primary.main,
-                  bgcolor: filters.Etapa ? theme.palette.primary.main : 'transparent',
-                  borderColor: theme.palette.primary.main,
-                  '&:hover': { 
-                    opacity: 0.85,
-                    transform: 'translateY(-2px)' 
-                  },
-                  transition: 'all 0.2s',
-                  fontWeight: 'medium',
-                  px: 1
-                }}
-              />
-            </Box>
-          </Collapse>
+
           
           <Box sx={{ p: 0, position: 'relative', height: calendarHeight }}>
             <Calendar
               localizer={localizer}
-              events={filteredEvents.length > 0 ? filteredEvents : events}
+              events={events}
               views={['month']}
               view="month"
               date={currentDate}
@@ -3209,6 +3243,8 @@ const Plant = () => {
             />
           </Box>
         </Paper>
+
+
 
         {/* Modal para detalles de un evento específico */}
       <Dialog 

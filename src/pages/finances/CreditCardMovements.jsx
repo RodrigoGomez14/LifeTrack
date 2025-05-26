@@ -190,7 +190,7 @@ const CreditCardMovements = ({ transactions = [], loading = false }) => {
   // Renderizar skeletons durante la carga
   if (loading) {
     return (
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 3 }}>
         <Skeleton variant="rectangular" height={56} sx={{ mb: 2, borderRadius: 1 }} />
         {[1, 2, 3].map((item) => (
           <Skeleton 
@@ -205,7 +205,7 @@ const CreditCardMovements = ({ transactions = [], loading = false }) => {
   }
 
   return (
-    <Box sx={{ mt: 2, width: '100%' }}>
+    <Box sx={{ width: '100%' }}>
       {/* Buscador */}
       <Paper
         elevation={0}
@@ -215,10 +215,12 @@ const CreditCardMovements = ({ transactions = [], loading = false }) => {
           alignItems: 'center',
           borderRadius: 2,
           mb: 3,
+          mx: 3,
+          mt: 3,
           boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
           bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f5f5f5',
           border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
-          width: '100%'
+          width: 'calc(100% - 48px)'
         }}
       >
         <IconButton sx={{ p: '10px' }} aria-label="buscar">
@@ -248,7 +250,9 @@ const CreditCardMovements = ({ transactions = [], loading = false }) => {
           borderRadius: 2,
           bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f5f5f5',
           border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
-          width: '100%'
+          mx: 3,
+          mb: 3,
+          width: 'calc(100% - 48px)'
         }}>
           <ReceiptIcon sx={{ fontSize: 60, color: 'text.secondary', opacity: 0.5 }} />
           <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary' }}>
@@ -261,7 +265,7 @@ const CreditCardMovements = ({ transactions = [], loading = false }) => {
       )}
 
       {/* Lista de días con acordeones */}
-      <Box sx={{ width: '100%' }}>
+      <Box sx={{ px: 3, pb: 3 }}>
         {groupedTransactions.map(({ date, transactions }) => {
           const dayTotal = getDayTotal(transactions);
           const formattedDate = dayjs(date).locale('es').format('dddd, D [de] MMMM [de] YYYY');
