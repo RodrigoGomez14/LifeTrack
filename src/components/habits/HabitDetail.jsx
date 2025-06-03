@@ -216,57 +216,6 @@ const HabitDetail = ({ habitId, onBack }) => {
       <Divider />
       <CardContent>
         <Grid container spacing={3}>
-          {/* Información general */}
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-              <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-                Información del Hábito
-              </Typography>
-              
-              {habit.description && (
-                <Typography variant="body2" paragraph>
-                  {habit.description}
-                </Typography>
-              )}
-              
-              <List disablePadding>
-                <ListItem disablePadding sx={{ mb: 1 }}>
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <RepeatIcon fontSize="small" color="primary" />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Frecuencia" 
-                    secondary={getFrequencyText(habit.frequency, habit.customDays)} 
-                    primaryTypographyProps={{ variant: 'body2' }}
-                  />
-                </ListItem>
-                
-                {habit.reminder && (
-                  <ListItem disablePadding sx={{ mb: 1 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <ScheduleIcon fontSize="small" color="primary" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Recordatorio" 
-                      secondary={habit.reminderTime || 'Activado'} 
-                      primaryTypographyProps={{ variant: 'body2' }}
-                    />
-                  </ListItem>
-                )}
-                
-                <ListItem disablePadding>
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <CalendarMonthIcon fontSize="small" color="primary" />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Creado" 
-                    secondary={habit.createdAt ? formatDate(habit.createdAt) : 'Desconocido'} 
-                    primaryTypographyProps={{ variant: 'body2' }}
-                  />
-                </ListItem>
-              </List>
-            </Paper>
-          </Grid>
           
           {/* Estadísticas */}
           <Grid item xs={12} md={6}>

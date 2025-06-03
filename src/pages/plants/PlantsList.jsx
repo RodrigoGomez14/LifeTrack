@@ -304,9 +304,9 @@ const PlantsList = () => {
               <Grid item xs={12} sm={4} md={3} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
                 <Button 
                   variant="contained" 
-                  startIcon={<ScienceIcon />}
+                  startIcon={<AddIcon />}
                   component={Link}
-                  to="/Aditivos"
+                  to="/NuevaPlanta"
                   size="large"
                   sx={{ 
                     bgcolor: theme.palette.primary.main,
@@ -327,7 +327,7 @@ const PlantsList = () => {
                     textTransform: 'none',
                   }}
                 >
-                  Ver Aditivos
+                  Agregar Planta
                 </Button>
               </Grid>
               {searchTerm && (

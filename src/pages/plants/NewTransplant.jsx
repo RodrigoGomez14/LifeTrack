@@ -13,7 +13,14 @@ import {
   CardHeader,
   Paper,
   Stack,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput
 } from "@mui/material";
 import { database, auth } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -36,11 +43,31 @@ const NewTransplant = () => {
   const [newVol, setNewVol] = useState("");
   const [transplantDate, setTransplantDate] = useState(new Date());
   const [notes, setNotes] = useState("");
+  const [selectedPlants, setSelectedPlants] = useState([]);
   
-  // Obtener el volumen actual de la maceta
-  const currentPlantId = checkSearch(location.search);
-  const currentPlant = userData?.plants?.active?.[currentPlantId];
-  const currentPotVolume = currentPlant?.potVolume || "No especificado";
+  const plantId = checkSearch(location.search);
+  
+  // Obtener todas las plantas activas del usuario
+  const activePlants = userData?.plants?.active ? Object.keys(userData.plants.active).map(id => ({
+    id,
+    name: userData.plants.active[id].name,
+    strain: userData.plants.active[id].strain,
+    currentPotVolume: userData.plants.active[id].potVolume || "No especificado"
+  })) : [];
+  
+  // Preseleccionar la planta actual si venimos de una planta específica
+  React.useEffect(() => {
+    if (plantId && activePlants.length > 0 && selectedPlants.length === 0) {
+      const currentPlant = activePlants.find(plant => plant.id === plantId);
+      if (currentPlant) {
+        setSelectedPlants([plantId]);
+      }
+    }
+  }, [activePlants.length]);
+  
+  // Obtener el volumen actual de la maceta (para la primera planta seleccionada)
+  const currentPlant = selectedPlants.length > 0 ? activePlants.find(p => p.id === selectedPlants[0]) : null;
+  const currentPotVolume = currentPlant?.currentPotVolume || "No especificado";
 
   const formatDate = (date) => {
     if (!date) return getDate();
@@ -54,38 +81,59 @@ const NewTransplant = () => {
   };
 
   const handleNewTransplant = () => {
-    const transplantData = {
-      date: formatDate(transplantDate),
-      previousPot: userData.plants.active[checkSearch(location.search)].potVolume,
-      newPot: parseInt(newVol),
-    };
-
-    if (notes.trim()) {
-      transplantData.notes = notes.trim();
-    }
-
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/transplants`
-      )
-      .push(transplantData);
+    const newVolume = parseInt(newVol);
     
-    database.ref(`${auth.currentUser.uid}/plants/active/${checkSearch(location.search)}`).transaction((data) => {
-      if (data) {
-        data.potVolume = parseInt(newVol);
+    // Crear las promesas para todas las plantas seleccionadas
+    const promises = selectedPlants.map(currentPlantId => {
+      const currentPlantData = activePlants.find(p => p.id === currentPlantId);
+      const transplantData = {
+        date: formatDate(transplantDate),
+        previousPot: currentPlantData?.currentPotVolume || "No especificado",
+        newPot: newVolume,
+      };
+
+      if (notes.trim()) {
+        transplantData.notes = notes.trim();
       }
-      return data;
+
+      // Guardar el transplante
+      const transplantPromise = database
+        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/transplants`)
+        .push(transplantData);
+      
+      // Actualizar el volumen de la maceta
+      const updatePromise = database
+        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}`)
+        .transaction((data) => {
+          if (data) {
+            data.potVolume = newVolume;
+          }
+          return data;
+        });
+
+      return Promise.all([transplantPromise, updatePromise]);
     });
 
-    setNewVol("");
-    setNotes("");
+    Promise.all(promises).then(() => {
+      setNewVol("");
+      setNotes("");
 
-    navigate(`/Planta/?${checkSearch(location.search)}`);
+      // Si solo hay una planta seleccionada, navegar a esa planta
+      // Si hay múltiples, navegar a la vista general de plantas
+      if (selectedPlants.length === 1) {
+        navigate(`/Planta/?${selectedPlants[0]}`);
+      } else {
+        navigate('/Plantas');
+      }
+    });
   };
 
-  const isFormValid = newVol && parseFloat(newVol) > 0;
+  const handlePlantChange = (event) => {
+    const value = event.target.value;
+    setSelectedPlants(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const isFormValid = newVol && parseFloat(newVol) > 0 && selectedPlants.length > 0;
 
   const potSizes = [
     { value: 0.5, label: '0.5L', description: 'Maceta muy pequeña' },
@@ -153,6 +201,48 @@ const NewTransplant = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Plantas seleccionadas</InputLabel>
+                        <Select
+                          multiple
+                          value={selectedPlants}
+                          onChange={handlePlantChange}
+                          input={<OutlinedInput label="Plantas seleccionadas" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => {
+                                const plant = activePlants.find(p => p.id === value);
+                                return (
+                                  <Chip 
+                                    key={value} 
+                                    label={plant ? `${plant.name} ${plant.strain ? `(${plant.strain})` : ''}` : value}
+                                    size="small"
+                                    color="primary"
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        >
+                          {activePlants.map((plant) => (
+                            <MenuItem key={plant.id} value={plant.id}>
+                              <Checkbox checked={selectedPlants.indexOf(plant.id) > -1} />
+                              <ListItemText 
+                                primary={plant.name}
+                                secondary={plant.strain || 'Sin cepa especificada'}
+                              />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
                       <Paper 
                         elevation={1}
                         sx={{ 
@@ -165,12 +255,40 @@ const NewTransplant = () => {
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                           <InfoIcon sx={{ color: theme.palette.info.main, fontSize: 20 }} />
                           <Typography variant="subtitle2" fontWeight="medium" color="info.main">
-                            Maceta actual
+                            Maceta actual {selectedPlants.length > 1 ? '(primera seleccionada)' : ''}
                           </Typography>
                         </Stack>
                         <Typography variant="h6" fontWeight="bold">
                           {currentPotVolume} litros
                         </Typography>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Paper 
+                        elevation={1}
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.success.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
+                          height: 'fit-content'
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <InfoIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
+                          <Typography variant="subtitle2" fontWeight="medium" color="success.main">
+                            Estado actual
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1}>
+                          <Chip 
+                            label={`${selectedPlants.length} ${selectedPlants.length === 1 ? 'planta' : 'plantas'}`} 
+                            color={selectedPlants.length > 0 ? "success" : "default"}
+                            variant={selectedPlants.length > 0 ? "filled" : "outlined"}
+                            size="small"
+                          />
+                        </Stack>
                       </Paper>
                     </Grid>
 
@@ -325,6 +443,7 @@ const NewTransplant = () => {
                   onClick={handleNewTransplant}
                   disabled={!isFormValid}
                   startIcon={<SaveIcon />}
+                  fullWidth
                   size="large"
                   sx={{
                     py: 1.5,

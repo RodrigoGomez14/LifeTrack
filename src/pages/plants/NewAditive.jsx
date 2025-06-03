@@ -164,6 +164,28 @@ const NewAditive = () => {
                         }}
                       />
                     </Grid>
+
+                    <Grid item xs={12}>
+                      <Paper 
+                        elevation={1}
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <ScienceIcon sx={{ color: theme.palette.info.main, fontSize: 20 }} />
+                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                            💡 Información importante
+                          </Typography>
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary">
+                          Los aditivos se guardan en tu biblioteca personal y estarán disponibles para usar en <strong>todas tus plantas</strong> durante riegos y aplicaciones de insecticidas.
+                        </Typography>
+                      </Paper>
+                    </Grid>
                   </Grid>
                 </CardContent>
               </Card>
@@ -443,19 +465,20 @@ const NewAditive = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
                   variant="contained"
-                  color="secondary"
+                  color="primary"
                   onClick={handleNewAditive}
                   disabled={!isFormValid}
                   startIcon={<SaveIcon />}
+                  fullWidth
                   size="large"
                   sx={{
                     py: 1.5,
                     px: 4,
                     borderRadius: 2,
                     fontWeight: 'bold',
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
                     '&:hover': {
-                      boxShadow: `0 6px 16px ${alpha(theme.palette.secondary.main, 0.4)}`,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                       transform: 'translateY(-2px)'
                     },
                     transition: 'all 0.2s ease'

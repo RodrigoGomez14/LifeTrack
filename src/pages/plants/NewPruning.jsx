@@ -20,7 +20,11 @@ import {
   TextField,
   Stack,
   Paper,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  ListItemText,
+  OutlinedInput,
+  Chip
 } from "@mui/material";
 import { database, auth } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -34,14 +38,36 @@ import { useTheme } from '@mui/material/styles';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
+import { useStore } from "../../store";
 
 const NewPruning = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const { userData } = useStore();
   const [type, setType] = useState("");
   const [pruningDate, setPruningDate] = useState(new Date());
   const [notes, setNotes] = useState("");
-  const theme = useTheme();
+  const [selectedPlants, setSelectedPlants] = useState([]);
+
+  const plantId = checkSearch(location.search);
+  
+  // Obtener todas las plantas activas del usuario
+  const activePlants = userData?.plants?.active ? Object.keys(userData.plants.active).map(id => ({
+    id,
+    name: userData.plants.active[id].name,
+    strain: userData.plants.active[id].strain
+  })) : [];
+  
+  // Preseleccionar la planta actual si venimos de una planta específica
+  React.useEffect(() => {
+    if (plantId && activePlants.length > 0 && selectedPlants.length === 0) {
+      const currentPlant = activePlants.find(plant => plant.id === plantId);
+      if (currentPlant) {
+        setSelectedPlants([plantId]);
+      }
+    }
+  }, [activePlants.length]);
 
   const formatDate = (date) => {
     if (!date) return getDate();
@@ -64,18 +90,30 @@ const NewPruning = () => {
       pruningData.notes = notes.trim();
     }
 
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/prunings`
-      )
-      .push(pruningData);
+    // Guardar la poda en todas las plantas seleccionadas
+    const promises = selectedPlants.map(currentPlantId => {
+      return database
+        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/prunings`)
+        .push(pruningData);
+    });
 
-    setType("");
-    setNotes("");
+    Promise.all(promises).then(() => {
+      setType("");
+      setNotes("");
 
-    navigate(`/Planta/?${checkSearch(location.search)}`);
+      // Si solo hay una planta seleccionada, navegar a esa planta
+      // Si hay múltiples, navegar a la vista general de plantas
+      if (selectedPlants.length === 1) {
+        navigate(`/Planta/?${selectedPlants[0]}`);
+      } else {
+        navigate('/Plantas');
+      }
+    });
+  };
+
+  const handlePlantChange = (event) => {
+    const value = event.target.value;
+    setSelectedPlants(typeof value === 'string' ? value.split(',') : value);
   };
 
   const pruningTypes = [
@@ -106,7 +144,7 @@ const NewPruning = () => {
   ];
 
   const selectedPruningType = pruningTypes.find(p => p.value === type);
-  const isFormValid = type;
+  const isFormValid = type && selectedPlants.length > 0;
 
   return (
     <Layout title="Nueva Poda">
@@ -159,6 +197,84 @@ const NewPruning = () => {
                           )}
                         />
                       </LocalizationProvider>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Plantas seleccionadas</InputLabel>
+                        <Select
+                          multiple
+                          value={selectedPlants}
+                          onChange={handlePlantChange}
+                          input={<OutlinedInput label="Plantas seleccionadas" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => {
+                                const plant = activePlants.find(p => p.id === value);
+                                return (
+                                  <Chip 
+                                    key={value} 
+                                    label={plant ? `${plant.name} ${plant.strain ? `(${plant.strain})` : ''}` : value}
+                                    size="small"
+                                    color="primary"
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        >
+                          {activePlants.map((plant) => (
+                            <MenuItem key={plant.id} value={plant.id}>
+                              <Checkbox checked={selectedPlants.indexOf(plant.id) > -1} />
+                              <ListItemText 
+                                primary={plant.name}
+                                secondary={plant.strain || 'Sin cepa especificada'}
+                              />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Paper 
+                        elevation={1}
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          height: 'fit-content'
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <InfoIcon sx={{ color: theme.palette.info.main, fontSize: 20 }} />
+                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                            Estado actual
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1}>
+                          <Chip 
+                            label={`${selectedPlants.length} ${selectedPlants.length === 1 ? 'planta' : 'plantas'}`} 
+                            color={selectedPlants.length > 0 ? "success" : "default"}
+                            variant={selectedPlants.length > 0 ? "filled" : "outlined"}
+                            size="small"
+                          />
+                          {type && (
+                            <Chip 
+                              label={selectedPruningType?.label || type}
+                              color="secondary"
+                              variant="filled"
+                              size="small"
+                            />
+                          )}
+                        </Stack>
+                      </Paper>
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
@@ -279,19 +395,20 @@ const NewPruning = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
                   variant="contained"
-                  color="success"
+                  color="primary"
                   onClick={handleNewPruning}
                   disabled={!isFormValid}
                   startIcon={<SaveIcon />}
+                  fullWidth
                   size="large"
                   sx={{ 
                     py: 1.5,
                     px: 4,
                     borderRadius: 2,
                     fontWeight: 'bold',
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.success.main, 0.3)}`,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
                     '&:hover': {
-                      boxShadow: `0 6px 16px ${alpha(theme.palette.success.main, 0.4)}`,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                       transform: 'translateY(-2px)'
                     },
                     transition: 'all 0.2s ease'

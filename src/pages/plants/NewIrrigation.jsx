@@ -26,7 +26,10 @@ import {
   Alert,
   Container,
   Fade,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  ListItemText as MuiListItemText,
+  OutlinedInput
 } from "@mui/material";
 import { database, auth } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -56,6 +59,26 @@ const NewIrrigation = () => {
   const [selectedDosis, setSelectedDosis] = useState('');
   const [irrigationDate, setIrrigationDate] = useState(new Date());
   const [notes, setNotes] = useState("");
+  const [selectedPlants, setSelectedPlants] = useState([]);
+
+  const plantId = checkSearch(location.search);
+  
+  // Obtener todas las plantas activas del usuario
+  const activePlants = userData?.plants?.active ? Object.keys(userData.plants.active).map(id => ({
+    id,
+    name: userData.plants.active[id].name,
+    strain: userData.plants.active[id].strain
+  })) : [];
+  
+  // Preseleccionar la planta actual si venimos de una planta específica
+  React.useEffect(() => {
+    if (plantId && activePlants.length > 0 && selectedPlants.length === 0) {
+      const currentPlant = activePlants.find(plant => plant.id === plantId);
+      if (currentPlant) {
+        setSelectedPlants([plantId]);
+      }
+    }
+  }, [activePlants.length]); // Solo ejecutar cuando cambien las plantas, no cuando cambien selectedPlants
 
   const formatDate = (date) => {
     if (!date) return getDate();
@@ -79,19 +102,26 @@ const NewIrrigation = () => {
       irrigationData.notes = notes.trim();
     }
 
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/irrigations`
-      )
-      .push(irrigationData);
+    // Guardar el riego en todas las plantas seleccionadas
+    const promises = selectedPlants.map(currentPlantId => {
+      return database
+        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/irrigations`)
+        .push(irrigationData);
+    });
 
-    setQuantity("");
-    setAditives([]);
-    setNotes("");
+    Promise.all(promises).then(() => {
+      setQuantity("");
+      setAditives([]);
+      setNotes("");
 
-    navigate(`/Planta/?${checkSearch(location.search)}`);
+      // Si solo hay una planta seleccionada, navegar a esa planta
+      // Si hay múltiples, navegar a la vista general de plantas
+      if (selectedPlants.length === 1) {
+        navigate(`/Planta/?${selectedPlants[0]}`);
+      } else {
+        navigate('/Plantas');
+      }
+    });
   };
 
   const handleAddAditive = () => {
@@ -112,7 +142,12 @@ const NewIrrigation = () => {
     setAditives(newAditives);
   };
 
-  const isFormValid = quantity && parseInt(quantity) > 0;
+  const handlePlantChange = (event) => {
+    const value = event.target.value;
+    setSelectedPlants(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const isFormValid = quantity && parseInt(quantity) > 0 && selectedPlants.length > 0;
 
   return (
     <Layout title="Nuevo Riego">
@@ -168,6 +203,48 @@ const NewIrrigation = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Plantas seleccionadas</InputLabel>
+                        <Select
+                          multiple
+                          value={selectedPlants}
+                          onChange={handlePlantChange}
+                          input={<OutlinedInput label="Plantas seleccionadas" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => {
+                                const plant = activePlants.find(p => p.id === value);
+                                return (
+                                  <Chip 
+                                    key={value} 
+                                    label={plant ? `${plant.name} ${plant.strain ? `(${plant.strain})` : ''}` : value}
+                                    size="small"
+                                    color="primary"
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        >
+                          {activePlants.map((plant) => (
+                            <MenuItem key={plant.id} value={plant.id}>
+                              <Checkbox checked={selectedPlants.indexOf(plant.id) > -1} />
+                              <MuiListItemText 
+                                primary={plant.name}
+                                secondary={plant.strain || 'Sin cepa especificada'}
+                              />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         label="Cantidad de agua"
                         type="number"
@@ -186,6 +263,42 @@ const NewIrrigation = () => {
                         }}
                         helperText="Cantidad en mililitros"
                       />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Paper 
+                        elevation={1}
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          height: 'fit-content'
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <InfoIcon sx={{ color: theme.palette.info.main, fontSize: 20 }} />
+                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                            Estado actual
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1}>
+                          <Chip 
+                            label={`${selectedPlants.length} ${selectedPlants.length === 1 ? 'planta' : 'plantas'}`} 
+                            color={selectedPlants.length > 0 ? "success" : "default"}
+                            variant={selectedPlants.length > 0 ? "filled" : "outlined"}
+                            size="small"
+                          />
+                          {aditives.length > 0 && (
+                            <Chip 
+                              label={`${aditives.length} ${aditives.length === 1 ? 'aditivo' : 'aditivos'}`} 
+                              color="secondary"
+                              variant="filled"
+                              size="small"
+                            />
+                          )}
+                        </Stack>
+                      </Paper>
                     </Grid>
 
                     <Grid item xs={12}>
@@ -380,19 +493,20 @@ const NewIrrigation = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
                   variant="contained"
-                  color="info"
+                  color="primary"
                   onClick={handleNewIrrigation}
                   disabled={!isFormValid}
                   startIcon={<SaveIcon />}
+                  fullWidth
                   size="large"
                   sx={{
                     py: 1.5,
                     px: 4,
                     borderRadius: 2,
                     fontWeight: 'bold',
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.info.main, 0.3)}`,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
                     '&:hover': {
-                      boxShadow: `0 6px 16px ${alpha(theme.palette.info.main, 0.4)}`,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                       transform: 'translateY(-2px)'
                     },
                     transition: 'all 0.2s ease'

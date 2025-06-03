@@ -2090,10 +2090,20 @@ const Plant = () => {
             textAlign: 'right !important'
           },
           '.rbc-off-range-bg': {
-            backgroundColor: '#f8f8f8 !important'
+            backgroundColor: '#f5f5f5 !important'
           },
           '.rbc-off-range': {
-            color: '#bbb !important'
+            color: '#999 !important'
+          },
+          '.rbc-off-range .rbc-date-cell': {
+            color: '#999 !important'
+          },
+          '.rbc-off-range .rbc-date-cell button': {
+            color: '#999 !important'
+          },
+          '.rbc-day-bg.rbc-off-range-bg': {
+            backgroundColor: '#f5f5f5 !important',
+            opacity: '0.6 !important'
           },
           '.rbc-today': {
             backgroundColor: 'transparent !important'
@@ -2395,6 +2405,42 @@ const Plant = () => {
                   border: `1px solid ${alpha('#ffffff', 0.2)}`,
                   boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
                 }}>
+                  {/* Cantidad */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 0.3 }}>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        opacity: 0.9, 
+                        fontWeight: 'medium',
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        color: '#ffffff'
+                      }}
+                    >
+                      Cantidad
+                    </Typography>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 'bold', 
+                        fontSize: '1.1rem',
+                        lineHeight: 1.2,
+                        color: '#ffffff'
+                      }}
+                    >
+                      {`${plant.quantity} plantas` || 'No especificada'}
+                    </Typography>
+                  </Box>
+                  {/* Separador */}
+                  <Box sx={{ 
+                    width: { xs: '100%', sm: '2px' }, 
+                    height: { xs: '1px', sm: '40px' }, 
+                    bgcolor: alpha('#ffffff', 0.3),
+                    borderRadius: 1
+                  }} />
+
+
                   {/* Genética */}
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 0.3 }}>
                     <Typography 
@@ -2538,6 +2584,9 @@ const Plant = () => {
                           overflow: 'hidden',
                           border: `1px solid ${alpha(stageColor, 0.2)}`,
                           transition: 'all 0.2s ease',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
                           '&:hover': {
                             transform: 'translateY(-2px)',
                             boxShadow: `0 6px 15px ${alpha(stageColor, 0.15)}`,
@@ -2549,114 +2598,232 @@ const Plant = () => {
                           })
                         }}
                       >
+                        {/* Header mejorado */}
                         <Box sx={{ 
-                          p: 1.5,
+                          p: 2,
                           background: `linear-gradient(135deg, ${stageColor} 0%, ${alpha(stageColor, 0.8)} 100%)`,
                           display: 'flex',
                           justifyContent: 'space-between',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          minHeight: '80px'
                         }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                            <Typography variant="body2" sx={{ color: 'white', fontWeight: 'medium' }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
+                            <Typography 
+                              variant="h6" 
+                              sx={{ 
+                                color: 'white', 
+                                fontWeight: 'bold',
+                                fontSize: '1.1rem',
+                                lineHeight: 1.2,
+                                mb: 0.5
+                              }}
+                            >
                               {stageName}
                             </Typography>
-                            {stageInfo.duration && (
+                            
+                            {/* Duración prominente para etapas activas */}
+                            {stageInfo.duration && stageInfo.isActive && (
+                              <Box sx={{ 
+                                bgcolor: alpha('#ffffff', 0.2),
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 2,
+                                backdropFilter: 'blur(4px)'
+                              }}>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    color: 'white', 
+                                    fontWeight: 'bold',
+                                    fontSize: '0.85rem'
+                                  }}
+                                >
+                                  {stageInfo.duration} días activa
+                                </Typography>
+                              </Box>
+                            )}
+                            
+                            {/* Duración discreta para etapas completadas */}
+                            {stageInfo.duration && stageInfo.isCompleted && !stageInfo.isActive && (
                               <Typography 
                                 variant="caption" 
                                 sx={{ 
-                                  color: 'rgba(255, 255, 255, 0.9)', 
+                                  color: 'rgba(255, 255, 255, 0.8)', 
                                   fontWeight: 'medium',
-                                  fontSize: '0.7rem',
-                                  textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                                  fontSize: '0.75rem'
                                 }}
                               >
-                                {stageInfo.duration} días
+                                Duró {stageInfo.duration} días
                               </Typography>
                             )}
                           </Box>
+                          
                           <Avatar 
                             sx={{ 
-                              width: 32,
-                              height: 32,
+                              width: 44,
+                              height: 44,
                               bgcolor: alpha('#ffffff', 0.2),
-                              color: '#ffffff'
+                              color: '#ffffff',
+                              border: `2px solid ${alpha('#ffffff', 0.3)}`
                             }}
                           >
                             {stageIcon}
                           </Avatar>
                         </Box>
                         
-                        <Box sx={{ p: 2 }}>
-                          {/* Fecha de inicio */}
-                          <Box sx={{ mb: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium', textTransform: 'uppercase' }}>
-                              Inicio
-                            </Typography>
-                            <Typography 
-                              variant="body2" 
-                              color="text.primary" 
-                              fontWeight={stageInfo.hasStarted ? 'medium' : 'normal'}
-                              sx={{ fontSize: '0.9rem' }}
-                            >
-                              {stageInfo.startDate ? format(new Date(stageInfo.startDate.split('/').reverse().join('-')), 'dd/MM/yy') : 'No iniciada'}
-                            </Typography>
-                          </Box>
-
-                          {/* Fecha de finalización */}
-                          <Box sx={{ mb: 1.5 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'medium', textTransform: 'uppercase' }}>
-                              Finalización
-                            </Typography>
-                            <Typography 
-                              variant="body2" 
-                              color={stageInfo.endDate ? "text.primary" : "text.secondary"}
-                              fontWeight={stageInfo.endDate ? 'medium' : 'normal'}
-                              sx={{ fontSize: '0.9rem' }}
-                            >
-                              {stageInfo.endDate 
-                                ? format(new Date(stageInfo.endDate.split('/').reverse().join('-')), 'dd/MM/yy')
-                                : stageInfo.isActive 
-                                  ? 'En curso' 
-                                  : 'Pendiente'
-                              }
-                            </Typography>
-                          </Box>
-
-                          {/* Indicador de estado */}
-                          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                        {/* Contenido reorganizado */}
+                        <Box sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                          {/* Estado prominente */}
+                          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
                             {stageInfo.isActive && (
                               <Chip 
-                                label="Activa" 
-                                size="small" 
+                                label="ETAPA ACTUAL" 
+                                size="medium" 
                                 sx={{ 
                                   bgcolor: stageColor, 
                                   color: 'white',
-                                  fontWeight: 'bold'
+                                  fontWeight: 'bold',
+                                  fontSize: '0.75rem',
+                                  px: 1,
+                                  '& .MuiChip-label': {
+                                    px: 2
+                                  }
                                 }} 
                               />
                             )}
                             {stageInfo.isCompleted && !stageInfo.isActive && (
                               <Chip 
-                                label="Completada" 
-                                size="small" 
+                                label="COMPLETADA" 
+                                size="medium" 
                                 sx={{ 
                                   bgcolor: theme.palette.success.main, 
                                   color: 'white',
-                                  fontWeight: 'bold'
+                                  fontWeight: 'bold',
+                                  fontSize: '0.75rem'
                                 }} 
                               />
                             )}
                             {!stageInfo.hasStarted && (
                               <Chip 
-                                label="Pendiente" 
-                                size="small" 
+                                label="PENDIENTE" 
+                                size="medium" 
+                                variant="outlined"
                                 sx={{ 
-                                  bgcolor: theme.palette.grey[400], 
-                                  color: 'white',
-                                  fontWeight: 'bold'
+                                  borderColor: theme.palette.grey[400], 
+                                  color: theme.palette.grey[600],
+                                  fontWeight: 'bold',
+                                  fontSize: '0.75rem'
                                 }} 
                               />
                             )}
+                          </Box>
+
+                          {/* Fechas con mejor jerarquía */}
+                          <Box sx={{ flex: 1 }}>
+                            {/* Fecha de inicio */}
+                            <Box sx={{ 
+                              mb: 2,
+                              p: 1.5,
+                              bgcolor: alpha(stageColor, 0.05),
+                              borderRadius: 2,
+                              border: `1px solid ${alpha(stageColor, 0.1)}`
+                            }}>
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  fontWeight: 'bold', 
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  color: stageColor,
+                                  display: 'block',
+                                  mb: 0.5
+                                }}
+                              >
+                                Fecha de inicio
+                              </Typography>
+                              <Typography 
+                                variant="body1" 
+                                sx={{ 
+                                  fontWeight: stageInfo.hasStarted ? 'bold' : 'normal',
+                                  color: stageInfo.hasStarted ? 'text.primary' : 'text.secondary',
+                                  fontSize: '0.95rem'
+                                }}
+                              >
+                                {stageInfo.startDate ? (
+                                  <>
+                                    <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                      {format(new Date(stageInfo.startDate.split('/').reverse().join('-')), 'dd/MM')}
+                                    </Box>
+                                    <Box component="span" sx={{ fontSize: '0.85rem', color: 'text.secondary', ml: 0.5 }}>
+                                      /{format(new Date(stageInfo.startDate.split('/').reverse().join('-')), 'yyyy')}
+                                    </Box>
+                                  </>
+                                ) : (
+                                  'No iniciada'
+                                )}
+                              </Typography>
+                            </Box>
+
+                            {/* Fecha de finalización */}
+                            <Box sx={{ 
+                              p: 1.5,
+                              bgcolor: stageInfo.endDate ? alpha(theme.palette.success.main, 0.05) : alpha(theme.palette.grey[400], 0.05),
+                              borderRadius: 2,
+                              border: `1px solid ${stageInfo.endDate ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.grey[400], 0.1)}`
+                            }}>
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  fontWeight: 'bold', 
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  color: stageInfo.endDate ? theme.palette.success.main : theme.palette.grey[500],
+                                  display: 'block',
+                                  mb: 0.5
+                                }}
+                              >
+                                Finalización
+                              </Typography>
+                              <Typography 
+                                variant="body1" 
+                                sx={{ 
+                                  fontWeight: stageInfo.endDate ? 'bold' : 'normal',
+                                  color: stageInfo.endDate ? "text.primary" : "text.secondary",
+                                  fontSize: '0.95rem'
+                                }}
+                              >
+                                {stageInfo.endDate ? (
+                                  <>
+                                    <Box component="span" sx={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                      {format(new Date(stageInfo.endDate.split('/').reverse().join('-')), 'dd/MM')}
+                                    </Box>
+                                    <Box component="span" sx={{ fontSize: '0.85rem', color: 'text.secondary', ml: 0.5 }}>
+                                      /{format(new Date(stageInfo.endDate.split('/').reverse().join('-')), 'yyyy')}
+                                    </Box>
+                                  </>
+                                ) : stageInfo.isActive ? (
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 0.5,
+                                    color: theme.palette.primary.main
+                                  }}>
+                                    <Box sx={{ 
+                                      width: 8, 
+                                      height: 8, 
+                                      bgcolor: theme.palette.primary.main, 
+                                      borderRadius: '50%',
+                                      animation: 'pulse 2s infinite'
+                                    }} />
+                                    <Typography component="span" sx={{ fontWeight: 'bold' }}>
+                                      En curso
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  'Pendiente'
+                                )}
+                              </Typography>
+                            </Box>
                           </Box>
                         </Box>
                       </Card>

@@ -18,7 +18,8 @@ import {
   InputAdornment,
   Select,
   MenuItem,
-  alpha
+  alpha,
+  Rating
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { database, auth } from '../../firebase';
@@ -33,6 +34,8 @@ import RepeatIcon from '@mui/icons-material/Repeat';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FormatPaintIcon from '@mui/icons-material/FormatPaint';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
 
 const NewHabit = () => {
   const navigate = useNavigate();
@@ -49,9 +52,11 @@ const NewHabit = () => {
   const [customDays, setCustomDays] = useState([]);
   const [monthlyDays, setMonthlyDays] = useState([]);
   const [yearlyMonths, setYearlyMonths] = useState([]);
+  const [yearlyDays, setYearlyDays] = useState([]);
   const [reminder, setReminder] = useState(false);
   const [reminderTime, setReminderTime] = useState('08:00');
   const [color, setColor] = useState('primary');
+  const [difficulty, setDifficulty] = useState(1);
   
   // Opciones para los días de la semana
   const weekdays = [
@@ -94,6 +99,55 @@ const NewHabit = () => {
     { value: 'warning', label: 'Naranja', hex: '#ed6c02' },
     { value: 'info', label: 'Celeste', hex: '#0288d1' }
   ];
+
+  // Opciones para niveles de dificultad
+  const difficultyOptions = [
+    { 
+      value: 1, 
+      label: 'Muy Fácil', 
+      description: 'Algo que puedes hacer sin esfuerzo',
+      multiplier: 1.0,
+      color: '#4caf50',
+      examples: 'Ej: Beber un vaso de agua, sonreír'
+    },
+    { 
+      value: 2, 
+      label: 'Fácil', 
+      description: 'Requiere un poco de atención pero es manejable',
+      multiplier: 1.5,
+      color: '#8bc34a',
+      examples: 'Ej: Leer 5 páginas, meditar 5 min'
+    },
+    { 
+      value: 3, 
+      label: 'Moderado', 
+      description: 'Necesita disciplina y esfuerzo constante',
+      multiplier: 2.5,
+      color: '#ff9800',
+      examples: 'Ej: Ejercicio 30 min, estudiar 1 hora'
+    },
+    { 
+      value: 4, 
+      label: 'Difícil', 
+      description: 'Requiere mucha determinación y sacrificio',
+      multiplier: 4.0,
+      color: '#f44336',
+      examples: 'Ej: Despertar a las 5 AM, dieta estricta'
+    },
+    { 
+      value: 5, 
+      label: 'Muy Difícil', 
+      description: 'Un desafío extremo que cambiará tu vida',
+      multiplier: 6.0,
+      color: '#9c27b0',
+      examples: 'Ej: Maratón diario, eliminar completamente el azúcar'
+    }
+  ];
+
+  // Función para obtener la información de dificultad
+  const getDifficultyInfo = (difficultyValue) => {
+    return difficultyOptions.find(option => option.value === difficultyValue) || difficultyOptions[0];
+  };
   
   // Manejar cambio en los días personalizados
   const handleDayToggle = (day) => {
@@ -121,19 +175,78 @@ const NewHabit = () => {
       setYearlyMonths([...yearlyMonths, month]);
     }
   };
+
+  // Manejar cambio en los días del mes para hábitos anuales
+  const handleYearlyDayToggle = (day) => {
+    if (yearlyDays.includes(day)) {
+      setYearlyDays(yearlyDays.filter(d => d !== day));
+    } else {
+      setYearlyDays([...yearlyDays, day]);
+    }
+  };
+  
+  // Validación específica para el paso 3
+  const isStep3Valid = () => {
+    if (frequency === 'custom' && customDays.length === 0) {
+      return false;
+    }
+    if (frequency === 'monthly' && monthlyDays.length === 0) {
+      return false;
+    }
+    if (frequency === 'yearly' && (yearlyMonths.length === 0 || yearlyDays.length === 0)) {
+      return false;
+    }
+    return true;
+  };
   
   // Determinar si el formulario es válido
   const isFormValid = () => {
-    if (!name.trim()) return false;
-    if (frequency === 'custom' && customDays.length === 0) return false;
-    if (frequency === 'monthly' && monthlyDays.length === 0) return false;
-    if (frequency === 'yearly' && yearlyMonths.length === 0) return false;
+    if (!name.trim()) {
+      console.log('Validation failed: name is empty');
+      return false;
+    }
+    
+    if (frequency === 'custom' && customDays.length === 0) {
+      console.log('Validation failed: custom frequency but no days selected');
+      return false;
+    }
+    
+    if (frequency === 'monthly' && monthlyDays.length === 0) {
+      console.log('Validation failed: monthly frequency but no days selected');
+      return false;
+    }
+    
+    if (frequency === 'yearly') {
+      if (yearlyMonths.length === 0) {
+        console.log('Validation failed: yearly frequency but no months selected');
+        return false;
+      }
+      if (yearlyDays.length === 0) {
+        console.log('Validation failed: yearly frequency but no days selected');
+        return false;
+      }
+    }
+    
+    console.log('Form validation passed');
     return true;
   };
   
   // Guardar el hábito
   const saveHabit = () => {
-    if (!isFormValid()) return;
+    console.log('Attempting to save habit...');
+    console.log('Form validation result:', isFormValid());
+    
+    if (!isFormValid()) {
+      console.log('Cannot save habit: form validation failed');
+      return;
+    }
+    
+    // Verificar autenticación
+    if (!auth.currentUser) {
+      console.error('No authenticated user found');
+      alert('Error: Usuario no autenticado. Por favor, inicia sesión de nuevo.');
+      return;
+    }
     
     const habitData = {
       name,
@@ -142,20 +255,29 @@ const NewHabit = () => {
       customDays: frequency === 'custom' ? customDays : [],
       monthlyDays: frequency === 'monthly' ? monthlyDays : [],
       yearlyMonths: frequency === 'yearly' ? yearlyMonths : [],
+      yearlyDays: frequency === 'yearly' ? yearlyDays : [],
       reminder,
       reminderTime: reminder ? reminderTime : null,
       color,
+      difficulty,
+      difficultyMultiplier: getDifficultyInfo(difficulty).multiplier,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       streak: 0
     };
     
+    console.log('Habit data to save:', habitData);
+    console.log('Saving to path:', `${auth.currentUser.uid}/habits`);
+    
     database.ref(`${auth.currentUser.uid}/habits`).push(habitData)
-      .then(() => {
+      .then((result) => {
+        console.log('Habit saved successfully:', result.key);
         navigate('/Habitos');
       })
       .catch(error => {
         console.error('Error al crear hábito:', error);
+        console.error('Error details:', error.message, error.code);
+        alert('Error al crear el hábito. Por favor, intenta de nuevo.');
       });
   };
   
@@ -171,6 +293,7 @@ const NewHabit = () => {
       if (step < 4) {
         setStep(step + 1);
       } else {
+        // Estamos en el paso 4, crear el hábito
         saveHabit();
       }
     }
@@ -467,7 +590,7 @@ const NewHabit = () => {
     </Box>
   );
   
-  // Renderizado del paso 3: Días personalizados (si aplica) y recordatorio
+  // Renderizado del paso 3: Días personalizados (si aplica), dificultad y recordatorio
   const renderStep3 = () => (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box mb={3}>
@@ -623,6 +746,136 @@ const NewHabit = () => {
               </Stack>
             </Box>
           )}
+
+          {/* Días del mes para hábitos anuales - solo mostrar si la frecuencia es anual */}
+          {frequency === 'yearly' && (
+            <Box>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                Selecciona los días del mes
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Elige en qué días del mes realizarás este hábito en los meses seleccionados (por ejemplo: el día 5, el día 15, etc.)
+              </Typography>
+              
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
+                {monthDays.map((day) => (
+                  <Chip
+                    key={day.value}
+                    label={day.value}
+                    onClick={() => handleYearlyDayToggle(day.value)}
+                    color={yearlyDays.includes(day.value) ? 'primary' : 'default'}
+                    variant={yearlyDays.includes(day.value) ? 'filled' : 'outlined'}
+                    sx={{ 
+                      mb: 1,
+                      borderWidth: 2,
+                      fontWeight: yearlyDays.includes(day.value) ? 'bold' : 'normal',
+                      '&:hover': {
+                        borderWidth: 2,
+                        opacity: 0.9
+                      }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Nivel de Dificultad */}
+          <Box>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              Nivel de Dificultad
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              La dificultad afectará la puntuación de tus estadísticas. Los hábitos más difíciles valen más puntos.
+            </Typography>
+            
+            <Stack spacing={2}>
+              {difficultyOptions.map((option) => (
+                <Card
+                  key={option.value}
+                  elevation={difficulty === option.value ? 3 : 1}
+                  onClick={() => setDifficulty(option.value)}
+                  sx={{ 
+                    cursor: 'pointer',
+                    borderRadius: 2,
+                    transition: 'all 0.3s ease',
+                    transform: difficulty === option.value ? 'scale(1.02)' : 'scale(1)',
+                    border: `2px solid ${difficulty === option.value ? option.color : 'transparent'}`,
+                    '&:hover': {
+                      transform: 'scale(1.02)',
+                      boxShadow: 3
+                    }
+                  }}
+                >
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box 
+                        sx={{ 
+                          bgcolor: alpha(option.color, 0.2),
+                          borderRadius: '50%',
+                          p: 1.5,
+                          color: option.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Rating
+                          value={option.value}
+                          max={5}
+                          readOnly
+                          size="small"
+                          icon={<FitnessCenterIcon fontSize="inherit" />}
+                          emptyIcon={<FitnessCenterIcon fontSize="inherit" sx={{ opacity: 0.3 }} />}
+                          sx={{ 
+                            '& .MuiRating-iconFilled': {
+                              color: option.color,
+                            },
+                            '& .MuiRating-iconEmpty': {
+                              color: alpha(option.color, 0.3),
+                            },
+                            fontSize: '1rem'
+                          }}
+                        />
+                      </Box>
+                      <Box flex={1}>
+                        <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
+                          <Typography variant="h6" fontWeight="bold">
+                            {option.label}
+                          </Typography>
+                          <Chip
+                            label={`${option.multiplier}x puntos`}
+                            size="small"
+                            sx={{ 
+                              bgcolor: alpha(option.color, 0.1),
+                              color: option.color,
+                              fontWeight: 'bold',
+                              fontSize: '0.7rem'
+                            }}
+                          />
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          {option.description}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          {option.examples}
+                        </Typography>
+                      </Box>
+                      <Radio 
+                        checked={difficulty === option.value}
+                        sx={{ 
+                          color: option.color,
+                          '&.Mui-checked': {
+                            color: option.color
+                          }
+                        }}
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Stack>
+          </Box>
           
           {/* Recordatorio */}
           <Box>
@@ -748,9 +1001,7 @@ const NewHabit = () => {
           variant="contained" 
           color="primary"
           onClick={() => handleStepChange('next')}
-          disabled={(frequency === 'custom' && customDays.length === 0) || 
-                   (frequency === 'monthly' && monthlyDays.length === 0) ||
-                   (frequency === 'yearly' && yearlyMonths.length === 0)}
+          disabled={!isStep3Valid()}
           endIcon={<ArrowForwardIcon />}
           sx={{ 
             px: 4,
@@ -795,6 +1046,18 @@ const NewHabit = () => {
             sx={{ 
               bgcolor: alpha(theme.palette.primary.main, 0.1),
               color: theme.palette.primary.main,
+              fontWeight: 'medium',
+              height: 32,
+              mb: 1
+            }}
+          />
+          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
+          <Chip
+            icon={<TrendingUpIcon />}
+            label={getDifficultyInfo(difficulty).label}
+            sx={{ 
+              bgcolor: alpha(getDifficultyInfo(difficulty).color, 0.1),
+              color: getDifficultyInfo(difficulty).color,
               fontWeight: 'medium',
               height: 32,
               mb: 1
@@ -956,6 +1219,35 @@ const NewHabit = () => {
               </Stack>
             )}
 
+            {frequency === 'yearly' && (
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Typography variant="body2" color="text.secondary">Días del mes:</Typography>
+                <Box textAlign="right">
+                  <Typography variant="body2" fontWeight="medium">
+                    {yearlyDays.sort((a, b) => a - b).join(', ')}
+                  </Typography>
+                </Box>
+              </Stack>
+            )}
+
+            <Stack direction="row" justifyContent="space-between">
+              <Typography variant="body2" color="text.secondary">Dificultad:</Typography>
+              <Box display="flex" alignItems="center">
+                <Box 
+                  sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: '50%', 
+                    bgcolor: getDifficultyInfo(difficulty).color,
+                    mr: 1 
+                  }} 
+                />
+                <Typography variant="body2" fontWeight="medium">
+                  {getDifficultyInfo(difficulty).label} ({getDifficultyInfo(difficulty).multiplier}x)
+                </Typography>
+              </Box>
+            </Stack>
+
             <Stack direction="row" justifyContent="space-between">
               <Typography variant="body2" color="text.secondary">Recordatorio:</Typography>
               <Typography variant="body2" fontWeight="medium">
@@ -1004,6 +1296,7 @@ const NewHabit = () => {
           variant="contained" 
           color="success"
           onClick={() => handleStepChange('next')}
+          disabled={!isFormValid()}
           endIcon={<CheckCircleIcon />}
           sx={{ 
             px: 4,
@@ -1053,7 +1346,7 @@ const NewHabit = () => {
                 {[
                   { label: 'Información', icon: <DescriptionIcon /> },
                   { label: 'Frecuencia', icon: <RepeatIcon /> },
-                  { label: 'Personalización', icon: <NotificationsActiveIcon /> },
+                  { label: 'Personalización', icon: <TrendingUpIcon /> },
                   { label: 'Finalizar', icon: <FormatPaintIcon /> }
                 ].map((item, index) => (
                   <Box 

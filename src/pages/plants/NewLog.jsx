@@ -10,7 +10,17 @@ import {
   Typography,
   alpha,
   Container,
-  CardHeader
+  CardHeader,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput,
+  Chip,
+  Stack,
+  Paper
 } from "@mui/material";
 import { database, auth } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -18,16 +28,39 @@ import { checkSearch, getDate } from "../../utils";
 import { useTheme } from '@mui/material/styles';
 import NoteAltIcon from '@mui/icons-material/NoteAlt';
 import SaveIcon from '@mui/icons-material/Save';
+import InfoIcon from '@mui/icons-material/Info';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
+import { useStore } from "../../store";
 
 const NewLog = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const { userData } = useStore();
   const [description, setDescription] = useState("");
   const [logDate, setLogDate] = useState(new Date());
+  const [selectedPlants, setSelectedPlants] = useState([]);
+
+  const plantId = checkSearch(location.search);
+  
+  // Obtener todas las plantas activas del usuario
+  const activePlants = userData?.plants?.active ? Object.keys(userData.plants.active).map(id => ({
+    id,
+    name: userData.plants.active[id].name,
+    strain: userData.plants.active[id].strain
+  })) : [];
+  
+  // Preseleccionar la planta actual si venimos de una planta específica
+  React.useEffect(() => {
+    if (plantId && activePlants.length > 0 && selectedPlants.length === 0) {
+      const currentPlant = activePlants.find(plant => plant.id === plantId);
+      if (currentPlant) {
+        setSelectedPlants([plantId]);
+      }
+    }
+  }, [activePlants.length]); // Solo ejecutar cuando cambien las plantas, no cuando cambien selectedPlants
 
   const formatDate = (date) => {
     if (!date) return getDate();
@@ -41,25 +74,39 @@ const NewLog = () => {
   };
 
   const handleNewLog = () => {
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/active/${checkSearch(
-          location.search
-        )}/logs`
-      )
-      .push({
-        date: formatDate(logDate),
-        description: description,
-        timestamp: Date.now()
-      });
+    const logData = {
+      date: formatDate(logDate),
+      description: description,
+      timestamp: Date.now()
+    };
 
-    setDescription("");
-    setLogDate(new Date());
+    // Guardar el registro en todas las plantas seleccionadas
+    const promises = selectedPlants.map(currentPlantId => {
+      return database
+        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/logs`)
+        .push(logData);
+    });
 
-    navigate(`/Planta/?${checkSearch(location.search)}`);
+    Promise.all(promises).then(() => {
+      setDescription("");
+      setLogDate(new Date());
+
+      // Si solo hay una planta seleccionada, navegar a esa planta
+      // Si hay múltiples, navegar a la vista general de plantas
+      if (selectedPlants.length === 1) {
+        navigate(`/Planta/?${selectedPlants[0]}`);
+      } else {
+        navigate('/Plantas');
+      }
+    });
   };
 
-  const isFormValid = description.trim().length > 0;
+  const handlePlantChange = (event) => {
+    const value = event.target.value;
+    setSelectedPlants(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const isFormValid = description.trim().length > 0 && selectedPlants.length > 0;
 
   return (
     <Layout title="Nuevo Registro">
@@ -123,6 +170,76 @@ const NewLog = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Plantas seleccionadas</InputLabel>
+                        <Select
+                          multiple
+                          value={selectedPlants}
+                          onChange={handlePlantChange}
+                          input={<OutlinedInput label="Plantas seleccionadas" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => {
+                                const plant = activePlants.find(p => p.id === value);
+                                return (
+                                  <Chip 
+                                    key={value} 
+                                    label={plant ? `${plant.name} ${plant.strain ? `(${plant.strain})` : ''}` : value}
+                                    size="small"
+                                    color="primary"
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        >
+                          {activePlants.map((plant) => (
+                            <MenuItem key={plant.id} value={plant.id}>
+                              <Checkbox checked={selectedPlants.indexOf(plant.id) > -1} />
+                              <ListItemText 
+                                primary={plant.name}
+                                secondary={plant.strain || 'Sin cepa especificada'}
+                              />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                      <Paper 
+                        elevation={1}
+                        sx={{ 
+                          p: 2, 
+                          borderRadius: 2, 
+                          bgcolor: alpha(theme.palette.info.main, 0.05),
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+                          height: 'fit-content'
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <InfoIcon sx={{ color: theme.palette.info.main, fontSize: 20 }} />
+                          <Typography variant="subtitle2" fontWeight="medium" color="info.main">
+                            Estado actual
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1}>
+                          <Chip 
+                            label={`${selectedPlants.length} ${selectedPlants.length === 1 ? 'planta' : 'plantas'}`} 
+                            color={selectedPlants.length > 0 ? "success" : "default"}
+                            variant={selectedPlants.length > 0 ? "filled" : "outlined"}
+                            size="small"
+                          />
+                        </Stack>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
                       <Box 
                         sx={{ 
                           p: 2, 
@@ -176,6 +293,7 @@ const NewLog = () => {
                   onClick={handleNewLog}
                   disabled={!isFormValid}
                   startIcon={<SaveIcon />}
+                  fullWidth
                   size="large"
                   sx={{
                     py: 1.5,

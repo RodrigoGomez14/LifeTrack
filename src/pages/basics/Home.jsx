@@ -695,15 +695,28 @@ const Home = () => {
         totalHabits: 0,
         completedToday: 0,
         todayCompletion: 0,
+        weightedTodayCompletion: 0,
         weeklyCompletion: 0,
+        weightedWeeklyCompletion: 0,
+        weeklyCompletedPoints: 0,
+        weeklyTotalPoints: 0,
         streak: 0,
         bestHabit: null,
         todayHabits: []
       };
     }
 
+    // Usar la misma función de formateo que la página de hábitos
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     const today = new Date();
-    const todayStr = formatDateForHabits(today);
+    const todayStr = formatDate(today);
     
     // Obtener hábitos activos (excluyendo el nodo "completed")
     const habits = Object.keys(userData.habits)
@@ -713,30 +726,49 @@ const Home = () => {
         ...userData.habits[id]
       }));
 
-    // Filtrar hábitos que aplican para hoy
+    // Filtrar hábitos que aplican para hoy usando la misma lógica que la página de hábitos
     const todayHabits = habits.filter(habit => shouldShowHabitForDate(habit, today));
     
-    // Contar hábitos completados hoy
-    const completedToday = todayHabits.filter(habit => 
+    // Obtener hábitos completados usando el mismo formato de clave
+    const completedTodayHabits = todayHabits.filter(habit => 
       userData.habits.completed?.[todayStr]?.[habit.id]
-    ).length;
+    );
+    
+    const completedToday = completedTodayHabits.length;
 
-    // Calcular porcentaje de completitud de hoy
+    // Calcular porcentaje de completitud de hoy (número simple)
     const todayCompletion = todayHabits.length > 0 
       ? Math.round((completedToday / todayHabits.length) * 100) 
       : 0;
 
-    // Calcular estadísticas semanales
-    const weekStats = calculateWeeklyHabitsStats(habits, today);
+    // Calcular ponderación para hoy usando el sistema de puntos (exactamente como la página de hábitos)
+    const todayWeightedPossible = todayHabits.reduce((sum, habit) => 
+      sum + (10 * (habit.difficultyMultiplier || 1.0)), 0
+    );
+    
+    const todayWeightedCompleted = completedTodayHabits.reduce((sum, habit) => 
+      sum + (10 * (habit.difficultyMultiplier || 1.0)), 0
+    );
+    
+    const todayWeightedCompletion = todayWeightedPossible > 0 
+      ? Math.round((todayWeightedCompleted / todayWeightedPossible) * 100) 
+      : 0;
 
-    // Encontrar el mejor hábito (más consistente en la semana)
-    const bestHabit = findBestHabit(habits, today);
+    // Calcular estadísticas semanales usando la misma lógica
+    const weekStats = calculateWeeklyHabitsStats(habits, today, formatDate);
+
+    // Encontrar el mejor hábito usando la misma lógica
+    const bestHabit = findBestHabit(habits, today, formatDate);
 
     return {
       totalHabits: habits.length,
       completedToday,
       todayCompletion,
+      weightedTodayCompletion: todayWeightedCompletion,
       weeklyCompletion: weekStats.completion,
+      weightedWeeklyCompletion: weekStats.weightedCompletion,
+      weeklyCompletedPoints: weekStats.weeklyCompletedPoints,
+      weeklyTotalPoints: weekStats.weeklyTotalPoints,
       bestHabit,
       todayHabits
     };
@@ -753,6 +785,19 @@ const Home = () => {
 
   // Función para determinar si un hábito aplica para una fecha
   const shouldShowHabitForDate = (habit, date) => {
+    // Verificar si el hábito fue creado antes o en la fecha actual
+    if (habit.createdAt) {
+      const createdDate = new Date(habit.createdAt);
+      createdDate.setHours(0, 0, 0, 0); // Normalizar a inicio del día
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0); // Normalizar a inicio del día
+      
+      // Si la fecha a verificar es anterior a la fecha de creación, no mostrar el hábito
+      if (checkDate < createdDate) {
+        return false;
+      }
+    }
+    
     const dayOfWeek = date.getDay(); // 0: domingo, 1: lunes, ..., 6: sábado
     const dayOfMonth = date.getDate(); // 1-31
     const month = date.getMonth() + 1; // 1-12
@@ -765,19 +810,29 @@ const Home = () => {
       case 'weekends':
         return dayOfWeek === 0 || dayOfWeek === 6; // Sábado o domingo
       case 'custom':
+        // Asegurarse de que customDays es un array antes de usar includes
         return Array.isArray(habit.customDays) && habit.customDays.includes(dayOfWeek);
       case 'monthly':
+        // Verificar si el día del mes está en la lista de días mensuales
         return Array.isArray(habit.monthlyDays) && habit.monthlyDays.includes(dayOfMonth);
       case 'yearly':
-        return Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
+        // Verificar si el mes actual está en la lista de meses anuales Y el día del mes está en la lista de días anuales
+        const isCorrectMonth = Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
+        const isCorrectDay = Array.isArray(habit.yearlyDays) && habit.yearlyDays.includes(dayOfMonth);
+        return isCorrectMonth && isCorrectDay;
       default:
-        return true;
+        return true; // Por defecto, mostrar si no hay frecuencia clara
     }
   };
 
   // Función para calcular estadísticas semanales
-  const calculateWeeklyHabitsStats = (habits, currentDate) => {
-    if (!userData?.habits?.completed) return { completion: 0 };
+  const calculateWeeklyHabitsStats = (habits, currentDate, formatDate) => {
+    if (!userData?.habits?.completed) return { 
+      completion: 0, 
+      weightedCompletion: 0,
+      weeklyCompletedPoints: 0,
+      weeklyTotalPoints: 0 
+    };
 
     // Obtener el rango de la semana actual (lunes a domingo)
     const today = new Date(currentDate);
@@ -790,6 +845,8 @@ const Home = () => {
 
     let totalPossible = 0;
     let totalCompleted = 0;
+    let weightedPossible = 0;
+    let weightedCompleted = 0;
 
     // Para cada día de la semana hasta hoy
     for (let i = 0; i < 7; i++) {
@@ -798,25 +855,36 @@ const Home = () => {
       
       if (day > today) break; // No contar días futuros
 
-      const dayStr = formatDateForHabits(day);
+      const dayStr = formatDate(day);
       
       habits.forEach(habit => {
         if (shouldShowHabitForDate(habit, day)) {
+          const difficultyMultiplier = habit.difficultyMultiplier || 1.0;
+          
+          // Contadores simples
           totalPossible++;
+          
+          // Contadores ponderados por dificultad
+          weightedPossible += (10 * difficultyMultiplier);
+          
           if (userData.habits.completed[dayStr]?.[habit.id]) {
             totalCompleted++;
+            weightedCompleted += (10 * difficultyMultiplier);
           }
         }
       });
     }
 
     return {
-      completion: totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0
+      completion: totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0,
+      weightedCompletion: weightedPossible > 0 ? Math.round((weightedCompleted / weightedPossible) * 100) : 0,
+      weeklyCompletedPoints: Math.round(weightedCompleted),
+      weeklyTotalPoints: Math.round(weightedPossible)
     };
   };
 
   // Función para encontrar el mejor hábito
-  const findBestHabit = (habits, currentDate) => {
+  const findBestHabit = (habits, currentDate, formatDate) => {
     if (!userData?.habits?.completed || habits.length === 0) return null;
 
     // Obtener el rango de la semana actual (lunes a domingo)
@@ -834,6 +902,10 @@ const Home = () => {
     habits.forEach(habit => {
       let possibleDays = 0;
       let completedDays = 0;
+      let weightedScore = 0;
+      let weightedPossible = 0;
+
+      const difficultyMultiplier = habit.difficultyMultiplier || 1.0;
 
       for (let i = 0; i < 7; i++) {
         const day = new Date(weekStart);
@@ -843,24 +915,31 @@ const Home = () => {
 
         if (shouldShowHabitForDate(habit, day)) {
           possibleDays++;
-          const dayStr = formatDateForHabits(day);
+          weightedPossible += (10 * difficultyMultiplier);
+          
+          const dayStr = formatDate(day);
           if (userData.habits.completed[dayStr]?.[habit.id]) {
             completedDays++;
+            weightedScore += (10 * difficultyMultiplier);
           }
         }
       }
 
       if (possibleDays > 0) {
         const percentage = (completedDays / possibleDays) * 100;
-        const score = percentage * 0.7 + completedDays * 10; // Fórmula ponderada
+        const weightedPercentage = weightedPossible > 0 ? (weightedScore / weightedPossible) * 100 : 0;
         
-        if (score > bestScore) {
-          bestScore = score;
+        // Usar el score ponderado como criterio principal
+        if (weightedScore > bestScore) {
+          bestScore = weightedScore;
           bestHabit = {
             ...habit,
             completedDays,
             possibleDays,
-            percentage: Math.round(percentage)
+            percentage: Math.round(percentage),
+            weightedScore: Math.round(weightedScore),
+            weightedPercentage: Math.round(weightedPercentage),
+            totalPossiblePoints: Math.round(weightedPossible)
           };
         }
       }
@@ -873,8 +952,17 @@ const Home = () => {
   const toggleHabitCompletion = async (habitId) => {
     if (!userData?.habits) return;
 
+    // Usar la misma función de formateo que la página de hábitos
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     const today = new Date();
-    const todayStr = formatDateForHabits(today);
+    const todayStr = formatDate(today);
     
     try {
       // Importar las dependencias de Firebase
@@ -1213,7 +1301,7 @@ const Home = () => {
                     color: theme.palette.primary.main,
                     letterSpacing: '-0.5px'
                   }}>
-                    {formatAmount(userData?.savings?.amountARS || 0)}
+                    $ {formatAmount(userData?.savings?.amountARS || 0)}
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
@@ -1353,7 +1441,7 @@ const Home = () => {
                     color: getBalance() >= 0 ? theme.palette.success.main : theme.palette.error.main,
                     letterSpacing: '-0.5px'
                   }}>
-                    {formatAmount(getBalance())}
+                    $ {formatAmount(getBalance())}
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
@@ -1605,7 +1693,7 @@ const Home = () => {
                     color: theme.palette.error.main,
                     letterSpacing: '-0.5px'
                   }}>
-                    {formatAmount(getExpenseTotal())}
+                    $ {formatAmount(getExpenseTotal())}
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
@@ -1806,7 +1894,7 @@ const Home = () => {
                     color: theme.palette.warning.main,
                     letterSpacing: '-0.5px'
                   }}>
-                    {formatAmount(creditCardsData.totalAmount)}
+                    $ {formatAmount(creditCardsData.totalAmount)}
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
@@ -2422,7 +2510,7 @@ const Home = () => {
                   boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
                 },
               }}
-              onClick={() => navigate('/habits')}
+              onClick={() => navigate('/habitos')}
             >
               <Box
                 sx={{
@@ -2459,8 +2547,8 @@ const Home = () => {
                     Completados hoy
                   </Typography>
                   <Typography variant={isMobile ? "h4" : "h3"} fontWeight="bold" sx={{ 
-                    color: habitsStats.todayCompletion >= 80 ? theme.palette.success.main : 
-                           habitsStats.todayCompletion >= 50 ? theme.palette.warning.main : 
+                    color: habitsStats.weightedTodayCompletion >= 80 ? theme.palette.success.main : 
+                           habitsStats.weightedTodayCompletion >= 50 ? theme.palette.warning.main : 
                            theme.palette.error.main,
                     letterSpacing: '-0.5px'
                   }}>
@@ -2468,20 +2556,20 @@ const Home = () => {
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
-                    {habitsStats.todayCompletion}% completado
+                    {habitsStats.weightedTodayCompletion}% completado
                   </Typography>
                 </Box>
 
                 <LinearProgress 
                   variant="determinate" 
-                  value={habitsStats.todayCompletion} 
+                  value={habitsStats.weightedTodayCompletion} 
                   sx={{
                     height: 8,
                     borderRadius: 4,
                     bgcolor: alpha(theme.palette.grey[500], 0.1),
                     '& .MuiLinearProgress-bar': {
-                      bgcolor: habitsStats.todayCompletion >= 80 ? theme.palette.success.main : 
-                               habitsStats.todayCompletion >= 50 ? theme.palette.warning.main : 
+                      bgcolor: habitsStats.weightedTodayCompletion >= 80 ? theme.palette.success.main : 
+                               habitsStats.weightedTodayCompletion >= 50 ? theme.palette.warning.main : 
                                theme.palette.error.main
                     },
                     mb: 2
@@ -2513,7 +2601,7 @@ const Home = () => {
                   boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
                 },
               }}
-              onClick={() => navigate('/habits')}
+              onClick={() => navigate('/habitos')}
             >
               <Box
                 sx={{
@@ -2553,19 +2641,17 @@ const Home = () => {
                     color: theme.palette.info.main,
                     letterSpacing: '-0.5px'
                   }}>
-                    {habitsStats.weeklyCompletion}%
+                    {habitsStats.weightedWeeklyCompletion}%
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
-                    {habitsStats.weeklyCompletion >= 80 ? 'Excelente' : 
-                     habitsStats.weeklyCompletion >= 60 ? 'Muy bien' : 
-                     habitsStats.weeklyCompletion >= 40 ? 'Regular' : 'Necesita mejorar'}
+                    {habitsStats.weeklyCompletedPoints} de {habitsStats.weeklyTotalPoints} puntos
                   </Typography>
                 </Box>
 
                 <LinearProgress 
                   variant="determinate" 
-                  value={habitsStats.weeklyCompletion} 
+                  value={habitsStats.weightedWeeklyCompletion} 
                   color="info"
                   sx={{
                     height: 8,
@@ -2600,7 +2686,7 @@ const Home = () => {
                   boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
                 },
               }}
-              onClick={() => navigate('/habits')}
+              onClick={() => navigate('/habitos')}
             >
               <Box
                 sx={{
@@ -2642,17 +2728,17 @@ const Home = () => {
                         color: theme.palette.primary.main,
                         letterSpacing: '-0.5px'
                       }}>
-                        {habitsStats.bestHabit.percentage}%
+                        {habitsStats.bestHabit.weightedPercentage}%
                       </Typography>
                       
                       <Typography variant="body2" color="text.secondary" fontWeight="medium" sx={{ mt: 0.5 }}>
-                        {habitsStats.bestHabit.completedDays} de {habitsStats.bestHabit.possibleDays} días
+                        {habitsStats.bestHabit.weightedScore} de {habitsStats.bestHabit.totalPossiblePoints} puntos
                       </Typography>
                     </Box>
 
                     <LinearProgress 
                       variant="determinate" 
-                      value={habitsStats.bestHabit.percentage} 
+                      value={habitsStats.bestHabit.weightedPercentage} 
                       color="primary"
                       sx={{
                         height: 8,
@@ -2738,7 +2824,16 @@ const Home = () => {
                 {habitsStats.todayHabits.length > 0 ? (
                   <List dense sx={{ py: 0 }}>
                     {habitsStats.todayHabits.map((habit) => {
-                      const todayStr = formatDateForHabits(new Date());
+                      // Usar la misma función de formateo que las otras funciones
+                      const formatDate = (date) => {
+                        const d = new Date(date);
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                      };
+                      
+                      const todayStr = formatDate(new Date());
                       const isCompleted = userData?.habits?.completed?.[todayStr]?.[habit.id];
                       
                       return (
@@ -2806,28 +2901,6 @@ const Home = () => {
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                       ¡Disfruta tu día libre!
-                    </Typography>
-                  </Box>
-                )}
-
-                {habitsStats.todayHabits.length > 0 && (
-                  <Box sx={{ mt: 'auto', pt: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={habitsStats.todayCompletion} 
-                      sx={{
-                        height: 6,
-                        borderRadius: 3,
-                        bgcolor: alpha(theme.palette.grey[500], 0.1),
-                        '& .MuiLinearProgress-bar': {
-                          bgcolor: habitsStats.todayCompletion >= 80 ? theme.palette.success.main : 
-                                   habitsStats.todayCompletion >= 50 ? theme.palette.warning.main : 
-                                   theme.palette.error.main
-                        }
-                      }}
-                    />
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', textAlign: 'center' }}>
-                      {habitsStats.todayCompletion}% completado
                     </Typography>
                   </Box>
                 )}

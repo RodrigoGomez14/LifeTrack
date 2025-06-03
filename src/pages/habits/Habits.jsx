@@ -62,6 +62,7 @@ import ReactApexChart from 'react-apexcharts';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 
 // Configurar locale de moment
 moment.locale('es');
@@ -210,6 +211,8 @@ const Habits = () => {
     // Variables para estadísticas
     let totalCompletions = 0;
     let totalPossible = 0;
+    let weightedCompletions = 0; // Nuevo: completados ponderados por dificultad
+    let weightedPossible = 0;    // Nuevo: posibles ponderados por dificultad
     let habitStats = {};
     let dayStats = {};
     
@@ -252,18 +255,23 @@ const Habits = () => {
         total: 0,
         completed: 0,
         percentage: 0,
-        score: 0
+        score: 0,
+        weightedScore: 0 // Nuevo: score ponderado por dificultad
       };
       
       // Para cada hábito, verificar si corresponde a este día
       habits.forEach(habit => {
         if (shouldShowHabitForDate(habit, currentDate)) {
+          // Obtener multiplicador de dificultad (por defecto 1.0 si no existe)
+          const difficultyMultiplier = habit.difficultyMultiplier || 1.0;
+          
           // Incrementar el contador total de hábitos para este día
           dayStats[dateStr].total++;
           
           // Solo contabilizar para estadísticas semanales si no es un día futuro
           if (currentDate <= statisticsEndDate) {
             totalPossible++;
+            weightedPossible += difficultyMultiplier; // Sumar peso de dificultad
           }
           
           // Inicializar estadísticas para este hábito si no existen
@@ -272,9 +280,12 @@ const Habits = () => {
               id: habit.id,
               name: habit.name,
               color: habit.color || 'primary',
+              difficulty: habit.difficulty || 1,
+              difficultyMultiplier: difficultyMultiplier,
               possibleDays: 0,
               completedDays: 0,
-              percentage: 0
+              percentage: 0,
+              weightedScore: 0 // Nuevo: score ponderado
             };
           }
           
@@ -291,7 +302,9 @@ const Habits = () => {
             // Solo contabilizar completados hasta la fecha actual
             if (currentDate <= statisticsEndDate) {
               totalCompletions++;
+              weightedCompletions += difficultyMultiplier; // Sumar peso de dificultad
               habitStats[habit.id].completedDays++;
+              habitStats[habit.id].weightedScore += (10 * difficultyMultiplier); // 10 puntos base * multiplicador de dificultad
             }
           }
           
@@ -311,13 +324,28 @@ const Habits = () => {
         }
       });
       
-      // Calcular porcentaje para este día
+      // Calcular porcentaje y scores para este día
       if (dayStats[dateStr].total > 0) {
-        dayStats[dateStr].percentage = Math.round((dayStats[dateStr].completed / dayStats[dateStr].total) * 100);
+        // Score ponderado por dificultad
+        const dayWeightedCompletions = habits
+          .filter(habit => shouldShowHabitForDate(habit, currentDate))
+          .filter(habit => completedHabits[dateStr] && completedHabits[dateStr][habit.id])
+          .reduce((sum, habit) => sum + (10 * (habit.difficultyMultiplier || 1.0)), 0); // 10 puntos base * multiplicador
         
-        // Calcular score ponderado para este día, similar a la fórmula de hábitos
-        // La fórmula combina 30% del porcentaje con 20 puntos por cada hábito completado
+        const dayWeightedPossible = habits
+          .filter(habit => shouldShowHabitForDate(habit, currentDate))
+          .reduce((sum, habit) => sum + (10 * (habit.difficultyMultiplier || 1.0)), 0); // 10 puntos base * multiplicador
+        
+        // Calcular porcentaje basado en puntos ponderados, no en número de hábitos
+        dayStats[dateStr].percentage = dayWeightedPossible > 0 
+          ? Math.round((dayWeightedCompletions / dayWeightedPossible) * 100) 
+          : 0;
+        
+        // Score original (sin ponderar) - mantener para compatibilidad
         dayStats[dateStr].score = (dayStats[dateStr].percentage * 0.3) + (dayStats[dateStr].completed * 20);
+        
+        dayStats[dateStr].weightedScore = dayWeightedCompletions; // Mostrar directamente los puntos obtenidos
+        dayStats[dateStr].totalPossiblePoints = dayWeightedPossible; // Agregar puntos totales posibles
       }
       
       // Avanzar al siguiente día
@@ -344,7 +372,7 @@ const Habits = () => {
       return a.resource.habit.name.localeCompare(b.resource.habit.name);
     });
     
-    // Calcular porcentajes para hábitos
+    // Calcular porcentajes y scores para hábitos
     Object.keys(habitStats).forEach(habitId => {
       const habit = habitStats[habitId];
       habit.percentage = habit.possibleDays > 0 
@@ -354,26 +382,28 @@ const Habits = () => {
     
     setHabitEvents(events);
     
-    // Calcular estadísticas para el día actual
+    // Calcular estadísticas para el día actual con ponderación
     const today = formatDate(new Date());
     const todayHabits = habits.filter(habit => shouldShowHabitForDate(habit, new Date()));
-    const completedToday = todayHabits.filter(habit => 
+    const completedTodayHabits = todayHabits.filter(habit => 
       completedHabits[today] && completedHabits[today][habit.id]
-    ).length;
+    );
+    const completedToday = completedTodayHabits.length;
     
-    // Encontrar el hábito más consistente
-    let mostConsistentHabit = { percentage: 0, completedDays: 0, score: 0 };
-    let leastConsistentHabit = { percentage: 100 };
+    // Calcular ponderación para hoy
+    const todayWeightedPossible = todayHabits.reduce((sum, habit) => sum + (10 * (habit.difficultyMultiplier || 1.0)), 0); // 10 puntos base * multiplicador
+    const todayWeightedCompleted = completedTodayHabits.reduce((sum, habit) => sum + (10 * (habit.difficultyMultiplier || 1.0)), 0); // 10 puntos base * multiplicador
+    const todayWeightedCompletion = todayWeightedPossible > 0 
+      ? Math.round((todayWeightedCompleted / todayWeightedPossible) * 100) 
+      : 0;
+    
+    // Encontrar el hábito más consistente basado en score ponderado
+    let mostConsistentHabit = { weightedScore: 0, percentage: 0, completedDays: 0 };
+    let leastConsistentHabit = { percentage: 100, weightedScore: Infinity };
     
     Object.values(habitStats).forEach(habit => {
-      // Calcular una puntuación ponderada que considere tanto el porcentaje como la cantidad de días completados
-      // La fórmula da más peso a hábitos con más días completados cuando los porcentajes son similares
-      const score = (habit.percentage * 0.5) + (habit.completedDays * 15);
-      
-      // Agregar la puntuación al objeto habit
-      habit.score = score;
-      
-      if (habit.possibleDays > 0 && score > mostConsistentHabit.score) {
+      // El hábito más consistente ahora se basa en el score ponderado
+      if (habit.possibleDays > 0 && habit.weightedScore > mostConsistentHabit.weightedScore) {
         mostConsistentHabit = habit;
       }
       if (habit.percentage < leastConsistentHabit.percentage && habit.possibleDays > 0) {
@@ -381,12 +411,12 @@ const Habits = () => {
       }
     });
     
-    // Encontrar el mejor y peor día, ahora usando el score ponderado
-    let bestDay = { score: 0 };
-    let worstDay = { percentage: 100 };
+    // Encontrar el mejor y peor día usando score ponderado
+    let bestDay = { weightedScore: 0 };
+    let worstDay = { percentage: 100, weightedScore: Infinity };
     
     Object.values(dayStats).forEach(day => {
-      if (day.score > bestDay.score && day.total > 0) {
+      if (day.weightedScore > bestDay.weightedScore && day.total > 0) {
         bestDay = day;
       }
       if (day.percentage < worstDay.percentage && day.total > 0) {
@@ -397,27 +427,53 @@ const Habits = () => {
       }
     });
     
-      setStats({
+    // Calcular porcentaje de compleción ponderado por dificultad con puntos base
+    const weightedCompletion = weightedPossible > 0 
+      ? Math.round((weightedCompletions / weightedPossible) * 100) 
+      : 0;
+    
+    // Calcular puntos semanales (multiplicar por 10 para obtener puntos reales)
+    const weeklyCompletedPoints = Math.round(weightedCompletions * 10);
+    const weeklyTotalPoints = Math.round(weightedPossible * 10);
+    
+    setStats({
       totalHabits: habits.length,
       todayHabits: todayHabits.length,
       completedToday,
       completion: todayHabits.length > 0 
         ? Math.round((completedToday / todayHabits.length) * 100) 
         : 0,
+      weightedTodayCompletion: todayWeightedCompletion, // Nueva métrica ponderada para hoy
       weeklyCompletion: totalPossible > 0 
         ? Math.round((totalCompletions / totalPossible) * 100) 
         : 0,
+      weightedWeeklyCompletion: weightedCompletion, // Porcentaje ponderado semanal
+      weeklyCompletedPoints, // Puntos completados esta semana
+      weeklyTotalPoints, // Puntos totales posibles esta semana
       mostConsistentHabit,
       leastConsistentHabit,
       bestDay,
       worstDay,
-      habitStats: Object.values(habitStats).sort((a, b) => b.percentage - a.percentage),
+      habitStats: Object.values(habitStats).sort((a, b) => b.weightedScore - a.weightedScore), // Ordenar por score ponderado
       dayStats: dayStats
     });
   };
   
   // Determinar si un hábito debe mostrarse para una fecha específica
   const shouldShowHabitForDate = (habit, date) => {
+    // Verificar si el hábito fue creado antes o en la fecha actual
+    if (habit.createdAt) {
+      const createdDate = new Date(habit.createdAt);
+      createdDate.setHours(0, 0, 0, 0); // Normalizar a inicio del día
+      const checkDate = new Date(date);
+      checkDate.setHours(0, 0, 0, 0); // Normalizar a inicio del día
+      
+      // Si la fecha a verificar es anterior a la fecha de creación, no mostrar el hábito
+      if (checkDate < createdDate) {
+        return false;
+      }
+    }
+    
     const dayOfWeek = date.getDay(); // 0: domingo, 1: lunes, ..., 6: sábado
     const dayOfMonth = date.getDate(); // 1-31
     const month = date.getMonth() + 1; // 1-12
@@ -436,8 +492,10 @@ const Habits = () => {
         // Verificar si el día del mes está en la lista de días mensuales
         return Array.isArray(habit.monthlyDays) && habit.monthlyDays.includes(dayOfMonth);
       case 'yearly':
-        // Verificar si el mes actual está en la lista de meses anuales
-        return Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
+        // Verificar si el mes actual está en la lista de meses anuales Y el día del mes está en la lista de días anuales
+        const isCorrectMonth = Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
+        const isCorrectDay = Array.isArray(habit.yearlyDays) && habit.yearlyDays.includes(dayOfMonth);
+        return isCorrectMonth && isCorrectDay;
       default:
         return true; // Por defecto, mostrar si no hay frecuencia clara
     }
@@ -634,11 +692,21 @@ const Habits = () => {
         }
         return 'Mensual';
       case 'yearly':
-        if (Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.length > 0) {
+        if (Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.length > 0 && 
+            Array.isArray(habit.yearlyDays) && habit.yearlyDays.length > 0) {
           const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-          // Ordenar los meses seleccionados
+          // Ordenar los meses y días seleccionados
           const sortedMonths = [...habit.yearlyMonths].sort((a, b) => a - b);
-          return sortedMonths.map(month => monthNames[month - 1]).join(', ');
+          const sortedDays = [...habit.yearlyDays].sort((a, b) => a - b);
+          
+          const monthsText = sortedMonths.map(month => monthNames[month - 1]).join(', ');
+          const daysText = sortedDays.join(', ');
+          
+          if (habit.yearlyDays.length === 1) {
+            return `${daysText} de ${monthsText}`;
+          } else {
+            return `Días ${daysText} de ${monthsText}`;
+          }
         }
         return 'Anual';
       default: return ''; // Frecuencia no especificada o desconocida
@@ -668,6 +736,18 @@ const Habits = () => {
     // Usar el color específico del hábito o un color por defecto
     const habitColor = habit.color ? theme.palette[habit.color].main : theme.palette.primary.main;
     
+    // Función para obtener el color de dificultad
+    const getDifficultyColor = (difficulty) => {
+      const colors = {
+        1: '#4caf50', // Muy Fácil - Verde
+        2: '#8bc34a', // Fácil - Verde claro
+        3: '#ff9800', // Moderado - Naranja
+        4: '#f44336', // Difícil - Rojo
+        5: '#9c27b0'  // Muy Difícil - Púrpura
+      };
+      return colors[difficulty] || colors[1];
+    };
+    
     return (
       <Box 
           sx={{
@@ -683,6 +763,7 @@ const Habits = () => {
           mb: 0.5,
           boxShadow: isCompleted ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
           transition: 'all 0.2s ease',
+          position: 'relative',
           '&:hover': {
             bgcolor: isCompleted 
               ? alpha(habitColor, 0.25)
@@ -706,10 +787,41 @@ const Habits = () => {
             fontWeight: isCompleted ? 'normal' : 'medium',
             textDecoration: isCompleted ? 'line-through' : 'none',
             color: isCompleted ? alpha(theme.palette.text.primary, 0.7) : theme.palette.text.primary,
-            fontSize: '0.8rem'
+            fontSize: '0.8rem',
+            flex: 1
           }}>
             {habit.name}
           </Typography>
+          
+          {/* Indicador de dificultad */}
+          {habit.difficulty && habit.difficulty > 1 && (
+            <Box
+              sx={{
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                bgcolor: getDifficultyColor(habit.difficulty),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mr: 0.5,
+                border: '1px solid white',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  fontSize: '0.55rem', 
+                  fontWeight: 'bold', 
+                  color: 'white',
+                  lineHeight: 1
+                }}
+              >
+                {habit.difficulty}
+              </Typography>
+            </Box>
+          )}
         </Box>
         <Checkbox
           checked={isCompleted}
@@ -1238,8 +1350,15 @@ const Habits = () => {
             </Tooltip>
           </Stack>
           
-          {!isCurrentWeek && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          {/* Fila de botones adicionales */}
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            gap: 2, 
+            mt: 2,
+            flexWrap: 'wrap'
+          }}>
+            {!isCurrentWeek && (
               <Button 
                 variant="contained" 
                 size="small" 
@@ -1259,8 +1378,29 @@ const Habits = () => {
               >
                 Ir a semana actual
               </Button>
-            </Box>
-          )}
+            )}
+            
+            {/* Botón para ir a la lista de hábitos */}
+            <Button 
+              variant="contained" 
+              size="small" 
+              onClick={() => navigate('/HabitosList')}
+              startIcon={<ListAltIcon />}
+              sx={{ 
+                borderRadius: 2,
+                py: 0.5,
+                px: 2,
+                boxShadow: 2,
+                bgcolor: alpha(theme.palette.info.main, 0.9),
+                color: 'white',
+                '&:hover': {
+                  bgcolor: theme.palette.info.main,
+                }
+              }}
+            >
+              {isMobile ? 'Lista' : 'Lista de Hábitos'}
+            </Button>
+          </Box>
         </Box>
       </Card>
     );
@@ -1286,10 +1426,34 @@ const Habits = () => {
       if (percentage >= 40) return { color: theme.palette.warning.main, text: 'Regular' };
       return { color: theme.palette.error.main, text: 'Necesita mejorar' };
     };
+
+    // Función para obtener el color de dificultad
+    const getDifficultyColor = (difficulty) => {
+      const colors = {
+        1: '#4caf50', // Muy Fácil - Verde
+        2: '#8bc34a', // Fácil - Verde claro
+        3: '#ff9800', // Moderado - Naranja
+        4: '#f44336', // Difícil - Rojo
+        5: '#9c27b0'  // Muy Difícil - Púrpura
+      };
+      return colors[difficulty] || colors[1];
+    };
+
+    // Función para obtener el nombre de dificultad
+    const getDifficultyLabel = (difficulty) => {
+      const labels = {
+        1: 'Muy Fácil',
+        2: 'Fácil',
+        3: 'Moderado',
+        4: 'Difícil',
+        5: 'Muy Difícil'
+      };
+      return labels[difficulty] || 'Fácil';
+    };
     
     return (
       <Grid container spacing={3}>
-        {/* Tarjeta 1: Resumen de la semana */}
+        {/* Tarjeta 1: Resumen de la semana con estadísticas ponderadas */}
         <Grid item xs={12} sm={6} md={3}>
           <Card 
             elevation={3} 
@@ -1328,30 +1492,36 @@ const Habits = () => {
                     Progreso Semanal
                   </Typography>
                   <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                    {formatWeekRangeDisplay(currentWeek)}
+                    Ponderado por dificultad
                   </Typography>
                 </Box>
               </Stack>
             </Box>
-                        <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Box sx={{ mb: 2, mt: 2, textAlign: 'center' }}>
-                <Typography variant="h3" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  {stats.weeklyCompletion}%
+                <Stack direction="row" justifyContent="center" alignItems="baseline" spacing={1}>
+                  <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                    {stats.weightedWeeklyCompletion || 0}%
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {stats.weeklyCompletedPoints || 0} de {stats.weeklyTotalPoints || 0} puntos
                 </Typography>
                 <Typography 
                   variant="subtitle2" 
                   sx={{ 
                     fontWeight: 'medium', 
-                    color: getColoredPercentage(stats.weeklyCompletion).color
+                    color: getColoredPercentage(stats.weightedWeeklyCompletion || 0).color,
+                    mt: 0.5
                   }}
                 >
-                  {getColoredPercentage(stats.weeklyCompletion).text}
+                  {getColoredPercentage(stats.weightedWeeklyCompletion || 0).text}
                 </Typography>
               </Box>
               
               <LinearProgress 
                 variant="determinate" 
-                value={stats.weeklyCompletion} 
+                value={stats.weightedWeeklyCompletion || 0} 
                 color="primary"
                 sx={{
                   height: 8,
@@ -1403,10 +1573,20 @@ const Habits = () => {
                       },
                       xaxis: {
                         categories: (() => {
-                          // Obtener las últimas 5 semanas
+                          // Obtener las últimas semanas (solo semanas completadas)
                           const weekLabels = [];
                           const currentDate = new Date();
-                          for (let i = 4; i >= 0; i--) {
+                          const todayDayOfWeek = currentDate.getDay(); // 0 = domingo, 1 = lunes, etc.
+                          
+                          // Si es domingo, la semana actual aún no está completada hasta el final del día
+                          // Solo considerar semanas completadas las que ya terminaron completamente
+                          const shouldIncludeCurrentWeek = false; // Nunca incluir la semana actual en el gráfico histórico
+                          
+                          // Siempre mostrar las últimas 5 semanas completadas
+                          const startWeekOffset = 5;
+                          const endWeekOffset = 1;
+                          
+                          for (let i = startWeekOffset; i >= endWeekOffset; i--) {
                             const weekStart = new Date(currentDate);
                             weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
                             // Formatear como "DD/MM"
@@ -1420,11 +1600,20 @@ const Habits = () => {
                     series={[{
                       name: 'Progreso',
                       data: (() => {
-                        // Calcular el progreso semanal para las últimas 5 semanas
+                        // Calcular el progreso semanal ponderado (solo semanas completadas)
                         const weeklyData = [];
                         const currentDate = new Date();
+                        const todayDayOfWeek = currentDate.getDay(); // 0 = domingo, 1 = lunes, etc.
                         
-                        for (let i = 4; i >= 0; i--) {
+                        // Si es domingo, la semana actual aún no está completada hasta el final del día
+                        // Solo considerar semanas completadas las que ya terminaron completamente
+                        const shouldIncludeCurrentWeek = false; // Nunca incluir la semana actual en el gráfico histórico
+                        
+                        // Siempre mostrar las últimas 5 semanas completadas
+                        const startWeekOffset = 5;
+                        const endWeekOffset = 1;
+                        
+                        for (let i = startWeekOffset; i >= endWeekOffset; i--) {
                           // Fecha de inicio para esta semana
                           const weekStart = new Date(currentDate);
                           weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
@@ -1434,20 +1623,21 @@ const Habits = () => {
                           weekEnd.setDate(weekStart.getDate() + 6);
                           
                           // Inicializar contadores
-                          let totalPossible = 0;
-                          let totalCompleted = 0;
+                          let totalWeightedPossible = 0;
+                          let totalWeightedCompleted = 0;
                           
                           // Para cada día de la semana
                           const dayIterator = new Date(weekStart);
                           while (dayIterator <= weekEnd) {
                             const dateStr = formatDate(dayIterator);
                             
-                            // Contar hábitos posibles y completados para este día
+                            // Contar hábitos posibles y completados para este día (ponderado)
                             habits.forEach(habit => {
                               if (shouldShowHabitForDate(habit, dayIterator)) {
-                                totalPossible++;
+                                const multiplier = habit.difficultyMultiplier || 1.0;
+                                totalWeightedPossible += (10 * multiplier); // 10 puntos base * multiplicador
                                 if (allWeeksCompletedHabits[dateStr] && allWeeksCompletedHabits[dateStr][habit.id]) {
-                                  totalCompleted++;
+                                  totalWeightedCompleted += (10 * multiplier); // 10 puntos base * multiplicador
                                 }
                               }
                             });
@@ -1456,9 +1646,9 @@ const Habits = () => {
                             dayIterator.setDate(dayIterator.getDate() + 1);
                           }
                           
-                          // Calcular el porcentaje para esta semana
-                          const weeklyPercentage = totalPossible > 0
-                            ? Math.round((totalCompleted / totalPossible) * 100)
+                          // Calcular el porcentaje ponderado para esta semana
+                          const weeklyPercentage = totalWeightedPossible > 0
+                            ? Math.round((totalWeightedCompleted / totalWeightedPossible) * 100)
                             : 0;
                           
                           weeklyData.push(weeklyPercentage);
@@ -1472,26 +1662,11 @@ const Habits = () => {
                   />
                 )}
               </Box>
-              
-              <Box sx={{ mt: 'auto', pt: 1 }}>
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between' 
-                  }}
-                >
-                  <span>Total hábitos: {stats.totalHabits}</span>
-                  <span>Completado hoy: {stats.completedToday}/{stats.todayHabits}</span>
-                </Typography>
-              </Box>
             </CardContent>
           </Card>
         </Grid>
         
-        {/* Tarjeta 2: Hábito más consistente */}
+        {/* Tarjeta 2: Hábito más consistente con indicador de dificultad */}
         <Grid item xs={12} sm={6} md={3}>
           <Card 
             elevation={3} 
@@ -1542,7 +1717,8 @@ const Habits = () => {
                     <Avatar 
                       sx={{ 
                         bgcolor: theme.palette[stats.mostConsistentHabit.color]?.main || theme.palette.primary.main,
-                        mr: 2
+                        mr: 2,
+                        position: 'relative'
                       }}
                     >
                       {stats.mostConsistentHabit.name?.substring(0, 1) || '?'}
@@ -1551,9 +1727,22 @@ const Habits = () => {
                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                         {stats.mostConsistentHabit.name}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {stats.mostConsistentHabit.completedDays} de {stats.mostConsistentHabit.possibleDays} días
-                      </Typography>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="body2" color="text.secondary">
+                          {Math.round(stats.mostConsistentHabit.weightedScore || 0)} de {Math.round((stats.mostConsistentHabit.possibleDays * 10 * (stats.mostConsistentHabit.difficultyMultiplier || 1.0)) || 0)} puntos
+                        </Typography>
+                        <Chip
+                          label={getDifficultyLabel(stats.mostConsistentHabit.difficulty)}
+                          size="small"
+                          sx={{ 
+                            bgcolor: alpha(getDifficultyColor(stats.mostConsistentHabit.difficulty), 0.1),
+                            color: getDifficultyColor(stats.mostConsistentHabit.difficulty),
+                            fontWeight: 'bold',
+                            fontSize: '0.65rem',
+                            height: 20
+                          }}
+                        />
+                      </Stack>
                     </Box>
                   </Box>
                   
@@ -1599,7 +1788,7 @@ const Habits = () => {
                           color: theme.palette.success.dark
                         }}
                       >
-                        Consistencia {stats.mostConsistentHabit.completedDays} días
+                        {Math.round(stats.mostConsistentHabit.weightedScore || 0)} pts
                       </Typography>
                     </Stack>
                   </Box>
@@ -1615,7 +1804,7 @@ const Habits = () => {
           </Card>
         </Grid>
         
-        {/* Tarjeta 3: Mejor día de la semana */}
+        {/* Tarjeta 3: Mejor día de la semana con score ponderado */}
         <Grid item xs={12} sm={6} md={3}>
           <Card 
             elevation={3} 
@@ -1659,7 +1848,7 @@ const Habits = () => {
                 </Box>
               </Stack>
             </Box>
-                        <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <CardContent sx={{ p: 3, bgcolor: 'background.paper', display: 'flex', flexDirection: 'column', height: '100%' }}>
               {stats.bestDay && stats.bestDay.day ? (
                 <>
                   <Box sx={{ mb: 2, mt: 2, textAlign: 'center' }}>
@@ -1673,10 +1862,7 @@ const Habits = () => {
                       {stats.bestDay.day}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {stats.bestDay.completed} de {stats.bestDay.total} hábitos
-                    </Typography>
-                    <Typography variant="caption" color="info.dark" sx={{ mt: 0.5, display: 'block', fontWeight: 'medium' }}>
-                      Rendimiento destacado
+                      {Math.round(stats.bestDay.weightedScore || stats.bestDay.score || 0)} de {Math.round(stats.bestDay.totalPossiblePoints || 0)} puntos
                     </Typography>
                   </Box>
                   
@@ -1691,6 +1877,18 @@ const Habits = () => {
                       mb: 2
                     }}
                   />
+
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      fontWeight: 'bold', 
+                      textAlign: 'center',
+                      color: theme.palette.info.main,
+                      mb: 1
+                    }}
+                  >
+                    {stats.bestDay.percentage}%
+                  </Typography>
                   
                   <Box sx={{ mt: 'auto', pt: 1 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -1710,7 +1908,7 @@ const Habits = () => {
                           color: theme.palette.info.dark
                         }}
                       >
-                        {stats.bestDay.completed} hábitos
+                        {Math.round(stats.bestDay.weightedScore || stats.bestDay.score || 0)} pts
                       </Typography>
                     </Stack>
                   </Box>
@@ -1726,7 +1924,7 @@ const Habits = () => {
           </Card>
         </Grid>
         
-        {/* Tarjeta 4: Hábito que necesita mejorar */}
+        {/* Tarjeta 4: Hábito que necesita mejorar con indicador de dificultad */}
         <Grid item xs={12} sm={6} md={3}>
           <Card 
             elevation={3} 
@@ -1777,7 +1975,8 @@ const Habits = () => {
                     <Avatar 
                       sx={{ 
                         bgcolor: theme.palette[stats.leastConsistentHabit.color]?.main || theme.palette.warning.main,
-                        mr: 2
+                        mr: 2,
+                        position: 'relative'
                       }}
                     >
                       {stats.leastConsistentHabit.name?.substring(0, 1) || '?'}
@@ -1786,9 +1985,22 @@ const Habits = () => {
                       <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                         {stats.leastConsistentHabit.name}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {stats.leastConsistentHabit.completedDays} de {stats.leastConsistentHabit.possibleDays} días
-                      </Typography>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="body2" color="text.secondary">
+                          {Math.round(stats.leastConsistentHabit.weightedScore || 0)} de {Math.round((stats.leastConsistentHabit.possibleDays * 10 * (stats.leastConsistentHabit.difficultyMultiplier || 1.0)) || 0)} puntos
+                        </Typography>
+                        <Chip
+                          label={getDifficultyLabel(stats.leastConsistentHabit.difficulty)}
+                          size="small"
+                          sx={{ 
+                            bgcolor: alpha(getDifficultyColor(stats.leastConsistentHabit.difficulty), 0.1),
+                            color: getDifficultyColor(stats.leastConsistentHabit.difficulty),
+                            fontWeight: 'bold',
+                            fontSize: '0.65rem',
+                            height: 20
+                          }}
+                        />
+                      </Stack>
                     </Box>
                   </Box>
                   
@@ -1834,7 +2046,7 @@ const Habits = () => {
                           color: theme.palette.warning.dark
                         }}
                       >
-                        Oportunidad de mejora
+                        {Math.round(stats.leastConsistentHabit.weightedScore || 0)} pts
                       </Typography>
                     </Stack>
                   </Box>
@@ -1963,7 +2175,18 @@ const Habits = () => {
       const weekLabels = [];
       const weekDates = [];
       
-      for (let i = 4; i >= 0; i--) {
+      // Determinar si debemos incluir la semana actual
+      const todayDayOfWeek = currentDate.getDay(); // 0 = domingo, 1 = lunes, etc.
+      
+      // Si es domingo, la semana actual aún no está completada hasta el final del día
+      // Solo considerar semanas completadas las que ya terminaron completamente
+      const shouldIncludeCurrentWeek = false; // Nunca incluir la semana actual en el gráfico histórico
+      
+      // Siempre mostrar las últimas 5 semanas completadas
+      const startWeekOffset = 5;
+      const endWeekOffset = 1;
+      
+      for (let i = startWeekOffset; i >= endWeekOffset; i--) {
         const weekStart = new Date(currentDate);
         weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
         
@@ -1975,7 +2198,7 @@ const Habits = () => {
         weekDates.push(weekStart);
       }
 
-      // Preparar series de datos para el gráfico
+      // Preparar series de datos para el gráfico (usando datos ponderados)
       const series = [];
       
       // Para cada una de las últimas 5 semanas
@@ -1993,30 +2216,31 @@ const Habits = () => {
           data: Array(7).fill(0) // Inicializar con 0 completados para cada día
         };
         
-        // Calcular el porcentaje de completados para cada día de la semana
+        // Calcular el porcentaje ponderado de completados para cada día de la semana
         for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
           const currentDay = new Date(weekStartDate);
           currentDay.setDate(weekStartDate.getDate() + dayOffset);
           const dateStr = formatDate(currentDay);
           
-          // Contar hábitos posibles y completados para ese día
-          let possibleHabits = 0;
-          let completedHabitsCount = 0;
+          // Contar hábitos posibles y completados para ese día (ponderado por dificultad)
+          let weightedPossibleHabits = 0;
+          let weightedCompletedHabitsCount = 0;
           
           habits.forEach(habit => {
             if (shouldShowHabitForDate(habit, currentDay)) {
-              possibleHabits++;
+              const multiplier = habit.difficultyMultiplier || 1.0;
+              weightedPossibleHabits += (10 * multiplier); // 10 puntos base * multiplicador
               
               // Verificar si el hábito fue completado
               if (allWeeksCompletedHabits[dateStr] && allWeeksCompletedHabits[dateStr][habit.id]) {
-                completedHabitsCount++;
+                weightedCompletedHabitsCount += (10 * multiplier); // 10 puntos base * multiplicador
               }
             }
           });
           
-          // Calcular porcentaje de completitud para ese día
-          weekData.data[dayOffset] = possibleHabits > 0 
-            ? Math.round((completedHabitsCount / possibleHabits) * 100) 
+          // Calcular porcentaje ponderado de completitud para ese día
+          weekData.data[dayOffset] = weightedPossibleHabits > 0 
+            ? Math.round((weightedCompletedHabitsCount / weightedPossibleHabits) * 100) 
             : 0;
         }
         
@@ -2212,10 +2436,10 @@ const Habits = () => {
               </Avatar>
               <Box>
                 <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
-                  Evolución Semanal
+                  Evolución Ponderada
                 </Typography>
                 <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                  Comparativa de las últimas 5 semanas
+                  Últimas 5 semanas (por dificultad)
                 </Typography>
               </Box>
             </Box>

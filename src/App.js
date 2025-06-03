@@ -4,8 +4,11 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'r
 import Login from './pages/basics/Login.jsx';
 import Home from './pages/basics/Home.jsx';
 import Finances from './pages/finances/Finances.jsx';
+import Savings from './pages/savings/Savings.jsx';
+import FundHistory from './pages/savings/FundHistory.jsx';
 import Loading from './pages/basics/Loading.jsx';
 import Habits from './pages/habits/Habits';
+import HabitsList from './pages/habits/HabitsList';
 import PlantsList from './pages/plants/PlantsList.jsx';
 import Plant from './pages/plants/Plant.jsx';
 import NewPlant from './pages/plants/NewPlant.jsx';
@@ -232,6 +235,7 @@ function App() {
       plants: groupedPlants,
       habits: groupedHabits,
       creditCards: groupedCreditCards,
+      savingsFunds: data.savingsFunds || {},
       config: data.config || {}  // Asegurarse de incluir la configuración
     };
   };
@@ -359,6 +363,8 @@ function App() {
       <Router>
         <Routes>
           <Route path="/finanzas" element={<Finances />} />
+          <Route path="/ahorros" element={<Savings />} />
+          <Route path="/ahorros/fondo/:fundId" element={<FundHistory />} />
           <Route path="/nuevoGasto" element={<NewExpense />} />
           <Route path="/nuevoIngreso" element={<NewIncome />} />
           <Route path="/exchange" element={<Exchange />} />
@@ -366,6 +372,7 @@ function App() {
           <Route path="/EditarHabito/:habitId" element={<EditHabit />} />
           <Route path="/DetalleHabito/:habitId" element={<HabitDetail />} />
           <Route path="/Habitos" element={<Habits />} />
+          <Route path="/HabitosList" element={<HabitsList />} />
           <Route path="/TarjetasCredito" element={<CreditCards />} />
           <Route path="/NuevaTarjeta" element={<NewCard />} />
           <Route path="/EditarTarjeta/:cardId" element={<EditCard />} />

@@ -22,7 +22,14 @@ import {
   DialogContent,
   DialogTitle,
   Container,
-  CardHeader
+  CardHeader,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput
 } from "@mui/material";
 import { database, auth, storage } from "../../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -39,6 +46,7 @@ import CollectionsIcon from '@mui/icons-material/Collections';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoIcon from '@mui/icons-material/Info';
+import { useStore } from "../../store";
 
 // Variables globales para estado y progreso
 let IS_UPLOADING = false;
@@ -392,6 +400,7 @@ const NewPhoto = () => {
   const location = useLocation();
   const theme = useTheme();
   const fileInputRef = useRef(null);
+  const { userData } = useStore();
   
   const [selectedImages, setSelectedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -401,10 +410,28 @@ const NewPhoto = () => {
   const [error, setError] = useState(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [heic2anyLoaded, setHeic2anyLoaded] = useState(false);
+  const [selectedPlants, setSelectedPlants] = useState([]);
   
   const plantId = checkSearch(location.search);
   const MAX_IMAGES = 10;
   
+  // Obtener todas las plantas activas del usuario
+  const activePlants = userData?.plants?.active ? Object.keys(userData.plants.active).map(id => ({
+    id,
+    name: userData.plants.active[id].name,
+    strain: userData.plants.active[id].strain
+  })) : [];
+  
+  // Preseleccionar la planta actual si venimos de una planta específica
+  useEffect(() => {
+    if (plantId && activePlants.length > 0 && selectedPlants.length === 0) {
+      const currentPlant = activePlants.find(plant => plant.id === plantId);
+      if (currentPlant) {
+        setSelectedPlants([plantId]);
+      }
+    }
+  }, [activePlants.length]); // Solo ejecutar cuando cambien las plantas, no cuando cambien selectedPlants
+
   // Crear el diálogo global una vez cuando el componente se monta
   useEffect(() => {
     createGlobalDialog(theme);
@@ -669,47 +696,53 @@ const NewPhoto = () => {
       // First compress the image
       const { file: imageToUpload, imageDataUrl } = await compressImage(file, preview);
       
-      try {
-        // Create a structured path for the image
-        const userId = auth.currentUser.uid;
-        const formattedDate = formatDate(photoDate).replace(/\//g, '-');
-        const filename = `${formattedDate}_${Date.now()}_${Math.floor(Math.random() * 10000) + index}`.replace(/[^\w.-]/g, '_');
-        
-        // Create a structured storage path: users/{userId}/plants/{plantId}/images/{filename}
-        const storagePath = `users/${userId}/plants/${plantId}/images/${filename}`;
-        const storageRef = storage.ref(storagePath);
-        
-        const uploadTask = storageRef.put(imageToUpload);
-        
-        // Upload without progress tracking
-        await uploadTask;
-        
-        const snapshot = await uploadTask;
-        const downloadUrl = await snapshot.ref.getDownloadURL();
-        
-        const photoData = {
-          date: formatDate(photoDate),
-          url: downloadUrl,
-          description: description || null,
-          timestamp: Date.now() + index,
-          storagePath: storagePath // Store the storage path for future reference
-        };
-        
-        await database
-          .ref(`${auth.currentUser.uid}/plants/active/${plantId}/images`)
-          .push(photoData);
-        
-        // Actualizar el progreso después de cada imagen exitosa
-        UPLOAD_PROGRESS.current = index + 1;
-        UPLOAD_PROGRESS.percentComplete = Math.round((UPLOAD_PROGRESS.current / totalImages) * 100);
-        // Actualizar el diálogo sin causar refrescos en React
-        window.updateUploadDialog(true, UPLOAD_PROGRESS);
-        
-        return true;
-      } catch (storageError) {
-        console.error(`Error en imagen ${index+1}:`, storageError);
-        return false;
+      let successCount = 0;
+      
+      // Iterar sobre todas las plantas seleccionadas
+      for (const currentPlantId of selectedPlants) {
+        try {
+          // Create a structured path for the image
+          const userId = auth.currentUser.uid;
+          const formattedDate = formatDate(photoDate).replace(/\//g, '-');
+          const filename = `${formattedDate}_${Date.now()}_${Math.floor(Math.random() * 10000) + index}_${currentPlantId}`.replace(/[^\w.-]/g, '_');
+          
+          // Create a structured storage path: users/{userId}/plants/{plantId}/images/{filename}
+          const storagePath = `users/${userId}/plants/${currentPlantId}/images/${filename}`;
+          const storageRef = storage.ref(storagePath);
+          
+          const uploadTask = storageRef.put(imageToUpload);
+          
+          // Upload without progress tracking
+          await uploadTask;
+          
+          const snapshot = await uploadTask;
+          const downloadUrl = await snapshot.ref.getDownloadURL();
+          
+          const photoData = {
+            date: formatDate(photoDate),
+            url: downloadUrl,
+            description: description || null,
+            timestamp: Date.now() + index,
+            storagePath: storagePath // Store the storage path for future reference
+          };
+          
+          await database
+            .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/images`)
+            .push(photoData);
+          
+          successCount++;
+        } catch (storageError) {
+          console.error(`Error en imagen ${index+1} para planta ${currentPlantId}:`, storageError);
+        }
       }
+      
+      // Actualizar el progreso después de cada imagen exitosa
+      UPLOAD_PROGRESS.current = index + 1;
+      UPLOAD_PROGRESS.percentComplete = Math.round((UPLOAD_PROGRESS.current / totalImages) * 100);
+      // Actualizar el diálogo sin causar refrescos en React
+      window.updateUploadDialog(true, UPLOAD_PROGRESS);
+      
+      return successCount > 0;
     } catch (error) {
       console.error(`Error en proceso completo de imagen ${index+1}:`, error);
       return false;
@@ -756,7 +789,14 @@ const NewPhoto = () => {
         // Reset global flag before navigation
         IS_UPLOADING = false;
         window.updateUploadDialog(false);
-        navigate(`/Planta/?${plantId}`);
+        
+        // Si solo hay una planta seleccionada, navegar a esa planta
+        // Si hay múltiples, navegar a la vista general de plantas
+        if (selectedPlants.length === 1) {
+          navigate(`/Planta/?${selectedPlants[0]}`);
+        } else {
+          navigate('/Plantas');
+        }
       }, 1500);
       
     } catch (error) {
@@ -787,7 +827,12 @@ const NewPhoto = () => {
     e.stopPropagation();
   };
 
-  const isFormValid = selectedImages.length > 0;
+  const handlePlantChange = (event) => {
+    const value = event.target.value;
+    setSelectedPlants(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const isFormValid = selectedImages.length > 0 && selectedPlants.length > 0;
 
   return (
     <Layout title="Nueva Foto">
@@ -843,6 +888,48 @@ const NewPhoto = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Plantas seleccionadas</InputLabel>
+                        <Select
+                          multiple
+                          value={selectedPlants}
+                          onChange={handlePlantChange}
+                          input={<OutlinedInput label="Plantas seleccionadas" />}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => {
+                                const plant = activePlants.find(p => p.id === value);
+                                return (
+                                  <Chip 
+                                    key={value} 
+                                    label={plant ? `${plant.name} ${plant.strain ? `(${plant.strain})` : ''}` : value}
+                                    size="small"
+                                    color="primary"
+                                  />
+                                );
+                              })}
+                            </Box>
+                          )}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        >
+                          {activePlants.map((plant) => (
+                            <MenuItem key={plant.id} value={plant.id}>
+                              <Checkbox checked={selectedPlants.indexOf(plant.id) > -1} />
+                              <ListItemText 
+                                primary={plant.name}
+                                secondary={plant.strain || 'Sin cepa especificada'}
+                              />
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
                       <Paper 
                         elevation={1}
                         sx={{ 
@@ -866,6 +953,12 @@ const NewPhoto = () => {
                             variant={selectedImages.length > 0 ? "filled" : "outlined"}
                             size="small"
                           />
+                          <Chip 
+                            label={`${selectedPlants.length} ${selectedPlants.length === 1 ? 'planta' : 'plantas'}`} 
+                            color={selectedPlants.length > 0 ? "success" : "default"}
+                            variant={selectedPlants.length > 0 ? "filled" : "outlined"}
+                            size="small"
+                          />
                           {selectedImages.length >= MAX_IMAGES && (
                             <Chip 
                               label="Máximo alcanzado" 
@@ -877,7 +970,7 @@ const NewPhoto = () => {
                       </Paper>
                     </Grid>
 
-                    <Grid item xs={12}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         label="Descripción (opcional)"
                         value={description}
@@ -1087,35 +1180,23 @@ const NewPhoto = () => {
 
             {/* Botones de acción */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => navigate(`/Planta/?${plantId}`)}
-                  disabled={IS_UPLOADING}
-                  sx={{
-                    px: 4,
-                    py: 1.5,
-                    borderRadius: 2
-                  }}
-                >
-                  Cancelar
-                </Button>
-                
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Button 
                   variant="contained"
-                  color="secondary"
+                  color="primary"
                   startIcon={IS_UPLOADING ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
                   onClick={handleUploadPhotos}
                   disabled={!isFormValid || IS_UPLOADING}
+                  fullWidth
                   size="large"
                   sx={{
                     py: 1.5,
                     px: 4,
                     borderRadius: 2,
                     fontWeight: 'bold',
-                    boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
                     '&:hover': {
-                      boxShadow: `0 6px 16px ${alpha(theme.palette.secondary.main, 0.4)}`,
+                      boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                       transform: 'translateY(-2px)'
                     },
                     transition: 'all 0.2s ease'
@@ -1123,7 +1204,7 @@ const NewPhoto = () => {
                 >
                   {IS_UPLOADING 
                     ? `Subiendo...` 
-                    : `Subir ${selectedImages.length > 1 ? selectedImages.length + ' Fotos' : 'Foto'}`}
+                    : `Subir ${selectedImages.length > 1 ? selectedImages.length + ' Fotos' : 'Foto'} ${selectedPlants.length > 1 ? `a ${selectedPlants.length} plantas` : ''}`}
                 </Button>
               </Box>
             </Grid>

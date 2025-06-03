@@ -179,7 +179,9 @@ const Timeline = () => {
         description: `La planta "${plant.name}" comenzó su ciclo de vida`,
         icon: <SpaIcon />,
         color: '#8e24aa',
-        stage: 'Germinacion'
+        stage: 'Germinacion',
+        timestamp: new Date(plant.birthDate.split('/').reverse().join('-')).getTime(),
+        sortOrder: 0 // Las etapas tienen prioridad
       });
     }
     
@@ -191,7 +193,9 @@ const Timeline = () => {
         description: `La planta entró en etapa vegetativa`,
         icon: <GrassIcon />,
         color: '#8e24aa',
-        stage: 'Vegetativo'
+        stage: 'Vegetativo',
+        timestamp: new Date(plant.inicioVegetativo.split('/').reverse().join('-')).getTime(),
+        sortOrder: 0
       });
     }
     
@@ -203,7 +207,9 @@ const Timeline = () => {
         description: `La planta entró en etapa de floración`,
         icon: <LocalFloristIcon />,
         color: '#8e24aa',
-        stage: 'Floracion'
+        stage: 'Floracion',
+        timestamp: new Date(plant.inicioFloracion.split('/').reverse().join('-')).getTime(),
+        sortOrder: 0
       });
     }
     
@@ -215,7 +221,9 @@ const Timeline = () => {
         description: `La planta fue cosechada`,
         icon: <LocalFloristIcon />,
         color: '#e65100',
-        stage: 'Cosecha'
+        stage: 'Cosecha',
+        timestamp: new Date(plant.finishDate.split('/').reverse().join('-')).getTime(),
+        sortOrder: 0
       });
     }
     
@@ -227,7 +235,9 @@ const Timeline = () => {
         description: `La planta completó el proceso de secado`,
         icon: <ParkIcon />,
         color: '#8e24aa',
-        stage: 'Enfrascado'
+        stage: 'Enfrascado',
+        timestamp: new Date(plant.finalSecado.split('/').reverse().join('-')).getTime(),
+        sortOrder: 0
       });
     }
     
@@ -268,6 +278,20 @@ const Timeline = () => {
           const daysInStage = stageInfo.startDate ? calculateDaysBetween(stageInfo.startDate, item.date) : null;
           const totalLifeDays = calculateTotalLifeDays(item.date);
           
+          // Crear timestamp basado en la fecha + tiempo de creación si está disponible
+          let timestamp = new Date(item.date.split('/').reverse().join('-')).getTime();
+          
+          // Si hay timestamp en el item, usarlo para el orden dentro del día
+          if (item.timestamp) {
+            timestamp = item.timestamp;
+          } else if (item.createdAt) {
+            timestamp = new Date(item.createdAt).getTime();
+          } else {
+            // Si no hay timestamp, usar la key como aproximación del orden de creación
+            // Las keys suelen ser strings que aumentan con el tiempo
+            timestamp += parseInt(key.replace(/\D/g, '')) || 0;
+          }
+          
           timelineEvents.push({
             date: item.date,
             type: action.type,
@@ -276,6 +300,9 @@ const Timeline = () => {
             icon: action.icon,
             color: action.color,
             details: item,
+            timestamp: timestamp,
+            sortOrder: 1, // Las acciones van después de las etapas en el mismo día
+            key: key, // Incluir la key para orden de fallback
             stageInfo: {
               stage: stageInfo.stage,
               daysInStage: daysInStage,
@@ -314,6 +341,22 @@ const Timeline = () => {
         const daysInStage = stageInfo.startDate ? calculateDaysBetween(stageInfo.startDate, date) : null;
         const totalLifeDays = calculateTotalLifeDays(date);
         
+        // Para las fotos, usar el timestamp de la primera foto como referencia
+        let timestamp = new Date(date.split('/').reverse().join('-')).getTime();
+        
+        // Buscar el timestamp más reciente de las fotos de ese día
+        const photosWithTimestamp = photos.filter(photo => photo.timestamp || photo.createdAt);
+        if (photosWithTimestamp.length > 0) {
+          const timestamps = photosWithTimestamp.map(photo => 
+            photo.timestamp || new Date(photo.createdAt).getTime()
+          );
+          timestamp = Math.max(...timestamps);
+        } else {
+          // Si no hay timestamps, usar las keys como aproximación
+          const keyNumbers = photos.map(photo => parseInt(photo.key.replace(/\D/g, '')) || 0);
+          timestamp += Math.max(...keyNumbers);
+        }
+        
         timelineEvents.push({
           date: date,
           type: 'Foto',
@@ -322,6 +365,8 @@ const Timeline = () => {
           icon: <PhotoCameraIcon />,
           color: theme.palette.secondary.main,
           photos: photos,
+          timestamp: timestamp,
+          sortOrder: 2, // Las fotos van al final del día
           stageInfo: {
             stage: stageInfo.stage,
             daysInStage: daysInStage,
@@ -333,11 +378,23 @@ const Timeline = () => {
       });
     }
     
-    // Ordenar eventos por fecha (más recientes primero)
+    // Ordenar eventos por fecha (más recientes primero) y luego por timestamp dentro del día
     timelineEvents.sort((a, b) => {
       const dateA = new Date(a.date.split('/').reverse().join('-'));
       const dateB = new Date(b.date.split('/').reverse().join('-'));
-      return dateB - dateA;
+      
+      // Primero ordenar por fecha (más recientes primero)
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateB.getTime() - dateA.getTime();
+      }
+      
+      // Si es el mismo día, ordenar por sortOrder y luego por timestamp
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+      
+      // Dentro del mismo sortOrder, ordenar por timestamp (cronológico dentro del día)
+      return a.timestamp - b.timestamp;
     });
     
     return timelineEvents;

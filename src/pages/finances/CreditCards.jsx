@@ -256,84 +256,48 @@ const CreditCards = () => {
           
           // Obtener fechas de cierre para determinar el período
           const currentMonthDates = getCardDates(card.id);
+          
+          // Calcular la fecha de cierre del mes anterior al mes seleccionado
+          let prevMonth = selectedMonth - 1;
+          let prevYear = selectedYear;
+          if (prevMonth === 0) {
+            prevMonth = 12;
+            prevYear -= 1;
+          }
+          
           let prevMonthClosingDate = null;
           
-          if (currentMonthDates?.prevClosingDate) {
-            // Si tenemos una fecha de cierre del mes anterior, usarla directamente
-            prevMonthClosingDate = new Date(currentMonthDates.prevClosingDate);
-          } else if (currentMonthDates?.closingDate) {
-            // Si no tenemos la fecha de cierre del mes anterior pero sí la actual, calcular la anterior
-            const currentClosingDate = new Date(currentMonthDates.closingDate);
-            // Retroceder un mes para obtener el mes anterior
-            const prevMonth = new Date(currentClosingDate);
-            prevMonth.setMonth(prevMonth.getMonth() - 1);
-            
-            // Buscar fecha de cierre del mes anterior
-            const prevMonthYear = prevMonth.getFullYear();
-            const prevMonthNum = prevMonth.getMonth() + 1;
-            let prevClosingDay = null;
-            
-            const cardData = userData.creditCards[card.id]; // Renombrado para evitar conflicto
-            const prevMonthKey = `${prevMonthYear}-${String(prevMonthNum).padStart(2, '0')}`;
-            
-            if (cardData.dates && cardData.dates[prevMonthKey] && cardData.dates[prevMonthKey].closingDate) {
-              prevClosingDay = new Date(cardData.dates[prevMonthKey].closingDate);
-            } else if (cardData.defaultClosingDay) {
-              prevClosingDay = new Date(prevMonthYear, prevMonthNum - 1, cardData.defaultClosingDay);
-            }
-            
-            if (prevClosingDay) {
-              prevMonthClosingDate = prevClosingDay;
-            }
+          // Intentar obtener la fecha específica del mes anterior
+          const cardData = userData.creditCards[card.id];
+          const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+          
+          if (cardData.dates && cardData.dates[prevMonthKey] && cardData.dates[prevMonthKey].closingDate) {
+            // Usar fecha específica configurada para el mes anterior
+            prevMonthClosingDate = new Date(cardData.dates[prevMonthKey].closingDate);
+          } else if (cardData.defaultClosingDay) {
+            // Usar día de cierre predeterminado en el mes anterior
+            prevMonthClosingDate = new Date(prevYear, prevMonth - 1, cardData.defaultClosingDay);
+          } else {
+            // Como último recurso, usar el último día del mes anterior al anterior
+            prevMonthClosingDate = new Date(prevYear, prevMonth, 0);
           }
           
-          // Si no se pudo determinar la fecha de cierre anterior, usar el día de cierre predeterminado del mes anterior
-          if (!prevMonthClosingDate) {
-            // Obtener el mes y año anteriores
-            let prevMonth = selectedMonth - 1;
-            let prevYear = selectedYear;
-            if (prevMonth === 0) {
-              prevMonth = 12;
-              prevYear = selectedYear - 1;
-            }
-            
-            // Si tenemos un día de cierre predeterminado, usarlo
-            if (card.defaultClosingDay) {
-              prevMonthClosingDate = new Date(prevYear, prevMonth - 1, card.defaultClosingDay);
-            } else {
-              // Como último recurso, usar el último día del mes anterior
-              prevMonthClosingDate = new Date(prevYear, prevMonth, 0);
-            }
-          }
+          // Fecha de cierre del mes seleccionado
+          let currentClosingDate = null;
           
-          // Fecha de cierre actual
-          const currentClosingDate = currentMonthDates?.closingDate 
-            ? new Date(currentMonthDates.closingDate)
-            : (() => {
-                // Si no hay fecha de cierre para el mes actual, construirla usando:
-                // 1. El mismo día que el cierre anterior (para mantener consistencia entre meses)
-                // 2. O el día de cierre predeterminado como respaldo
-                const prevClosingDay = prevMonthClosingDate.getDate();
-                
-                let closingDay;
-                // Priorizar usar el mismo día que el cierre anterior
-                if (prevClosingDay) {
-                  closingDay = prevClosingDay;
-                  console.log(`[${card.name}] Usando el mismo día de cierre que el mes anterior: ${closingDay}`);
-                } else if (card.defaultClosingDay) {
-                  closingDay = card.defaultClosingDay;
-                  console.log(`[${card.name}] Usando el día de cierre predeterminado: ${closingDay}`);
-                } else {
-                  // Último recurso: usar el último día del mes
-                  closingDay = new Date(selectedYear, selectedMonth, 0).getDate();
-                  console.log(`[${card.name}] Usando el último día del mes: ${closingDay}`);
-                }
-                
-                return new Date(selectedYear, selectedMonth - 1, closingDay);
-              })();
+          if (currentMonthDates?.closingDate) {
+            // Usar fecha específica configurada
+            currentClosingDate = new Date(currentMonthDates.closingDate);
+          } else if (cardData.defaultClosingDay) {
+            // Usar día de cierre predeterminado en el mes seleccionado
+            currentClosingDate = new Date(selectedYear, selectedMonth - 1, cardData.defaultClosingDay);
+          } else {
+            // Como último recurso, usar el último día del mes seleccionado
+            currentClosingDate = new Date(selectedYear, selectedMonth, 0);
+          }
           
           // Log del rango de fechas para debugging
-          console.log(`[Card: ${card.name}] Período de facturación: ${prevMonthClosingDate.toISOString().split('T')[0]} a ${currentClosingDate.toISOString().split('T')[0]}`);
+          console.log(`[Card: ${card.name}] Período de facturación ${selectedMonth}/${selectedYear}: ${prevMonthClosingDate.toISOString().split('T')[0]} a ${currentClosingDate.toISOString().split('T')[0]}`);
           
           // Procesar transacciones de la tarjeta actual
           Object.keys(userData.creditCards.transactions[card.id]).forEach(key => {
@@ -357,12 +321,28 @@ const CreditCards = () => {
               transactionDate = new Date();
             }
             
-            // Filtrar por período de facturación - Usar estrictamente > para prevMonthClosingDate
-            if (transactionDate > prevMonthClosingDate && transactionDate <= currentClosingDate) {
+            // Normalizar las fechas a medianoche para comparación precisa por día
+            const normalizedTransactionDate = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
+            const normalizedPrevClosingDate = new Date(prevMonthClosingDate.getFullYear(), prevMonthClosingDate.getMonth(), prevMonthClosingDate.getDate());
+            const normalizedCurrentClosingDate = new Date(currentClosingDate.getFullYear(), currentClosingDate.getMonth(), currentClosingDate.getDate());
+            
+            // Establecer horas para comparación precisa
+            normalizedTransactionDate.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de zona horaria
+            normalizedPrevClosingDate.setHours(0, 0, 0, 0); // Inicio del día del cierre anterior
+            normalizedCurrentClosingDate.setHours(23, 59, 59, 999); // Fin del día del cierre actual
+            
+            // Filtrar por período de facturación
+            // El período incluye desde el día SIGUIENTE al cierre anterior hasta el día de cierre actual (INCLUSIVE)
+            // Por ejemplo: si el cierre anterior fue 19/mayo y el actual es 19/junio
+            // El período incluye del 20/mayo al 19/junio (ambos inclusive)
+            if (normalizedTransactionDate > normalizedPrevClosingDate && normalizedTransactionDate <= normalizedCurrentClosingDate) {
+              console.log(`[${card.name}] Transacción incluida: ${transaction.date} (${transactionDate.toISOString().split('T')[0]}) - Monto: ${transaction.amount}`);
               cardTransactions.push({
                 id: key,
                 ...transaction
               });
+            } else {
+              console.log(`[${card.name}] Transacción excluida: ${transaction.date} (${transactionDate.toISOString().split('T')[0]}) - Fuera del período`);
             }
           });
           
@@ -1670,140 +1650,161 @@ const CreditCards = () => {
           <Grid container spacing={3}>
             {/* Columna izquierda - Selector de tarjetas */}
             <Grid item xs={12} lg={5}>
-              <Card elevation={2} sx={{ borderRadius: 3, mb: 3 }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" fontWeight="600" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Card 
+                elevation={2} 
+                sx={{ 
+                  borderRadius: 3,
+                  position: 'sticky',
+                  top: 88, // Altura de la app bar (64px) + margen adicional (24px)
+                  height: 'calc(100vh - 112px)', // Altura completa menos el espacio top/bottom ajustado
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+              >
+                <CardContent 
+                  sx={{ 
+                    p: 3, 
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <Typography variant="h6" fontWeight="600" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
                     <CreditCardIcon color="primary" />
                     Selecciona una tarjeta
                   </Typography>
                   
-                  <Grid container spacing={2}>
-                    {cards.map(card => {
-                      const isSelected = selectedCard === card.id;
-                      const cardTotal = getCardTotal(card.id);
-                      const isPaid = isCardPaid(card.id);
-                      const cardType = card.name.toLowerCase().includes('visa') ? 'visa' : 
-                                     card.name.toLowerCase().includes('master') ? 'mastercard' : 'credit-card';
-                      
-                      return (
-                        <Grid item xs={12} key={card.id}>
-                          <Card
-                            onClick={() => handleCardSelect(card.id)}
-                            sx={{
-                              cursor: 'pointer',
-                              borderRadius: 3,
-                              transition: 'all 0.3s ease',
-                              transform: isSelected ? 'translateY(-8px)' : 'none',
-                              boxShadow: isSelected 
-                                ? `0 12px 24px ${alpha(theme.palette.primary.main, 0.3)}` 
-                                : theme.shadows[2],
-                              border: isSelected 
-                                ? `2px solid ${theme.palette.primary.main}`
-                                : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                              position: 'relative',
-                              overflow: 'hidden',
-                              '&:hover': {
-                                transform: 'translateY(-4px)',
-                                boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.2)}`
-                              }
-                            }}
-                          >
-                            {/* Indicador de selección */}
-                            {isSelected && (
-                              <Box
-                                sx={{
-                                  position: 'absolute',
-                                  top: 12,
-                                  right: 12,
-                                  width: 24,
-                                  height: 24,
-                                  borderRadius: '50%',
-                                  bgcolor: theme.palette.primary.main,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  zIndex: 2
-                                }}
-                              >
-                                <CheckIcon sx={{ color: 'white', fontSize: 16 }} />
-                              </Box>
-                            )}
-                            
-                            {/* Header de la tarjeta */}
-                            <Box
+                  <Box sx={{ flex: 1, overflow: 'auto', pr: 1, pt: 2 }}>
+                    <Grid container spacing={2}>
+                      {cards.map(card => {
+                        const isSelected = selectedCard === card.id;
+                        const cardTotal = getCardTotal(card.id);
+                        const isPaid = isCardPaid(card.id);
+                        const cardType = card.name.toLowerCase().includes('visa') ? 'visa' : 
+                                       card.name.toLowerCase().includes('master') ? 'mastercard' : 'credit-card';
+                        
+                        return (
+                          <Grid item xs={12} key={card.id}>
+                            <Card
+                              onClick={() => handleCardSelect(card.id)}
                               sx={{
-                                p: 2.5,
-                                background: cardType === 'visa' 
-                                  ? 'linear-gradient(135deg, #1a237e 0%, #303f9f 100%)' 
-                                  : cardType === 'mastercard'
-                                    ? 'linear-gradient(135deg, #b71c1c 0%, #e53935 100%)'
-                                    : 'linear-gradient(135deg, #455a64 0%, #78909c 100%)',
-                                color: 'white',
-                                position: 'relative'
+                                cursor: 'pointer',
+                                borderRadius: 3,
+                                transition: 'all 0.3s ease',
+                                transform: isSelected ? 'translateY(-8px)' : 'none',
+                                boxShadow: isSelected 
+                                  ? `0 12px 24px ${alpha(theme.palette.primary.main, 0.3)}` 
+                                  : theme.shadows[2],
+                                border: isSelected 
+                                  ? `2px solid ${theme.palette.primary.main}`
+                                  : `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: `0 8px 16px ${alpha(theme.palette.primary.main, 0.2)}`
+                                }
                               }}
                             >
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                                <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>
-                                  {cardType === 'visa' ? 'VISA' : cardType === 'mastercard' ? 'MASTER' : 'CARD'}
-                                </Typography>
-                                <IconButton 
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenMenu(e, card.id);
+                              {/* Indicador de selección */}
+                              {isSelected && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 12,
+                                    right: 12,
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    bgcolor: theme.palette.primary.main,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 2
                                   }}
-                                  sx={{ color: 'white', opacity: 0.8 }}
                                 >
-                                  <MoreVertIcon />
-                                </IconButton>
-                              </Box>
+                                  <CheckIcon sx={{ color: 'white', fontSize: 16 }} />
+                                </Box>
+                              )}
                               
-                              <Typography 
-                                variant="body1" 
-                                fontWeight="medium" 
-                                sx={{ 
-                                  fontFamily: 'monospace', 
-                                  letterSpacing: 2,
-                                  mb: 1
+                              {/* Header de la tarjeta */}
+                              <Box
+                                sx={{
+                                  p: 2.5,
+                                  background: cardType === 'visa' 
+                                    ? 'linear-gradient(135deg, #1a237e 0%, #303f9f 100%)' 
+                                    : cardType === 'mastercard'
+                                      ? 'linear-gradient(135deg, #b71c1c 0%, #e53935 100%)'
+                                      : 'linear-gradient(135deg, #455a64 0%, #78909c 100%)',
+                                  color: 'white',
+                                  position: 'relative'
                                 }}
                               >
-                                **** **** **** {card.lastFourDigits || '0000'}
-                              </Typography>
-                              
-                              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                {card.name}
-                              </Typography>
-                            </Box>
-                            
-                            {/* Información de la tarjeta */}
-                            <CardContent sx={{ p: 2.5 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="body2" color="text.secondary">
-                                  Total del período:
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                                  <Typography variant="h6" fontWeight="bold" sx={{ letterSpacing: 1 }}>
+                                    {cardType === 'visa' ? 'VISA' : cardType === 'mastercard' ? 'MASTER' : 'CARD'}
+                                  </Typography>
+                                  <IconButton 
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenMenu(e, card.id);
+                                    }}
+                                    sx={{ color: 'white', opacity: 0.8 }}
+                                  >
+                                    <MoreVertIcon />
+                                  </IconButton>
+                                </Box>
+                                
+                                <Typography 
+                                  variant="body1" 
+                                  fontWeight="medium" 
+                                  sx={{ 
+                                    fontFamily: 'monospace', 
+                                    letterSpacing: 2,
+                                    mb: 1
+                                  }}
+                                >
+                                  **** **** **** {card.lastFourDigits || '0000'}
                                 </Typography>
-                                <Typography variant="h6" fontWeight="bold" color={cardTotal > 0 ? "text.primary" : "text.secondary"}>
-                                  {formatAmount(cardTotal)}
+                                
+                                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                  {card.name}
                                 </Typography>
                               </Box>
                               
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Typography variant="body2" color="text.secondary">
-                                  Estado:
-                                </Typography>
-                                <Chip 
-                                  label={isPaid ? "Pagada" : cardTotal > 0 ? "Pendiente" : "Sin gastos"}
-                                  size="small"
-                                  color={isPaid ? "success" : cardTotal > 0 ? "warning" : "default"}
-                                  variant={isPaid ? "filled" : "outlined"}
-                                  sx={{ fontWeight: 'medium' }}
-                                />
-                              </Box>
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                      );
-                    })}
-                  </Grid>
+                              {/* Información de la tarjeta */}
+                              <CardContent sx={{ p: 2.5 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Total del período:
+                                  </Typography>
+                                  <Typography variant="h6" fontWeight="bold" color={cardTotal > 0 ? "text.primary" : "text.secondary"}>
+                                    {formatAmount(cardTotal)}
+                                  </Typography>
+                                </Box>
+                                
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Estado:
+                                  </Typography>
+                                  <Chip 
+                                    label={isPaid ? "Pagada" : cardTotal > 0 ? "Pendiente" : "Sin gastos"}
+                                    size="small"
+                                    color={isPaid ? "success" : cardTotal > 0 ? "warning" : "default"}
+                                    variant={isPaid ? "filled" : "outlined"}
+                                    sx={{ fontWeight: 'medium' }}
+                                  />
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
