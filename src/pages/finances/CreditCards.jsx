@@ -249,10 +249,10 @@ const CreditCards = () => {
     if (userData?.creditCards && cards.length > 0) {
       const allTransactions = {};
       
-      // Procesar transacciones de todas las tarjetas
-      cards.forEach(card => {
-        if (userData.creditCards.transactions && userData.creditCards.transactions[card.id]) {
-          const cardTransactions = [];
+              // Procesar transacciones de todas las tarjetas
+        cards.forEach(card => {
+          if (userData.creditCards.transactions && userData.creditCards.transactions[card.id]) {
+            const cardTransactions = [];
           
           // Obtener fechas de cierre para determinar el período
           const currentMonthDates = getCardDates(card.id);
@@ -272,8 +272,14 @@ const CreditCards = () => {
           const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
           
           if (cardData.dates && cardData.dates[prevMonthKey] && cardData.dates[prevMonthKey].closingDate) {
-            // Usar fecha específica configurada para el mes anterior
-            prevMonthClosingDate = new Date(cardData.dates[prevMonthKey].closingDate);
+            // Usar fecha específica configurada para el mes anterior - parsear manualmente para evitar problemas de zona horaria
+            const prevClosingDateStr = cardData.dates[prevMonthKey].closingDate;
+            if (typeof prevClosingDateStr === 'string' && prevClosingDateStr.includes('-')) {
+              const [year, month, day] = prevClosingDateStr.split('-').map(num => parseInt(num, 10));
+              prevMonthClosingDate = new Date(year, month - 1, day);
+            } else {
+              prevMonthClosingDate = new Date(prevClosingDateStr);
+            }
           } else if (cardData.defaultClosingDay) {
             // Usar día de cierre predeterminado en el mes anterior
             prevMonthClosingDate = new Date(prevYear, prevMonth - 1, cardData.defaultClosingDay);
@@ -286,8 +292,13 @@ const CreditCards = () => {
           let currentClosingDate = null;
           
           if (currentMonthDates?.closingDate) {
-            // Usar fecha específica configurada
-            currentClosingDate = new Date(currentMonthDates.closingDate);
+            // Usar fecha específica configurada - parsear manualmente para evitar problemas de zona horaria
+            if (typeof currentMonthDates.closingDate === 'string' && currentMonthDates.closingDate.includes('-')) {
+              const [year, month, day] = currentMonthDates.closingDate.split('-').map(num => parseInt(num, 10));
+              currentClosingDate = new Date(year, month - 1, day);
+            } else {
+              currentClosingDate = new Date(currentMonthDates.closingDate);
+            }
           } else if (cardData.defaultClosingDay) {
             // Usar día de cierre predeterminado en el mes seleccionado
             currentClosingDate = new Date(selectedYear, selectedMonth - 1, cardData.defaultClosingDay);
@@ -296,62 +307,96 @@ const CreditCards = () => {
             currentClosingDate = new Date(selectedYear, selectedMonth, 0);
           }
           
-          // Log del rango de fechas para debugging
-          console.log(`[Card: ${card.name}] Período de facturación ${selectedMonth}/${selectedYear}: ${prevMonthClosingDate.toISOString().split('T')[0]} a ${currentClosingDate.toISOString().split('T')[0]}`);
+
           
           // Procesar transacciones de la tarjeta actual
           Object.keys(userData.creditCards.transactions[card.id]).forEach(key => {
             const transaction = userData.creditCards.transactions[card.id][key];
+            
+
             
             // Convertir la fecha de la transacción
             let transactionDate = null;
             
             if (typeof transaction.date === 'string') {
               if (transaction.date.includes('/')) {
+                // Formato DD/MM/YYYY o D/M/YYYY
                 const [day, month, year] = transaction.date.split('/').map(num => parseInt(num, 10));
                 transactionDate = new Date(year, month - 1, day);
               } else if (transaction.date.includes('-')) {
-                transactionDate = new Date(transaction.date);
+                // Formato YYYY-MM-DD - parsear manualmente para evitar problemas de zona horaria
+                const [year, month, day] = transaction.date.split('-').map(num => parseInt(num, 10));
+                transactionDate = new Date(year, month - 1, day);
               }
             } else if (transaction.date instanceof Date) {
-              transactionDate = transaction.date;
+              transactionDate = new Date(transaction.date);
             }
             
             if (!transactionDate || isNaN(transactionDate.getTime())) {
-              transactionDate = new Date();
+              return; // Saltar esta transacción si la fecha es inválida
             }
             
-            // Normalizar las fechas a medianoche para comparación precisa por día
-            const normalizedTransactionDate = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
-            const normalizedPrevClosingDate = new Date(prevMonthClosingDate.getFullYear(), prevMonthClosingDate.getMonth(), prevMonthClosingDate.getDate());
-            const normalizedCurrentClosingDate = new Date(currentClosingDate.getFullYear(), currentClosingDate.getMonth(), currentClosingDate.getDate());
+            // Crear fechas normalizadas para comparación (solo día, sin horas)
+            const transactionDay = new Date(transactionDate.getFullYear(), transactionDate.getMonth(), transactionDate.getDate());
+            const prevClosingDay = new Date(prevMonthClosingDate.getFullYear(), prevMonthClosingDate.getMonth(), prevMonthClosingDate.getDate());
+            const currentClosingDay = new Date(currentClosingDate.getFullYear(), currentClosingDate.getMonth(), currentClosingDate.getDate());
             
-            // Establecer horas para comparación precisa
-            normalizedTransactionDate.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de zona horaria
-            normalizedPrevClosingDate.setHours(0, 0, 0, 0); // Inicio del día del cierre anterior
-            normalizedCurrentClosingDate.setHours(23, 59, 59, 999); // Fin del día del cierre actual
+
             
             // Filtrar por período de facturación
             // El período incluye desde el día SIGUIENTE al cierre anterior hasta el día de cierre actual (INCLUSIVE)
             // Por ejemplo: si el cierre anterior fue 19/mayo y el actual es 19/junio
             // El período incluye del 20/mayo al 19/junio (ambos inclusive)
-            if (normalizedTransactionDate > normalizedPrevClosingDate && normalizedTransactionDate <= normalizedCurrentClosingDate) {
-              console.log(`[${card.name}] Transacción incluida: ${transaction.date} (${transactionDate.toISOString().split('T')[0]}) - Monto: ${transaction.amount}`);
+            
+            // Comparar usando getTime() para evitar problemas de comparación de objetos Date
+            const transactionTime = transactionDay.getTime();
+            const prevClosingTime = prevClosingDay.getTime();
+            const currentClosingTime = currentClosingDay.getTime();
+            
+            // La transacción debe ser DESPUÉS del cierre anterior y HASTA (inclusive) el cierre actual
+            if (transactionTime > prevClosingTime && transactionTime <= currentClosingTime) {
               cardTransactions.push({
                 id: key,
                 ...transaction
               });
-            } else {
-              console.log(`[${card.name}] Transacción excluida: ${transaction.date} (${transactionDate.toISOString().split('T')[0]}) - Fuera del período`);
             }
           });
           
-          // Ordenar por fecha
+          // Ordenar por fecha (más reciente primero)
           cardTransactions.sort((a, b) => {
-            const dateA = new Date(a.date);
-            const dateB = new Date(b.date);
-            return dateB - dateA;
+            // Parsear fechas de manera consistente
+            let dateA, dateB;
+            
+            // Para fecha A
+            if (typeof a.date === 'string') {
+              if (a.date.includes('/')) {
+                const [day, month, year] = a.date.split('/').map(num => parseInt(num, 10));
+                dateA = new Date(year, month - 1, day);
+              } else if (a.date.includes('-')) {
+                const [year, month, day] = a.date.split('-').map(num => parseInt(num, 10));
+                dateA = new Date(year, month - 1, day);
+              }
+            } else {
+              dateA = new Date(a.date);
+            }
+            
+            // Para fecha B
+            if (typeof b.date === 'string') {
+              if (b.date.includes('/')) {
+                const [day, month, year] = b.date.split('/').map(num => parseInt(num, 10));
+                dateB = new Date(year, month - 1, day);
+              } else if (b.date.includes('-')) {
+                const [year, month, day] = b.date.split('-').map(num => parseInt(num, 10));
+                dateB = new Date(year, month - 1, day);
+              }
+            } else {
+              dateB = new Date(b.date);
+            }
+            
+            return dateB.getTime() - dateA.getTime();
           });
+          
+
           
           allTransactions[card.id] = cardTransactions;
         }
@@ -450,8 +495,13 @@ const CreditCards = () => {
     let prevClosingDay = null;
     if (card.dates && card.dates[prevMonthKey] && card.dates[prevMonthKey].closingDate) {
       prevMonthClosingDate = card.dates[prevMonthKey].closingDate;
-      // Obtener el día del cierre anterior para usarlo si es necesario
-      prevClosingDay = new Date(prevMonthClosingDate).getDate();
+      // Obtener el día del cierre anterior para usarlo si es necesario - parsear manualmente
+      if (typeof prevMonthClosingDate === 'string' && prevMonthClosingDate.includes('-')) {
+        const [year, month, day] = prevMonthClosingDate.split('-').map(num => parseInt(num, 10));
+        prevClosingDay = day;
+      } else {
+        prevClosingDay = new Date(prevMonthClosingDate).getDate();
+      }
     } else if (card.defaultClosingDay) {
       // Si no hay fecha específica para el mes anterior, construirla con el día de cierre predeterminado
       prevClosingDay = card.defaultClosingDay;
@@ -623,14 +673,12 @@ const CreditCards = () => {
   // Verificación consolidada del estado de pago - ejecutada cuando tenemos todos los datos necesarios
   useEffect(() => {
     if (userData && cards.length > 0) {
-      console.log('Ejecutando verificación completa de estado de pago');
       checkMonthPaymentStatus();
     }
   }, [userData, cards, selectedMonth, selectedYear]);
 
   // Restablecer el estado de verificación cuando cambia el mes o año
   useEffect(() => {
-    console.log('Mes o año cambiado, reiniciando estado de verificación');
     setPaymentStatusChecked(false);
   }, [selectedMonth, selectedYear]);
 
@@ -638,7 +686,6 @@ const CreditCards = () => {
   const checkMonthPaymentStatus = async () => {
     try {
       const selectedYearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-      console.log('Verificando pagos para:', selectedYearMonth);
       
       // Verificar si existe un registro de pago global para este mes
       const globalPaymentExists = !!(userData?.creditCardPayments?.[selectedYearMonth]);
@@ -730,13 +777,6 @@ const CreditCards = () => {
       
       // Forzar que este botón siempre esté activo cuando estamos en el mes anterior y hay tarjetas vencidas
       const shouldBeEnabled = isSelectedMonthPrevious && !allCardsPaid && anyCardPastDueDate;
-      
-      console.log('ESTADO FINAL DEL BOTÓN:', {
-        isSelectedMonthPrevious,
-        allCardsPaid,
-        anyCardPastDueDate,
-        shouldBeEnabled
-      });
       
       setPaymentStatusChecked(true);
       
@@ -1466,29 +1506,11 @@ const CreditCards = () => {
                       const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
                       const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
                       
-                      const today = new Date();
-                      const currentMonth = today.getMonth() + 1;
-                      const currentYear = today.getFullYear();
-                      
-                      const isFutureLimitExceeded = 
-                        (nextYear > currentYear) || 
-                        (nextYear === currentYear && nextMonth > currentMonth + 1);
-                      
-                      if (!isFutureLimitExceeded) {
-                        setSelectedMonth(nextMonth);
-                        setSelectedYear(nextYear);
-                      }
+                      // TEMPORALMENTE HABILITADO PARA TESTING
+                      setSelectedMonth(nextMonth);
+                      setSelectedYear(nextYear);
                     }}
-                    disabled={(() => {
-                      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
-                      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
-                      const today = new Date();
-                      const currentMonth = today.getMonth() + 1;
-                      const currentYear = today.getFullYear();
-                      
-                      return (nextYear > currentYear) || 
-                             (nextYear === currentYear && nextMonth > currentMonth + 1);
-                    })()}
+                    disabled={false} // TEMPORALMENTE HABILITADO PARA TESTING
                     sx={{ 
                       bgcolor: alpha(theme.palette.primary.main, 0.1),
                       '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }

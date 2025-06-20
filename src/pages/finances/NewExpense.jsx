@@ -135,7 +135,7 @@ const NewExpense = () => {
           category: category,
           subcategory: subcategory,
           date: formattedDate, // Usar mismo formato que getDate()
-          description: description,
+          description: `${description} - Cuota ${String(i + 1).padStart(2, '0')}/${String(installments).padStart(2, '0')}`,
           valorUSD: dollarRate['venta'],
           paymentMethod: 'creditCard',
           cardId: selectedCard,

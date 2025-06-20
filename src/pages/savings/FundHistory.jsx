@@ -30,6 +30,7 @@ import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { formatAmount, getDate } from '../../utils';
 import { database, auth } from '../../firebase';
+import ReactApexChart from 'react-apexcharts';
 import SavingsIcon from '@mui/icons-material/Savings';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
@@ -57,6 +58,7 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import EmptyStateIcon from '@mui/icons-material/AccountBalanceWallet';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 
 const FundHistory = () => {
   const theme = useTheme();
@@ -194,10 +196,212 @@ const FundHistory = () => {
     }
   }, [fund, selectedMonth]);
 
-  // Obtener transacciones ordenadas por fecha
+  // Función para generar datos del gráfico de evolución del fondo específico
+  const generateFundEvolutionData = () => {
+    if (!fund?.history) return { labels: [], depositsData: [], withdrawalsData: [], balanceData: [] };
+
+    // Crear un objeto para almacenar los datos diarios del mes seleccionado
+    const dailyData = {};
+    
+    // Obtener todas las transacciones del fondo para el mes seleccionado
+    const allTransactions = Object.entries(fund.history);
+    const monthTransactions = filterTransactionsByMonth(allTransactions, selectedMonth.year, selectedMonth.month);
+    
+    monthTransactions.forEach(([_, transaction]) => {
+      if (transaction.date) {
+        const dateKey = transaction.date;
+        if (!dailyData[dateKey]) {
+          dailyData[dateKey] = {
+            deposits: 0,
+            withdrawals: 0,
+            balance: transaction.newTotal || 0
+          };
+        }
+        
+        if (transaction.type === 'deposit') {
+          dailyData[dateKey].deposits += transaction.amount;
+        } else if (transaction.type === 'withdrawal') {
+          dailyData[dateKey].withdrawals += transaction.amount;
+        }
+        
+        // Usar el balance más reciente para cada día
+        dailyData[dateKey].balance = transaction.newTotal || 0;
+      }
+    });
+
+    // Convertir a arrays ordenados por fecha
+    const sortedDates = Object.keys(dailyData).sort((a, b) => {
+      const dateA = new Date(a.split('/').reverse().join('-'));
+      const dateB = new Date(b.split('/').reverse().join('-'));
+      return dateA - dateB;
+    });
+
+    const labels = [];
+    const depositsData = [];
+    const withdrawalsData = [];
+    const balanceData = [];
+    
+    sortedDates.forEach(date => {
+      const dayData = dailyData[date];
+      
+      labels.push(date);
+      depositsData.push(dayData.deposits);
+      withdrawalsData.push(dayData.withdrawals);
+      balanceData.push(dayData.balance);
+    });
+
+    return { labels, depositsData, withdrawalsData, balanceData };
+  };
+
+  const { labels: evolutionLabels, depositsData, withdrawalsData, balanceData } = generateFundEvolutionData();
+
+  // Configuración del gráfico de línea para el balance
+  const evolutionChartOptions = {
+    chart: {
+      height: 350,
+      type: 'line',
+      toolbar: {
+        show: true,
+        tools: {
+          download: true,
+          selection: false,
+          zoom: false,
+          zoomin: false,
+          zoomout: false,
+          pan: false,
+          reset: false
+        }
+      },
+      fontFamily: theme.typography.fontFamily,
+      background: 'transparent',
+      dropShadow: {
+        enabled: true,
+        top: 2,
+        left: 2,
+        blur: 4,
+        opacity: 0.15
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 4,
+      lineCap: 'round'
+    },
+    markers: {
+      size: 6,
+      strokeWidth: 3,
+      strokeColors: theme.palette.background.paper,
+      fillColors: [theme.palette.primary.main],
+      hover: {
+        size: 8
+      }
+    },
+    xaxis: {
+      categories: evolutionLabels,
+      labels: {
+        style: {
+          colors: theme.palette.text.secondary,
+          fontSize: '12px'
+        }
+      },
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      }
+    },
+    yaxis: {
+      labels: {
+        formatter: (value) => formatAmount(value),
+        style: {
+          colors: theme.palette.text.secondary
+        }
+      }
+    },
+    tooltip: {
+      shared: true,
+      intersect: false,
+      y: {
+        formatter: val => formatAmount(val)
+      },
+      theme: theme.palette.mode === 'dark' ? 'dark' : 'light',
+      style: {
+        fontSize: '12px',
+        fontFamily: theme.typography.fontFamily
+      }
+    },
+    grid: {
+      borderColor: theme.palette.divider,
+      strokeDashArray: 5,
+      xaxis: {
+        lines: {
+          show: true
+        }
+      },
+      yaxis: {
+        lines: {
+          show: true
+        }
+      },
+      padding: {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 10
+      }
+    },
+    legend: {
+      show: false
+    },
+    responsive: [
+      {
+        breakpoint: 600,
+        options: {
+          chart: {
+            height: 240
+          }
+        }
+      }
+    ],
+    colors: [theme.palette.primary.main]
+  };
+
+  const evolutionChartData = [
+    {
+      name: 'Balance',
+      type: 'line',
+      data: balanceData
+    }
+  ];
+
+  // Obtener transacciones ordenadas por fecha y timestamp
   const sortedTransactions = fund?.history 
     ? Object.entries(fund.history)
-        .sort((a, b) => parseDate(b[1].date) - parseDate(a[1].date))
+        .sort((a, b) => {
+          const dateA = parseDate(a[1].date);
+          const dateB = parseDate(b[1].date);
+          
+          // Primero ordenar por fecha (más reciente primero)
+          if (dateB.getTime() !== dateA.getTime()) {
+            return dateB.getTime() - dateA.getTime();
+          }
+          
+          // Si las fechas son iguales, ordenar por timestamp (más reciente primero)
+          // Si no hay timestamp, usar el orden de inserción (clave de Firebase)
+          const timestampA = a[1].timestamp || 0;
+          const timestampB = b[1].timestamp || 0;
+          
+          if (timestampB !== timestampA) {
+            return timestampB - timestampA;
+          }
+          
+          // Como último recurso, ordenar por la clave de Firebase (más reciente primero)
+          return b[0].localeCompare(a[0]);
+        })
     : [];
 
   // Obtener transacciones filtradas según el modo de vista
@@ -246,64 +450,12 @@ const FundHistory = () => {
           py: 3
         }}
       >
-        {/* Breadcrumbs */}
-        <Box 
-          sx={{ 
-            mb: 4, 
-            p: { xs: 2, sm: 3 },
-            bgcolor: alpha(theme.palette.primary.main, 0.05),
-            borderRadius: 2,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-          }}
-        >
-          <Breadcrumbs 
-            separator={<NavigateNextIcon fontSize="small" />}
-            sx={{ 
-              '& .MuiBreadcrumbs-separator': {
-                color: theme.palette.primary.main,
-                opacity: 0.7
-              }
-            }}
-          >
-            <Link 
-              underline="hover" 
-              color="primary"
-              onClick={() => navigate('/ahorros')}
-              sx={{ 
-                cursor: 'pointer',
-                fontWeight: 'medium',
-                fontSize: '1.1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                '&:hover': {
-                  color: theme.palette.primary.dark
-                }
-              }}
-            >
-              <SavingsIcon fontSize="small" />
-              Ahorros
-            </Link>
-            <Typography 
-              color="text.primary" 
-              sx={{ 
-                fontWeight: 'bold',
-                fontSize: '1.1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5
-              }}
-            >
-              {availableIcons[fund.icon] && React.cloneElement(availableIcons[fund.icon], { fontSize: "small" })}
-              {fund.name}
-            </Typography>
-          </Breadcrumbs>
-        </Box>
 
         {/* Navegador Mensual */}
         <Card 
           elevation={2}
           sx={{ 
+            mt:2,
             mb: 4,
             borderRadius: { xs: 2, sm: 3 },
             overflow: 'hidden',
@@ -643,6 +795,96 @@ const FundHistory = () => {
           </Grid>
         </Grid>
 
+        {/* Gráfico de evolución del fondo */}
+        <Card 
+          elevation={3} 
+          sx={{ 
+            mb: { xs: 2, sm: 3 },
+            borderRadius: { xs: 2, sm: 3 }, 
+            overflow: 'hidden',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: { xs: 'none', sm: 'translateY(-5px)' },
+              boxShadow: { xs: theme.shadows[3], sm: theme.shadows[10] },
+            }
+          }}
+        >
+          <Box
+            sx={{
+              p: { xs: 2, sm: 3 },
+              background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+              borderBottom: `1px solid ${theme.palette.divider}`
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  width: { xs: 36, sm: 40 },
+                  height: { xs: 36, sm: 40 }
+                }}
+              >
+                <AutoGraphIcon />
+              </Avatar>
+              <Box>
+                <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
+                  Evolución del Fondo
+                </Typography>
+                <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
+                  {formatSelectedMonth()} - {fund.name}
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+          
+          <Box sx={{ p: { xs: 2, sm: 2.5 }, pt: { xs: 2.5, sm: 3 }, bgcolor: 'background.paper' }}>
+            {evolutionLabels.length > 0 ? (
+              <ReactApexChart 
+                options={{
+                  ...evolutionChartOptions,
+                  chart: {
+                    ...evolutionChartOptions.chart,
+                    height: isMobile ? 300 : 450,
+                    toolbar: {
+                      show: !isMobile,
+                      tools: {
+                        download: true,
+                        selection: false,
+                        zoom: false,
+                        zoomin: false,
+                        zoomout: false,
+                        pan: false,
+                        reset: false
+                      }
+                    }
+                  }
+                }} 
+                series={evolutionChartData} 
+                type="line" 
+                height={isMobile ? 300 : 450}
+              />
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                flexDirection: 'column',
+                height: 300,
+                opacity: 0.7
+              }}>
+                <AutoGraphIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography color="textSecondary" align="center" gutterBottom>
+                  No hay transacciones en {formatSelectedMonth().toLowerCase()}
+                </Typography>
+                <Typography variant="body2" color="textSecondary" align="center">
+                  Las transacciones de este mes aparecerán en este gráfico
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Card>
+
         {/* Lista de transacciones */}
         <Card 
           elevation={3}
@@ -717,109 +959,82 @@ const FundHistory = () => {
                       
                       <ListItemText
                         primary={
-                          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 0.5 }}>
-                            <Typography variant="subtitle1" fontWeight="medium">
-                              {transaction.description}
-                            </Typography>
-                            {/* Indicador visual del balance si está disponible */}
-                            {transaction.newTotal !== undefined && (
-                              <Box 
+                          <Typography variant="h6" fontWeight="600" sx={{ mb: 0.5, color: 'text.primary' }}>
+                            {transaction.description}
+                          </Typography>
+                        }
+                        secondary={
+                          <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                              <Typography 
+                                variant="body2" 
+                                color="text.secondary"
                                 sx={{ 
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: 0.5,
-                                  px: 1.5,
-                                  py: 0.5,
-                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                  borderRadius: 1,
-                                  border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
-                                }}
-                              >
-                                <Typography 
-                                  variant="caption" 
-                                  color="text.secondary"
-                                  sx={{ fontWeight: 'medium' }}
-                                >
-                                  Balance:
-                                </Typography>
-                                <Typography 
-                                  variant="body2" 
-                                  color="primary.main" 
-                                  sx={{ fontWeight: 'bold' }}
-                                >
-                                  {formatAmount(transaction.newTotal)}
-                                </Typography>
-                              </Box>
-                            )}
-                          </Stack>
-                        }
-                        secondary={
-                          <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 0.5 }}>
-                            <Chip
-                              icon={<CalendarTodayIcon />}
-                              label={parseDate(transaction.date).toLocaleDateString('es-ES', {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                              size="small"
-                              variant="outlined"
-                            />
-                            <Chip
-                              label={transaction.type === 'deposit' ? 'Depósito' : 'Retiro'}
-                              size="small"
-                              sx={{
-                                bgcolor: transaction.type === 'deposit' 
-                                  ? alpha(theme.palette.success.main, 0.1)
-                                  : alpha(theme.palette.error.main, 0.1),
-                                color: transaction.type === 'deposit' 
-                                  ? theme.palette.success.main
-                                  : theme.palette.error.main
-                              }}
-                            />
-                            {/* Mostrar balance después de la transacción si está disponible */}
-                            {transaction.newTotal !== undefined && (
-                              <Chip
-                                label={`Balance: ${formatAmount(transaction.newTotal)}`}
-                                size="small"
-                                sx={{
-                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                  color: theme.palette.primary.main,
                                   fontWeight: 'medium'
                                 }}
-                              />
-                            )}
+                              >
+                                <CalendarTodayIcon sx={{ fontSize: 14 }} />
+                                {parseDate(transaction.date).toLocaleDateString('es-ES', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                  month: 'short'
+                                })}
+                              </Typography>
+                              
+                              {/* Balance resultante - solo se muestra una vez */}
+                              {transaction.newTotal !== undefined && (
+                                <Typography 
+                                  variant="body2"
+                                  color="primary.main"
+                                  sx={{ 
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    px: 1,
+                                    py: 0.25,
+                                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                    borderRadius: 0.75,
+                                    fontSize: '0.8rem'
+                                  }}
+                                >
+                                  Balance: {formatAmount(transaction.newTotal)}
+                                </Typography>
+                              )}
+                            </Stack>
                           </Stack>
                         }
                       />
                       
                       <ListItemSecondaryAction>
-                        <Box sx={{ textAlign: 'right' }}>
+                        <Box sx={{ textAlign: 'right', minWidth: 120 }}>
+                          {/* Monto principal - más prominente */}
                           <Typography
-                            variant="h6"
-                            fontWeight="bold"
+                            variant="h5"
+                            fontWeight="700"
                             color={transaction.type === 'deposit' ? 'success.main' : 'error.main'}
+                            sx={{ 
+                              lineHeight: 1.2,
+                              letterSpacing: '-0.5px'
+                            }}
                           >
                             {transaction.type === 'deposit' ? '+' : '-'}{formatAmount(transaction.amount)}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          
+                          {/* Equivalente en USD - secundario */}
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary"
+                            sx={{ 
+                              fontWeight: 'medium',
+                              mt: 0.25
+                            }}
+                          >
                             USD {formatAmount(transaction.amount / (dollarRate?.venta || 1))}
                           </Typography>
-                          {/* Mostrar balance resultante en la parte derecha también */}
-                          {transaction.newTotal !== undefined && (
-                            <Typography 
-                              variant="caption" 
-                              color="primary.main" 
-                              sx={{ 
-                                display: 'block',
-                                fontWeight: 'bold',
-                                mt: 0.5
-                              }}
-                            >
-                              → {formatAmount(transaction.newTotal)}
-                            </Typography>
-                          )}
                         </Box>
                       </ListItemSecondaryAction>
                     </ListItem>

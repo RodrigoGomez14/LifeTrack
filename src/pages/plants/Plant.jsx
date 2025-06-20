@@ -170,6 +170,8 @@ const calculateDaysBetween = (startDateStr, endDateStr = null) => {
   
   // Parsear la fecha de fin si existe
   let endDate;
+  let isCalculatingToToday = false;
+  
   if (endDateStr) {
     const endParts = endDateStr.split('/');
     if (endParts.length === 3) {
@@ -178,10 +180,12 @@ const calculateDaysBetween = (startDateStr, endDateStr = null) => {
     } else {
       // Si el formato no es válido, usar la fecha actual
       endDate = new Date();
+      isCalculatingToToday = true;
     }
   } else {
     // Si no se proporciona fecha de fin, usar la fecha actual
     endDate = new Date();
+    isCalculatingToToday = true;
   }
   
   // Asegurar que ambas fechas sean instancias válidas de Date
@@ -192,7 +196,12 @@ const calculateDaysBetween = (startDateStr, endDateStr = null) => {
 
   // Calcular diferencia en días
   const diffTime = Math.abs(endDate - startDate);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Si estamos calculando hasta hoy, restar 1 día para no contar el día actual
+  if (isCalculatingToToday && diffDays > 0) {
+    diffDays = diffDays - 1;
+  }
   
   return diffDays;
 };
@@ -621,7 +630,7 @@ const Plant = () => {
     const weightStats = [];
     
     // Peso húmedo - mostrar si la planta ha sido cosechada
-    if (plant.finishDate) {
+    if (plant.inicioSecado) {
       weightStats.push({
         label: 'Peso húmedo',
         value: plant.pesoHumedo ? `${plant.pesoHumedo}g` : 'No registrado',
@@ -1605,12 +1614,20 @@ const Plant = () => {
         return calculateDaysBetween(plant.inicioVegetativo);
       }
     } else if (stageName === 'Floracion' && plant.inicioFloracion) {
-      if (plant.finishDate) {
+      if (plant.inicioSecado) {
         // Si ya fue cosechada, calcular días que estuvo en floración
-        return calculateDaysBetween(plant.inicioFloracion, plant.finishDate);
+        return calculateDaysBetween(plant.inicioFloracion, plant.inicioSecado);
       } else {
         // Si sigue en floración, calcular días desde el inicio hasta hoy
         return calculateDaysBetween(plant.inicioFloracion);
+      }
+    } else if (stageName === 'Secado' && plant.inicioSecado) {
+      if (plant.finalSecado) {
+        // Si ya fue enfrascada, calcular días que estuvo en secado
+        return calculateDaysBetween(plant.inicioSecado, plant.finalSecado);
+      } else if (plant.etapa === 'Secado') {
+        // Si sigue en secado, calcular días desde el inicio hasta hoy
+        return calculateDaysBetween(plant.inicioSecado);
       }
     }
     return null;
@@ -1624,7 +1641,7 @@ const Plant = () => {
       case 'Vegetativo':
         return plant.inicioFloracion || null;
       case 'Floracion':
-        return plant.finishDate || null;
+        return plant.inicioSecado || null;
       case 'Secado':
         return plant.finalSecado || null;
       default:
@@ -1655,12 +1672,12 @@ const Plant = () => {
         break;
       case 'Floracion':
         startDate = plant.inicioFloracion;
-        endDate = plant.finishDate;
+        endDate = plant.inicioSecado;
         isActive = plant.etapa === 'Floracion';
-        isCompleted = !!plant.finishDate;
+        isCompleted = !!plant.inicioSecado;
         break;
       case 'Secado':
-        startDate = plant.finishDate;
+        startDate = plant.inicioSecado;
         endDate = plant.finalSecado;
         isActive = plant.etapa === 'Secado';
         isCompleted = !!plant.finalSecado;
@@ -1732,9 +1749,9 @@ const Plant = () => {
       [newStageDate]: getDate()
     };
     
-    // Si cambiamos a Secado, también añadir fecha de finalización
+    // Si cambiamos a Secado, también añadir fecha de inicio de secado
     if (newStage === 'Secado') {
-      updateData.finishDate = getDate();
+      updateData.inicioSecado = getDate();
     }
     
     // Si cambiamos de Secado a Enfrascado, añadir fecha de finalización del secado
@@ -1757,7 +1774,7 @@ const Plant = () => {
           ...prev,
           etapa: newStage,
           [newStageDate]: updateData[newStageDate],
-          ...(newStage === 'Secado' && { finishDate: updateData.finishDate }),
+          ...(newStage === 'Secado' && { inicioSecado: updateData.inicioSecado }),
           ...(newStage === 'Enfrascado' && { finalSecado: updateData.finalSecado })
         }));
         
@@ -1882,9 +1899,9 @@ const Plant = () => {
       .then((snapshot) => {
         const plantData = snapshot.val();
         
-        // Añadir fecha de finalización si no existe
-        if (!plantData.finishDate) {
-          plantData.finishDate = getDate();
+        // Añadir fecha de inicio de secado si no existe
+        if (!plantData.inicioSecado) {
+          plantData.inicioSecado = getDate();
         }
         
         // Si la planta está en etapa de secado y no tiene fecha de finalización del secado,
@@ -2030,9 +2047,9 @@ const Plant = () => {
 
   // Modificar la función calculateDaysSinceStageChange para usar birthDate para Germinación
   const calculateDaysSinceStageChange = () => {
-    if (plant.isArchived && plant.finishDate) {
+    if (plant.isArchived && plant.inicioSecado) {
       return calculateDryingDays();
-    } else if (plant.etapa === 'Secado' && plant.finishDate) {
+    } else if (plant.etapa === 'Secado' && plant.inicioSecado) {
       return calculateDryingDays();
     } else if (plant.etapa === 'Floracion' && plant.inicioFloracion) {
       return calculateDaysBetween(plant.inicioFloracion);
@@ -2046,15 +2063,15 @@ const Plant = () => {
 
   // Función para calcular días de secado
   const calculateDryingDays = () => {
-    if (!plant.finishDate) return null;
+    if (!plant.inicioSecado) return null;
     
-    // Si existe finalSecado, calcular la diferencia entre finishDate y finalSecado
+    // Si existe finalSecado, calcular la diferencia entre inicioSecado y finalSecado
     if (plant.finalSecado) {
-      return calculateDaysBetween(plant.finishDate, plant.finalSecado);
+      return calculateDaysBetween(plant.inicioSecado, plant.finalSecado);
     }
     
-    // Si no existe finalSecado, calcular la diferencia entre finishDate y la fecha actual
-    return calculateDaysBetween(plant.finishDate);
+    // Si no existe finalSecado, calcular la diferencia entre inicioSecado y la fecha actual
+    return calculateDaysBetween(plant.inicioSecado);
   };
 
   // Estilos globales para las animaciones y línea de tiempo
@@ -2386,7 +2403,7 @@ const Plant = () => {
                       {plant.etapa === 'Floracion' ? 'Cosechar' : 
                        plant.etapa === 'Germinacion' ? 'Cambiar a Vegetativo' :
                        plant.etapa === 'Vegetativo' ? 'Cambiar a Floración' :
-                       plant.etapa === 'Secado' ? 'Cambiar a Enfrascado' :
+                       plant.etapa === 'Secado' ? 'Enfrascar' :
                        'Cambiar etapa'}
                     </Button>
                   )}
@@ -2439,7 +2456,6 @@ const Plant = () => {
                     bgcolor: alpha('#ffffff', 0.3),
                     borderRadius: 1
                   }} />
-
 
                   {/* Genética */}
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 0.3 }}>
@@ -2513,6 +2529,46 @@ const Plant = () => {
                     borderRadius: 1
                   }} />
                   
+                  {/* Fecha de cosecha - Solo mostrar si existe */}
+                  {plant.inicioSecado && (
+                    <>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 0.3 }}>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            opacity: 0.9, 
+                            fontWeight: 'medium',
+                            fontSize: '0.75rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            color: '#ffffff'
+                          }}
+                        >
+                          Cosecha
+                        </Typography>
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontWeight: 'bold', 
+                            fontSize: '1.1rem',
+                            lineHeight: 1.2,
+                            color: '#ffffff'
+                          }}
+                        >
+                          {plant.inicioSecado}
+                        </Typography>
+                      </Box>
+                      
+                      {/* Separador */}
+                      <Box sx={{ 
+                        width: { xs: '100%', sm: '2px' }, 
+                        height: { xs: '1px', sm: '40px' }, 
+                        bgcolor: alpha('#ffffff', 0.3),
+                        borderRadius: 1
+                      }} />
+                    </>
+                  )}
+                  
                   {/* Etapa actual */}
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 0.3 }}>
                     <Typography 
@@ -2551,11 +2607,11 @@ const Plant = () => {
 
         {/* Sección de estadísticas y datos detallados */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          {/* Etapas de crecimiento - 3 tarjetas individuales */}
+          {/* Etapas de crecimiento - 4 tarjetas individuales */}
           <Grid item xs={12}>
             <Box sx={{ mb: 3 }}>
               <Grid container spacing={2} sx={{ mb: 3 }}>
-                {['Germinacion', 'Vegetativo', 'Floracion'].map((stageName) => {
+                {['Germinacion', 'Vegetativo', 'Floracion', 'Secado'].map((stageName) => {
                   const stageInfo = getStageInfo(stageName);
                   
                   // Mejorar la lógica de colores para mejor diferenciación
@@ -2573,10 +2629,12 @@ const Plant = () => {
                   
                   const stageIcon = stageName === 'Germinacion' ? <SpaIcon /> :
                                    stageName === 'Vegetativo' ? <GrassIcon /> :
-                                   <LocalFloristIcon />;
+                                   stageName === 'Floracion' ? <LocalFloristIcon /> :
+                                   stageName === 'Secado' ? <ParkIcon /> :
+                                   <ForestIcon />;
 
                   return (
-                    <Grid item xs={12} sm={4} key={stageName}>
+                    <Grid item xs={12} sm={6} md={3} key={stageName}>
                       <Card 
                         elevation={3}
                         sx={{ 
@@ -2834,59 +2892,6 @@ const Plant = () => {
 
               {/* Información adicional */}
               <Grid container spacing={2} alignItems="center">
-                {/* Botón especial para completar secado */}
-                {plant.etapa === 'Secado' && plant.finishDate && !plant.finalSecado && (
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={changeToEnfrascado}
-                        startIcon={<LocalFloristIcon />}
-                        sx={{ 
-                          px: 6, 
-                          py: 2,
-                          fontSize: '1.1rem',
-                          fontWeight: 'bold',
-                          background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-                          border: 'none',
-                          '&:hover': {
-                            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                            transform: 'translateY(-3px)',
-                            boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.4)}`
-                          },
-                          transition: 'all 0.3s ease',
-                          borderRadius: 3,
-                          boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                        }}
-                      >
-                        Finalizar secado
-                      </Button>
-                    </Box>
-                  </Grid>
-                )}
-
-                {/* Fecha de la cosecha - Solo visible cuando existe finishDate */}
-                {plant.finishDate && (
-                  <Grid item xs={12}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      gap: 2,
-                      p: 2,
-                      bgcolor: alpha(theme.palette.success.main, 0.05),
-                      borderRadius: 2,
-                      border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                      mt: 2
-                    }}>
-                      <CalendarTodayIcon fontSize="small" sx={{ color: theme.palette.success.main }} />
-                      <Typography variant="subtitle1" fontWeight="medium">
-                        Fecha de la cosecha: {convertToDetailedDate(plant.finishDate)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                )}
               </Grid>
             </Box>
           </Grid>

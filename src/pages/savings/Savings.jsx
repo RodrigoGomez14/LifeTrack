@@ -43,6 +43,7 @@ import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { formatAmount, getDate } from '../../utils';
 import { database, auth } from '../../firebase';
+
 import SavingsIcon from '@mui/icons-material/Savings';
 import AddIcon from '@mui/icons-material/Add';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -69,6 +70,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+
 import { useNavigate } from 'react-router-dom';
 
 const Savings = () => {
@@ -269,6 +271,8 @@ const Savings = () => {
   const totalFundsBalance = Object.values(savingsFunds)
     .filter(fund => fund && typeof fund === 'object') // Filtrar valores null/undefined
     .reduce((total, fund) => total + (fund.balance || 0), 0);
+
+
 
   return (
     <Layout title="Fondos de Ahorro">

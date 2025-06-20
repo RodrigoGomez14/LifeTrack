@@ -383,18 +383,18 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/ayuda" element={<Ayuda />} />
           <Route path="/register" element={<Login />} />
-          <Route path="/Plantas" element={<PrivateRoute><PlantsList /></PrivateRoute>} />
-          <Route path="/Planta" element={<PrivateRoute><Plant /></PrivateRoute>} />
-          <Route path="/NuevaPlanta" element={<PrivateRoute><NewPlant /></PrivateRoute>} />
-          <Route path="/NuevoRiego" element={<PrivateRoute><NewIrrigation /></PrivateRoute>} />
-          <Route path="/NuevaPoda" element={<PrivateRoute><NewPruning /></PrivateRoute>} />
-          <Route path="/NuevoInsecticida" element={<PrivateRoute><NewInsecticide /></PrivateRoute>} />
-          <Route path="/NuevoTransplante" element={<PrivateRoute><NewTransplant /></PrivateRoute>} />
-          <Route path="/Aditivos" element={<PrivateRoute><Aditives /></PrivateRoute>} />
-          <Route path="/NuevoAditivo" element={<PrivateRoute><NewAditive /></PrivateRoute>} />
-          <Route path="/NuevaFoto" element={<PrivateRoute><NewPhoto /></PrivateRoute>} />
-          <Route path="/NuevoLog" element={<PrivateRoute><NewLog /></PrivateRoute>} />
-          <Route path="/LineaTiempo" element={<PrivateRoute><Timeline /></PrivateRoute>} />
+          <Route path="/Plantas" element={<PlantsList />} />
+          <Route path="/Planta" element={<Plant />} />
+          <Route path="/NuevaPlanta" element={<NewPlant />} />
+          <Route path="/NuevoRiego" element={<NewIrrigation />} />
+          <Route path="/NuevaPoda" element={<NewPruning />} />
+          <Route path="/NuevoInsecticida" element={<NewInsecticide />} />
+          <Route path="/NuevoTransplante" element={<NewTransplant />} />
+          <Route path="/Aditivos" element={<Aditives />} />
+          <Route path="/NuevoAditivo" element={<NewAditive />} />
+          <Route path="/NuevaFoto" element={<NewPhoto />} />
+          <Route path="/NuevoLog" element={<NewLog />} />
+          <Route path="/LineaTiempo" element={<Timeline />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
