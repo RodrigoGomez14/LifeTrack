@@ -122,10 +122,17 @@ function App() {
           }
 
           groupdedFinances.incomes[year].months[month].data.push(transaction);
-          groupdedFinances.incomes[year].months[month].total += transaction.amount;
-          groupdedFinances.incomes[year].months[month].totalUSD += transaction.amountUSD;
-          groupdedFinances.incomes[year].total += transaction.amount;
-          groupdedFinances.incomes[year].totalUSD += transaction.amountUSD;
+          
+          // Considerar devoluciones en los cálculos de ingresos también
+          const originalAmount = transaction.amount || 0;
+          const refundAmount = transaction.refundAmount || 0;
+          const effectiveAmount = originalAmount - refundAmount;
+          const effectiveAmountUSD = transaction.amountUSD ? (transaction.amountUSD * (1 - (refundAmount / originalAmount))) : (effectiveAmount / (transaction.valorUSD || 1));
+          
+          groupdedFinances.incomes[year].months[month].total += effectiveAmount;
+          groupdedFinances.incomes[year].months[month].totalUSD += effectiveAmountUSD;
+          groupdedFinances.incomes[year].total += effectiveAmount;
+          groupdedFinances.incomes[year].totalUSD += effectiveAmountUSD;
         } else {
           console.warn(`Transacción de ingreso ${transactionId} sin fecha válida:`, transaction);
         }
@@ -163,10 +170,16 @@ function App() {
           
           // Solo sumar al total si no es una transacción con tarjeta que debe excluirse
           if (!transaction.excludeFromTotal) {
-            groupdedFinances.expenses[year].months[month].total += transaction.amount;
-            groupdedFinances.expenses[year].months[month].totalUSD += transaction.amountUSD;
-            groupdedFinances.expenses[year].total += transaction.amount;
-            groupdedFinances.expenses[year].totalUSD += transaction.amountUSD;
+            // Considerar devoluciones en los cálculos
+            const originalAmount = transaction.amount || 0;
+            const refundAmount = transaction.refundAmount || 0;
+            const effectiveAmount = originalAmount - refundAmount;
+            const effectiveAmountUSD = transaction.amountUSD ? (transaction.amountUSD * (1 - (refundAmount / originalAmount))) : (effectiveAmount / (transaction.valorUSD || 1));
+            
+            groupdedFinances.expenses[year].months[month].total += effectiveAmount;
+            groupdedFinances.expenses[year].months[month].totalUSD += effectiveAmountUSD;
+            groupdedFinances.expenses[year].total += effectiveAmount;
+            groupdedFinances.expenses[year].totalUSD += effectiveAmountUSD;
           }
         } else {
           console.warn(`Transacción de gasto ${transactionId} sin fecha válida:`, transaction);

@@ -1506,14 +1506,21 @@ const CreditCards = () => {
                       const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
                       const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
                       
-                      // TEMPORALMENTE HABILITADO PARA TESTING
                       setSelectedMonth(nextMonth);
                       setSelectedYear(nextYear);
                     }}
-                    disabled={false} // TEMPORALMENTE HABILITADO PARA TESTING
+                    disabled={(() => {
+                      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+                      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+                      return isBeyondFutureLimit(nextYear, nextMonth, 1);
+                    })()}
                     sx={{ 
                       bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                      '&.Mui-disabled': {
+                        bgcolor: alpha(theme.palette.grey[500], 0.1),
+                        color: alpha(theme.palette.grey[500], 0.5)
+                      }
                     }}
                   >
                     <ChevronRightIcon />

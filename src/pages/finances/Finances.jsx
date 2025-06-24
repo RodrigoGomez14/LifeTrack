@@ -42,7 +42,10 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Container
+  Container,
+  Dialog,
+  DialogContent,
+  TextField
 } from '@mui/material';
 import TransactionsTabs from '../../components/finances/TransactionsTabs';
 import SavingsTab from '../../components/finances/SavingsTab';
@@ -109,6 +112,10 @@ import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import InfoIcon from '@mui/icons-material/Info';
+import UndoIcon from '@mui/icons-material/Undo';
+import CloseIcon from '@mui/icons-material/Close';
+import { database, auth } from '../../firebase';
+import { getDate } from '../../utils';
 
 const Finances = () => {
   const { userData, dollarRate } = useStore();
@@ -123,7 +130,112 @@ const Finances = () => {
     savingsPanel: false
   });
   
+  // Estados para el dialog de devolución
+  const [openRefundDialog, setOpenRefundDialog] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [refundForm, setRefundForm] = useState({
+    amount: '',
+    description: ''
+  });
+  
   const navigate = useNavigate();
+  
+  // Función para abrir el dialog de devolución
+  const handleOpenRefund = (transaction) => {
+    // Solo permitir devoluciones en gastos, no en ingresos
+    if (dataType !== 'expenses') return;
+    
+    setSelectedTransaction(transaction);
+    setRefundForm({
+      amount: '',
+      description: `Devolución de ${transaction.description}`
+    });
+    setOpenRefundDialog(true);
+  };
+  
+  // Función para cerrar el dialog de devolución
+  const handleCloseRefund = () => {
+    setOpenRefundDialog(false);
+    setSelectedTransaction(null);
+    setRefundForm({
+      amount: '',
+      description: ''
+    });
+  };
+  
+  // Función para procesar la devolución
+  const handleProcessRefund = async () => {
+    if (!selectedTransaction || !refundForm.amount || parseFloat(refundForm.amount) <= 0) {
+      return;
+    }
+    
+    const refundAmount = parseFloat(refundForm.amount);
+    const originalAmount = selectedTransaction.amount || 0;
+    
+    // Validar que la devolución no sea mayor al gasto original
+    if (refundAmount > originalAmount) {
+      alert('La devolución no puede ser mayor al gasto original');
+      return;
+    }
+    
+    try {
+      const updates = {};
+      
+      // Encontrar la transacción en la base de datos para actualizarla
+      // Necesitamos buscar por todos los campos para encontrar la transacción exacta
+      const expensesRef = database.ref(`${auth.currentUser.uid}/expenses`);
+      const snapshot = await expensesRef.once('value');
+      let transactionKey = null;
+      
+      if (snapshot.exists()) {
+        const expenses = snapshot.val();
+        // Buscar la transacción que coincida con los datos
+        for (const [key, expense] of Object.entries(expenses)) {
+          if (expense.date === selectedTransaction.date &&
+              expense.description === selectedTransaction.description &&
+              expense.amount === selectedTransaction.amount &&
+              expense.category === selectedTransaction.category) {
+            transactionKey = key;
+            break;
+          }
+        }
+      }
+      
+      if (transactionKey) {
+        // Actualizar la transacción original con el campo de devolución
+        updates[`${auth.currentUser.uid}/expenses/${transactionKey}/refundAmount`] = refundAmount;
+        updates[`${auth.currentUser.uid}/expenses/${transactionKey}/refundDescription`] = refundForm.description;
+        updates[`${auth.currentUser.uid}/expenses/${transactionKey}/refundDate`] = getDate();
+        updates[`${auth.currentUser.uid}/expenses/${transactionKey}/hasRefund`] = true;
+      }
+      
+      // Actualizar ahorros (aumentar por el monto devuelto)
+      const currentSavings = userData?.savings?.amountARS || 0;
+      updates[`${auth.currentUser.uid}/savings/amountARS`] = currentSavings + refundAmount;
+      
+      // Registrar en historial de ahorros
+      const newHistoryKey = database.ref().child(`${auth.currentUser.uid}/savings/amountARSHistory`).push().key;
+      updates[`${auth.currentUser.uid}/savings/amountARSHistory/${newHistoryKey}`] = {
+        date: getDate(),
+        amount: refundAmount,
+        newTotal: currentSavings + refundAmount,
+        description: `Devolución: ${refundForm.description}`
+      };
+      
+      // Ejecutar todas las actualizaciones
+      await database.ref().update(updates);
+      
+      // Cerrar el dialog
+      handleCloseRefund();
+      
+      // Mostrar mensaje de éxito
+      alert('Devolución procesada exitosamente');
+      
+    } catch (error) {
+      console.error('Error al procesar devolución:', error);
+      alert('Error al procesar la devolución');
+    }
+  };
   
   // Estados para los datos procesados
   const [monthlyData, setMonthlyData] = useState(null);
@@ -246,17 +358,22 @@ const Finances = () => {
             }
           }
           
-          // Si no está oculta, no es una transacción futura y no debe excluirse de totales, sumamos al total
-          if (!transaction.hiddenFromList && !isFutureTransaction && !transaction.excludeFromTotal) {
-            categoryData[category].total += transaction.amount || 0;
+                      // Si no está oculta, no es una transacción futura y no debe excluirse de totales, sumamos al total
+            if (!transaction.hiddenFromList && !isFutureTransaction && !transaction.excludeFromTotal) {
+              // Calcular el monto efectivo considerando devoluciones
+              const originalAmount = transaction.amount || 0;
+              const refundAmount = transaction.refundAmount || 0;
+              const effectiveAmount = originalAmount - refundAmount;
+              
+              categoryData[category].total += effectiveAmount;
             
-            // Agregar subcategoría si existe
-            if (transaction.subcategory) {
-              if (!categoryData[category].subcategories[transaction.subcategory]) {
-                categoryData[category].subcategories[transaction.subcategory] = 0;
+                          // Agregar subcategoría si existe
+              if (transaction.subcategory) {
+                if (!categoryData[category].subcategories[transaction.subcategory]) {
+                  categoryData[category].subcategories[transaction.subcategory] = 0;
+                }
+                categoryData[category].subcategories[transaction.subcategory] += effectiveAmount;
               }
-              categoryData[category].subcategories[transaction.subcategory] += transaction.amount || 0;
-            }
           }
         });
         
@@ -420,7 +537,11 @@ const Finances = () => {
             return !transaction.hiddenFromList && !transaction.excludeFromTotal;
           });
           
-          expenseData[monthIndex] = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+          expenseData[monthIndex] = visibleData.reduce((sum, transaction) => {
+            const originalAmount = transaction.amount || 0;
+            const refundAmount = transaction.refundAmount || 0;
+            return sum + (originalAmount - refundAmount);
+          }, 0);
         } else {
           // Si no hay datos detallados, usar el total
           expenseData[monthIndex] = monthData.total || 0;
@@ -459,7 +580,11 @@ const Finances = () => {
             return !transaction.hiddenFromList;
           });
           
-          incomeData[monthIndex] = visibleData.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+          incomeData[monthIndex] = visibleData.reduce((sum, transaction) => {
+            const originalAmount = transaction.amount || 0;
+            const refundAmount = transaction.refundAmount || 0;
+            return sum + (originalAmount - refundAmount);
+          }, 0);
         } else {
           // Si no hay datos detallados, usar el total
           incomeData[monthIndex] = monthData.total || 0;
@@ -2348,25 +2473,28 @@ const Finances = () => {
         };
       }
       
-      // Sumar al total del día
-      const amount = transaction.amount || 0;
+      // Sumar al total del día considerando devoluciones
+      const originalAmount = transaction.amount || 0;
+      const refundAmount = transaction.refundAmount || 0;
+      const effectiveAmount = originalAmount - refundAmount;
+      
       groups[dateKey].transactions.push(transaction);
       
       // Verificar si es una transacción con tarjeta de crédito
       const isCreditCard = transaction.paymentMethod === 'creditCard' || transaction.creditCardTransaction === true;
       
-      // Para el total general siempre sumamos todas las transacciones
-      groups[dateKey].total += amount;
+      // Para el total general siempre sumamos todas las transacciones (con monto efectivo)
+      groups[dateKey].total += effectiveAmount;
       
       // Solo sumamos al cashTotal si NO es una transacción con tarjeta
       if (!isCreditCard) {
-        groups[dateKey].cashTotal += amount;
+        groups[dateKey].cashTotal += effectiveAmount;
       }
       
       if (transaction.hiddenFromList) {
-        groups[dateKey].hiddenTotal += amount;
+        groups[dateKey].hiddenTotal += effectiveAmount;
       } else {
-        groups[dateKey].visibleTotal += amount;
+        groups[dateKey].visibleTotal += effectiveAmount;
       }
       
       return groups;
@@ -2449,14 +2577,34 @@ const Finances = () => {
       }
     };
     
-    // Calcular totales para los contadores superiores
+    // Calcular totales para los contadores superiores considerando devoluciones
     const totals = {
-      all: filteredTransactions.reduce((sum, t) => sum + (t.amount || 0), 0),
-      visible: filteredTransactions.filter(t => !t.hiddenFromList).reduce((sum, t) => sum + (t.amount || 0), 0),
-      hidden: filteredTransactions.filter(t => t.hiddenFromList).reduce((sum, t) => sum + (t.amount || 0), 0),
+      all: filteredTransactions.reduce((sum, t) => {
+        const originalAmount = t.amount || 0;
+        const refundAmount = t.refundAmount || 0;
+        return sum + (originalAmount - refundAmount);
+      }, 0),
+      visible: filteredTransactions.filter(t => !t.hiddenFromList).reduce((sum, t) => {
+        const originalAmount = t.amount || 0;
+        const refundAmount = t.refundAmount || 0;
+        return sum + (originalAmount - refundAmount);
+      }, 0),
+      hidden: filteredTransactions.filter(t => t.hiddenFromList).reduce((sum, t) => {
+        const originalAmount = t.amount || 0;
+        const refundAmount = t.refundAmount || 0;
+        return sum + (originalAmount - refundAmount);
+      }, 0),
       // Totales adicionales
-      withoutCard: filteredTransactions.filter(t => !t.hiddenFromList && !t.excludeFromTotal).reduce((sum, t) => sum + (t.amount || 0), 0),
-      withCard: filteredTransactions.filter(t => !t.hiddenFromList && t.excludeFromTotal).reduce((sum, t) => sum + (t.amount || 0), 0),
+      withoutCard: filteredTransactions.filter(t => !t.hiddenFromList && !t.excludeFromTotal).reduce((sum, t) => {
+        const originalAmount = t.amount || 0;
+        const refundAmount = t.refundAmount || 0;
+        return sum + (originalAmount - refundAmount);
+      }, 0),
+      withCard: filteredTransactions.filter(t => !t.hiddenFromList && t.excludeFromTotal).reduce((sum, t) => {
+        const originalAmount = t.amount || 0;
+        const refundAmount = t.refundAmount || 0;
+        return sum + (originalAmount - refundAmount);
+      }, 0),
       count: filteredTransactions.length,
       hiddenCount: filteredTransactions.filter(t => t.hiddenFromList).length,
       visibleCount: filteredTransactions.filter(t => !t.hiddenFromList).length,
@@ -2469,6 +2617,12 @@ const Finances = () => {
       
       // Determinar si es una transacción con tarjeta que se excluye de los totales
       const isExcludedFromTotal = transaction.excludeFromTotal;
+      
+      // Calcular montos considerando devoluciones
+      const originalAmount = transaction.amount || 0;
+      const refundAmount = transaction.refundAmount || 0;
+      const effectiveAmount = originalAmount - refundAmount;
+      const hasRefund = transaction.hasRefund || false;
       
       return (
         <Box 
@@ -2484,6 +2638,11 @@ const Finances = () => {
               borderStyle: 'dashed',
               borderColor: theme.palette.info.light,
               bgcolor: alpha(theme.palette.info.main, 0.04)
+            }),
+            ...(hasRefund && {
+              borderLeftWidth: 4,
+              borderLeftColor: theme.palette.success.main,
+              bgcolor: alpha(theme.palette.success.main, 0.02)
             })
           }}
         >
@@ -2498,14 +2657,34 @@ const Finances = () => {
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  position: 'relative'
                 }}
               >
                 {getCategoryIcon(transaction.category || 'default')}
+                {hasRefund && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      width: 16,
+                      height: 16,
+                      bgcolor: theme.palette.success.main,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: `2px solid ${theme.palette.background.paper}`
+                    }}
+                  >
+                    <UndoIcon sx={{ fontSize: 10, color: 'white' }} />
+                  </Box>
+                )}
               </Box>
             </Grid>
             
-            <Grid item xs={7} sm={8}>
+            <Grid item xs={dataType === 'expenses' ? 6 : 7} sm={dataType === 'expenses' ? 7 : 8}>
               <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
                 {transaction.description}
                 {isExcludedFromTotal && (
@@ -2522,8 +2701,22 @@ const Finances = () => {
                     }} 
                   />
                 )}
+                {hasRefund && (
+                  <Chip 
+                    label={`Devolución: ${formatAmount(refundAmount)}`}
+                    size="small" 
+                    sx={{ 
+                      ml: 1, 
+                      height: 20, 
+                      fontSize: '0.7rem',
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                      color: theme.palette.success.main,
+                      borderRadius: 1
+                    }} 
+                  />
+                )}
               </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                 <Chip
                   label={transaction.category}
                   size="small"
@@ -2568,20 +2761,72 @@ const Finances = () => {
                   </Typography>
                 </Box>
               </Stack>
+              
+            </Grid>
+            <Grid item xs={1} sm={1} sx={{ textAlign: 'right' }}>
+              {/* Botón de devolución para gastos */}
+                {dataType === 'expenses' && !hasRefund && (
+                  <Grid item xs={1} sm={1} sx={{ textAlign: 'right' }}>
+                    <Tooltip title="Procesar devolución" arrow>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenRefund(transaction)}
+                        sx={{
+                          color: theme.palette.success.main,
+                          bgcolor: alpha(theme.palette.success.main, 0.1),
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.success.main, 0.2),
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <UndoIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Grid>
+                )}
+            </Grid>
+            <Grid item xs={3} sm={3} sx={{ textAlign: 'right' }}>
+              {hasRefund ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      textDecoration: 'line-through',
+                      color: 'text.secondary',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    ${formatAmount(originalAmount)}
+                  </Typography>
+                  <Typography 
+                    variant="subtitle1" 
+                    fontWeight="bold" 
+                    color={effectiveAmount < 0 ? 'success.main' : 'error.main'}
+                  >
+                    {formatAmount(effectiveAmount)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    USD {formatAmount(effectiveAmount / (transaction.valorUSD || dollarRate?.venta || 1))}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <Typography 
+                    variant="subtitle1" 
+                    fontWeight="bold" 
+                    color={originalAmount < 0 ? 'success.main' : 'error.main'}
+                  >
+                    ${formatAmount(originalAmount)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    USD {formatAmount(transaction.amountUSD || (originalAmount / (transaction.valorUSD || dollarRate?.venta || 1)))}
+                  </Typography>
+                </Box>
+              )}
             </Grid>
             
-            <Grid item xs={3} sm={3} sx={{ textAlign: 'right' }}>
-              <Typography 
-                variant="subtitle1" 
-                fontWeight="bold" 
-                color={transaction.amount < 0 ? 'success.main' : 'error.main'}
-              >
-                ${formatAmount(transaction.amount)}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                USD {formatAmount(transaction.amountUSD || (transaction.amount / (transaction.valorUSD || dollarRate?.venta || 1)))}
-              </Typography>
-            </Grid>
           </Grid>
         </Box>
       );
@@ -2597,14 +2842,22 @@ const Finances = () => {
         t => t.paymentMethod === 'creditCard' || t.creditCardTransaction === true || t.excludeFromTotal === true
       );
       
-      // Calcular los totales separados por método de pago
+      // Calcular los totales separados por método de pago considerando devoluciones
       const cashTotal = dateData.transactions
         .filter(t => !t.excludeFromTotal)
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
+        .reduce((sum, t) => {
+          const originalAmount = t.amount || 0;
+          const refundAmount = t.refundAmount || 0;
+          return sum + (originalAmount - refundAmount);
+        }, 0);
         
       const cardTotal = dateData.transactions
         .filter(t => t.excludeFromTotal)
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
+        .reduce((sum, t) => {
+          const originalAmount = t.amount || 0;
+          const refundAmount = t.refundAmount || 0;
+          return sum + (originalAmount - refundAmount);
+        }, 0);
       
       return (
         <Card 
@@ -3437,6 +3690,232 @@ const Finances = () => {
             </Grid>
           </Grid>
         </Grid>
+
+      {/* Dialog para procesar devolución */}
+      <Dialog 
+        open={openRefundDialog} 
+        onClose={handleCloseRefund}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {/* Header con gradiente */}
+        <Box
+          sx={{
+            p: 3,
+            background: `linear-gradient(135deg, ${theme.palette.success.dark} 0%, ${theme.palette.success.main} 100%)`,
+            color: 'white',
+            position: 'relative'
+          }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ position: 'relative', zIndex: 1 }}>
+            <Avatar
+              sx={{
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                width: 56,
+                height: 56
+              }}
+            >
+              <UndoIcon fontSize="large" />
+            </Avatar>
+            
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
+                Procesar Devolución
+              </Typography>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                {selectedTransaction?.description}
+              </Typography>
+            </Box>
+            
+            <IconButton
+              onClick={handleCloseRefund}
+              sx={{ 
+                color: 'white',
+                bgcolor: 'rgba(255,255,255,0.1)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </Box>
+
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ p: 3 }}>
+            {/* Información del gasto original */}
+            <Card
+              elevation={0}
+              sx={{
+                mb: 3,
+                p: 2,
+                bgcolor: alpha(theme.palette.error.main, 0.1),
+                border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                borderRadius: 2
+              }}
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: theme.palette.error.main, width: 40, height: 40 }}>
+                  <TrendingDownIcon />
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Gasto original
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="error.main">
+                    {formatAmount(selectedTransaction?.amount || 0)}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Fecha
+                  </Typography>
+                  <Typography variant="body2" fontWeight="medium" color="text.primary">
+                    {selectedTransaction?.date}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Card>
+
+            <Stack spacing={3}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'medium' }}>
+                  Monto a devolver
+                </Typography>
+                <TextField
+                  value={refundForm.amount}
+                  onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+                  fullWidth
+                  type="number"
+                  placeholder="0"
+                  variant="outlined"
+                  size="large"
+                  inputProps={{
+                    max: selectedTransaction?.amount || 0,
+                    min: 0.01,
+                    step: 0.01
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                        <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                          $
+                        </Typography>
+                      </Box>
+                    ),
+                    sx: {
+                      fontSize: '1.2rem',
+                      fontWeight: 'medium',
+                      '& input': {
+                        textAlign: 'center',
+                        fontSize: '1.5rem',
+                        fontWeight: 'bold'
+                      }
+                    }
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      bgcolor: alpha(theme.palette.success.main, 0.05),
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.success.main, 0.08)
+                      },
+                      '&.Mui-focused': {
+                        bgcolor: alpha(theme.palette.success.main, 0.08),
+                        '& fieldset': {
+                          borderColor: theme.palette.success.main,
+                          borderWidth: 2
+                        }
+                      }
+                    }
+                  }}
+                />
+                {refundForm.amount && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Equivalente: USD {formatAmount(parseFloat(refundForm.amount || 0) / (dollarRate?.venta || 1))}
+                  </Typography>
+                )}
+                {refundForm.amount && parseFloat(refundForm.amount) > (selectedTransaction?.amount || 0) && (
+                  <Typography variant="caption" color="error.main" sx={{ mt: 1, display: 'block' }}>
+                    La devolución no puede ser mayor al gasto original
+                  </Typography>
+                )}
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'medium' }}>
+                  Descripción
+                </Typography>
+                <TextField
+                  value={refundForm.description}
+                  onChange={(e) => setRefundForm({ ...refundForm, description: e.target.value })}
+                  fullWidth
+                  placeholder="Describe el motivo de la devolución"
+                  variant="outlined"
+                  multiline
+                  rows={2}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2
+                    }
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  Opcional - Describe el motivo de esta devolución
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+        </DialogContent>
+
+        <Box
+          sx={{
+            p: 3,
+            bgcolor: alpha(theme.palette.grey[100], 0.5),
+            borderTop: `1px solid ${theme.palette.divider}`
+          }}
+        >
+          <Button 
+            onClick={handleProcessRefund}
+            variant="contained"
+            disabled={
+              !refundForm.amount || 
+              parseFloat(refundForm.amount) <= 0 ||
+              parseFloat(refundForm.amount) > (selectedTransaction?.amount || 0)
+            }
+            startIcon={<UndoIcon />}
+            fullWidth
+            size="large"
+            sx={{
+              borderRadius: 2,
+              py: 1.5,
+              bgcolor: theme.palette.success.main,
+              fontWeight: 'bold',
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              boxShadow: theme.shadows[3],
+              '&:hover': {
+                bgcolor: theme.palette.success.dark,
+                boxShadow: theme.shadows[6],
+                transform: 'translateY(-1px)'
+              },
+              '&.Mui-disabled': {
+                bgcolor: theme.palette.grey[300],
+                color: theme.palette.grey[500]
+              },
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Procesar Devolución
+          </Button>
+        </Box>
+      </Dialog>
 
       {/* SpeedDial para acciones rápidas */}
       <SpeedDial
