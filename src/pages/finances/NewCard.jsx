@@ -18,9 +18,8 @@ import {
   Snackbar,
   InputAdornment
 } from '@mui/material';
-import { database } from '../../firebase';
+import { addCreditCard } from '../../services/finances';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase';
 import { useStore } from '../../store';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -81,7 +80,7 @@ const NewCard = () => {
       };
       
       // Guardar la tarjeta en Firebase
-      await database.ref(`${auth.currentUser.uid}/creditCards`).push(cardData);
+      await addCreditCard(cardData);
       
       // Mostrar mensaje de éxito
       setSuccess(true);

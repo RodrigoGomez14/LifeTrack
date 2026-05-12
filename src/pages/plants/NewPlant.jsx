@@ -21,7 +21,7 @@ import {
   Alert,
   alpha
 } from '@mui/material';
-import { database, auth } from '../../firebase';
+import { addPlant } from '../../services/plants';
 import { useNavigate } from 'react-router-dom';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -110,7 +110,7 @@ const NewPlant = () => {
       plantData.inicioFloracion = formatDate(inicioFloracion);
     }
 
-    database.ref(`${auth.currentUser.uid}/plants/active`).push(plantData);
+    addPlant(plantData);
 
     setName('');
     setQuantity('');

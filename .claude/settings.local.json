@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm uninstall *)",
+      "Bash(awk *)",
+      "Bash(grep -n \"^  const TimeNavigator\\\\|^  };$\" C:/Users/rodri/desktop/lifetrack/src/pages/finances/Finances.jsx)",
+      "Bash(grep -n \"^  const \\\\w\\\\|^  };\\\\s*$\\\\|<TransactionsPanelWithChart\\\\|<TransactionsListPanel\\\\|Tendencias Anuales\\\\|Evolución Histórica de Ahorros\\\\|<RefundDialog\" C:/Users/rodri/desktop/lifetrack/src/pages/finances/Finances.jsx)",
+      "Bash(sed -i '700,704d' C:/Users/rodri/desktop/lifetrack/src/pages/basics/Home.jsx)",
+      "Bash(sed -i '369,644d' C:/Users/rodri/desktop/lifetrack/src/pages/basics/Home.jsx)",
+      "Bash(sed -n '1076,1732p' C:/Users/rodri/desktop/lifetrack/src/pages/habits/Habits.jsx)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

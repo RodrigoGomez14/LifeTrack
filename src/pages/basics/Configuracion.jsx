@@ -46,7 +46,16 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useStore } from '../../store';
-import { database, auth, storage } from '../../firebase';
+import { auth, storage } from '../../firebase';
+import { useAuth } from '../../hooks/useAuth';
+import {
+  setDisplayName as setDisplayNameInDb,
+  setTheme,
+  setConfig,
+  setPrivacyConfig,
+  getUserBackup,
+  deleteAllUserData,
+} from '../../services/config';
 import { useNavigate } from 'react-router-dom';
 
 // Iconos
@@ -92,6 +101,14 @@ import SyncIcon from '@mui/icons-material/Sync';
 import { red, pink, purple, deepPurple, indigo, blue, lightBlue, cyan, teal, green, lightGreen, lime, yellow, amber, orange, deepOrange, brown, grey, blueGrey } from '@mui/material/colors';
 
 function Configuracion() {
+  const {
+    user,
+    signOut,
+    sendPasswordReset,
+    updateDisplayName,
+    updatePhotoURL,
+    deleteAccount,
+  } = useAuth();
   const theme = useTheme();
   const { userData, setUserData } = useStore();
   const navigate = useNavigate();
@@ -240,11 +257,11 @@ function Configuracion() {
   
   // Cargar datos del usuario al inicio
   useEffect(() => {
-    if (auth.currentUser) {
-      setEmail(auth.currentUser.email || '');
-      setDisplayName(auth.currentUser.displayName || '');
-      setPhotoURL(auth.currentUser.photoURL || '');
-      
+    if (user) {
+      setEmail(user.email || '');
+      setDisplayName(user.displayName || '');
+      setPhotoURL(user.photoURL || '');
+
       loadBackupsInfo();
     }
     
@@ -373,9 +390,7 @@ function Configuracion() {
         await fileRef.put(file);
         const downloadURL = await fileRef.getDownloadURL();
         
-        await auth.currentUser.updateProfile({
-          photoURL: downloadURL
-        });
+        await updatePhotoURL(downloadURL);
         
         setPhotoURL(downloadURL);
         setUploading(false);
@@ -408,7 +423,7 @@ function Configuracion() {
         highContrast
       };
       
-      await database.ref(`${auth.currentUser.uid}/config/theme`).update(themeConfig);
+      await setTheme(themeConfig);
       
       if (userData && userData.config) {
         setUserData({
@@ -437,21 +452,19 @@ function Configuracion() {
     setSaving(true);
     
     try {
-      if (auth.currentUser) {
-        await auth.currentUser.updateProfile({
-          displayName: displayName
-        });
+      if (user) {
+        await updateDisplayName(displayName);
       }
-      
-      await database.ref(`${auth.currentUser.uid}/displayName`).set(displayName);
-      
+
+      await setDisplayNameInDb(displayName);
+
       if (userData) {
         setUserData({
           ...userData,
           displayName: displayName
         });
       }
-      
+
       setEditingName(false);
       setSaving(false);
       showSnackbar('Nombre de usuario actualizado correctamente', 'success');
@@ -467,12 +480,10 @@ function Configuracion() {
     setSaving(true);
     
     try {
-      if (auth.currentUser) {
-        await auth.currentUser.updateProfile({
-          displayName: displayName
-        });
+      if (user) {
+        await updateDisplayName(displayName);
       }
-      
+
       const configToSave = {
         profile: {
           phoneNumber,
@@ -559,8 +570,8 @@ function Configuracion() {
         lastUpdated: new Date().toISOString()
       };
       
-      await database.ref(`${auth.currentUser.uid}/config`).update(configToSave);
-      await database.ref(`${auth.currentUser.uid}/displayName`).set(displayName);
+      await setConfig(configToSave);
+      await setDisplayNameInDb(displayName);
       
       if (userData) {
         setUserData({
@@ -1667,7 +1678,7 @@ function Configuracion() {
                         variant="outlined"
                         color="primary"
                         startIcon={<LockIcon />}
-                        onClick={() => auth.sendPasswordResetEmail(auth.currentUser.email)}
+                        onClick={() => sendPasswordReset(user.email)}
                         sx={{ borderRadius: 2 }}
                       >
                         Cambiar contraseña
@@ -2301,9 +2312,8 @@ function Configuracion() {
     setIsCreatingBackup(true);
     
     try {
-      const snapshot = await database.ref(auth.currentUser.uid).once('value');
-      const userData = snapshot.val();
-      
+      const userData = await getUserBackup();
+
       if (!userData) {
         showSnackbar('No hay datos para crear una copia de seguridad', 'warning');
         setIsCreatingBackup(false);
@@ -2322,8 +2332,8 @@ function Configuracion() {
         const storageRef = storage.ref(`backups/${auth.currentUser.uid}/${fileName}`);
         await storageRef.put(blob);
         
-        await database.ref(`${auth.currentUser.uid}/config/privacy`).update({
-          lastBackupDate: now.toISOString()
+        await setPrivacyConfig({
+          lastBackupDate: now.toISOString(),
         });
         
         setLastBackupDate(now.toISOString());
@@ -2364,8 +2374,8 @@ function Configuracion() {
       if (window.confirm('¿Estás seguro que deseas eliminar tu cuenta? Esta acción no se puede deshacer y perderás todos tus datos.')) {
         setSaving(true);
         
-        await database.ref(auth.currentUser.uid).remove();
-        await auth.currentUser.delete();
+        await deleteAllUserData();
+        await deleteAccount();
         
         showSnackbar('Tu cuenta ha sido eliminada correctamente', 'success');
         
@@ -2379,7 +2389,7 @@ function Configuracion() {
       if (error.code === 'auth/requires-recent-login') {
         showSnackbar('Por seguridad, debes volver a iniciar sesión antes de eliminar tu cuenta', 'error');
         setTimeout(() => {
-          auth.signOut().then(() => navigate('/'));
+          signOut().then(() => navigate('/'));
         }, 2000);
       } else {
         showSnackbar('Error al eliminar la cuenta: ' + error.message, 'error');

@@ -16,10 +16,10 @@ import {
   Paper,
   Container
 } from '@mui/material';
-import { database } from '../../firebase';
+import { addIncome } from '../../services/finances';
+import { updateSavingsWithHistory } from '../../services/savings';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase'; 
-import { useStore } from '../../store'; 
+import { useStore } from '../../store';
 import { getDate, formatAmount } from '../../utils';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import WorkIcon from '@mui/icons-material/Work';
@@ -51,22 +51,21 @@ const NewIncome = () => {
       return;
     }
 
-    database.ref(`${auth.currentUser.uid}/incomes`).push({
+    addIncome({
       amount: parseFloat(amount),
-      amountUSD: parseFloat(amount/dollarRate['venta']),
+      amountUSD: parseFloat(amount / dollarRate['venta']),
       category: category,
       subcategory: subcategory,
       date: getDate(),
       description: description,
-      valorUSD: dollarRate['venta']
+      valorUSD: dollarRate['venta'],
     });
 
     // Actualizar el valor de ahorros en ARS y su historial
-    database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(userData.savings.amountARS + parseFloat(amount));
-    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-      date: getDate(),
+    updateSavingsWithHistory({
+      currency: 'ARS',
       amount: parseFloat(amount),
-      newTotal: (userData.savings.amountARS + parseFloat(amount)),
+      currentBalance: userData.savings.amountARS,
     });
 
     setAmount('');

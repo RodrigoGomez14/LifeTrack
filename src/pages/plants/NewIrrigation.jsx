@@ -31,7 +31,7 @@ import {
   ListItemText as MuiListItemText,
   OutlinedInput
 } from "@mui/material";
-import { database, auth } from "../../firebase";
+import { addPlantActivity } from "../../services/plants";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import { useStore } from "../../store";
@@ -103,11 +103,9 @@ const NewIrrigation = () => {
     }
 
     // Guardar el riego en todas las plantas seleccionadas
-    const promises = selectedPlants.map(currentPlantId => {
-      return database
-        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/irrigations`)
-        .push(irrigationData);
-    });
+    const promises = selectedPlants.map(currentPlantId =>
+      addPlantActivity(currentPlantId, 'irrigations', irrigationData)
+    );
 
     Promise.all(promises).then(() => {
       setQuantity("");

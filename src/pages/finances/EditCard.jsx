@@ -18,9 +18,8 @@ import {
   CircularProgress,
   InputAdornment
 } from '@mui/material';
-import { database } from '../../firebase';
+import { updateCreditCard } from '../../services/finances';
 import { useNavigate, useParams } from 'react-router-dom';
-import { auth } from '../../firebase';
 import { useStore } from '../../store';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import { useTheme } from '@mui/material/styles';
@@ -104,7 +103,7 @@ const EditCard = () => {
       };
       
       // Actualizar la tarjeta en Firebase
-      await database.ref(`${auth.currentUser.uid}/creditCards/${cardId}`).update(cardData);
+      await updateCreditCard(cardId, cardData);
       
       // Mostrar mensaje de éxito
       setSuccess(true);

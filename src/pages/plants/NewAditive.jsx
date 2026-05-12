@@ -25,7 +25,7 @@ import {
   Avatar,
   Tooltip
 } from "@mui/material";
-import { database, auth } from "../../firebase";
+import { addAditive } from "../../services/plants";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from '@mui/material/styles';
 import ScienceIcon from '@mui/icons-material/Science';
@@ -47,16 +47,12 @@ const NewAditive = () => {
   const [dosisName, setDosisName] = useState("");
 
   const handleNewAditive = () => {
-    database
-      .ref(
-        `${auth.currentUser.uid}/plants/aditives`
-      )
-      .push({
-        type: type,
-        name: name,
-        brand: brand,
-        dosis: dosisList
-      });
+    addAditive({
+      type: type,
+      name: name,
+      brand: brand,
+      dosis: dosisList,
+    });
 
     setName("");
     setType("");

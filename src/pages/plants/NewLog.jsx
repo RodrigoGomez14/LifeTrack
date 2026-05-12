@@ -22,7 +22,7 @@ import {
   Stack,
   Paper
 } from "@mui/material";
-import { database, auth } from "../../firebase";
+import { addPlantActivity } from "../../services/plants";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import { useTheme } from '@mui/material/styles';
@@ -81,11 +81,9 @@ const NewLog = () => {
     };
 
     // Guardar el registro en todas las plantas seleccionadas
-    const promises = selectedPlants.map(currentPlantId => {
-      return database
-        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/logs`)
-        .push(logData);
-    });
+    const promises = selectedPlants.map(currentPlantId =>
+      addPlantActivity(currentPlantId, 'logs', logData)
+    );
 
     Promise.all(promises).then(() => {
       setDescription("");

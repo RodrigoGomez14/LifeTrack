@@ -22,7 +22,7 @@ import {
   ListItemText,
   OutlinedInput
 } from "@mui/material";
-import { database, auth } from "../../firebase";
+import { addPlantActivity, setPlantPotVolume } from "../../services/plants";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import { useStore } from "../../store";
@@ -96,20 +96,9 @@ const NewTransplant = () => {
         transplantData.notes = notes.trim();
       }
 
-      // Guardar el transplante
-      const transplantPromise = database
-        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/transplants`)
-        .push(transplantData);
-      
-      // Actualizar el volumen de la maceta
-      const updatePromise = database
-        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}`)
-        .transaction((data) => {
-          if (data) {
-            data.potVolume = newVolume;
-          }
-          return data;
-        });
+      // Guardar el transplante y actualizar el volumen de la maceta
+      const transplantPromise = addPlantActivity(currentPlantId, 'transplants', transplantData);
+      const updatePromise = setPlantPotVolume(currentPlantId, newVolume);
 
       return Promise.all([transplantPromise, updatePromise]);
     });

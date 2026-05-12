@@ -21,7 +21,7 @@ import {
   Stack
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { database, auth } from '../../firebase';
+import { addHabit, updateHabit, removeHabit } from '../../services/habits';
 import { useStore } from '../../store';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -96,7 +96,7 @@ const HabitForm = ({ habit = null, isEditing = false }) => {
     try {
       if (isEditing && habit) {
         // Actualizar hábito existente
-        database.ref(`${auth.currentUser.uid}/habits/${habit.id}`).update(habitData)
+        updateHabit(habit.id, habitData)
           .then(() => {
             console.log('Hábito actualizado correctamente');
             navigate('/Habitos');
@@ -107,7 +107,7 @@ const HabitForm = ({ habit = null, isEditing = false }) => {
           });
       } else {
         // Crear nuevo hábito
-        database.ref(`${auth.currentUser.uid}/habits`).push(habitData)
+        addHabit(habitData)
           .then(() => {
             console.log('Hábito creado correctamente');
             navigate('/Habitos');
@@ -127,7 +127,7 @@ const HabitForm = ({ habit = null, isEditing = false }) => {
   const deleteHabit = () => {
     if (isEditing && habit) {
       if (window.confirm('¿Estás seguro de eliminar este hábito? Esta acción no se puede deshacer.')) {
-        database.ref(`${auth.currentUser.uid}/habits/${habit.id}`).remove()
+        removeHabit(habit.id)
           .then(() => {
             navigate('/Habitos');
           })

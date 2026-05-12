@@ -33,7 +33,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import SavingsIcon from '@mui/icons-material/Savings';
 import { Link, useLocation } from 'react-router-dom';
-import { auth } from '../../firebase';
+import { useAuth } from '../../hooks/useAuth';
 import { useStore } from '../../store';
 import GrassIcon from '@mui/icons-material/Grass';
 import ScienceIcon from '@mui/icons-material/Science';
@@ -43,6 +43,7 @@ const Drawer = ({ open, toggleDrawer }) => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { userData } = useStore();
+  const { user, signOut } = useAuth();
   const [expandedItems, setExpandedItems] = useState({});
 
   // Auto-expand parent if current path is a sub-item
@@ -60,7 +61,7 @@ const Drawer = ({ open, toggleDrawer }) => {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await signOut();
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
@@ -349,7 +350,7 @@ const Drawer = ({ open, toggleDrawer }) => {
       <Box sx={{ mt: 'auto' }}>
         <Divider sx={{ mx: 2, mb: 2 }} />
         
-        {auth.currentUser && (
+        {user && (
           <Box sx={{ px: 2, pb: 2 }}>
             {/* Información del usuario */}
             <Box
@@ -370,9 +371,9 @@ const Drawer = ({ open, toggleDrawer }) => {
                   bgcolor: theme.palette.primary.main,
                   mr: 1.5
                 }}
-                src={auth.currentUser.photoURL}
+                src={user.photoURL}
               >
-                {!auth.currentUser.photoURL && (userData?.displayName || auth.currentUser.email).charAt(0).toUpperCase()}
+                {!user.photoURL && (userData?.displayName || user.email).charAt(0).toUpperCase()}
               </Avatar>
               
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -380,7 +381,7 @@ const Drawer = ({ open, toggleDrawer }) => {
                   {userData?.displayName || 'Usuario'}
                 </Typography> 
                 <Typography variant="caption" color="text.secondary" noWrap>
-                  {auth.currentUser.email}
+                  {user.email}
                 </Typography>
               </Box>
               

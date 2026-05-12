@@ -26,7 +26,7 @@ import {
   OutlinedInput,
   Chip
 } from "@mui/material";
-import { database, auth } from "../../firebase";
+import { addPlantActivity } from "../../services/plants";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import ContentCutIcon from '@mui/icons-material/ContentCut';
@@ -91,11 +91,9 @@ const NewPruning = () => {
     }
 
     // Guardar la poda en todas las plantas seleccionadas
-    const promises = selectedPlants.map(currentPlantId => {
-      return database
-        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/prunings`)
-        .push(pruningData);
-    });
+    const promises = selectedPlants.map(currentPlantId =>
+      addPlantActivity(currentPlantId, 'prunings', pruningData)
+    );
 
     Promise.all(promises).then(() => {
       setType("");

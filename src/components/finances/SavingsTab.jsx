@@ -29,7 +29,13 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
-import { database, auth } from '../../firebase';
+import { getCurrentUser } from '../../services/auth';
+import {
+  setCarMaintenancePercentage,
+  setCarMaintenancePending,
+  applyCarMaintenancePending,
+  updateSavingsWithHistory,
+} from '../../services/savings';
 import { useStore } from '../../store';
 import { getDate } from "../../utils";
 import { useTheme } from '@mui/material/styles';
@@ -191,34 +197,24 @@ const SavingsTab = ({ data }) => {
     };
 
     const editPercentage = () => {
-        if (auth.currentUser) {
-            database.ref(`${auth.currentUser.uid}/savings/carMaintenancePercentage`).set(parseFloat(newPercentage/100));
+        if (getCurrentUser()) {
+            setCarMaintenancePercentage(parseFloat(newPercentage / 100));
             setEditPercentageActive(false);
         }
     };
 
     const addPendingToTotal = () => {
-        if (!auth.currentUser || !userData?.savings?.carMaintenancePending) return;
+        if (!getCurrentUser() || !userData?.savings?.carMaintenancePending) return;
 
-        const totalRef = database.ref(`${auth.currentUser.uid}/savings`);
-        totalRef.transaction((data) => {
-            if (data) {
-                data.carMaintenance = (data.carMaintenance || 0) + parseInt(data.carMaintenancePending);
-            }
-            return data;
-        });
-
-        database.ref(`${auth.currentUser.uid}/savings/carMaintenancePending`).set(0);
+        applyCarMaintenancePending();
+        setCarMaintenancePending(0);
 
         // Actualizar el valor de ahorros en ARS y su historial
         if (userData?.savings?.amountARS) {
-            database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(
-                userData.savings.amountARS - userData.savings.carMaintenancePending
-            );
-            database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-                date: getDate(),
+            updateSavingsWithHistory({
+                currency: 'ARS',
                 amount: -userData.savings.carMaintenancePending,
-                newTotal: (userData.savings.amountARS - userData.savings.carMaintenancePending),
+                currentBalance: userData.savings.amountARS,
             });
         }
     };

@@ -21,19 +21,19 @@ import NewAditive from './pages/plants/NewAditive.jsx';
 import NewExpense from './pages/finances/NewExpense.jsx';
 import NewIncome from './pages/finances/NewIncome.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
-import { database, auth } from './firebase.js';
+import { subscribeToAuthChanges, getCurrentUser } from './services/auth';
+import { subscribeToUserData } from './services/database';
 import { useStore } from './store'; 
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { indigo, teal, blue, lightBlue, purple, green, orange, red, deepPurple, amber, cyan, brown, grey, blueGrey, pink, deepOrange } from '@mui/material/colors';
 import NewHabit from './pages/habits/NewHabit';
 import EditHabit from './pages/habits/EditHabit';
-import HabitDetail from './components/habits/HabitDetail';
+import HabitDetailPage from './pages/habits/HabitDetail';
 import CreditCards from './pages/finances/CreditCards.jsx';
 import NewCard from './pages/finances/NewCard';
 import EditCard from './pages/finances/EditCard';
 import UpdateCardDates from './pages/finances/UpdateCardDates.jsx';
-import { ColorModeContext } from './utils';
 import Configuracion from './pages/basics/Configuracion';
 import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
@@ -89,6 +89,9 @@ function App() {
   };
 
   const filterData = (data) => {
+    // El nodo del usuario puede no existir (cuenta nueva) → snapshot.val() es null
+    data = data || {};
+
     const groupdedFinances = {incomes:{},expenses:{}};
     let groupedSavings = {};
     let groupedPlants = {};
@@ -194,17 +197,19 @@ function App() {
 
     // Procesar plantas
     if(data.plants){
-      groupedPlants['active'] = data.plants.active;
-      groupedPlants['history'] = data.plants.history;
+      groupedPlants['active'] = data.plants.active || {};
+      groupedPlants['history'] = data.plants.history || {};
       let aditives = {fertilizantes:{},insecticidas:{}};
-      Object.keys(data.plants.aditives).forEach((aditiveId) => {
-        if(data.plants.aditives[aditiveId].type==='Fertilizante'){
-          aditives.fertilizantes[aditiveId]=data.plants.aditives[aditiveId];
-        }
-        else{
-          aditives.insecticidas[aditiveId]=data.plants.aditives[aditiveId];
-        }
-      });
+      if (data.plants.aditives) {
+        Object.keys(data.plants.aditives).forEach((aditiveId) => {
+          const aditive = data.plants.aditives[aditiveId];
+          if (aditive?.type === 'Fertilizante') {
+            aditives.fertilizantes[aditiveId] = aditive;
+          } else {
+            aditives.insecticidas[aditiveId] = aditive;
+          }
+        });
+      }
       groupedPlants['aditives']=aditives;
     }
 
@@ -335,7 +340,13 @@ function App() {
   }, [userData]);  // Regenerar el tema cuando cambie userData
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    let unsubscribeData = null;
+    const unsubscribe = subscribeToAuthChanges((user) => {
+      // Limpiar listener previo si había una sesión anterior
+      if (unsubscribeData) {
+        unsubscribeData();
+        unsubscribeData = null;
+      }
       if (user) {
         // Obtener el valor del dólar blue
         fetch('https://dolarapi.com/v1/dolares/blue')
@@ -346,8 +357,8 @@ function App() {
         .catch((error) => {
           console.error('Error fetching dollar rate:', error);
         });
-        database.ref(user.uid).on('value', (snapshot) => {
-          const filteredData = filterData(snapshot.val());
+        unsubscribeData = subscribeToUserData((data) => {
+          const filteredData = filterData(data);
           setUserData(filteredData);
           setUserLoggedIn(true);
           setIsLoading(false);
@@ -358,7 +369,10 @@ function App() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribeData) unsubscribeData();
+      unsubscribe();
+    };
   }, [setUserData, setUserLoggedIn, setIsLoading, setDollarRate]);
 
   if (isLoading) {
@@ -366,7 +380,7 @@ function App() {
   }
 
   const PrivateRoute = ({ children }) => {
-    return auth.currentUser ? children : <Navigate to="/login" />;
+    return getCurrentUser() ? children : <Navigate to="/login" />;
   };
 
   return (
@@ -383,7 +397,7 @@ function App() {
           <Route path="/exchange" element={<Exchange />} />
           <Route path="/NuevoHabito" element={<NewHabit />} />
           <Route path="/EditarHabito/:habitId" element={<EditHabit />} />
-          <Route path="/DetalleHabito/:habitId" element={<HabitDetail />} />
+          <Route path="/DetalleHabito/:habitId" element={<HabitDetailPage />} />
           <Route path="/Habitos" element={<Habits />} />
           <Route path="/HabitosList" element={<HabitsList />} />
           <Route path="/TarjetasCredito" element={<CreditCards />} />

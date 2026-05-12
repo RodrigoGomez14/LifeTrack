@@ -27,7 +27,7 @@ import {
   Chip,
   Avatar
 } from '@mui/material';
-import { database, auth } from '../../firebase';
+import { setCardDatesForMonth } from '../../services/finances';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useStore } from '../../store'; 
 import { useTheme } from '@mui/material/styles';
@@ -410,9 +410,9 @@ const UpdateCardDates = () => {
       const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
       
       // Actualizar las fechas en Firebase (ahora como fechas completas)
-      await database.ref(`${auth.currentUser.uid}/creditCards/${cardId}/dates/${monthKey}`).update({
+      await setCardDatesForMonth(cardId, monthKey, {
         closingDate: closingDate,
-        dueDate: dueDate
+        dueDate: dueDate,
       });
       
       // Mostrar mensaje de éxito

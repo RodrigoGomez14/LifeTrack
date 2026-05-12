@@ -42,7 +42,7 @@ import { useTheme, alpha } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { formatAmount, getDate } from '../../utils';
-import { database, auth } from '../../firebase';
+import { addSavingsFund, transferToFund } from '../../services/savings';
 
 import SavingsIcon from '@mui/icons-material/Savings';
 import AddIcon from '@mui/icons-material/Add';
@@ -124,9 +124,9 @@ const Savings = () => {
     };
 
     try {
-      // Crear el fondo en Firebase usando push()
-      database.ref(`${auth.currentUser.uid}/savingsFunds`).push(newFund);
-      
+      // Crear el fondo en Firebase
+      addSavingsFund(newFund);
+
       setOpenCreateFund(false);
       setFundForm({
         name: '',
@@ -166,26 +166,15 @@ const Savings = () => {
     };
 
     try {
-      // Actualizar el balance del fondo
-      database.ref(`${auth.currentUser.uid}/savingsFunds/${selectedFund.id}/balance`).set(newBalance);
-      database.ref(`${auth.currentUser.uid}/savingsFunds/${selectedFund.id}/lastContribution`).set(new Date().toISOString());
-      
-      // Agregar transacción al historial del fondo
-      database.ref(`${auth.currentUser.uid}/savingsFunds/${selectedFund.id}/history`).push(transaction);
-
-      // Reducir los ahorros (movemos dinero DESDE ahorros HACIA el fondo)
-      const newSavingsTotal = currentSavings - amount;
-      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(newSavingsTotal);
-      
-      // Registrar en el historial de savings (con signo negativo porque se reduce)
-      database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-        date: getDate(),
-        amount: -amount,
-        newTotal: newSavingsTotal,
-        description: `Transferencia a fondo: ${selectedFund.name}`,
-        type: 'fund_transfer'
+      // Mover dinero de savings al fondo (atómico: balance + lastContribution + history del fondo + savings + history savings)
+      await transferToFund({
+        fundId: selectedFund.id,
+        amount,
+        currentFundBalance: selectedFund.balance || 0,
+        currentSavings,
+        transactionData: transaction,
       });
-      
+
       setOpenAddMoney(false);
       setMoneyForm({ amount: '', description: '' });
       setSelectedFund(null);
@@ -219,26 +208,16 @@ const Savings = () => {
     };
 
     try {
-      // Actualizar el balance del fondo
-      database.ref(`${auth.currentUser.uid}/savingsFunds/${selectedFund.id}/balance`).set(newBalance);
-      
-      // Agregar transacción al historial del fondo
-      database.ref(`${auth.currentUser.uid}/savingsFunds/${selectedFund.id}/history`).push(transaction);
-
-      // Aumentar los ahorros (movemos dinero DESDE el fondo HACIA ahorros)
+      // Mover dinero del fondo a savings (amount negativo: sale del fondo, vuelve a savings)
       const currentSavings = userData.savings?.amountARS || 0;
-      const newSavingsTotal = currentSavings + amount;
-      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(newSavingsTotal);
-      
-      // Registrar en el historial de savings (con signo positivo porque se incrementa)
-      database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-        date: getDate(),
-        amount: amount,
-        newTotal: newSavingsTotal,
-        description: `Retiro de fondo: ${selectedFund.name}`,
-        type: 'fund_withdrawal'
+      await transferToFund({
+        fundId: selectedFund.id,
+        amount: -amount,
+        currentFundBalance: selectedFund.balance || 0,
+        currentSavings,
+        transactionData: transaction,
       });
-      
+
       setOpenWithdrawMoney(false);
       setMoneyForm({ amount: '', description: '' });
       setSelectedFund(null);

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme, alpha } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useStore } from '../../store';
-import { auth, database } from '../../firebase';
+import { useAuth } from '../../hooks/useAuth';
 import Layout from '../../components/layout/Layout';
 import {
   Container,
@@ -50,6 +50,7 @@ import CloseIcon from '@mui/icons-material/Close';
 const Perfil = () => {
   const theme = useTheme();
   const { userData } = useStore();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
@@ -308,8 +309,8 @@ const Perfil = () => {
           <Grid item xs={12} md={4} sx={{ textAlign: 'center', zIndex: 1, mt: 1 }}>
             <Box sx={{ position: 'relative', display: 'inline-block' }}>
               <Avatar
-                src={auth.currentUser?.photoURL}
-                alt={userData?.displayName || auth.currentUser?.displayName || "Usuario"}
+                src={user?.photoURL}
+                alt={userData?.displayName || user?.displayName || "Usuario"}
                 sx={{
                   width: 140,
                   height: 140,
@@ -319,7 +320,7 @@ const Perfil = () => {
                   fontSize: 48
                 }}
               >
-                {!auth.currentUser?.photoURL && (userData?.displayName || auth.currentUser?.displayName || "U").charAt(0).toUpperCase()}
+                {!user?.photoURL && (userData?.displayName || user?.displayName || "U").charAt(0).toUpperCase()}
               </Avatar>
               
               <label htmlFor="profile-image-upload">
@@ -350,11 +351,11 @@ const Perfil = () => {
             </Box>
             
             <Typography variant="h5" fontWeight="bold" sx={{ mt: 2 }}>
-              {userData?.displayName || auth.currentUser?.displayName || "Usuario"}
+              {userData?.displayName || user?.displayName || "Usuario"}
             </Typography>
             
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              {auth.currentUser?.email}
+              {user?.email}
             </Typography>
             
             <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>

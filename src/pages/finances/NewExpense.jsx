@@ -23,9 +23,9 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
-import { database } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase';
+import { addExpense, addCardTransaction } from '../../services/finances';
+import { updateSavingsWithHistory } from '../../services/savings';
 import { useStore } from '../../store'; 
 import { getDate, formatAmount } from '../../utils';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -99,23 +99,22 @@ const NewExpense = () => {
     
     if (paymentMethod === 'cash') {
       // Pago en efectivo: actualizar directamente los gastos y ahorros
-    database.ref(`${auth.currentUser.uid}/expenses`).push({
+      addExpense({
         amount: parsedAmount,
         amountUSD: parsedAmount / dollarRate['venta'],
-      category: category,
-      subcategory: subcategory,
-      date: getDate(),
-      description: description,
+        category: category,
+        subcategory: subcategory,
+        date: getDate(),
+        description: description,
         valorUSD: dollarRate['venta'],
-        paymentMethod: 'cash'
+        paymentMethod: 'cash',
       });
 
-    // Actualizar el valor de ahorros en ARS y su historial
-      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(userData.savings.amountARS - parsedAmount);
-    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-      date: getDate(),
+      // Actualizar el valor de ahorros en ARS y su historial
+      updateSavingsWithHistory({
+        currency: 'ARS',
         amount: -parsedAmount,
-        newTotal: (userData.savings.amountARS - parsedAmount),
+        currentBalance: userData.savings.amountARS,
       });
     } else {
       // Pago con tarjeta de crédito: registrar transacción en la tarjeta
@@ -144,14 +143,14 @@ const NewExpense = () => {
         };
         
         // Guardar la transacción en la tarjeta seleccionada
-        database.ref(`${auth.currentUser.uid}/creditCards/transactions/${selectedCard}`).push(transactionData);
-        
+        addCardTransaction(selectedCard, transactionData);
+
         // Guardar todas las cuotas en expenses (no solo la primera)
-        database.ref(`${auth.currentUser.uid}/expenses`).push({
+        addExpense({
           ...transactionData,
           creditCardTransaction: true,
           excludeFromTotal: true, // Marca para excluir de los cálculos totales
-          hiddenFromList: false   // Asegurar que no se oculte de la lista
+          hiddenFromList: false,  // Asegurar que no se oculte de la lista
         });
       }
     }

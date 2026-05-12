@@ -19,7 +19,8 @@ import {
   IconButton
 } from '@mui/material';
 import { useNavigate } from "react-router-dom";
-import { database, auth } from '../../firebase';
+import { addExpense, addIncome } from '../../services/finances';
+import { updateSavingsWithHistory } from '../../services/savings';
 import { useStore } from '../../store'; 
 import { getDate, formatAmount } from '../../utils';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -53,54 +54,43 @@ const Exchange = () => {
       return;
     }
 
-    if (operationType === "Compra") {
-      database.ref(`${auth.currentUser.uid}/expenses`).push({
-        operationType: operationType,
-        amount: parseFloat(amountARS),
-        amountUSD: parseFloat(amountARS/exRate),
-        category: 'Exchange',
-        date: getDate(),
-        valorUSD: exRate
-      });
-    } 
-    else {
-      database.ref(`${auth.currentUser.uid}/incomes`).push({
-        operationType: operationType,
-        amount: parseFloat(amountARS),
-        amountUSD: -parseFloat(amountARS/exRate),
-        category: 'Exchange',
-        date: getDate(),
-        valorUSD: exRate
-      });
-    }
+    const isCompra = operationType === "Compra";
+    const arsAmount = parseFloat(amountARS);
+    const usdAmount = parseFloat(amountUSD);
 
-    // Actualizar el valor de ahorros en USD y en ARS
-    if (operationType === "Compra") {
-      // Aumentar el valor de ahorros en USD
-      database.ref(`${auth.currentUser.uid}/savings/amountUSD`).set(userData.savings.amountUSD + parseFloat(amountUSD));
-      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(userData.savings.amountARS - parseFloat(amountARS));
+    if (isCompra) {
+      addExpense({
+        operationType: operationType,
+        amount: arsAmount,
+        amountUSD: parseFloat(amountARS / exRate),
+        category: 'Exchange',
+        date: getDate(),
+        valorUSD: exRate,
+      });
     } else {
-      database.ref(`${auth.currentUser.uid}/savings/amountUSD`).set(userData.savings.amountUSD - parseFloat(amountUSD));
-      database.ref(`${auth.currentUser.uid}/savings/amountARS`).set(userData.savings.amountARS + parseFloat(amountARS));
+      addIncome({
+        operationType: operationType,
+        amount: arsAmount,
+        amountUSD: -parseFloat(amountARS / exRate),
+        category: 'Exchange',
+        date: getDate(),
+        valorUSD: exRate,
+      });
     }
 
-    // Agrega el movimiento al Historial de USD y ARS
-    database.ref(`${auth.currentUser.uid}/savings/amountUSDHistory`).push({
-      date: getDate(),
+    // Actualizar saldos + history en USD y ARS según el sentido del exchange
+    updateSavingsWithHistory({
+      currency: 'USD',
+      amount: isCompra ? usdAmount : -usdAmount,
+      currentBalance: userData.savings.amountUSD,
       operationType: operationType,
-      amount: amountARS,
-      amountUSD: parseFloat(amountUSD),
-      newTotal: operationType === 'Compra' ? 
-        (userData.savings.amountUSD + parseFloat(amountUSD)) : 
-        (userData.savings.amountUSD - parseFloat(amountUSD)),
+      amount_ars: arsAmount,
     });
 
-    database.ref(`${auth.currentUser.uid}/savings/amountARSHistory`).push({
-      date: getDate(),
-      amount: (operationType === 'Compra' ? -parseFloat(amountARS) : parseFloat(amountARS)),
-      newTotal: operationType === 'Compra' ? 
-        (userData.savings.amountARS - parseFloat(amountARS)) : 
-        (userData.savings.amountARS + parseFloat(amountARS)),
+    updateSavingsWithHistory({
+      currency: 'ARS',
+      amount: isCompra ? -arsAmount : arsAmount,
+      currentBalance: userData.savings.amountARS,
     });
 
     // Simular un pequeño retraso para feedback visual

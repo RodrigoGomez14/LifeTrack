@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   AppBar as MuiAppBar, 
   Toolbar, 
@@ -25,7 +25,7 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { auth } from '../../firebase';
+import { useAuth } from '../../hooks/useAuth';
 import { formatAmount } from '../../utils';
 import { useStore } from '../../store';
 import SwapHorizontalCircleIcon from '@mui/icons-material/SwapHorizontalCircle';
@@ -46,32 +46,23 @@ const AppBar = ({ toggleDrawer, title }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { userData } = useStore();
+  const { user, signOut } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+
   // Verificar si estamos en la página de plantas
   const isInPlantsPage = location.pathname === '/Plantas' || location.pathname === '/plantas';
-  
+
   // Verificar si estamos en la página de aditivos
   const isInAditivesPage = location.pathname === '/Aditivos' || location.pathname === '/aditivos';
-  
+
   // Obtener el nombre de usuario para personalizar la interfaz
-  const displayName = auth.currentUser?.displayName || '';
+  const displayName = user?.displayName || '';
   const firstName = displayName ? displayName.split(' ')[0] : '';
   
   // Estados para menús
   const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
   const [quickActionMenuAnchor, setQuickActionMenuAnchor] = useState(null);
-  
-  // Estado para cotizacion del dólar
-  const [dollarRate, setDollarRate] = useState({ buy: 1250, sell: 1300 });
-  const [rateChange, setRateChange] = useState(1.5); // Porcentaje de cambio respecto a ayer
-  
-  // Simular obtención de cotización del dólar
-  useEffect(() => {
-    // En un caso real, aquí habría una llamada a una API para obtener la cotización actualizada
-    // setDollarRate({ buy: valorActualizado, sell: valorActualizado });
-  }, []);
-  
+
   // Funciones para manejar apertura/cierre de menús
   const handleOpenProfileMenu = (event) => setProfileMenuAnchor(event.currentTarget);
   const handleCloseProfileMenu = () => setProfileMenuAnchor(null);
@@ -306,16 +297,16 @@ const AppBar = ({ toggleDrawer, title }) => {
                 }}
               >
                 <Avatar 
-                  alt={auth.currentUser?.displayName || "Usuario"} 
-                  src={auth.currentUser?.photoURL}
+                  alt={user?.displayName || "Usuario"}
+                  src={user?.photoURL}
                   sx={{ 
                     width: { xs: 32, sm: 40 }, 
                     height: { xs: 32, sm: 40 },
                     border: `2px solid ${theme.palette.primary.contrastText}` 
                   }}
                 >
-                  {!auth.currentUser?.photoURL && auth.currentUser?.displayName 
-                    ? auth.currentUser.displayName.charAt(0).toUpperCase() 
+                  {!user?.photoURL && user?.displayName
+                    ? user.displayName.charAt(0).toUpperCase()
                     : "U"}
                 </Avatar>
               </IconButton>
@@ -347,7 +338,7 @@ const AppBar = ({ toggleDrawer, title }) => {
                   {firstName ? `Hola, ${firstName}` : 'Bienvenido'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {auth.currentUser?.email}
+                  {user?.email}
                 </Typography>
               </Box>
               <Divider sx={{ mb: 1 }} />
@@ -367,7 +358,7 @@ const AppBar = ({ toggleDrawer, title }) => {
               <MenuItem 
                 onClick={async () => { 
                   handleCloseProfileMenu(); 
-                  await auth.signOut(); 
+                  await signOut();
                 }}
                 sx={{ color: theme.palette.error.main }}
               >

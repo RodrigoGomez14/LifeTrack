@@ -22,7 +22,8 @@ import {
   Rating
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { database, auth } from '../../firebase';
+import { addHabit } from '../../services/habits';
+import { getCurrentUser } from '../../services/auth';
 import { useStore } from '../../store';
 import { useTheme } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -242,7 +243,7 @@ const NewHabit = () => {
     }
     
     // Verificar autenticación
-    if (!auth.currentUser) {
+    if (!getCurrentUser()) {
       console.error('No authenticated user found');
       alert('Error: Usuario no autenticado. Por favor, inicia sesión de nuevo.');
       return;
@@ -267,11 +268,10 @@ const NewHabit = () => {
     };
     
     console.log('Habit data to save:', habitData);
-    console.log('Saving to path:', `${auth.currentUser.uid}/habits`);
-    
-    database.ref(`${auth.currentUser.uid}/habits`).push(habitData)
-      .then((result) => {
-        console.log('Habit saved successfully:', result.key);
+
+    addHabit(habitData)
+      .then((key) => {
+        console.log('Habit saved successfully:', key);
         navigate('/Habitos');
       })
       .catch(error => {

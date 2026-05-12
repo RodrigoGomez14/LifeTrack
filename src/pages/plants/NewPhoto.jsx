@@ -31,7 +31,8 @@ import {
   ListItemText,
   OutlinedInput
 } from "@mui/material";
-import { database, auth, storage } from "../../firebase";
+import { auth, storage } from "../../firebase";
+import { addPlantActivity } from "../../services/plants";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -726,9 +727,7 @@ const NewPhoto = () => {
             storagePath: storagePath // Store the storage path for future reference
           };
           
-          await database
-            .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/images`)
-            .push(photoData);
+          await addPlantActivity(currentPlantId, 'images', photoData);
           
           successCount++;
         } catch (storageError) {

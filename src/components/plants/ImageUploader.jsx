@@ -17,7 +17,8 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CloseIcon from '@mui/icons-material/Close';
 import { useTheme } from '@mui/material/styles';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { database, auth } from "../../firebase";
+import { auth } from "../../firebase";
+import { addPlantActivity } from "../../services/plants";
 import { getDate } from "../../utils";
 
 const ImageUploader = ({ plantId, onUploadComplete }) => {
@@ -61,16 +62,12 @@ const ImageUploader = ({ plantId, onUploadComplete }) => {
       clearInterval(interval);
       setUploadProgress(100);
       
-      await database
-        .ref(
-          `${auth.currentUser.uid}/plants/active/${plantId}/images`
-        )
-        .push({
-          date: currentDate,
-          url: downloadURL,
-          fileName: fileName,
-          timestamp: Date.now()
-        });
+      await addPlantActivity(plantId, 'images', {
+        date: currentDate,
+        url: downloadURL,
+        fileName: fileName,
+        timestamp: Date.now(),
+      });
       
       setSuccessMessage('Imagen subida correctamente');
       setOpenSnackbar(true);

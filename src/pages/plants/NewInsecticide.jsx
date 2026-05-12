@@ -25,7 +25,7 @@ import {
   ListItemText,
   OutlinedInput
 } from "@mui/material";
-import { database, auth } from "../../firebase";
+import { addPlantActivity } from "../../services/plants";
 import { useNavigate, useLocation } from "react-router-dom";
 import { checkSearch, getDate } from "../../utils";
 import { useStore } from "../../store";
@@ -100,11 +100,9 @@ const NewInsecticide = () => {
     }
 
     // Guardar la aplicación de insecticida en todas las plantas seleccionadas
-    const promises = selectedPlants.map(currentPlantId => {
-      return database
-        .ref(`${auth.currentUser.uid}/plants/active/${currentPlantId}/insecticides`)
-        .push(insecticideData);
-    });
+    const promises = selectedPlants.map(currentPlantId =>
+      addPlantActivity(currentPlantId, 'insecticides', insecticideData)
+    );
 
     Promise.all(promises).then(() => {
       setAppMethod("");

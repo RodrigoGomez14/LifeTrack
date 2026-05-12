@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../../firebase.js';
-import firebase from 'firebase/compat/app';
+import { useAuth } from '../../hooks/useAuth';
 import { 
   Typography, 
   TextField, 
@@ -124,6 +123,7 @@ const Auth = () => {
   const isSmallMobile = useMediaQuery('(max-width:360px)');
   const navigate = useNavigate();
   const location = useLocation();
+  const { signIn, signUp, signInWithGoogle, sendPasswordReset } = useAuth();
   
   // Estado para controlar la pestaña activa (login o registro)
   const [activeTab, setActiveTab] = useState(0);
@@ -302,7 +302,7 @@ const Auth = () => {
     setError(null);
     
     try {
-      await auth.signInWithEmailAndPassword(loginEmail, loginPassword);
+      await signIn(loginEmail, loginPassword);
       // Guardar preferencia "recordarme" si está seleccionada
       if (rememberMe) {
         localStorage.setItem('rememberEmail', loginEmail);
@@ -343,14 +343,13 @@ const Auth = () => {
     setError(null);
     
     try {
-      // Crear usuario con email y contraseña
-      const userCredential = await auth.createUserWithEmailAndPassword(registerEmail, registerPassword);
-      
-      // Actualizar el perfil con el nombre
-      await userCredential.user.updateProfile({
-        displayName: registerName
+      // Crear usuario con email y contraseña + nombre
+      await signUp({
+        email: registerEmail,
+        password: registerPassword,
+        displayName: registerName,
       });
-      
+
       setSuccess('Registro exitoso. ¡Bienvenido a LifeTrack!');
       // Cambiar a la pestaña de login después de un registro exitoso
       setTimeout(() => {
@@ -387,8 +386,7 @@ const Auth = () => {
     setError(null);
     
     try {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      await auth.signInWithPopup(provider);
+      await signInWithGoogle();
       navigate('/Home');
     } catch (error) {
       console.error("Error de autenticación con Google:", error);
@@ -414,7 +412,7 @@ const Auth = () => {
     setError(null);
     
     try {
-      await auth.sendPasswordResetEmail(loginEmail);
+      await sendPasswordReset(loginEmail);
       setSuccess('Se ha enviado un correo para restablecer tu contraseña');
     } catch (error) {
       setError('No se pudo enviar el correo de restablecimiento');
