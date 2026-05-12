@@ -18,15 +18,14 @@ import NewPruning from './pages/plants/NewPruning.jsx';
 import NewTransplant from './pages/plants/NewTransplant.jsx';
 import Aditives from './pages/plants/Aditives.jsx';
 import NewAditive from './pages/plants/NewAditive.jsx';
-import NewExpense from './pages/finances/NewExpense.jsx';
-import NewIncome from './pages/finances/NewIncome.jsx';
+import NewTransaction from './pages/finances/NewTransaction.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
 import { subscribeToAuthChanges, getCurrentUser } from './services/auth';
 import { subscribeToUserData } from './services/database';
 import { useStore } from './store'; 
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
-import { indigo, teal, blue, lightBlue, purple, green, orange, red, deepPurple, amber, cyan, brown, grey, blueGrey, pink, deepOrange } from '@mui/material/colors';
+import { indigo, teal } from '@mui/material/colors';
 import NewHabit from './pages/habits/NewHabit';
 import EditHabit from './pages/habits/EditHabit';
 import HabitDetailPage from './pages/habits/HabitDetail';
@@ -43,50 +42,6 @@ import Timeline from './pages/plants/Timeline.jsx';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
-
-  // Definición de temas predefinidos
-  const predefinedThemes = {
-    indigoTeal: {
-      primary: indigo,
-      secondary: teal,
-      name: 'Índigo y Verde azulado'
-    },
-    purpleGreen: {
-      primary: deepPurple,
-      secondary: green,
-      name: 'Púrpura y Verde'
-    },
-    blueAmber: {
-      primary: blue,
-      secondary: amber,
-      name: 'Azul y Ámbar'
-    },
-    cyanOrange: {
-      primary: cyan,
-      secondary: orange,
-      name: 'Cian y Naranja'
-    },
-    redLightBlue: {
-      primary: red,
-      secondary: lightBlue,
-      name: 'Rojo y Azul claro'
-    },
-    brownTeal: {
-      primary: brown,
-      secondary: teal,
-      name: 'Marrón y Verde azulado'
-    },
-    greenPink: {
-      primary: green,
-      secondary: pink,
-      name: 'Verde y Rosa'
-    },
-    orangeBlue: {
-      primary: deepOrange,
-      secondary: blue,
-      name: 'Naranja y Azul'
-    }
-  };
 
   const filterData = (data) => {
     // El nodo del usuario puede no existir (cuenta nueva) → snapshot.val() es null
@@ -258,44 +213,19 @@ function App() {
     };
   };
 
-  // Crear tema dinámico basado en la configuración del usuario
+  // Tema fijo indigo + teal — solo respetamos el flag darkMode
   const theme = useMemo(() => {
-    let primaryColor = indigo[500];  // Color predeterminado
-    let secondaryColor = teal[500];  // Color predeterminado
-    let isDarkMode = false;          // Modo predeterminado
-    let selectedTheme = 'indigoTeal'; // Tema predeterminado
-
-    // Si hay datos de usuario y configuración de tema
-    if (userData && userData.config && userData.config.theme) {
-      const userTheme = userData.config.theme;
-      
-      // Si hay un tema específico seleccionado
-      if (userTheme.selectedTheme && predefinedThemes[userTheme.selectedTheme]) {
-        selectedTheme = userTheme.selectedTheme;
-        primaryColor = predefinedThemes[selectedTheme].primary[500];
-        secondaryColor = predefinedThemes[selectedTheme].secondary[500];
-      } 
-      // Si no hay tema pero hay colores seleccionados (retrocompatibilidad)
-      else if (userTheme.primaryColor) {
-        primaryColor = userTheme.primaryColor;
-        secondaryColor = userTheme.secondaryColor || teal[500];
-      }
-      
-      // Modo oscuro/claro
-      isDarkMode = userTheme.darkMode || false;
-    }
+    const isDarkMode = userData?.config?.theme?.darkMode || false;
 
     return createTheme({
       palette: {
         mode: isDarkMode ? 'dark' : 'light',
         primary: {
-          main: primaryColor,
+          main: indigo[500],
         },
         secondary: {
-          main: secondaryColor,
-          dark: typeof secondaryColor === 'string' 
-            ? secondaryColor 
-            : (predefinedThemes[selectedTheme]?.secondary[700] || teal[700]),
+          main: teal[500],
+          dark: teal[700],
         },
         background: {
           default: isDarkMode ? '#121212' : '#f5f5f5',
@@ -392,8 +322,8 @@ function App() {
           <Route path="/finanzas" element={<Finances />} />
           <Route path="/ahorros" element={<Savings />} />
           <Route path="/ahorros/fondo/:fundId" element={<FundHistory />} />
-          <Route path="/nuevoGasto" element={<NewExpense />} />
-          <Route path="/nuevoIngreso" element={<NewIncome />} />
+          <Route path="/nuevoGasto" element={<NewTransaction type="expense" />} />
+          <Route path="/nuevoIngreso" element={<NewTransaction type="income" />} />
           <Route path="/exchange" element={<Exchange />} />
           <Route path="/NuevoHabito" element={<NewHabit />} />
           <Route path="/EditarHabito/:habitId" element={<EditHabit />} />

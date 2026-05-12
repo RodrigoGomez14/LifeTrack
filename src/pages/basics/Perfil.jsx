@@ -388,9 +388,7 @@ const Perfil = () => {
                       Tema preferido
                     </Typography>
                     <Typography variant="body1">
-                      {userData?.config?.theme?.selectedTheme ? 
-                        predefinedThemes[userData.config.theme.selectedTheme]?.name || "Tema predeterminado" : 
-                        "Tema predeterminado"}
+                      {userData?.config?.theme?.darkMode ? 'Modo Oscuro' : 'Modo Claro'}
                     </Typography>
                   </Box>
                   
@@ -808,50 +806,6 @@ const Perfil = () => {
     </Box>
   );
 
-  // Temas predefinidos (igual que en App.js y Configuracion.jsx)
-  const predefinedThemes = {
-    indigoTeal: {
-      primary: "indigo",
-      secondary: "teal",
-      name: 'Índigo y Verde azulado'
-    },
-    purpleGreen: {
-      primary: "deepPurple",
-      secondary: "green",
-      name: 'Púrpura y Verde'
-    },
-    blueAmber: {
-      primary: "blue",
-      secondary: "amber",
-      name: 'Azul y Ámbar'
-    },
-    cyanOrange: {
-      primary: "cyan",
-      secondary: "orange",
-      name: 'Cian y Naranja'
-    },
-    redLightBlue: {
-      primary: "red",
-      secondary: "lightBlue",
-      name: 'Rojo y Azul claro'
-    },
-    brownTeal: {
-      primary: "brown",
-      secondary: "teal",
-      name: 'Marrón y Verde azulado'
-    },
-    greenPink: {
-      primary: "green",
-      secondary: "pink",
-      name: 'Verde y Rosa'
-    },
-    orangeBlue: {
-      primary: "deepOrange",
-      secondary: "blue",
-      name: 'Naranja y Azul'
-    }
-  };
-  
   return (
     <Layout title="Mi Perfil">
       <Container maxWidth="lg" sx={{ py: 4 }}>

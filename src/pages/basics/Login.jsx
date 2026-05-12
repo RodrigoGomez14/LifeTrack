@@ -1,1088 +1,1044 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { 
-  Typography, 
-  TextField, 
-  Button, 
-  Container, 
-  Grid, 
-  Box, 
-  Paper, 
-  Tab, 
-  Tabs, 
-  InputAdornment, 
-  IconButton, 
-  Divider, 
-  Checkbox,
-  FormControlLabel,
-  Link,
-  Fade,
-  LinearProgress,
-  Alert,
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  IconButton,
+  InputAdornment,
+  Avatar,
+  Stack,
+  Divider,
+  Chip,
   CircularProgress,
-  useTheme,
+  Fade,
   alpha,
-  useMediaQuery
 } from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
-import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import { useTheme } from '@mui/material/styles';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import GoogleIcon from '@mui/icons-material/Google';
-import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { useNavigate, useLocation } from 'react-router-dom';
+import AppleIcon from '@mui/icons-material/Apple';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import CheckIcon from '@mui/icons-material/Check';
+import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { useAuth } from '../../hooks/useAuth';
+import { auth, storage } from '../../firebase';
 
-// Componente de elementos decorativos para el fondo
-const BackgroundDecorator = () => {
-  const theme = useTheme();
-  const primaryColor = theme.palette.primary.main;
-  const secondaryColor = theme.palette.secondary.main;
-  
-  return (
-    <Box sx={{ 
-      position: 'absolute', 
-      top: 0, 
-      left: 0, 
-      right: 0, 
-      bottom: 0, 
-      overflow: 'hidden',
-      zIndex: -1,
-      opacity: 0.6
-    }}>
-      {/* Círculo grande en la esquina superior derecha */}
-      <Box sx={{ 
-        position: 'absolute',
-        top: '-15vh',
-        right: '-15vh',
-        width: '50vh',
-        height: '50vh',
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${alpha(primaryColor, 0.4)} 0%, ${alpha(primaryColor, 0.1)} 70%)`,
-      }} />
-      
-      {/* Círculo mediano en la esquina inferior izquierda */}
-      <Box sx={{ 
-        position: 'absolute',
-        bottom: '-10vh',
-        left: '-10vh',
-        width: '40vh',
-        height: '40vh',
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${alpha(secondaryColor, 0.3)} 0%, ${alpha(secondaryColor, 0.05)} 70%)`,
-      }} />
-      
-      {/* Pequeños puntos decorativos */}
-      {Array.from({ length: 20 }).map((_, index) => (
-        <Box 
-          key={index}
-          sx={{
-            position: 'absolute',
-            top: `${Math.random() * 100}%`,
-            left: `${Math.random() * 100}%`,
-            width: `${Math.random() * 10 + 5}px`,
-            height: `${Math.random() * 10 + 5}px`,
-            borderRadius: '50%',
-            backgroundColor: Math.random() > 0.5 ? alpha(primaryColor, 0.2) : alpha(secondaryColor, 0.2),
-          }}
-        />
-      ))}
-      
-      {/* Líneas curvas decorativas */}
-      <svg
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none'
-        }}
-      >
-        <path
-          d="M0,50 Q250,180 500,80 T1000,100"
-          fill="none"
-          stroke={alpha(primaryColor, 0.1)}
-          strokeWidth="3"
-        />
-        <path
-          d="M0,150 Q250,50 500,120 T1000,50"
-          fill="none"
-          stroke={alpha(secondaryColor, 0.1)}
-          strokeWidth="2"
-        />
-      </svg>
-    </Box>
-  );
+// ── Helpers a nivel módulo ──────────────────────────────────────────────────
+
+const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const calculatePasswordStrength = (password) => {
+  if (!password) return { score: 0, label: '', requirements: { length: false, upper: false, number: false, symbol: false } };
+  const requirements = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    number: /[0-9]/.test(password),
+    symbol: /[^A-Za-z0-9]/.test(password),
+  };
+  const score = Object.values(requirements).filter(Boolean).length;
+  const label = score <= 1 ? 'Débil' : score === 2 ? 'Media' : score === 3 ? 'Fuerte' : 'Muy fuerte';
+  return { score, label, requirements };
 };
 
-const Auth = () => {
+// Mapeo de códigos de error de Firebase a mensajes en español
+const mapFirebaseError = (code) => {
+  switch (code) {
+    case 'auth/user-not-found':
+      return 'No existe una cuenta con este email';
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Email o contraseña incorrectos';
+    case 'auth/email-already-in-use':
+      return 'Ya existe una cuenta con este email';
+    case 'auth/invalid-email':
+      return 'Email no válido';
+    case 'auth/weak-password':
+      return 'La contraseña es demasiado débil';
+    case 'auth/too-many-requests':
+      return 'Demasiados intentos fallidos. Inténtalo más tarde';
+    case 'auth/network-request-failed':
+      return 'Error de conexión. Verificá tu internet';
+    case 'auth/popup-closed-by-user':
+      return 'Ventana cerrada antes de completar el inicio de sesión';
+    default:
+      return 'Algo salió mal. Inténtalo de nuevo';
+  }
+};
+
+const uploadProfilePhoto = async (file) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Usuario no autenticado');
+  const fileRef = storage.ref().child(`profileImages/${uid}/${file.name}`);
+  await fileRef.put(file);
+  return fileRef.getDownloadURL();
+};
+
+// ── Componente ──────────────────────────────────────────────────────────────
+
+const Login = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isSmallMobile = useMediaQuery('(max-width:360px)');
   const navigate = useNavigate();
-  const location = useLocation();
-  const { signIn, signUp, signInWithGoogle, sendPasswordReset } = useAuth();
-  
-  // Estado para controlar la pestaña activa (login o registro)
-  const [activeTab, setActiveTab] = useState(0);
-  
-  // Estados del formulario de Login
+  const { signIn, signUp, signInWithGoogle, sendPasswordReset, updatePhotoURL } = useAuth();
+
+  // Pantalla activa: welcome | register | login
+  const [currentScreen, setCurrentScreen] = useState('welcome');
+  const [step, setStep] = useState(1); // 1-4 — solo para 'register'
+
+  // Datos del wizard
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+
+  // Login (separados para no perder estado entre pantallas)
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  
-  // Estados del formulario de Registro
-  const [registerName, setRegisterName] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  
-  // Estados para la UI
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [passwordStrength, setPasswordStrength] = useState(0);
-  
-  // Validaciones
-  const [loginEmailError, setLoginEmailError] = useState('');
-  const [loginPasswordError, setLoginPasswordError] = useState('');
-  const [registerNameError, setRegisterNameError] = useState('');
-  const [registerEmailError, setRegisterEmailError] = useState('');
-  const [registerPasswordError, setRegisterPasswordError] = useState('');
-  const [confirmPasswordError, setConfirmPasswordError] = useState('');
-  
-  // Cambiar a la pestaña apropiada basado en la URL
-  useEffect(() => {
-    if (location.pathname.includes('registro')) {
-      setActiveTab(1);
-    } else {
-      setActiveTab(0);
-    }
-  }, [location]);
 
-  // Manejar cambio de pestaña
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-    setError(null);
-    setSuccess(null);
+  // UI state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+
+  const passwordCheck = useMemo(() => calculatePasswordStrength(password), [password]);
+
+  // Reset error/info al cambiar de paso o pantalla
+  const goToStep = (n) => {
+    setError('');
+    setInfo('');
+    setStep(n);
   };
-  
-  // Función para validar email
-  const validateEmail = (email) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-  };
-  
-  // Calcular fuerza de la contraseña
-  const calculatePasswordStrength = (password) => {
-    let strength = 0;
-    
-    if (password.length >= 8) strength += 1;
-    if (/[A-Z]/.test(password)) strength += 1;
-    if (/[0-9]/.test(password)) strength += 1;
-    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
-    
-    setPasswordStrength(strength);
-    return strength;
-  };
-  
-  // Manejar cambio en la contraseña de registro
-  const handleRegisterPasswordChange = (e) => {
-    const password = e.target.value;
-    setRegisterPassword(password);
-    calculatePasswordStrength(password);
-    
-    if (password.length < 8) {
-      setRegisterPasswordError('La contraseña debe tener al menos 8 caracteres');
-    } else if (password.length > 30) {
-      setRegisterPasswordError('La contraseña no debe exceder 30 caracteres');
-    } else {
-      setRegisterPasswordError('');
-    }
-    
-    // Validar confirmación de contraseña si ya hay algo escrito
-    if (confirmPassword) {
-      if (password !== confirmPassword) {
-        setConfirmPasswordError('Las contraseñas no coinciden');
-      } else {
-        setConfirmPasswordError('');
-      }
-    }
-  };
-  
-  // Validar formulario de login
-  const validateLoginForm = () => {
-    let isValid = true;
-    
-    if (!loginEmail) {
-      setLoginEmailError('El email es requerido');
-      isValid = false;
-    } else if (!validateEmail(loginEmail)) {
-      setLoginEmailError('Email inválido');
-      isValid = false;
-    } else {
-      setLoginEmailError('');
-    }
-    
-    if (!loginPassword) {
-      setLoginPasswordError('La contraseña es requerida');
-      isValid = false;
-    } else {
-      setLoginPasswordError('');
-    }
-    
-    return isValid;
-  };
-  
-  // Validar formulario de registro
-  const validateRegisterForm = () => {
-    let isValid = true;
-    
-    if (!registerName) {
-      setRegisterNameError('El nombre es requerido');
-      isValid = false;
-    } else if (registerName.length < 3) {
-      setRegisterNameError('El nombre debe tener al menos 3 caracteres');
-      isValid = false;
-    } else {
-      setRegisterNameError('');
-    }
-    
-    if (!registerEmail) {
-      setRegisterEmailError('El email es requerido');
-      isValid = false;
-    } else if (!validateEmail(registerEmail)) {
-      setRegisterEmailError('Email inválido');
-      isValid = false;
-    } else {
-      setRegisterEmailError('');
-    }
-    
-    if (!registerPassword) {
-      setRegisterPasswordError('La contraseña es requerida');
-      isValid = false;
-    } else if (registerPassword.length < 8) {
-      setRegisterPasswordError('La contraseña debe tener al menos 8 caracteres');
-      isValid = false;
-    } else {
-      setRegisterPasswordError('');
-    }
-    
-    if (!confirmPassword) {
-      setConfirmPasswordError('Confirma tu contraseña');
-      isValid = false;
-    } else if (registerPassword !== confirmPassword) {
-      setConfirmPasswordError('Las contraseñas no coinciden');
-      isValid = false;
-    } else {
-      setConfirmPasswordError('');
-    }
-    
-    if (!acceptTerms) {
-      setError('Debes aceptar los términos y condiciones');
-      isValid = false;
-    }
-    
-    return isValid;
+  const goToScreen = (s) => {
+    setError('');
+    setInfo('');
+    setCurrentScreen(s);
+    if (s === 'register') setStep(1);
   };
 
-  // Manejar inicio de sesión
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    
-    if (!validateLoginForm()) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      await signIn(loginEmail, loginPassword);
-      // Guardar preferencia "recordarme" si está seleccionada
-      if (rememberMe) {
-        localStorage.setItem('rememberEmail', loginEmail);
-      } else {
-        localStorage.removeItem('rememberEmail');
-      }
-      navigate('/Home');
-    } catch (error) {
-      let errorMessage = '';
-      
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No existe una cuenta con este email';
-          break;
-        case 'auth/wrong-password':
-          errorMessage = 'Contraseña incorrecta';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Demasiados intentos fallidos. Inténtalo más tarde';
-          break;
-        default:
-          errorMessage = 'Error al iniciar sesión. Inténtalo de nuevo';
-      }
-      
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Manejar registro
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    
-    if (!validateRegisterForm()) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Crear usuario con email y contraseña + nombre
-      await signUp({
-        email: registerEmail,
-        password: registerPassword,
-        displayName: registerName,
-      });
+  // ── Handlers de Firebase ──────────────────────────────────────────────────
 
-      setSuccess('Registro exitoso. ¡Bienvenido a LifeTrack!');
-      // Cambiar a la pestaña de login después de un registro exitoso
-      setTimeout(() => {
-        setActiveTab(0);
-        setLoginEmail(registerEmail);
-        setSuccess(null);
-      }, 2000);
-    } catch (error) {
-      let errorMessage = '';
-      
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = 'Ya existe una cuenta con este email';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'El email no es válido';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'La contraseña es demasiado débil';
-          break;
-        default:
-          errorMessage = 'Error al crear la cuenta. Inténtalo de nuevo';
-      }
-      
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Inicio de sesión con Google
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    setError(null);
-    
+  const handleGoogle = async () => {
+    if (loading) return;
+    setError('');
+    setLoading(true);
     try {
       await signInWithGoogle();
       navigate('/Home');
-    } catch (error) {
-      console.error("Error de autenticación con Google:", error);
-      setError('Error al iniciar sesión con Google. Inténtalo de nuevo');
+    } catch (e) {
+      console.error('Google sign-in error:', e);
+      setError(mapFirebaseError(e.code));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
-  // Olvidé mi contraseña
+
+  const handleLoginSubmit = async () => {
+    if (loading) return;
+    setError('');
+
+    if (!loginEmail || !validateEmail(loginEmail)) {
+      setError('Email no válido');
+      return;
+    }
+    if (!loginPassword) {
+      setError('Ingresá tu contraseña');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signIn(loginEmail, loginPassword);
+      navigate('/Home');
+    } catch (e) {
+      console.error('Login error:', e);
+      setError(mapFirebaseError(e.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgotPassword = async () => {
-    if (!loginEmail) {
-      setLoginEmailError('Ingresa tu email para restablecer la contraseña');
+    if (loading) return;
+    setError('');
+    setInfo('');
+
+    if (!loginEmail || !validateEmail(loginEmail)) {
+      setError('Ingresá tu email para recuperar la contraseña');
       return;
     }
-    
-    if (!validateEmail(loginEmail)) {
-      setLoginEmailError('Email inválido');
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    
+
+    setLoading(true);
     try {
       await sendPasswordReset(loginEmail);
-      setSuccess('Se ha enviado un correo para restablecer tu contraseña');
-    } catch (error) {
-      setError('No se pudo enviar el correo de restablecimiento');
+      setInfo('Te enviamos un correo para restablecer la contraseña');
+    } catch (e) {
+      setError(mapFirebaseError(e.code));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
-  // Obtener color para indicador de fuerza de contraseña
-  const getPasswordStrengthColor = () => {
-    switch (passwordStrength) {
-      case 0:
-        return theme.palette.error.main;
-      case 1:
-        return theme.palette.error.main;
-      case 2:
-        return theme.palette.warning.main;
-      case 3:
-        return theme.palette.success.light;
-      case 4:
-        return theme.palette.success.main;
-      default:
-        return theme.palette.grey[500];
+
+  const handleStep3Submit = async () => {
+    if (loading) return;
+    setError('');
+
+    if (!name.trim()) {
+      setError('Ingresá tu nombre');
+      return;
+    }
+
+    const displayName = lastName.trim() ? `${name.trim()} ${lastName.trim()}` : name.trim();
+
+    setLoading(true);
+    try {
+      await signUp({ email, password, displayName });
+
+      if (photoFile) {
+        try {
+          const url = await uploadProfilePhoto(photoFile);
+          await updatePhotoURL(url);
+        } catch (uploadError) {
+          // El usuario ya fue creado; subida de foto falló — no bloqueo el flujo
+          console.warn('Foto no subida:', uploadError);
+        }
+      }
+
+      goToStep(4);
+    } catch (e) {
+      console.error('Signup error:', e);
+      setError(mapFirebaseError(e.code));
+    } finally {
+      setLoading(false);
     }
   };
-  
-  // Obtener mensaje de fuerza de contraseña
-  const getPasswordStrengthLabel = () => {
-    switch (passwordStrength) {
-      case 0:
-        return 'Débil';
-      case 1:
-        return 'Débil';
-      case 2:
-        return 'Media';
-      case 3:
-        return 'Fuerte';
-      case 4:
-        return 'Muy fuerte';
-      default:
-        return '';
-    }
+
+  const handlePhotoSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  // ── Validaciones por paso ─────────────────────────────────────────────────
+
+  const canAdvanceStep1 = email.trim() && validateEmail(email);
+  const canAdvanceStep2 =
+    passwordCheck.requirements.length &&
+    passwordCheck.requirements.upper &&
+    passwordCheck.requirements.number;
+  const canAdvanceStep3 = name.trim().length > 0;
+
+  // ── UI compartida ─────────────────────────────────────────────────────────
+
+  const renderProgressDots = (current, total = 4) => (
+    <Box sx={{ display: 'flex', gap: 0.75, justifyContent: 'center' }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <Box
+          key={i}
+          sx={{
+            width: i + 1 === current ? 24 : 8,
+            height: 8,
+            borderRadius: 999,
+            bgcolor: i + 1 <= current ? theme.palette.primary.main : alpha(theme.palette.primary.main, 0.2),
+            transition: 'width 0.2s ease',
+          }}
+        />
+      ))}
+    </Box>
+  );
+
+  const renderRegisterHeader = (currentStep) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5 }}>
+      <IconButton
+        onClick={() => (currentStep === 1 ? goToScreen('welcome') : goToStep(currentStep - 1))}
+        sx={{
+          bgcolor: alpha(theme.palette.action.hover, 0.4),
+          '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.7) },
+        }}
+        size="small"
+      >
+        <ArrowBackIcon fontSize="small" />
+      </IconButton>
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>{renderProgressDots(currentStep)}</Box>
+      <Box sx={{ width: 32 }} />
+    </Box>
+  );
+
+  const renderErrorBanner = () =>
+    error ? (
+      <Box
+        sx={{
+          mx: 3,
+          mb: 2,
+          px: 2,
+          py: 1.25,
+          borderRadius: 2,
+          bgcolor: alpha(theme.palette.error.main, 0.08),
+          color: theme.palette.error.main,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          {error}
+        </Typography>
+      </Box>
+    ) : null;
+
+  const renderInfoBanner = () =>
+    info ? (
+      <Box
+        sx={{
+          mx: 3,
+          mb: 2,
+          px: 2,
+          py: 1.25,
+          borderRadius: 2,
+          bgcolor: alpha(theme.palette.success.main, 0.08),
+          color: theme.palette.success.dark,
+        }}
+      >
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          {info}
+        </Typography>
+      </Box>
+    ) : null;
+
+  const primaryButtonSx = {
+    bgcolor: theme.palette.primary.main,
+    color: 'white',
+    borderRadius: 999,
+    py: 1.5,
+    fontWeight: 600,
+    textTransform: 'none',
+    fontSize: '1rem',
+    '&:hover': { bgcolor: theme.palette.primary.dark },
+    '&.Mui-disabled': { bgcolor: alpha(theme.palette.primary.main, 0.3), color: 'white' },
+  };
+
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 2,
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: theme.palette.primary.main,
+        borderWidth: 2,
+      },
+    },
+    '& .MuiInputLabel-root.Mui-focused': {
+      color: theme.palette.primary.main,
+    },
+  };
+
+  // ── PANTALLA 0 — Welcome ─────────────────────────────────────────────────
+
+  const renderWelcome = () => (
+    <Box
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        background: `linear-gradient(160deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+        display: 'flex',
+        flexDirection: 'column',
+        color: 'white',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Cards apiladas */}
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          px: 3,
+        }}
+      >
+        <Box sx={{ position: 'relative', width: '100%', maxWidth: 320, height: 280 }}>
+          {/* Card 3 (atrás) — Plantas */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 80,
+              left: 0,
+              right: 0,
+              bgcolor: 'white',
+              borderRadius: 4,
+              p: 2.5,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+              transform: 'rotate(-4deg)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.success.main, 0.12),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <LocalFloristIcon sx={{ color: theme.palette.success.main }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                Plantas
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 700 }}>
+                Riego en 2 días
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Card 2 (medio) — Hábitos */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 40,
+              left: 0,
+              right: 0,
+              bgcolor: 'white',
+              borderRadius: 4,
+              p: 2.5,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
+              transform: 'rotate(2deg)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.primary.main, 0.12),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CheckIcon sx={{ color: theme.palette.primary.main }} />
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                Hábitos
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 700 }}>
+                6 de 8 hoy
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Card 1 (frente) — Finanzas */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bgcolor: 'white',
+              borderRadius: 4,
+              p: 2.5,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
+              transform: 'rotate(-2deg)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                bgcolor: alpha(theme.palette.success.main, 0.12),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <AttachMoneyIcon sx={{ color: theme.palette.success.main }} />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                Finanzas
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 700 }}>
+                $1.840
+              </Typography>
+            </Box>
+            <Chip
+              size="small"
+              icon={<TrendingUpIcon sx={{ fontSize: 14 }} />}
+              label="+12%"
+              sx={{
+                bgcolor: alpha(theme.palette.success.main, 0.12),
+                color: theme.palette.success.main,
+                fontWeight: 700,
+                '& .MuiChip-icon': { color: theme.palette.success.main },
+              }}
+            />
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Brand */}
+      <Box sx={{ px: 4, textAlign: 'center', mb: 3 }}>
+        <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: -1 }}>
+          LifeTrack
+        </Typography>
+        <Typography variant="body1" sx={{ opacity: 0.85, mt: 0.5 }}>
+          Tu vida, en un solo lugar.
+        </Typography>
+      </Box>
+
+      {/* Botones */}
+      <Box sx={{ px: 3, pb: 4 }}>
+        <Stack spacing={1.5}>
+          <Button
+            fullWidth
+            onClick={() => goToScreen('register')}
+            sx={{
+              bgcolor: 'white',
+              color: theme.palette.text.primary,
+              borderRadius: 999,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '1rem',
+              '&:hover': { bgcolor: alpha('#ffffff', 0.9) },
+            }}
+          >
+            Crear cuenta
+          </Button>
+          <Button
+            fullWidth
+            onClick={() => goToScreen('login')}
+            sx={{
+              bgcolor: 'transparent',
+              color: 'white',
+              border: `1px solid ${alpha('#ffffff', 0.4)}`,
+              borderRadius: 999,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '1rem',
+              '&:hover': { bgcolor: alpha('#ffffff', 0.08), borderColor: alpha('#ffffff', 0.6) },
+            }}
+          >
+            Ya tengo cuenta
+          </Button>
+        </Stack>
+      </Box>
+    </Box>
+  );
+
+  // ── PASO 1 — Email ───────────────────────────────────────────────────────
+
+  const renderStep1 = () => (
+    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+      {renderRegisterHeader(1)}
+
+      <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>
+          Creá tu cuenta
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Te lleva menos de un minuto.
+        </Typography>
+
+        {/* Apple (decorativo) */}
+        <Button
+          fullWidth
+          startIcon={<AppleIcon />}
+          sx={{
+            bgcolor: '#000',
+            color: '#fff',
+            borderRadius: 999,
+            py: 1.4,
+            fontWeight: 600,
+            textTransform: 'none',
+            mb: 1.5,
+            '&:hover': { bgcolor: alpha('#000', 0.85) },
+          }}
+        >
+          Continuar con Apple
+        </Button>
+
+        {/* Google */}
+        <Button
+          fullWidth
+          onClick={handleGoogle}
+          disabled={loading}
+          startIcon={<GoogleIcon />}
+          sx={{
+            bgcolor: 'white',
+            color: theme.palette.text.primary,
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 999,
+            py: 1.4,
+            fontWeight: 600,
+            textTransform: 'none',
+            mb: 2.5,
+            '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.5) },
+          }}
+        >
+          {loading ? <CircularProgress size={20} /> : 'Continuar con Google'}
+        </Button>
+
+        {/* Divisor */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+          <Divider sx={{ flex: 1 }} />
+          <Typography variant="caption" color="text.secondary">
+            o continúa con email
+          </Typography>
+          <Divider sx={{ flex: 1 }} />
+        </Box>
+
+        <TextField
+          fullWidth
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          sx={inputSx}
+        />
+
+        {renderErrorBanner()}
+      </Box>
+
+      <Box sx={{ px: 3, pb: 3, pt: 2 }}>
+        <Button fullWidth disabled={!canAdvanceStep1 || loading} onClick={() => goToStep(2)} sx={primaryButtonSx}>
+          Continuar
+        </Button>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
+          Al continuar aceptás los Términos y la Política de Privacidad.
+        </Typography>
+      </Box>
+    </Box>
+  );
+
+  // ── PASO 2 — Contraseña ──────────────────────────────────────────────────
+
+  const renderStep2 = () => {
+    const req = passwordCheck.requirements;
+    const strengthColor =
+      passwordCheck.score <= 1
+        ? theme.palette.error.main
+        : passwordCheck.score === 2
+        ? theme.palette.warning.main
+        : theme.palette.success.main;
+
+    const renderRequirement = (met, label, optional = false) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+        <CheckCircleIcon
+          sx={{
+            fontSize: 18,
+            color: met
+              ? theme.palette.success.main
+              : optional
+              ? theme.palette.text.disabled
+              : alpha(theme.palette.text.disabled, 0.5),
+          }}
+        />
+        <Typography
+          variant="body2"
+          sx={{ color: met ? 'text.primary' : 'text.secondary', fontWeight: met ? 500 : 400 }}
+        >
+          {label}
+        </Typography>
+      </Box>
+    );
+
+    return (
+      <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+        {renderRegisterHeader(2)}
+
+        <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>
+            Creá una contraseña
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Será tu llave para entrar a LifeTrack.
+          </Typography>
+
+          <TextField
+            fullWidth
+            label="Contraseña"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            sx={inputSx}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" size="small">
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Barra de fuerza */}
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                Fuerza
+              </Typography>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: strengthColor }}>
+                {passwordCheck.label || '—'}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              {[0, 1, 2, 3].map((i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    flex: 1,
+                    height: 6,
+                    borderRadius: 999,
+                    bgcolor:
+                      i < passwordCheck.score ? strengthColor : alpha(theme.palette.text.disabled, 0.2),
+                    transition: 'background-color 0.2s ease',
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          {/* Checklist */}
+          <Box sx={{ mt: 2 }}>
+            {renderRequirement(req.length, 'Mínimo 8 caracteres')}
+            {renderRequirement(req.upper, 'Una letra mayúscula')}
+            {renderRequirement(req.number, 'Un número')}
+            {renderRequirement(req.symbol, 'Un símbolo (opcional)', true)}
+          </Box>
+
+          {renderErrorBanner()}
+        </Box>
+
+        <Box sx={{ px: 3, pb: 3, pt: 2 }}>
+          <Button fullWidth disabled={!canAdvanceStep2 || loading} onClick={() => goToStep(3)} sx={primaryButtonSx}>
+            Continuar
+          </Button>
+        </Box>
+      </Box>
+    );
+  };
+
+  // ── PASO 3 — Nombre y foto ───────────────────────────────────────────────
+
+  const renderStep3 = () => (
+    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+      {renderRegisterHeader(3)}
+
+      <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>
+          ¿Cómo te llamás?
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Así te llamaremos en la app.
+        </Typography>
+
+        {/* Avatar */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              src={photoPreview}
+              sx={{
+                width: 112,
+                height: 112,
+                bgcolor: alpha(theme.palette.secondary.main, 0.18),
+                color: theme.palette.secondary.dark,
+                fontSize: 44,
+                fontWeight: 700,
+              }}
+            >
+              {!photoPreview && (name ? name.charAt(0).toUpperCase() : '?')}
+            </Avatar>
+            <input
+              accept="image/*"
+              id="photo-input"
+              type="file"
+              hidden
+              onChange={handlePhotoSelect}
+            />
+            <label htmlFor="photo-input">
+              <IconButton
+                component="span"
+                sx={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  bgcolor: theme.palette.success.main,
+                  color: 'white',
+                  width: 36,
+                  height: 36,
+                  '&:hover': { bgcolor: theme.palette.success.dark },
+                }}
+              >
+                <PhotoCameraIcon fontSize="small" />
+              </IconButton>
+            </label>
+          </Box>
+        </Box>
+
+        <Stack spacing={2}>
+          <TextField
+            fullWidth
+            label="Nombre"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            sx={inputSx}
+          />
+          <TextField
+            fullWidth
+            label="Apellido (opcional)"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            sx={inputSx}
+          />
+        </Stack>
+
+        {renderErrorBanner()}
+      </Box>
+
+      <Box sx={{ px: 3, pb: 3, pt: 2 }}>
+        <Button
+          fullWidth
+          disabled={!canAdvanceStep3 || loading}
+          onClick={handleStep3Submit}
+          sx={primaryButtonSx}
+        >
+          {loading ? <CircularProgress size={22} sx={{ color: 'white' }} /> : 'Continuar'}
+        </Button>
+      </Box>
+    </Box>
+  );
+
+  // ── PASO 4 — Done ────────────────────────────────────────────────────────
+
+  const renderStep4 = () => (
+    <Box
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.paper',
+        px: 4,
+        textAlign: 'center',
+      }}
+    >
+      <Box
+        sx={{
+          width: 96,
+          height: 96,
+          borderRadius: '50%',
+          bgcolor: alpha(theme.palette.secondary.main, 0.12),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: `0 0 0 12px ${alpha(theme.palette.secondary.main, 0.06)}`,
+          mb: 3,
+        }}
+      >
+        <CheckCircleIcon sx={{ fontSize: 64, color: theme.palette.secondary.main }} />
+      </Box>
+
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+        ¡Todo listo, {name}!
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 320 }}>
+        Tu cuenta está creada. Vamos a configurar tu primer registro.
+      </Typography>
+
+      <Stack direction="row" spacing={1} sx={{ mb: 4 }}>
+        <Chip
+          label="Finanzas"
+          sx={{
+            bgcolor: alpha(theme.palette.primary.main, 0.12),
+            color: theme.palette.primary.main,
+            fontWeight: 600,
+          }}
+        />
+        <Chip
+          label="Hábitos"
+          sx={{
+            bgcolor: alpha(theme.palette.secondary.main, 0.15),
+            color: theme.palette.secondary.dark,
+            fontWeight: 600,
+          }}
+        />
+      </Stack>
+
+      <Box sx={{ width: '100%', maxWidth: 360 }}>
+        <Button fullWidth onClick={() => navigate('/Home')} sx={primaryButtonSx}>
+          Empezar a usar LifeTrack
+        </Button>
+      </Box>
+    </Box>
+  );
+
+  // ── PANTALLA LOGIN ───────────────────────────────────────────────────────
+
+  const renderLogin = () => (
+    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5 }}>
+        <IconButton
+          onClick={() => goToScreen('welcome')}
+          sx={{
+            bgcolor: alpha(theme.palette.action.hover, 0.4),
+            '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.7) },
+          }}
+          size="small"
+        >
+          <ArrowBackIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>
+          Bienvenido de vuelta
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Ingresá a tu cuenta.
+        </Typography>
+
+        <Stack spacing={2}>
+          <TextField
+            fullWidth
+            label="Email"
+            type="email"
+            value={loginEmail}
+            onChange={(e) => setLoginEmail(e.target.value)}
+            sx={inputSx}
+          />
+          <TextField
+            fullWidth
+            label="Contraseña"
+            type={showLoginPassword ? 'text' : 'password'}
+            value={loginPassword}
+            onChange={(e) => setLoginPassword(e.target.value)}
+            sx={inputSx}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowLoginPassword(!showLoginPassword)} edge="end" size="small">
+                    {showLoginPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Stack>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+          <Button
+            onClick={handleForgotPassword}
+            disabled={loading}
+            sx={{ textTransform: 'none', color: theme.palette.primary.main, fontWeight: 500 }}
+            size="small"
+          >
+            ¿Olvidaste tu contraseña?
+          </Button>
+        </Box>
+
+        {renderErrorBanner()}
+        {renderInfoBanner()}
+
+        <Button
+          fullWidth
+          onClick={handleLoginSubmit}
+          disabled={loading}
+          sx={{ ...primaryButtonSx, mt: 2 }}
+        >
+          {loading ? <CircularProgress size={22} sx={{ color: 'white' }} /> : 'Iniciar sesión'}
+        </Button>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, my: 3 }}>
+          <Divider sx={{ flex: 1 }} />
+          <Typography variant="caption" color="text.secondary">
+            o
+          </Typography>
+          <Divider sx={{ flex: 1 }} />
+        </Box>
+
+        <Button
+          fullWidth
+          onClick={handleGoogle}
+          disabled={loading}
+          startIcon={<GoogleIcon />}
+          sx={{
+            bgcolor: 'white',
+            color: theme.palette.text.primary,
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: 999,
+            py: 1.4,
+            fontWeight: 600,
+            textTransform: 'none',
+            '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.5) },
+          }}
+        >
+          Continuar con Google
+        </Button>
+      </Box>
+
+      <Box sx={{ px: 3, pb: 3, pt: 1, textAlign: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          ¿No tenés cuenta?{' '}
+          <Box
+            component="span"
+            onClick={() => goToScreen('welcome')}
+            sx={{
+              color: theme.palette.primary.main,
+              fontWeight: 600,
+              cursor: 'pointer',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            Crear una
+          </Box>
+        </Typography>
+      </Box>
+    </Box>
+  );
+
+  // ── Render principal ─────────────────────────────────────────────────────
+
+  const renderActive = () => {
+    if (currentScreen === 'welcome') return renderWelcome();
+    if (currentScreen === 'login') return renderLogin();
+    // register
+    if (step === 1) return renderStep1();
+    if (step === 2) return renderStep2();
+    if (step === 3) return renderStep3();
+    if (step === 4) return renderStep4();
+    return null;
   };
 
   return (
-    <Box sx={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'relative',
-      background: theme.palette.mode === 'dark' 
-        ? `linear-gradient(145deg, ${alpha(theme.palette.background.default, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`
-        : `linear-gradient(145deg, ${alpha('#f5f7fa', 0.97)} 0%, ${alpha('#c3cfe2', 0.95)} 100%)`,
-      pt: { xs: 2, sm: 4 },
-      pb: { xs: 4, sm: 8 }
-    }}>
-      {/* Elementos decorativos de fondo */}
-      <BackgroundDecorator />
-      
-      <Container 
-        maxWidth="lg" 
-        sx={{ 
-          position: 'relative', 
-          zIndex: 1,
-          px: { xs: isSmallMobile ? 1 : 2, sm: 3 } // Reducir padding horizontal en móvil
-        }}
-      >
-        <Box
-          sx={{ width: '100%', opacity: 1 }}
-        >
-          <Grid container spacing={0} justifyContent="center" alignItems="stretch" sx={{ minHeight: { md: '600px' } }}>
-            {/* Panel izquierdo - Solo visible en pantallas medianas y grandes */}
-            {!isMobile && (
-              <Grid item xs={12} md={5} lg={6}>
-                <Paper
-                  elevation={24}
-                  sx={{
-                    height: '100%',
-                    borderRadius: { xs: 3, md: '16px 0 0 16px' },
-                    overflow: 'hidden',
-                    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    p: 4,
-                    color: 'white',
-                    position: 'relative',
-                    boxShadow: `0 10px 40px ${alpha(theme.palette.primary.dark, 0.4)}`
-                  }}
-                >
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      opacity: 0.075,
-                      backgroundImage: 'url(/assets/auth-bg-pattern.svg)',
-                      backgroundSize: 'cover',
-                      zIndex: 0
-                    }}
-                  />
-                  
-                  <Box sx={{ position: 'relative', zIndex: 1 }}>
-                    <Typography 
-                      variant="h3" 
-                      fontWeight="bold"
-                      gutterBottom
-                    >
-                      {activeTab === 0 ? '¡Bienvenido de nuevo!' : 'Únete a LifeTrack'}
-                    </Typography>
-                    
-                    <Typography 
-                      variant="h6"
-                      sx={{ mb: 4, maxWidth: '80%', fontWeight: 'normal' }}
-                    >
-                      {activeTab === 0 
-                        ? 'Inicia sesión para continuar tu viaje hacia un mejor control de tus finanzas y hábitos personales.' 
-                        : 'Crea una cuenta para comenzar a organizar tu vida financiera, hábitos y más en un solo lugar.'}
-                    </Typography>
-                    
-                    <Box>
-                      <Typography variant="body1" paragraph>
-                        Con LifeTrack podrás:
-                      </Typography>
-                      
-                      <Box sx={{ ml: 2, mb: 4 }}>
-                        {[
-                          'Organizar tus finanzas personales',
-                          'Hacer seguimiento de tus hábitos',
-                          'Administrar tus tarjetas de crédito',
-                          'Visualizar tus gastos e ingresos',
-                          'Y mucho más...'
-                        ].map((item, index) => (
-                          <Box 
-                            key={index} 
-                            sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: 1.5, 
-                              mb: 1.5,
-                              opacity: 0.9
-                            }}
-                          >
-                            <Box 
-                              sx={{ 
-                                width: 20, 
-                                height: 20, 
-                                borderRadius: '50%', 
-                                bgcolor: 'white',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              <ArrowForwardIcon sx={{ color: theme.palette.primary.main, fontSize: 14 }} />
-                            </Box>
-                            <Typography variant="body1">{item}</Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
-                  </Box>
-                </Paper>
-              </Grid>
-            )}
-            
-            {/* Panel derecho - Formularios */}
-            <Grid item xs={12} md={7} lg={6}>
-              <Paper
-                elevation={24}
-                sx={{
-                  borderRadius: { 
-                    xs: 3, 
-                    md: isMobile ? 3 : '0 16px 16px 0' 
-                  },
-                  p: { 
-                    xs: isSmallMobile ? 2 : 3, 
-                    sm: 4 
-                  },
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: isMobile ? `0 10px 40px ${alpha(theme.palette.primary.dark, 0.25)}` : 'none',
-                  backgroundColor: alpha(theme.palette.background.paper, 0.95)
-                }}
-              >
-                {/* Logo y título */}
-                <Box sx={{ mb: { xs: 2, sm: 3 }, textAlign: 'center' }}>
-                  <Typography 
-                    variant={isSmallMobile ? "h5" : isMobile ? "h4" : "h4"} 
-                    component="h1" 
-                    fontWeight="bold" 
-                    color="primary"
-                    sx={{ mb: 1 }}
-                  >
-                    LifeTrack
-                  </Typography>
-                  <Typography variant={isMobile ? "body2" : "body1"} color="text.secondary">
-                    {activeTab === 0 ? 'Inicia sesión en tu cuenta' : 'Crea una nueva cuenta'}
-          </Typography>
-                </Box>
-                
-                {/* Pestañas para alternar entre login y registro */}
-                <Tabs
-                  value={activeTab}
-                  onChange={handleTabChange}
-                  centered
-                  sx={{
-                    mb: { xs: 2, sm: 3 },
-                    '& .MuiTab-root': {
-                      minWidth: { xs: 100, sm: 120 },
-                      fontWeight: 'bold',
-                      fontSize: { xs: '0.875rem', sm: '1rem' },
-                      p: { xs: 1, sm: 2 }
-                    }
-                  }}
-                >
-                  <Tab 
-                    label="Iniciar Sesión" 
-                    icon={<LockOutlinedIcon fontSize={isMobile ? "small" : "medium"} />} 
-                    iconPosition="start" 
-                  />
-                  <Tab 
-                    label="Registrarse" 
-                    icon={<PersonAddOutlinedIcon fontSize={isMobile ? "small" : "medium"} />} 
-                    iconPosition="start" 
-                  />
-                </Tabs>
-                
-                {/* Alertas de error y éxito */}
-                {error && (
-                  <Alert 
-                    severity="error" 
-                    sx={{ mb: 2 }}
-                    onClose={() => setError(null)}
-                  >
-                    {error}
-                  </Alert>
-                )}
-                
-                {success && (
-                  <Alert 
-                    severity="success" 
-                    sx={{ mb: 2 }}
-                    onClose={() => setSuccess(null)}
-                  >
-                    {success}
-                  </Alert>
-                )}
-                
-                {/* Loader */}
-                {isLoading && (
-                  <LinearProgress sx={{ mb: 2 }} />
-                )}
-                
-                {/* Contenido de la pestaña de login */}
-                <Box 
-                  sx={{ 
-                    display: activeTab === 0 ? 'block' : 'none',
-                    flex: 1,
-                    overflowY: 'auto'
-                  }}
-                >
-                  <form onSubmit={handleLogin}>
-            <TextField
-              label="Email"
-              type="email"
-                      fullWidth
-                      margin="normal"
-                      variant="outlined"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      error={!!loginEmailError}
-                      helperText={loginEmailError}
-                      disabled={isLoading}
-                      size={isMobile ? "small" : "medium"}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <EmailOutlinedIcon fontSize={isMobile ? "small" : "medium"} color="action" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    
-                    <TextField
-                      label="Contraseña"
-                      type={showLoginPassword ? 'text' : 'password'}
-                      fullWidth
-                      margin="normal"
-                      variant="outlined"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      error={!!loginPasswordError}
-                      helperText={loginPasswordError}
-                      disabled={isLoading}
-                      size={isMobile ? "small" : "medium"}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <LockOutlinedIcon fontSize={isMobile ? "small" : "medium"} color="action" />
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowLoginPassword(!showLoginPassword)}
-                              edge="end"
-                              size={isMobile ? "small" : "medium"}
-                            >
-                              {showLoginPassword ? (
-                                <VisibilityOffOutlinedIcon fontSize={isMobile ? "small" : "medium"} />
-                              ) : (
-                                <VisibilityOutlinedIcon fontSize={isMobile ? "small" : "medium"} />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    
-                    <Box sx={{ 
-                      mt: 1, 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      flexDirection: { xs: isSmallMobile ? 'column' : 'row', sm: 'row' },
-                      gap: { xs: 1, sm: 0 }
-                    }}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            color="primary"
-                            size="small"
-                          />
-                        }
-                        label={<Typography variant={isMobile ? "caption" : "body2"}>Recordarme</Typography>}
-                        sx={{ 
-                          mr: 0,
-                          alignSelf: isSmallMobile ? 'flex-start' : 'center' 
-                        }}
-                      />
-                      
-                      <Link
-                        component="button"
-                        variant={isMobile ? "caption" : "body2"}
-                        onClick={handleForgotPassword}
-                        underline="hover"
-                        color="primary"
-                        type="button"
-                        disabled={isLoading}
-                        sx={{ 
-                          alignSelf: isSmallMobile ? 'flex-start' : 'center',
-                          mt: isSmallMobile ? -1 : 0 
-                        }}
-                      >
-                        ¿Olvidaste tu contraseña?
-                      </Link>
-                    </Box>
-                    
-                    <Button
-                      type="submit"
-                      fullWidth
-                      variant="contained"
-                      color="primary"
-                      size={isMobile ? "medium" : "large"}
-                      disabled={isLoading}
-                      sx={{ 
-                        mt: { xs: 2, sm: 3 }, 
-                        mb: { xs: 1, sm: 2 },
-                        py: { xs: 1, sm: 1.5 },
-                        fontWeight: 'bold',
-                        borderRadius: 2
-                      }}
-                    >
-                      {isLoading ? (
-                        <CircularProgress size={isMobile ? 20 : 24} color="inherit" />
-                      ) : (
-                        'Iniciar Sesión'
-                      )}
-                    </Button>
-                    
-                    <Divider sx={{ my: { xs: 2, sm: 3 } }}>
-                      <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
-                        O continuar con
-                      </Typography>
-                    </Divider>
-                    
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<GoogleIcon fontSize={isMobile ? "small" : "medium"} />}
-                      onClick={handleGoogleSignIn}
-                      disabled={isLoading}
-                      size={isMobile ? "medium" : "large"}
-                      sx={{ mb: 2 }}
-                    >
-                      Iniciar sesión con Google
-                    </Button>
-                  </form>
-                </Box>
-                
-                {/* Contenido de la pestaña de registro */}
-                <Box 
-                  sx={{ 
-                    display: activeTab === 1 ? 'block' : 'none',
-                    flex: 1,
-                    overflowY: 'auto'
-                  }}
-                >
-                  <form onSubmit={handleRegister}>
-                    <TextField
-                      label="Nombre completo"
-                      fullWidth
-                      margin="normal"
-              variant="outlined"
-                      value={registerName}
-                      onChange={(e) => setRegisterName(e.target.value)}
-                      error={!!registerNameError}
-                      helperText={registerNameError}
-                      disabled={isLoading}
-                      size={isMobile ? "small" : "medium"}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <PersonOutlineOutlinedIcon fontSize={isMobile ? "small" : "medium"} color="action" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    
-                    <TextField
-                      label="Email"
-                      type="email"
-              fullWidth
-                      margin="normal"
-                      variant="outlined"
-                      value={registerEmail}
-                      onChange={(e) => setRegisterEmail(e.target.value)}
-                      error={!!registerEmailError}
-                      helperText={registerEmailError}
-                      disabled={isLoading}
-                      size={isMobile ? "small" : "medium"}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <EmailOutlinedIcon fontSize={isMobile ? "small" : "medium"} color="action" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    
-            <TextField
-                      label="Contraseña"
-                      type={showRegisterPassword ? 'text' : 'password'}
-                      fullWidth
-                      margin="normal"
-              variant="outlined"
-                      value={registerPassword}
-                      onChange={handleRegisterPasswordChange}
-                      error={!!registerPasswordError}
-                      helperText={registerPasswordError}
-                      disabled={isLoading}
-                      size={isMobile ? "small" : "medium"}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <LockOutlinedIcon fontSize={isMobile ? "small" : "medium"} color="action" />
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                              edge="end"
-                              size={isMobile ? "small" : "medium"}
-                            >
-                              {showRegisterPassword ? (
-                                <VisibilityOffOutlinedIcon fontSize={isMobile ? "small" : "medium"} />
-                              ) : (
-                                <VisibilityOutlinedIcon fontSize={isMobile ? "small" : "medium"} />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    
-                    {/* Indicador de fuerza de contraseña */}
-                    {registerPassword && (
-                      <Box sx={{ mt: 1, mb: { xs: 1, sm: 2 } }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
-                            Fuerza de la contraseña
-                          </Typography>
-                          <Typography variant={isMobile ? "caption" : "body2"} sx={{ color: getPasswordStrengthColor() }}>
-                            {getPasswordStrengthLabel()}
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={(passwordStrength / 4) * 100}
-                          sx={{
-                            height: isMobile ? 4 : 6,
-                            borderRadius: 3,
-                            bgcolor: alpha(theme.palette.grey[500], 0.2),
-                            '& .MuiLinearProgress-bar': {
-                              bgcolor: getPasswordStrengthColor(),
-                            },
-                          }}
-                        />
-                      </Box>
-                    )}
-                    
-                    <TextField
-                      label="Confirmar contraseña"
-                      type={showConfirmPassword ? 'text' : 'password'}
-              fullWidth
-                      margin="normal"
-                      variant="outlined"
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value);
-                        if (e.target.value && e.target.value !== registerPassword) {
-                          setConfirmPasswordError('Las contraseñas no coinciden');
-                        } else {
-                          setConfirmPasswordError('');
-                        }
-                      }}
-                      error={!!confirmPasswordError}
-                      helperText={confirmPasswordError}
-                      disabled={isLoading}
-                      size={isMobile ? "small" : "medium"}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <LockOutlinedIcon fontSize={isMobile ? "small" : "medium"} color="action" />
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                              edge="end"
-                              size={isMobile ? "small" : "medium"}
-                            >
-                              {showConfirmPassword ? (
-                                <VisibilityOffOutlinedIcon fontSize={isMobile ? "small" : "medium"} />
-                              ) : (
-                                <VisibilityOutlinedIcon fontSize={isMobile ? "small" : "medium"} />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                    
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={acceptTerms}
-                          onChange={(e) => setAcceptTerms(e.target.checked)}
-                          color="primary"
-                          size="small"
-                        />
-                      }
-                      label={
-                        <Typography variant={isMobile ? "caption" : "body2"}>
-                          Acepto los{' '}
-                          <Link href="#" underline="hover" color="primary">
-                            términos y condiciones
-                          </Link>{' '}
-                          y la{' '}
-                          <Link href="#" underline="hover" color="primary">
-                            política de privacidad
-                          </Link>
-                        </Typography>
-                      }
-                      sx={{ mt: 1 }}
-                    />
-                    
-                    <Button
-                      type="submit"
-                      fullWidth
-                      variant="contained"
-                      color="primary"
-                      size={isMobile ? "medium" : "large"}
-                      disabled={isLoading}
-                      sx={{ 
-                        mt: { xs: 2, sm: 3 }, 
-                        mb: { xs: 1, sm: 2 },
-                        py: { xs: 1, sm: 1.5 },
-                        fontWeight: 'bold',
-                        borderRadius: 2
-                      }}
-                    >
-                      {isLoading ? (
-                        <CircularProgress size={isMobile ? 20 : 24} color="inherit" />
-                      ) : (
-                        'Crear Cuenta'
-                      )}
-                    </Button>
-                    
-                    <Divider sx={{ my: { xs: 2, sm: 3 } }}>
-                      <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
-                        O regístrate con
-                      </Typography>
-                    </Divider>
-                    
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<GoogleIcon fontSize={isMobile ? "small" : "medium"} />}
-                      onClick={handleGoogleSignIn}
-                      disabled={isLoading}
-                      size={isMobile ? "medium" : "large"}
-                      sx={{ mb: 2 }}
-                    >
-                      Registrarse con Google
-            </Button>
-          </form>
-                </Box>
-                
-                {/* Pie de página */}
-                <Box sx={{ mt: 'auto', textAlign: 'center' }}>
-                  <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
-                    {activeTab === 0 ? (
-                      <>
-                        ¿No tienes una cuenta?{' '}
-                        <Link
-                          component="button"
-                          variant={isMobile ? "caption" : "body2"}
-                          onClick={() => setActiveTab(1)}
-                          underline="hover"
-                          color="primary"
-                          type="button"
-                        >
-                          Regístrate ahora
-                        </Link>
-                      </>
-                    ) : (
-                      <>
-                        ¿Ya tienes una cuenta?{' '}
-                        <Link
-                          component="button"
-                          variant={isMobile ? "caption" : "body2"}
-                          onClick={() => setActiveTab(0)}
-                          underline="hover"
-                          color="primary"
-                          type="button"
-                        >
-                          Inicia sesión
-                        </Link>
-                      </>
-                    )}
-                  </Typography>
-                </Box>
-              </Paper>
-        </Grid>
-      </Grid>
-        </Box>
-    </Container>
-    </Box>
+    <Fade in key={`${currentScreen}-${step}`} timeout={250}>
+      <Box sx={{ position: 'fixed', inset: 0 }}>{renderActive()}</Box>
+    </Fade>
   );
 };
 
-export default Auth;
+export default Login;

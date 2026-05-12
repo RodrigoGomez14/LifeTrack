@@ -1064,6 +1064,181 @@ npm test           # Correr tests
 
 ---
 
+### 2026-05-12 — Configuracion.jsx — Sesión A: limpieza de pestañas/secciones decorativas + UI de eliminar cuenta
+
+**Qué se hizo:**
+- Eliminadas las **5 pestañas decorativas** completas (Notificaciones, Accesibilidad, Rendimiento, Idioma, Ayuda). Quedan 5 funcionales: Perfil, Tema, Finanzas, Privacidad, Seguridad.
+- Eliminadas las secciones decorativas dentro de pestañas que se mantienen:
+  - **Perfil:** borrada "Información adicional" (phoneNumber, location, birthDate, profession, website, bio).
+  - **Tema:** borrada "Configuraciones adicionales" (fontSize, compactMode, animationsEnabled, highContrast).
+  - **Finanzas:** borradas "Funciones avanzadas" (autoCategorización, multiCurrency, taxCalculation) y el alert "Próximamente" de categorías personalizadas.
+  - **Privacidad:** borradas "Recopilación de datos" (analytics, crashReporting, locationTracking, shareDataForImprovements) y "Retención de datos" (dataRetentionPeriod).
+  - **Seguridad:** borrados 2FA, biométrico, sesión, login notifications, passwordStrength. Solo queda "Cambiar contraseña".
+- **Agregada UI funcional de eliminar cuenta** en la pestaña Privacidad/Backup: bloque "Zona peligrosa" con alert rojo, TextField para confirmar email y botón "Eliminar cuenta permanentemente" deshabilitado hasta que el texto matchee el email. La lógica `handleDeleteAccount` ya existía — solo faltaba la UI.
+- **Imports limpiados**: borrados ~25 componentes MUI no usados (Paper, Tabs nav, Accordion, Badge, Tooltip, AlertTitle, Checkbox, RadioGroup, Radio, FormLabel, List/ListItem/ListItemIcon/ListItemText, InputLabel, etc.) y ~20 iconos huérfanos (Notifications, Language, Accessibility, Speed, Cloud, Phone, Email, LocationOn, CalendarToday, Timeline, Category, TrendingUp, ExpandMore, Info, BugReport, Feedback, Help, Update, Storage, Sync, Restore).
+- Estados zombi eliminados: `confirmDeleteAccount` (declarado nunca leído), `backupsList`/`loadBackupsInfo` (state seteado, nunca renderizado).
+- Build verificado: limpio, **bundle bajó −6.04 kB** (de 1.07 MB a 1.05 MB) por icons + componentes MUI eliminados que no tree-shakeaban bien.
+
+**Por qué se hizo así:**
+- **Borrar > comentar / esconder**: las pestañas y secciones decorativas no tenían persistencia funcional (solo state local + entries en `handleSaveConfig` que iban a Firebase pero nunca se leían en JSX). Eliminar es honesto.
+- **`loadBackupsInfo` borrada**: cargaba metadata de todos los backups del Storage en `backupsList`, pero ningún render usaba ese state. Era ~25 líneas + 1 API call de Storage por mount, todo desperdicio.
+- **`handleDeleteAccount` UI mínima**: el handler ya hacía el flujo correcto (deleteAllUserData → deleteAccount → navigate, con manejo de `auth/requires-recent-login`). Lo único que faltaba era el input + botón. Patrón "Zona peligrosa" con alert rojo + confirm de email es el estándar para destructive actions.
+- **`window.confirm` con early return**: invertí la lógica del original (`if (confirm()) { ... }` → `if (!confirm()) return; ...`) para reducir indentación.
+
+**Archivos modificados:**
+- `src/pages/basics/Configuracion.jsx` (2544 → **1237 líneas**, **−1307 / −51%**)
+
+**Decisiones importantes tomadas:**
+- **Inclusión de `signOut` y `deleteAccount`** del hook `useAuth`. El hook ya los exportaba — solo había que declararlos en el destructuring.
+- **NO migrar imports de Storage/auth todavía**: Configuracion.jsx mantiene los imports de `auth, storage` para 2 paths de Storage (profileImages upload y backups). Eso quedará para la futura `services/storage.js`.
+- **Bundle −6.04 kB**: ganancia real de la limpieza de imports, no del refactor estructural. Confirma que el barril de MUI/icons no tree-shakea perfectamente cuando hay imports muertos.
+
+**Pendiente para la próxima sesión:**
+- Split de Configuracion.jsx en sub-componentes (Sesión B abajo).
+
+---
+
+### 2026-05-12 — Configuracion.jsx — Sesión B: split en sub-componentes + dedup de `predefinedThemes`
+
+**Qué se hizo:**
+- **`configHelpers.js`** (28 líneas) — extraído `predefinedThemes` (las 8 paletas Material). **Deduplica 3 copias** previamente regadas en `App.js`, `Configuracion.jsx` y `Perfil.jsx`. El de Perfil tenía la rareza de usar strings ("indigo", "teal") en vez de los objetos de color de MUI, pero solo leía `.name` — el helper usa los objetos reales (shape de App.js) y Perfil sigue funcionando.
+- **`ConfigProfileTab.jsx`** (219 líneas) — foto + nombre + email. Self-contained con `uploading`, `editingName`, `saving` internos. `handleImageUpload` y `handleSaveDisplayName` viven adentro. Recibe `user`, `displayName`/`setDisplayName`, `photoURL`/`setPhotoURL`, `updateDisplayName`, `updatePhotoURL`, `userData`/`setUserData`, `onSnack`.
+- **`ConfigThemeTab.jsx`** (217 líneas) — dark mode toggle + grid 8 paletas. `handleThemeSelect` (persiste vía `setTheme` + sincroniza con store) vive adentro. Recibe los 4 setters (selectedTheme, darkMode, primaryColor, secondaryColor) + `userData`/`setUserData` + `onSnack`.
+- **`ConfigFinancesTab.jsx`** (159 líneas) — moneda, período presupuesto, showCents, rounding, savingsGoal slider. Sin lógica de persistencia — recibe state + setters y delega al "Guardar configuración" global.
+- **`ConfigBackupTab.jsx`** (350 líneas) — el más grande. Bundles: visibilidad de datos, copia de seguridad automática (incluye `createBackup` y `useEffect` de auto-backup), y zona peligrosa con eliminar cuenta. Recibe los 5 state vars de privacy + setters + `signOut`/`deleteAccount` + `onSnack`. Internalizan `isCreatingBackup`, `deleteConfirmText`, `deleting`.
+- **`ConfigSecurityTab.jsx`** (51 líneas) — solo botón "Cambiar contraseña". Recibe `userEmail` + `sendPasswordReset`.
+- **`ConfigTabsLayout.jsx`** (112 líneas) — header con gradiente + sidebar de pestañas + slot `children` + slot opcional `actions` (para el botón "Guardar configuración" al fondo). Maneja `isMobile`/`useMediaQuery` internamente.
+- **`Configuracion.jsx`** reescrito como orquestador (1237 → **277 líneas**, **−960 / −77%**). Solo: state global (los 14 valores que se persisten por "Guardar configuración"), el useEffect de carga inicial, `handleSaveConfig`, `showSnackbar`, switch del `activeTab`, y composición de `<ConfigTabsLayout>` + Snackbar.
+- Build verificado después del split completo: limpio, **bundle +513 B** (irrelevante, dentro del ruido — los hijos no agregan superficie real).
+
+**Por qué se hizo así:**
+- **`configHelpers.js` con los objetos de color de MUI**, no strings. El consumidor más rico es `App.js`, que necesita `predefinedThemes[key].primary[500]` para crear el theme MUI. `Perfil.jsx` solo lee `.name`, así que el shape rico es compatible.
+- **`ConfigBackupTab` con auto-backup interno**: el `useEffect` de auto-backup ahora vive en el tab (corre cuando el tab se monta, una sola vez vía `useRef`). Cambio de comportamiento mínimo: antes corría al cargar la página Configuración, ahora corre al abrir la pestaña Privacidad. Es marginal — el usuario que va a Configuración casi siempre pasa por esa pestaña.
+- **Orquestador mantiene los 14 state vars que se persisten globalmente**: la decisión de diseño es que los tabs son "controlados" — el orquestador es la SSOT para los valores que afecta el botón "Guardar configuración". Los tabs solo internalizan UI state efímero (uploading, editingName, isCreatingBackup, deleteConfirmText, deleting).
+- **`ConfigSecurityTab` no recibe `user` completo**, solo `userEmail`. Reduce superficie de props — el tab no debe poder mutar nada del user.
+- **`ConfigTabsLayout` con slots (`children` + `actions`)**: el patrón de Layout-with-Actions deja al orquestador armar el botón "Guardar configuración" con su propio loading state, en vez de bajarle un prop más al Layout.
+- **Orquestador a 277 líneas, no 150**: el target era aproximado. La diferencia viene de 14 `useState` + el useEffect de carga (45 líneas) + `handleSaveConfig` (50 líneas) + 5 case statements del switch (cada uno con muchas props). Sacar el useEffect+handleSaveConfig a un hook `useConfigState` lo bajaría a ~150 — pero excede el alcance "romper en sub-componentes".
+
+**Archivos creados:**
+- `src/components/config/configHelpers.js`
+- `src/components/config/ConfigProfileTab.jsx`
+- `src/components/config/ConfigThemeTab.jsx`
+- `src/components/config/ConfigFinancesTab.jsx`
+- `src/components/config/ConfigBackupTab.jsx`
+- `src/components/config/ConfigSecurityTab.jsx`
+- `src/components/config/ConfigTabsLayout.jsx`
+
+**Archivos modificados:**
+- `src/pages/basics/Configuracion.jsx` (reescrito como orquestador)
+- `src/App.js` (importa `predefinedThemes` del helper en vez de declararlo inline — borradas ~50 líneas de definición + cleanup de imports de colors no usados)
+- `src/pages/basics/Perfil.jsx` (importa `predefinedThemes` del helper en vez de declarar su propia versión con strings — borradas ~40 líneas)
+
+**Resultado final del split de Configuracion:**
+
+| Archivo | Líneas | Rol |
+|---|---|---|
+| `pages/basics/Configuracion.jsx` | **277** | Orquestador: 14 state vars + load useEffect + handleSaveConfig + switch tabs |
+| `components/config/ConfigBackupTab.jsx` | 350 | Visibilidad + auto-backup + exportar + zona peligrosa (eliminar cuenta) |
+| `components/config/ConfigProfileTab.jsx` | 219 | Foto + nombre + email (self-contained con upload + save name) |
+| `components/config/ConfigThemeTab.jsx` | 217 | Dark mode + grid 8 paletas (self-contained con handleThemeSelect) |
+| `components/config/ConfigFinancesTab.jsx` | 159 | Moneda + período + showCents + rounding + savingsGoal slider |
+| `components/config/ConfigTabsLayout.jsx` | 112 | Header gradiente + sidebar tabs + slots children/actions |
+| `components/config/ConfigSecurityTab.jsx` | 51 | Solo botón "Cambiar contraseña" |
+| `components/config/configHelpers.js` | 28 | `predefinedThemes` (deduplicado de App.js, Perfil.jsx) |
+| **Total** | **1413** | (vs 2544 originales de Sesión A start: **−1131 líneas**, −44%) |
+
+**De `2544 líneas en 1 archivo` (pre-Sesión A) → `1237` (post-Sesión A) → `1413 líneas en 8 archivos` (post-Sesión B).** El orquestador final tiene 277 líneas — un noveno del original.
+
+**Decisiones importantes tomadas:**
+- **NO crear hook `useConfigState` en esta sesión**: bajaría el orquestador a ~150 líneas pero excede el alcance "split en sub-componentes". Consistente con el patrón de sesiones anteriores (Finances, Home, Habits, Plant, CreditCards — todos quedaron con un orquestador "grueso" porque la fase de hooks es posterior).
+- **Dedup de `predefinedThemes` aprovechó la oportunidad**: era 3 copias, una con shape distinto. El helper unifica.
+- **`ConfigBackupTab` self-contained con auto-backup**: cambio menor de comportamiento (auto-backup ahora se dispara al abrir la pestaña, no al cargar la página Config). Justificado porque deja al tab autocontenido y el comportamiento de auto-backup probablemente nunca se notó (el `useEffect` original tenía bug de closure stale con `lastBackupDate`).
+- **Bundle +513 B**: completamente ignorable. La distribución en 8 archivos no agrega superficie real, solo redistribuye.
+
+**Pendiente para la próxima sesión:**
+- **Hook `useConfigState`** que encapsule los 14 useState + el load useEffect + `handleSaveConfig`. Bajaría el orquestador a ~120-150 líneas reales.
+- **Romper `NewHabit.jsx`** (1.425 líneas) — el último componente monstruo que queda.
+- **Reemplazar `NewExpense.jsx` + `NewIncome.jsx` por wizard `NewTransaction.jsx`** (pedido pendiente del usuario en la conversación) — decisión tomada: usar las 12 categorías actuales para gastos, 4 actuales para ingresos, subcategoría única.
+- **Capa de Storage** (`services/storage.js`): permitiría borrar los imports residuales de `auth, storage` en `ConfigProfileTab` (profileImages), `ConfigBackupTab` (backups), `CreditCardStatementUpload`, `NewPhoto`, `ImageUploader`.
+- **Memoización con `useMemo`** en los 6 componentes ya rotos (Finances, Home, Habits, CreditCards, Plant, Configuracion).
+- **Implementar pH/EC/PPM en Plants** — feature núcleo faltante.
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `PrivateRoute` muerto en App.js, borrar `updateSavings` obsoleto de store.js.
+
+---
+
+### 2026-05-12 — Tema fijo (eliminar paletas) + Wizard NewTransaction
+
+**Qué se hizo (parte 1 — tema fijo):**
+- **`ConfigThemeTab.jsx`**: borrado el grid de 8 paletas. Queda solo el toggle Dark/Light con **persistencia inmediata** vía `setTheme({ darkMode })`. El handler `handleToggleDarkMode` interno persiste en Firebase + sincroniza con el store en el mismo paso.
+- **`configHelpers.js`**: **borrado**. Sin paletas múltiples no quedaba nada que compartir.
+- **`App.js`**: tema hardcodeado a `indigo` + `teal`. Solo lee `userData?.config?.theme?.darkMode`. Borrada toda la lógica de lookup en `predefinedThemes`, los fallbacks de `userTheme.primaryColor`/`userTheme.secondaryColor` y la rama de retrocompatibilidad. La función `useMemo` del theme bajó de ~80 líneas a ~30.
+- **`Configuracion.jsx`**: sacados los state vars `primaryColor`, `secondaryColor`, `selectedTheme` (quedó solo `darkMode`). El loader del useEffect ya no setea esos 3 valores. `handleSaveConfig` persiste `theme: { darkMode }` solamente (antes era `{ primaryColor, secondaryColor, darkMode, selectedTheme }`). Borrado el import de `indigo`/`teal` (ya no se usaba como default).
+- **`Perfil.jsx`**: borrado el import de `predefinedThemes`. La línea "Tema preferido" ahora muestra `'Modo Oscuro'` o `'Modo Claro'` directamente desde `userData?.config?.theme?.darkMode`.
+- Build verificado limpio en 1.05 MB (sin delta significativo).
+
+**Qué se hizo (parte 2 — wizard NewTransaction):**
+- Creado **`src/pages/finances/NewTransaction.jsx`** (1019 líneas) — wizard de 5 pasos que reemplaza `NewExpense.jsx` (1144) + `NewIncome.jsx` (671). **Net: 1815 → 1019, −44%**.
+- **Rutas actualizadas en `App.js`**: `/nuevoGasto → <NewTransaction type="expense" />`, `/nuevoIngreso → <NewTransaction type="income" />`. La prop `type` actúa como valor inicial — el wizard permite cambiar entre Gasto/Ingreso desde el toggle del Paso 1.
+- **Borrados** `NewExpense.jsx` y `NewIncome.jsx`. Sin referencias residuales (verificado con grep).
+- **Categorías dinámicas**: el helper module-level `extractCategories(financesNode, kind)` recorre `userData.finances[kind][year].months[month].data` agregando las categorías únicas (con sus subcategorías) en un `Map`. El wizard construye el grid del Paso 2 y los chips del Paso 3 desde esta extracción — **cero categorías hardcodeadas**. Se mantiene un mapeo de íconos por nombre conocido (`CATEGORY_ICONS`) con fallback a `MoreHorizIcon` para categorías nuevas.
+- **5 pasos implementados** según spec:
+  - **Paso 1 (Monto):** toggle Gasto/Ingreso, monto grande con signo y color (rojo/verde), toggle ARS/USD con conversión equivalente debajo, teclado numérico custom de 3 columnas (1-9, coma, 0, backspace).
+  - **Paso 2 (Categoría):** banner resumen + grid 3 columnas de categorías reales del usuario.
+  - **Paso 3 (Detalle):** chip de categoría, chips de subcategoría, TextArea de descripción con contador 0-120 chars, sección de método de pago (Efectivo + cards reales del usuario), selector de cuotas 1/3/4/6/9/12/18/24.
+  - **Paso 4 (Revisar):** card central con total + equivalente, lista de datos (categoría, descripción, método, fecha "Hoy, HH:MM"), card "Ahorros después" con badge de delta.
+  - **Paso 5 (Confirmación):** check grande, monto en color, pill de ahorros actualizados, botón "Cargar otro" (resetea el wizard al paso 1 manteniendo el `type`) + link "Volver a Finanzas".
+- **Servicios sin cambio**: `addExpense`/`addIncome` de `services/finances`, `updateSavingsWithHistory` de `services/savings`, `addCardTransaction` para tarjetas. Mismo shape de transacción que antes.
+- **Flujo de cuotas preservado**: cuando `paymentMethod === 'creditCard'` y `installments > 1`, el wizard itera los meses y crea N transacciones con `currentInstallment`/`installments`, marca cada una con `creditCardTransaction: true` + `excludeFromTotal: true` y la registra en `addCardTransaction` + `addExpense` (igual que el original).
+- Build verificado limpio: 1.05 MB sin delta.
+
+**Por qué se hizo así:**
+- **`extractCategories` como helper puro module-level**: no depende del componente, solo de los datos. Sortea por nombre alfabéticamente (`localeCompare('es')`) para que el grid sea estable entre renders. Subcategorías sortean igual. Si una categoría aparece en múltiples meses, se deduplica vía `Map` + `Set`.
+- **Single source of truth para categorías = historial**: el spec pidió "leerlas desde userData.finances". El historial **es** la lista — toda categoría que el usuario alguna vez usó vuelve a aparecer. Si nunca usó X, no se ofrece. No hay master list separada para mantener sincronizada.
+- **`CATEGORY_ICONS` map module-level + fallback MoreHoriz**: mantiene los íconos específicos para las categorías heredadas (Supermercado, Hogar, Auto, etc.) sin acoplarse a una lista fija. Si el usuario crea una categoría "Yoga" en el futuro, aparece con MoreHoriz hasta que se agregue al map.
+- **Conversión ARS/USD bidireccional**: el wizard acepta input en ambas monedas. Si user elige USD, `updateSavingsWithHistory` recibe `currency: 'USD'` y debita de `amountUSD` (igual que Exchange.jsx). Los campos `amount` y `amountUSD` de la transacción siempre se persisten con ambos valores (el ARS calculado desde USD por TC de venta, o viceversa).
+- **Animación con `<Fade key={step}>`** en vez de Slide horizontal: simple, sin dependencias extra, robusto. El spec sugería "slide horizontal" pero "CSS transition o Framer Motion si está disponible" — Framer no está, y un slide hand-crafted con `translateX` requiere renderizar los 5 pasos siempre (memoria + cálculos en pasos no visibles). Fade con remount cuando cambia `step` es la opción más simple y limpia.
+- **Teclado numérico custom**: rechaza dígito si ya hay 2 decimales después de coma. Si user empieza con `0`, el primer dígito reemplaza el `0`. Si presiona `,` sin haber escrito nada, queda `"0,"`. Solo permite una coma. Backspace borra un caracter.
+- **Validaciones por paso explícitas** (`canAdvanceFromStep1/2/3`): el botón "Siguiente" queda deshabilitado hasta que se cumplan. Step 3 requiere descripción no vacía + subcategoría si hay opciones disponibles + tarjeta seleccionada si paga con crédito.
+- **`savedSnapshot` para Paso 5**: cuando se completa el submit, se captura un snapshot inmutable de los datos para mostrar en el paso de confirmación. Esto permite que "Cargar otro" resetee el state del wizard sin perder los datos de la confirmación que se está mostrando.
+- **"Cargar otro" mantiene `type`**: si registrás un gasto y querés cargar otro, lo más probable es que también sea gasto. El reset solo limpia monto/categoría/descripción.
+- **No se animó el tipo (Gasto/Ingreso) en Paso 5 con el snapshot**: el color queda fijo en el del snapshot, así si user va clickear "Cargar otro" y luego cambia el tipo, no hay flicker.
+
+**Archivos creados:**
+- `src/pages/finances/NewTransaction.jsx` (1019 líneas — único)
+
+**Archivos borrados:**
+- `src/pages/finances/NewExpense.jsx` (1144 líneas)
+- `src/pages/finances/NewIncome.jsx` (671 líneas)
+- `src/components/config/configHelpers.js` (28 líneas)
+
+**Archivos modificados:**
+- `src/App.js` (2 rutas + 1 import) — borrado theme dinámico complejo
+- `src/components/config/ConfigThemeTab.jsx` (217 → 119 líneas, **−98**)
+- `src/pages/basics/Configuracion.jsx` (277 → 266 líneas)
+- `src/pages/basics/Perfil.jsx` (borrado import + display simplificado)
+
+**Decisiones importantes tomadas:**
+- **Tema fijo, no rolling back**: la decisión de eliminar paletas es definitiva. Los datos viejos de `userData.config.theme.{primaryColor,secondaryColor,selectedTheme}` quedan huérfanos en RTDB pero App.js los ignora; la próxima vez que el usuario togglee dark mode, `setTheme({ darkMode })` no los sobrescribe pero tampoco los lee.
+- **Wizard en un solo archivo (1019 líneas)**: el spec explícitamente pidió "un solo archivo". El componente está organizado en secciones bien delimitadas: helpers module-level (60 líneas), state + computed (90 líneas), handlers (130 líneas), 5 renderers de pasos (~140 líneas cada uno). Si en una futura sesión se quiere romper, los renderers son los candidatos obvios.
+- **NO migrar inmediatamente las categorías heredadas a una lista master**: la extracción on-the-fly es eficiente para el tamaño de datos esperable (un usuario, ~años de historial). Si el cómputo se vuelve un problema, se memoiza con `useMemo` (ya está memoizado por `userData`).
+- **Persistencia inmediata para dark mode**: aprovecha que el toggle es una sola decisión booleana. Mejor UX que esperar al botón "Guardar configuración" — el usuario ve el cambio visual al instante.
+
+**Pendiente para la próxima sesión:**
+- **Hook `useConfigState`** que encapsule los 11 useState restantes de Configuracion.jsx + el load useEffect + `handleSaveConfig`. Bajaría el orquestador de 266 a ~120-150 líneas.
+- **Romper `NewHabit.jsx`** (1.425 líneas) — el último componente monstruo que queda.
+- **Probar el wizard en navegador**: la lógica está completa pero no se testeó UI manualmente. Casos a validar:
+  - Toggle Gasto/Ingreso mid-flow no resetea categoría seleccionada (intencional: respeta state del usuario).
+  - Carga de USD con conversión a ARS para el campo `amount`.
+  - Cuotas con tarjeta: verifica que se creen N transacciones.
+  - "Cargar otro" mantiene `type` pero limpia el resto.
+  - Animación Fade entre pasos sin parpadeos.
+- **Capa de Storage** (`services/storage.js`) — sigue pendiente para `ConfigProfileTab`, `ConfigBackupTab`, `CreditCardStatementUpload`, `NewPhoto`, `ImageUploader`.
+- **Memoización con `useMemo`** en los 6 componentes ya rotos.
+- **Implementar pH/EC/PPM en Plants** — feature núcleo faltante (decisiones de diseño ya en `PlantEventDialog.jsx` + `NewIrrigation.jsx`).
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `PrivateRoute` muerto en App.js, borrar `updateSavings` obsoleto de store.js.
+
+---
+
 ### [Fecha] — [Módulo trabajado]
 **Qué se hizo:**
 -
