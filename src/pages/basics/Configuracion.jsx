@@ -56,8 +56,7 @@ function Configuracion() {
   const [email, setEmail] = useState('');
   const [photoURL, setPhotoURL] = useState('');
 
-  // Tema (solo darkMode — paletas fijas indigo/teal)
-  const [darkMode, setDarkMode] = useState(false);
+  // Tema (dark-only — sin toggle)
 
   // Finanzas
   const [defaultCurrency, setDefaultCurrency] = useState('ARS');
@@ -83,10 +82,6 @@ function Configuracion() {
 
     if (userData && userData.config) {
       const config = userData.config;
-
-      if (config.theme) {
-        setDarkMode(config.theme.darkMode || false);
-      }
 
       if (config.finances) {
         setDefaultCurrency(config.finances.defaultCurrency || 'ARS');
@@ -121,7 +116,6 @@ function Configuracion() {
       }
 
       const configToSave = {
-        theme: { darkMode },
         finances: { defaultCurrency, showCents, savingsGoal, budgetPeriod, roundingEnabled },
         privacy: {
           showSavingsOnDashboard,
@@ -173,10 +167,7 @@ function Configuracion() {
         return (
           <ConfigThemeTab
             displayName={displayName}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
             userData={userData}
-            setUserData={setUserData}
             onSnack={showSnackbar}
           />
         );

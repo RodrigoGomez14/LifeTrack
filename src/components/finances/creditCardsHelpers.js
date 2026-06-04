@@ -1,6 +1,105 @@
 // Helpers puros para el módulo de tarjetas de crédito.
 // No dependen de hooks, theme ni state de React.
 
+// Identifica el tipo visual de tarjeta a partir del nombre.
+export function getCardType(name = '') {
+  const lower = name.toLowerCase();
+  if (lower.includes('visa')) return 'visa';
+  if (lower.includes('master')) return 'mastercard';
+  return 'credit-card';
+}
+
+export function getCardGradient(cardType) {
+  if (cardType === 'visa') return 'linear-gradient(135deg, #1a237e 0%, #303f9f 100%)';
+  if (cardType === 'mastercard') return 'linear-gradient(135deg, #b71c1c 0%, #e53935 100%)';
+  return 'linear-gradient(135deg, #455a64 0%, #78909c 100%)';
+}
+
+export function getCardLabel(cardType) {
+  if (cardType === 'visa') return 'VISA';
+  if (cardType === 'mastercard') return 'MASTER';
+  return 'CARD';
+}
+
+// Quita el sufijo "- Cuota XX/YY" de una descripción para obtener la descripción base
+// de una compra a cuotas. Las cuotas comparten esta base.
+export function stripInstallmentSuffix(description = '') {
+  return description.replace(/\s*-\s*Cuota\s+\d+\/\d+\s*$/i, '').trim();
+}
+
+// Extrae las compras a cuotas activas (con cuotas pendientes) de una tarjeta.
+// Una compra a cuotas se identifica por description base + installments + monto por cuota.
+// Devuelve [{description, category, installments, installmentAmount, paid, remaining, totalRemaining, futureDates}].
+export function extractActiveInstallments(cardTransactions, today = new Date()) {
+  if (!cardTransactions) return [];
+  const groups = new Map();
+
+  Object.values(cardTransactions).forEach((tx) => {
+    if (!tx.installments || tx.installments < 2) return;
+    const baseDesc = stripInstallmentSuffix(tx.description || '');
+    const amountKey = Math.round((tx.amount || 0) * 100);
+    const key = `${baseDesc}|${tx.installments}|${amountKey}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        description: baseDesc || '(sin descripción)',
+        category: tx.category,
+        subcategory: tx.subcategory,
+        installments: tx.installments,
+        installmentAmount: tx.amount || 0,
+        items: [],
+      });
+    }
+    groups.get(key).items.push({ ...tx, _date: parseFlexibleDate(tx.date) });
+  });
+
+  const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+  return Array.from(groups.values())
+    .map((g) => {
+      const paid = g.items.filter((it) => {
+        if (!it._date) return false;
+        const t = new Date(it._date.getFullYear(), it._date.getMonth(), it._date.getDate()).getTime();
+        return t <= todayTime;
+      }).length;
+      const remaining = Math.max(0, g.installments - paid);
+      return {
+        description: g.description,
+        category: g.category,
+        subcategory: g.subcategory,
+        installments: g.installments,
+        installmentAmount: g.installmentAmount,
+        paid,
+        remaining,
+        totalRemaining: g.installmentAmount * remaining,
+        futureDates: g.items
+          .filter((it) => it._date && new Date(it._date.getFullYear(), it._date.getMonth(), it._date.getDate()).getTime() > todayTime)
+          .map((it) => it._date),
+      };
+    })
+    .filter((g) => g.remaining > 0)
+    .sort((a, b) => b.totalRemaining - a.totalRemaining);
+}
+
+// Agrupa cuotas futuras de una tarjeta por mes (YYYY-MM) y devuelve [{key, label, total}]
+// ordenado cronológicamente. Acepta el array devuelto por extractActiveInstallments.
+export function buildFutureCommitmentByMonth(activeInstallments) {
+  const monthMap = new Map(); // key YYYY-MM → total
+  activeInstallments.forEach((g) => {
+    g.futureDates.forEach((d) => {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthMap.set(key, (monthMap.get(key) || 0) + g.installmentAmount);
+    });
+  });
+
+  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return Array.from(monthMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, total]) => {
+      const [y, m] = key.split('-').map(Number);
+      return { key, label: `${months[m - 1]} ${String(y).slice(2)}`, total };
+    });
+}
+
 // True si el mes/año dado está más allá del límite de N meses futuros desde hoy.
 export function isBeyondFutureLimit(year, month, limitMonths = 1) {
   const today = new Date();
@@ -185,7 +284,7 @@ function formatDayMonthYear(date) {
 
 // Construye el objeto `updates` para `bulkUpdate` que persiste el pago de tarjetas.
 // Registra: pago global del mes, payments por tarjeta (solo las con saldo), una
-// expense por cuota (viernes), y actualiza savings/amountARS + history.
+// expense por cuota (viernes), y actualiza savings/amountARS o savings/amountUSD + history.
 //
 // Las keys de RTDB (`expenseKeys`, `savingsHistoryKey`) se pre-generan en el
 // orquestador con `generateKey` y se pasan acá, manteniendo el helper puro.
@@ -204,6 +303,7 @@ export function buildPaymentUpdates({
   currentSavings,
   expenseKeys, // Array<string> con length = numberOfPayments
   savingsHistoryKey,
+  source, // 'ars' | 'usd'
 }) {
   const firstFormatted = formatDayMonthYear(paymentDates[0]);
   const nowIso = new Date().toISOString();
@@ -247,9 +347,13 @@ export function buildPaymentUpdates({
     };
   }
 
+  const isUSD = source === 'usd';
+  const savingsPath = isUSD ? 'savings/amountUSD' : 'savings/amountARS';
+  const historyPath = isUSD ? 'savings/amountUSDHistory' : 'savings/amountARSHistory';
+
   const newSavingsTotal = currentSavings - roundedAmount;
-  updates['savings/amountARS'] = newSavingsTotal;
-  updates[`savings/amountARSHistory/${savingsHistoryKey}`] = {
+  updates[savingsPath] = newSavingsTotal;
+  updates[`${historyPath}/${savingsHistoryKey}`] = {
     date: firstFormatted,
     amount: -roundedAmount,
     newTotal: newSavingsTotal,

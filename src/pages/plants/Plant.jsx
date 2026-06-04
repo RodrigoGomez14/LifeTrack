@@ -1,23 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Swal from 'sweetalert2';
-import { Box, Typography, Alert } from "@mui/material";
+import { Box, Typography, Card, alpha, IconButton } from "@mui/material";
 import { useTheme } from '@mui/material/styles';
-import HistoryIcon from '@mui/icons-material/History';
+import CreateOutlinedIcon from '@mui/icons-material/CreateOutlined';
+import { SectionCard } from "../../design-system";
 import Layout from "../../components/layout/Layout";
 import { useStore } from "../../store";
-import { updatePlant, archivePlant } from "../../services/plants";
-import { read } from "../../services/database";
+import { updatePlant } from "../../services/plants";
 import { checkSearch, getDate } from "../../utils";
 import { getNextStage } from "../../components/plants/plantsHelpers";
-import PlantHero from "../../components/plants/PlantHero";
-import PlantStageCards from "../../components/plants/PlantStageCards";
-import PlantQuickActions from "../../components/plants/PlantQuickActions";
-import PlantActionStats from "../../components/plants/PlantActionStats";
 import PlantStageDialog from "../../components/plants/PlantStageDialog";
 import PlantProfilePhotoDialog from "../../components/plants/PlantProfilePhotoDialog";
-import PlantEventDialog from "../../components/plants/PlantEventDialog";
-import PlantCalendar from "../../components/plants/PlantCalendar";
+import PlantMeasurementsChart from "../../components/plants/PlantMeasurementsChart";
+import PlantPhotoCompare from "../../components/plants/PlantPhotoCompare";
+import WeekStrip, { getDayKey } from "../../components/plants/WeekStrip";
+import { STAGES } from "../../components/plants/PlantShared";
 
 const Plant = () => {
   const { userData } = useStore();
@@ -26,636 +24,372 @@ const Plant = () => {
   const theme = useTheme();
 
   const [plant, setPlant] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [events, setEvents] = useState([]);
-  const [openCalendarModal, setOpenCalendarModal] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [highlightedTab, setHighlightedTab] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(new Date());
+  const [showStageDialog, setShowStageDialog] = useState(false);
+  const [isChangingStage, setIsChangingStage] = useState(false);
+  const [showProfilePhotoSelector, setShowProfilePhotoSelector] = useState(false);
+  const [showPhotoCompare, setShowPhotoCompare] = useState(false);
 
-  // Estados para los inputs de peso
   const [pesoHumedoInput, setPesoHumedoInput] = useState('');
   const [pesoSecoInput, setPesoSecoInput] = useState('');
   const [savingPesoHumedo, setSavingPesoHumedo] = useState(false);
   const [savingPesoSeco, setSavingPesoSeco] = useState(false);
 
-  // Navegación del calendario
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [showStageDialog, setShowStageDialog] = useState(false);
-  const [isChangingStage, setIsChangingStage] = useState(false);
-  const [showProfilePhotoSelector, setShowProfilePhotoSelector] = useState(false);
-  const [isMovingToHistory, setIsMovingToHistory] = useState(false);
-
-  // Resaltado temporal de la stat card clickeada — limpia el highlight tras 2s.
   useEffect(() => {
-    if (highlightedTab !== null) {
-      const timer = setTimeout(() => {
-        setHighlightedTab(null);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [highlightedTab]);
-
-  useEffect(() => {
-    setLoading(true); // Indicar que estamos cargando al cambiar de ubicación
     const id = checkSearch(location.search);
-    
-    // Primero buscar en plantas activas
     if (userData?.plants?.active && userData.plants.active[id]) {
-      setPlant({...userData.plants.active[id], id});
-      setLoading(false);
-    } 
-    // Si no está en activas, buscar en plantas archivadas
-    else if (userData?.plants?.history && userData.plants.history[id]) {
-      setPlant({...userData.plants.history[id], id, isArchived: true});
-      setLoading(false);
-    }
-    // Si no está en ninguna de las dos ubicaciones pero userData.plants está disponible
-    else if (userData?.plants) {
-      // Buscar en otras posibles ubicaciones
+      setPlant({ ...userData.plants.active[id], id, isArchived: false });
+    } else if (userData?.plants?.history && userData.plants.history[id]) {
+      setPlant({ ...userData.plants.history[id], id, isArchived: true });
+    } else if (userData?.plants) {
       let found = false;
-      
-      // Verificar si existe la propiedad 'archived'
       if (userData.plants.archived && userData.plants.archived[id]) {
-        setPlant({...userData.plants.archived[id], id, isArchived: true});
-        found = true;
-      } else {
-        // Buscar en todas las propiedades que no sean 'active'
+        setPlant({ ...userData.plants.archived[id], id, isArchived: true }); found = true;
+      }
+      if (!found) {
         for (const key in userData.plants) {
           if (key !== 'active' && typeof userData.plants[key] === 'object') {
             for (const plantId in userData.plants[key]) {
-              if (plantId === id) {
-                setPlant({...userData.plants[key][plantId], id, isArchived: true});
-                found = true;
-                break;
-              }
+              if (plantId === id) { setPlant({ ...userData.plants[key][plantId], id, isArchived: true }); found = true; break; }
             }
             if (found) break;
           }
         }
       }
-      
-      setLoading(false);
     }
-  }, [location.search, userData.plants]);
+  }, [location.search, userData?.plants]);
 
-  useEffect(() => {
-    if (plant) {
-      generateEvents();
-    }
-  }, [plant, theme.palette]);
+  const stage = STAGES.find((s) => s.key === plant?.etapa) || STAGES[0];
+  const daysActive = useMemo(() => {
+    if (!plant?.birthDate) return 0;
+    const [d, m, y] = plant.birthDate.split('/');
+    const plantDate = new Date(+y, +m - 1, +d);
+    return Math.floor((selectedDay - plantDate) / (1000 * 60 * 60 * 24));
+  }, [plant, selectedDay]);
+  const weeksActive = Math.floor(daysActive / 7);
 
-  const generateEvents = () => {
-    const newEvents = [];
-    
-    const actions = [
-      { type: 'Riego', data: plant.irrigations, color: theme.palette.info.main, icon: 'water' },
-      { type: 'Insecticida', data: plant.insecticides, color: theme.palette.error.main, icon: 'bug' },
-      { type: 'Poda', data: plant.prunings, color: theme.palette.success.main, icon: 'cut' },
-      { type: 'Transplante', data: plant.transplants, color: theme.palette.warning.main, icon: 'swap' },
-      { type: 'Log', data: plant.logs, color: '#9c27b0', icon: 'note' }
+  const selectedKey = getDayKey(selectedDay);
+  const dayEntries = useMemo(() => {
+    if (!plant) return [];
+    const entries = [];
+    const types = [
+      { prop: 'irrigations', getVals: (e) => [
+        e.ph !== undefined ? { type: 'ph', value: e.ph, color: '#4CAF50' } : null,
+        e.ec !== undefined ? { type: 'ec', value: e.ec, color: '#2196F3' } : null,
+        e.ppm !== undefined ? { type: 'ppm', value: e.ppm, color: '#FF9800' } : null,
+        e.waterTemp !== undefined ? { type: 'temp', value: e.waterTemp, color: '#E91E63' } : null,
+        e.quantity ? { type: 'water', value: e.quantity, color: '#00BCD4' } : null,
+      ]},
+      { prop: 'logs', getVals: (e) => [
+        e.ph !== undefined ? { type: 'ph', value: e.ph, color: '#4CAF50' } : null,
+        e.ec !== undefined ? { type: 'ec', value: e.ec, color: '#2196F3' } : null,
+        e.ppm !== undefined ? { type: 'ppm', value: e.ppm, color: '#FF9800' } : null,
+        e.waterTemp !== undefined ? { type: 'temp', value: e.waterTemp, color: '#E91E63' } : null,
+      ]},
+      { prop: 'prunings', getVals: (e) => [{ type: 'note', value: e.type || 'Poda', color: '#4CAF50' }] },
+      { prop: 'insecticides', getVals: (e) => [{ type: 'note', value: e.treatmentType || 'Insecticida', color: '#FF5722' }] },
+      { prop: 'transplants', getVals: (e) => [{ type: 'note', value: `${e.newPot || '?'}L`, color: '#9C27B0' }] },
+      { prop: 'logs', getVals: (e) => [{ type: 'note', value: (e.description || '').slice(0, 40), color: '#607D8B' }] },
     ];
-
-    // Procesar las acciones normales
-    actions.forEach(action => {
-      if (action.data) {
-        Object.keys(action.data).forEach(key => {
-          const item = action.data[key];
-          if (!item.date) return; // Asegurarse de que existe la fecha
-          
-          const dateArray = item.date.split('/');
-          const formattedDate = `${dateArray[2]}-${dateArray[1].padStart(2, '0')}-${dateArray[0].padStart(2, '0')}`;
-          
-          // Crear fecha ajustada para asegurar que se muestre en el día correcto
-          const eventDate = new Date(formattedDate + 'T12:00:00');
-          
-          let description = '';
-          switch(action.type) {
-            case 'Riego':
-              description = `${item.quantity}ml`;
-              break;
-            case 'Insecticida':
-              description = item.product || 'Sin producto';
-              break;
-            case 'Poda':
-              description = item.type || 'Sin tipo';
-              break;
-            case 'Transplante':
-              description = `${item.previousPot || '?'}L → ${item.newPot || '?'}L`;
-              break;
-            case 'Log':
-              description = item.description && item.description.length > 30 
-                ? item.description.substring(0, 30) + '...' 
-                : item.description || 'Sin descripción';
-              break;
-            default:
-              description = 'Sin descripción';
+    types.forEach(({ prop, getVals }) => {
+      if (plant[prop]) {
+        Object.values(plant[prop]).forEach((entry) => {
+          if (entry.date === selectedKey) {
+            const vals = getVals(entry).filter(Boolean);
+            vals.forEach((v) => entries.push(v));
           }
-          
-          newEvents.push({
-            id: `${action.type}-${key}`,
-            title: `${action.type}: ${description}`,
-            start: eventDate,
-            end: eventDate,
-            allDay: true,
-            resourceType: action.type,
-            color: action.color,
-            icon: action.icon,
-            details: item || {},
-            eventKey: key,
-            description: description
-          });
         });
       }
     });
+    return entries;
+  }, [plant, selectedKey]);
 
-    // Procesar fotos de manera especial (agrupar por fecha)
-    if (plant.images) {
-      // Agrupar fotos por fecha
-      const photosByDate = {};
-      
-      Object.keys(plant.images).forEach(key => {
-        const photo = plant.images[key];
-        if (!photo.date) return;
-        
-        // Usar solo la fecha como clave (sin la hora)
-        if (!photosByDate[photo.date]) {
-          photosByDate[photo.date] = [];
-        }
-        
-        photosByDate[photo.date].push({
-          ...photo,
-          key: key
-        });
-      });
-      
-      // Crear eventos agrupados de fotos
-      Object.keys(photosByDate).forEach(date => {
-        const photos = photosByDate[date];
-        const dateArray = date.split('/');
-        const formattedDate = `${dateArray[2]}-${dateArray[1].padStart(2, '0')}-${dateArray[0].padStart(2, '0')}`;
-        const eventDate = new Date(formattedDate + 'T12:00:00');
-        
-        newEvents.push({
-          id: `Fotos-${date}`,
-          title: `Fotos (${photos.length})`,
-          start: eventDate,
-          end: eventDate,
-          allDay: true,
-          resourceType: 'Foto',
-          color: theme.palette.secondary.main,
-          icon: 'photo',
-          photos: photos, // Guardar todas las fotos del día
-          imageUrl: photos[0].url || photos[0].dataUrl, // Usar la primera foto como miniatura
-          details: {
-            date: date,
-            type: 'Fotografías',
-            count: photos.length
-          },
-          thumbnail: true,
-          description: `${photos.length} foto${photos.length > 1 ? 's' : ''}`
-        });
-      });
+  const dayTime = useMemo(() => {
+    if (!plant) return '';
+    const sources = [plant.logs, plant.irrigations];
+    for (const source of sources) {
+      if (!source) continue;
+      for (const entry of Object.values(source)) {
+        if (entry.date === selectedKey && entry.time) return entry.time;
+      }
     }
+    return '';
+  }, [plant, selectedKey]);
 
-    // Añadir eventos para las fechas de etapas de crecimiento
-    // Germinación
-    if (plant.birthDate) {
-      const birthDateArray = plant.birthDate.split('/');
-      const formattedBirthDate = `${birthDateArray[2]}-${birthDateArray[1].padStart(2, '0')}-${birthDateArray[0].padStart(2, '0')}`;
-      const birthEventDate = new Date(formattedBirthDate + 'T12:00:00');
-        
-        newEvents.push({
-        id: `Etapa-Germinacion`,
-        title: `Inicio de Germinación`,
-        start: birthEventDate,
-        end: birthEventDate,
-          allDay: true,
-        resourceType: 'Etapa',
-        stageType: 'Germinacion',
-        color: '#8e24aa', // Color morado para etapas
-        icon: 'seedling',
-        details: {
-          date: plant.birthDate,
-          type: 'Inicio de Germinación',
-          description: `Fecha de nacimiento de la planta "${plant.name}"`
-        }
-      });
-    }
-    
-    // Vegetativo
-    if (plant.inicioVegetativo) {
-      const vegDateArray = plant.inicioVegetativo.split('/');
-      const formattedVegDate = `${vegDateArray[2]}-${vegDateArray[1].padStart(2, '0')}-${vegDateArray[0].padStart(2, '0')}`;
-      const vegEventDate = new Date(formattedVegDate + 'T12:00:00');
-      
-      newEvents.push({
-        id: `Etapa-Vegetativo`,
-        title: `Inicio de Vegetativo`,
-        start: vegEventDate,
-        end: vegEventDate,
-        allDay: true,
-        resourceType: 'Etapa',
-        stageType: 'Vegetativo',
-        color: '#8e24aa', // Color morado para etapas
-        icon: 'sprout',
-        details: {
-          date: plant.inicioVegetativo,
-          type: 'Inicio de Vegetativo',
-          description: `La planta "${plant.name}" entró en etapa vegetativa`
-        }
-      });
-    }
-    
-    // Floración
-    if (plant.inicioFloracion) {
-      const florDateArray = plant.inicioFloracion.split('/');
-      const formattedFlorDate = `${florDateArray[2]}-${florDateArray[1].padStart(2, '0')}-${florDateArray[0].padStart(2, '0')}`;
-      const florEventDate = new Date(formattedFlorDate + 'T12:00:00');
-      
-      newEvents.push({
-        id: `Etapa-Floracion`,
-        title: `Inicio de Floración`,
-        start: florEventDate,
-        end: florEventDate,
-        allDay: true,
-        resourceType: 'Etapa',
-        stageType: 'Floracion',
-        color: '#8e24aa', // Color morado para etapas
-        icon: 'flower',
-        details: {
-          date: plant.inicioFloracion,
-          type: 'Inicio de Floración',
-          description: `La planta "${plant.name}" entró en etapa de floración`
-        }
-      });
-    }
+  const isFuture = useMemo(() => {
+    const today = new Date(); today.setHours(23, 59, 59, 999);
+    return selectedDay > today;
+  }, [selectedDay]);
 
-    // Ordenar los eventos por fecha
-    newEvents.sort((a, b) => a.start - b.start);
+  const dayLogData = useMemo(() => {
+    if (!plant?.logs) return { completeData: null, soloPhData: null };
+    let completeData = null;
+    let soloPhData = null;
+    Object.values(plant.logs).forEach((entry) => {
+      if (entry.date !== selectedKey) return;
+      if (entry.ph !== undefined && entry.ec !== undefined && entry.ppm !== undefined) {
+        completeData = entry;
+      } else if (entry.ph !== undefined && entry.ec === undefined && entry.ppm === undefined) {
+        soloPhData = entry;
+      }
+    });
+    return { completeData, soloPhData };
+  }, [plant, selectedKey]);
 
-    setEvents(newEvents);
-  };
-
-
-  const handleEventClick = (event) => {
-    if (event.resourceType === 'Foto') {
-      // No establecer selectedEvent, simplemente abrir la galería de fotos
-      // Esto evitará que se abra el modal simple
-      return;
-    }
-    
-    // Para otros tipos de eventos, mantener el comportamiento original
-    setSelectedEvent(event);
-    setOpenCalendarModal(true);
-  };
-
-
-
-
-  // Manejador para cambiar la etapa de la planta
-  const handleChangeStage = () => {
-    setShowStageDialog(true);
-  };
-
-  // Función para confirmar el cambio de etapa. Determina la siguiente etapa, persiste
-  // los campos de fecha asociados y, si pasa a Enfrascado, mueve al historial.
   const confirmStageChange = () => {
     setIsChangingStage(true);
-
     const plantId = checkSearch(location.search);
     const next = getNextStage(plant.etapa);
-
-    if (!next) {
-      setIsChangingStage(false);
-      setShowStageDialog(false);
-      Swal.fire({
-        icon: 'info',
-        title: 'Fin del ciclo',
-        text: 'La planta ya ha completado todo su ciclo de vida.',
-        confirmButtonColor: theme.palette.primary.main,
-      });
-      return;
-    }
-
+    if (!next) { setIsChangingStage(false); setShowStageDialog(false); return; }
     const { newStage, dateField } = next;
     const today = getDate();
     const updateData = { etapa: newStage, [dateField]: today };
-    if (plant.etapa === 'Secado' && newStage === 'Enfrascado') {
-      updateData.finalSecado = today;
-    }
-
+    if (plant.etapa === 'Secado' && newStage === 'Enfrascado') updateData.finalSecado = today;
     updatePlant(plantId, updateData, { isArchived: plant.isArchived })
-      .then(() => {
-        setPlant((prev) => ({ ...prev, ...updateData }));
-        setIsChangingStage(false);
-        setShowStageDialog(false);
-
-        if (newStage === 'Enfrascado') {
-          Swal.fire({
-            icon: 'success',
-            title: 'Planta enfrascada',
-            text: 'La planta ha completado su ciclo y será movida al archivo',
-            confirmButtonColor: theme.palette.primary.main,
-            timer: 2000,
-            timerProgressBar: true,
-          }).then(() => moveToHistory());
-        } else {
-          Swal.fire({
-            icon: 'success',
-            title: `Etapa actualizada a ${newStage}`,
-            text: `La planta ha avanzado a la etapa de ${newStage}`,
-            confirmButtonColor: theme.palette.primary.main,
-            timer: 2000,
-            timerProgressBar: true,
-          });
-        }
-      })
-      .catch((error) => {
-        console.error('Error al cambiar etapa:', error);
-        setIsChangingStage(false);
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'No se pudo actualizar la etapa. Inténtalo nuevamente.',
-          confirmButtonColor: theme.palette.primary.main,
-        });
-      });
+      .then(() => { setPlant((p) => ({ ...p, ...updateData })); setIsChangingStage(false); setShowStageDialog(false); Swal.fire({ icon: 'success', title: `Etapa: ${newStage}`, timer: 1500 }); })
+      .catch(() => { setIsChangingStage(false); Swal.fire({ icon: 'error', title: 'Error al cambiar etapa' }); });
   };
 
   const handleSetProfilePhoto = (imageUrl, imageKey) => {
     setShowProfilePhotoSelector(false);
-    
-    // Actualizar la base de datos con la foto de perfil seleccionada
     const plantId = checkSearch(location.search);
-    updatePlant(plantId, {
-      profilePhotoUrl: imageUrl,
-      profilePhotoKey: imageKey,
-    }, { isArchived: plant.isArchived })
-      .then(() => {
-        // Actualizar el estado local
-        setPlant(prev => ({
-          ...prev,
-          profilePhotoUrl: imageUrl,
-          profilePhotoKey: imageKey
-        }));
-        
-        // Mostrar mensaje de éxito
-        Swal.fire({
-          icon: 'success',
-          title: 'Foto de perfil actualizada',
-          text: 'La foto de perfil se ha actualizado correctamente',
-          confirmButtonColor: theme.palette.primary.main,
-          timer: 2000,
-          timerProgressBar: true
-        });
-      })
-      .catch(error => {
-        console.error("Error al actualizar la foto de perfil:", error);
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'No se pudo actualizar la foto de perfil. Inténtalo nuevamente.',
-          confirmButtonColor: theme.palette.primary.main
-        });
-      });
+    updatePlant(plantId, { profilePhotoUrl: imageUrl, profilePhotoKey: imageKey }, { isArchived: plant.isArchived })
+      .then(() => { setPlant((p) => ({ ...p, profilePhotoUrl: imageUrl, profilePhotoKey: imageKey })); Swal.fire({ icon: 'success', title: 'Foto actualizada', timer: 1500 }); })
+      .catch(() => Swal.fire({ icon: 'error', title: 'Error' }));
   };
 
-  // Función para mover la planta al historial
-  const moveToHistory = () => {
-    setIsMovingToHistory(true);
-    
-    // Obtener los datos actuales de la planta
-    const plantId = checkSearch(location.search);
-    
-    // Crear una copia de la planta para el historial
-    read(`plants/active/${plantId}`)
-      .then((plantData) => {
-        // Si la planta está en etapa de secado y no tiene fecha de finalización del secado,
-        // establecer automáticamente la fecha de finalización del secado
-        if (plantData.etapa === 'Secado' && !plantData.finalSecado) {
-          plantData.finalSecado = getDate();
-          plantData.etapa = 'Enfrascado';
-          plantData.inicioEnfrascado = getDate();
-        }
-        // archivePlant() agrega `inicioSecado` si falta, hace push a history y remove de active
-        return archivePlant(plantId, plantData);
-      })
-      .then((newHistoryId) => {
-        // Redirigir inmediatamente a la planta en el historial si tenemos el ID
-        if (newHistoryId) {
-          // Navegar primero, antes de mostrar la alerta
-          navigate(`/Planta/?${newHistoryId}`);
-          
-          // Pequeño retraso para que la redirección ocurra antes de mostrar cualquier mensaje
-          setTimeout(() => {
-            setIsMovingToHistory(false);
-            
-            // Mostrar mensaje después de la redirección
-            Swal.fire({
-              icon: 'success',
-              title: 'Planta archivada',
-              text: 'La planta se ha movido correctamente al historial',
-              confirmButtonColor: theme.palette.primary.main,
-              timer: 2000,
-              timerProgressBar: true
-            });
-          }, 300);
-        } else {
-          // Si no hay ID, simplemente ir a la lista (caso raro)
-          setIsMovingToHistory(false);
-          navigate('/Plantas');
-          
-          // Mostrar mensaje
-          Swal.fire({
-            icon: 'success',
-            title: 'Planta archivada',
-            text: 'La planta se ha movido correctamente al historial',
-            confirmButtonColor: theme.palette.primary.main
-          });
-        }
-      })
-      .catch(error => {
-        console.error("Error al mover la planta al historial:", error);
-        setIsMovingToHistory(false);
-        
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'No se pudo mover la planta al historial. Inténtalo nuevamente.',
-          confirmButtonColor: theme.palette.primary.main
-        });
-      });
-  };
-
-  // Early return if plant is not loaded yet
-  if (!plant) {
-    return (
-      <Layout title="Cargando...">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-          <Typography variant="h6" color="text.secondary">
-            Cargando datos de la planta...
-          </Typography>
-        </Box>
-      </Layout>
-    );
-  }
-
-  // Función para guardar peso húmedo
   const handleSavePesoHumedo = async () => {
     if (!pesoHumedoInput || parseFloat(pesoHumedoInput) <= 0) return;
-    
     setSavingPesoHumedo(true);
     try {
       const plantId = checkSearch(location.search);
-      await updatePlant(plantId, {
-        pesoHumedo: parseFloat(pesoHumedoInput),
-      }, { isArchived: plant.isArchived });
-      
-      setPlant(prev => ({
-        ...prev,
-        pesoHumedo: parseFloat(pesoHumedoInput)
-      }));
-      
-      setPesoHumedoInput('');
-      
-      // Mostrar mensaje de éxito
-      Swal.fire({
-        icon: 'success',
-        title: 'Peso húmedo guardado',
-        text: `Se ha registrado ${pesoHumedoInput}g como peso húmedo`,
-        confirmButtonColor: theme.palette.primary.main,
-        timer: 2000,
-        timerProgressBar: true
-      });
-    } catch (error) {
-      console.error("Error al guardar peso húmedo:", error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo guardar el peso húmedo. Inténtalo nuevamente.',
-        confirmButtonColor: theme.palette.primary.main
-      });
-    } finally {
-      setSavingPesoHumedo(false);
-    }
+      await updatePlant(plantId, { pesoHumedo: parseFloat(pesoHumedoInput) }, { isArchived: plant.isArchived });
+      setPlant((p) => ({ ...p, pesoHumedo: parseFloat(pesoHumedoInput) })); setPesoHumedoInput('');
+      Swal.fire({ icon: 'success', title: 'Peso guardado', timer: 1500 });
+    } catch { Swal.fire({ icon: 'error', title: 'Error' }); }
+    setSavingPesoHumedo(false);
   };
 
-  // Función para guardar peso seco
   const handleSavePesoSeco = async () => {
     if (!pesoSecoInput || parseFloat(pesoSecoInput) <= 0) return;
-    
     setSavingPesoSeco(true);
     try {
       const plantId = checkSearch(location.search);
-      await updatePlant(plantId, {
-        pesoSeco: parseFloat(pesoSecoInput),
-      }, { isArchived: plant.isArchived });
-      
-      setPlant(prev => ({
-        ...prev,
-        pesoSeco: parseFloat(pesoSecoInput)
-      }));
-      
-      setPesoSecoInput('');
-      
-      // Mostrar mensaje de éxito
-      Swal.fire({
-        icon: 'success',
-        title: 'Peso seco guardado',
-        text: `Se ha registrado ${pesoSecoInput}g como peso seco final`,
-        confirmButtonColor: theme.palette.primary.main,
-        timer: 2000,
-        timerProgressBar: true
-      });
-    } catch (error) {
-      console.error("Error al guardar peso seco:", error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo guardar el peso seco. Inténtalo nuevamente.',
-        confirmButtonColor: theme.palette.primary.main
-      });
-    } finally {
-      setSavingPesoSeco(false);
-    }
+      await updatePlant(plantId, { pesoSeco: parseFloat(pesoSecoInput) }, { isArchived: plant.isArchived });
+      setPlant((p) => ({ ...p, pesoSeco: parseFloat(pesoSecoInput) })); setPesoSecoInput('');
+      Swal.fire({ icon: 'success', title: 'Peso guardado', timer: 1500 });
+    } catch { Swal.fire({ icon: 'error', title: 'Error' }); }
+    setSavingPesoSeco(false);
   };
 
+  if (!plant) {
+    return <Layout title="Cargando..."><Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><Typography variant="h6" color="text.secondary">Cargando...</Typography></Box></Layout>;
+  }
+
   return (
-    <Layout title={plant?.name || "Planta"}>
-      <Box sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden', py: 2, px: { xs: 1, sm: 2, md: 3 } }}>
-        {/* Alerta para plantas archivadas */}
-        {plant.isArchived && (
-          <Alert 
-            severity="info" 
-            icon={<HistoryIcon />}
-            sx={{ 
-              mt: 3,
-              mb: 3, 
-              borderRadius: 2
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-              <Typography variant="body1">
-                Esta planta se encuentra archivada. Solo se pueden registrar los pesos húmedo y seco.
-              </Typography>
+    <Layout title={plant.name || 'Planta'}>
+      <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2, pb: 8 }}>
+        <Box sx={{ bgcolor: alpha(theme.palette.divider, 0.25), borderRadius: 2, py: 1, px: 0.5 }}>
+          <WeekStrip
+            allPlants={[plant]}
+            selectedDay={selectedDay}
+            onDaySelect={setSelectedDay}
+            showLabels={false}
+          />
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mr: 1 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: stage.color }}>
+            DÍA {daysActive} (SEMANA {weeksActive})
+          </Typography>
+        </Box>
+
+        {!isFuture && (
+          <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2, display: 'flex', gap: 1 }}>
+            <Box onClick={() => navigate(`/NuevaFoto?id=${plant.id}`)}
+              sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: 1, borderRadius: 2, border: `1px solid ${alpha('#FF9800', 0.3)}`, cursor: 'pointer', color: '#FF9800', '&:hover': { bgcolor: alpha('#FF9800', 0.06) } }}>
+              <Box component="span" sx={{ fontSize: '1.2rem' }}>📸</Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1 }}>Foto</Typography>
             </Box>
-          </Alert>
+            <Box onClick={() => navigate(`/Registrar?id=${plant.id}&date=${encodeURIComponent(selectedKey)}`)}
+              sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: 1, borderRadius: 2, border: `1px solid ${alpha('#00BCD4', 0.3)}`, cursor: 'pointer', color: '#00BCD4', '&:hover': { bgcolor: alpha('#00BCD4', 0.06) } }}>
+              <Box component="span" sx={{ fontSize: '1.2rem' }}>💧</Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1 }}>Riego</Typography>
+            </Box>
+            <Box onClick={() => navigate(`/NuevaAccion?id=${plant.id}&tipo=poda`)}
+              sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: 1, borderRadius: 2, border: `1px solid ${alpha('#4CAF50', 0.3)}`, cursor: 'pointer', color: '#4CAF50', '&:hover': { bgcolor: alpha('#4CAF50', 0.06) } }}>
+              <Box component="span" sx={{ fontSize: '1.2rem' }}>✂️</Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1 }}>Poda</Typography>
+            </Box>
+            <Box onClick={() => navigate(`/NuevaAccion?id=${plant.id}&tipo=insecticida`)}
+              sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: 1, borderRadius: 2, border: `1px solid ${alpha('#FF5722', 0.3)}`, cursor: 'pointer', color: '#FF5722', '&:hover': { bgcolor: alpha('#FF5722', 0.06) } }}>
+              <Box component="span" sx={{ fontSize: '1.2rem' }}>🐛</Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1 }}>Foliar</Typography>
+            </Box>
+          </Card>
         )}
 
-        <PlantHero
-          plant={plant}
-          onChangeProfilePhoto={() => setShowProfilePhotoSelector(true)}
-          onChangeStage={handleChangeStage}
-        />
+        {/* DAY ENTRIES */}
+        <Card variant="outlined" sx={{ p: 2, borderRadius: 2, textAlign: 'center', position: 'relative' }}>
+          {dayLogData.completeData && !isFuture && (
+            <IconButton size="small" onClick={() => {
+              const cd = dayLogData.completeData;
+              const existingLog = cd ? Object.entries(plant.logs).find(([k, e]) => e === cd) : null;
+              const logKey = existingLog ? existingLog[0] : '';
+              const params = new URLSearchParams();
+              params.set('id', plant.id);
+              params.set('date', selectedKey);
+              if (logKey) params.set('irrKey', logKey);
+              if (cd) {
+                if (cd.ph !== undefined) params.set('ph', cd.ph);
+                if (cd.ec !== undefined) params.set('ec', cd.ec);
+                if (cd.ppm !== undefined) params.set('ppm', cd.ppm);
+                if (cd.waterTemp !== undefined) params.set('waterTemp', cd.waterTemp);
+                if (cd.notes) params.set('notes', cd.notes);
+              }
+              navigate(`/LogPlanta?${params.toString()}`);
+            }}
+              sx={{ position: 'absolute', top: 8, right: 8, color: 'text.secondary' }}>
+              <CreateOutlinedIcon fontSize="small" />
+            </IconButton>
+          )}
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
+              {selectedKey === getDayKey(new Date()) ? 'HOY' : selectedKey}
+            </Typography>
+            {dayTime && (
+              <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.light', mt: 0.25, mb: 1.5 }}>
+                {dayTime}
+              </Typography>
+            )}
+            {!dayTime && <Box sx={{ height: 32 }} />}
+          </Box>
+          {dayEntries.length === 0 && !isFuture ? (
+            <Box onClick={() => navigate(`/LogPlanta?id=${plant.id}&date=${encodeURIComponent(selectedKey)}`)}
+              sx={{ textAlign: 'center', py: 2, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' }, borderRadius: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.light' }}>
+                📋 Registrar log
+              </Typography>
+            </Box>
+          ) : dayEntries.length === 0 ? null : (
+            <>
+              {(() => {
+                const completeData = dayLogData.completeData;
+                const soloPhData = dayLogData.soloPhData;
+                const phMain = soloPhData ? soloPhData.ph : (completeData ? completeData.ph : null);
+                const phStrikethrough = soloPhData && completeData ? completeData.ph : null;
 
-        <PlantStageCards plant={plant} />
+                const cards = [
+                  { type: 'ph', label: 'pH', value: phMain, subValue: phStrikethrough, color: '#4CAF50', unit: '' },
+                  ...(completeData ? [
+                    { type: 'ec', label: 'EC', value: completeData.ec, color: '#2196F3', unit: ' mS/cm' },
+                    { type: 'ppm', label: 'PPM', value: completeData.ppm, color: '#FF9800', unit: '' },
+                    { type: 'temp', label: 'Temp', value: completeData.waterTemp, color: '#E91E63', unit: '°C' },
+                  ] : []),
+                ].filter((c) => c.value !== undefined && c.value !== null);
 
-        <PlantQuickActions plant={plant} locationSearch={location.search} />
+                return (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 1.5 }}>
+                    {cards.map((c, i) => (
+                      <Card key={i} variant="outlined" sx={{ borderRadius: 2, textAlign: 'center', py: 1.5, px: 1, bgcolor: alpha(c.color, 0.04), borderColor: alpha(c.color, 0.2) }}>
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: c.color, letterSpacing: 1 }}>
+                          {c.label}
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: c.color, mt: 0.25 }}>
+                          {c.value}{c.unit}
+                        </Typography>
+                        {c.subValue != null && (
+                          <Typography variant="caption" sx={{ color: alpha(c.color, 0.5), textDecoration: 'line-through', display: 'block' }}>
+                            {c.subValue}{c.unit}
+                          </Typography>
+                        )}
+                      </Card>
+                    ))}
+                  </Box>
+                );
+              })()}
+            </>
+          )}
+          {!isFuture && (
+          <Box sx={{ mt: 0, display: 'flex', gap: 1 }}>
+          {!dayLogData.completeData && (
+            <Box onClick={() => navigate(`/LogPlanta?id=${plant.id}&date=${encodeURIComponent(selectedKey)}`)}
+              sx={{ flex: 1, textAlign: 'center', py: 1, borderRadius: 2, border: `1px solid ${theme.palette.divider}`, cursor: 'pointer', color: 'primary.light', fontWeight: 600, fontSize: '0.85rem', '&:hover': { bgcolor: 'action.hover' } }}>
+              📋 Registrar log
+            </Box>
+          )}
+          {dayLogData.completeData && !dayLogData.soloPhData && (
+            <Box onClick={() => navigate(`/RegularPh?id=${plant.id}&date=${encodeURIComponent(selectedKey)}`)}
+              sx={{ flex: 1, textAlign: 'center', py: 1, borderRadius: 2, border: `1px solid ${alpha('#4CAF50', 0.3)}`, cursor: 'pointer', color: '#4CAF50', fontWeight: 600, fontSize: '0.85rem', '&:hover': { bgcolor: alpha('#4CAF50', 0.06) } }}>
+              🧪 Regular pH
+            </Box>
+          )}
+          </Box>
+          )}
+        </Card>
 
-        <PlantActionStats
-          plant={plant}
-          highlightedTab={highlightedTab}
-          onHighlightChange={setHighlightedTab}
-          pesoHumedoInput={pesoHumedoInput}
-          setPesoHumedoInput={setPesoHumedoInput}
-          pesoSecoInput={pesoSecoInput}
-          setPesoSecoInput={setPesoSecoInput}
-          savingPesoHumedo={savingPesoHumedo}
-          savingPesoSeco={savingPesoSeco}
-          onSavePesoHumedo={handleSavePesoHumedo}
-          onSavePesoSeco={handleSavePesoSeco}
-        />
+        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
+          📈 EVOLUCIÓN
+        </Typography>
+        <PlantMeasurementsChart plant={plant} />
 
-        <PlantCalendar
-          events={events}
-          currentDate={currentDate}
-          onCurrentDateChange={setCurrentDate}
-          onEventClick={handleEventClick}
-          locationSearch={location.search}
-        />
+        {plant.images && (
+          <>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', ml: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
+                📸 FOTOS
+              </Typography>
+              <Typography variant="caption" onClick={() => setShowPhotoCompare(true)} sx={{ cursor: 'pointer', color: 'primary.light', fontWeight: 600, fontSize: 11 }}>
+                Ver galería
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
+              {Object.values(plant.images).filter((img) => img.date === selectedKey).sort((a, b) => {
+                const p = (d) => { const [dd, mm, yy] = (d || '0/0/0').split('/'); return new Date(+yy, +mm - 1, +dd); };
+                return p(b.date) - p(a.date);
+              }).slice(0, 4).map((img, idx) => (
+                <Box key={idx} sx={{ aspectRatio: '1', borderRadius: 2, overflow: 'hidden', cursor: 'pointer' }} onClick={() => setShowPhotoCompare(true)}>
+                  <Box component="img" src={img.url} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </Box>
+              ))}
+            </Box>
+          </>
+        )}
 
-        <PlantEventDialog
-          open={openCalendarModal}
-          onClose={() => setOpenCalendarModal(false)}
-          event={selectedEvent}
-        />
+        {(plant.etapa === 'Secado' || plant.etapa === 'Enfrascado' || plant.pesoHumedo || plant.pesoSeco) && (
+          <SectionCard title="Pesos" icon={<Box component="span" sx={{ color: '#fff', fontSize: 16 }}>⚖️</Box>}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <Box component="input" type="number" placeholder="Peso húmedo (g)" value={pesoHumedoInput} onChange={(e) => setPesoHumedoInput(e.target.value)} disabled={savingPesoHumedo}
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${theme.palette.divider}`, background: 'transparent', color: theme.palette.text.primary, fontSize: '0.85rem' }} />
+                  <Box component="button" onClick={handleSavePesoHumedo} sx={{ px: 2, py: 1, borderRadius: 2, border: 'none', bgcolor: 'primary.main', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    {savingPesoHumedo ? '...' : 'Guardar'}
+                  </Box>
+                </Box>
+                {plant.pesoHumedo ? <Typography variant="caption" color="text.secondary">Actual: {plant.pesoHumedo}g</Typography> : null}
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <Box component="input" type="number" placeholder="Peso seco (g)" value={pesoSecoInput} onChange={(e) => setPesoSecoInput(e.target.value)} disabled={savingPesoSeco}
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${theme.palette.divider}`, background: 'transparent', color: theme.palette.text.primary, fontSize: '0.85rem' }} />
+                  <Box component="button" onClick={handleSavePesoSeco} sx={{ px: 2, py: 1, borderRadius: 2, border: 'none', bgcolor: 'primary.main', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>
+                    {savingPesoSeco ? '...' : 'Guardar'}
+                  </Box>
+                </Box>
+                {plant.pesoSeco ? <Typography variant="caption" color="text.secondary">Actual: {plant.pesoSeco}g</Typography> : null}
+              </Box>
+            </Box>
+          </SectionCard>
+        )}
       </Box>
 
-      <PlantProfilePhotoDialog
-        open={showProfilePhotoSelector}
-        onClose={() => setShowProfilePhotoSelector(false)}
-        plant={plant}
-        onSelectPhoto={handleSetProfilePhoto}
-        locationSearch={location.search}
-      />
-
-      <PlantStageDialog
-        open={showStageDialog}
-        onClose={() => setShowStageDialog(false)}
-        plant={plant}
-        isChangingStage={isChangingStage}
-        onConfirm={confirmStageChange}
-      />
+      {showStageDialog && (
+        <PlantStageDialog open={showStageDialog} onClose={() => setShowStageDialog(false)} plant={plant} onConfirm={confirmStageChange} isChanging={isChangingStage} />
+      )}
+      {showProfilePhotoSelector && (
+        <PlantProfilePhotoDialog open={showProfilePhotoSelector} onClose={() => setShowProfilePhotoSelector(false)} plant={plant} onSelect={handleSetProfilePhoto} />
+      )}
+      <PlantPhotoCompare open={showPhotoCompare} onClose={() => setShowPhotoCompare(false)} plant={plant} />
     </Layout>
   );
 };

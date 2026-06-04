@@ -388,7 +388,7 @@ const Perfil = () => {
                       Tema preferido
                     </Typography>
                     <Typography variant="body1">
-                      {userData?.config?.theme?.darkMode ? 'Modo Oscuro' : 'Modo Claro'}
+                      Modo Oscuro
                     </Typography>
                   </Box>
                   
@@ -778,7 +778,7 @@ const Perfil = () => {
                 <Button 
                   variant="text" 
                   color="primary" 
-                  onClick={() => navigate('/TarjetasCredito')}
+                  onClick={() => navigate('/tarjetas')}
                   sx={{ mt: 1 }}
                 >
                   Ver Todas las Tarjetas

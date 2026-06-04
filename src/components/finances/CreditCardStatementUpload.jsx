@@ -1,314 +1,259 @@
 import React, { useState } from 'react';
 import {
-  Card,
-  CardContent,
   Box,
   Typography,
+  Card,
   Button,
   Stack,
   Avatar,
   CircularProgress,
-  Link,
-  useMediaQuery,
+  alpha,
 } from '@mui/material';
-import { useTheme, alpha } from '@mui/material/styles';
-import ReceiptIcon from '@mui/icons-material/Receipt';
+import { useTheme } from '@mui/material/styles';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import DownloadIcon from '@mui/icons-material/FileDownloadOutlined';
-import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { auth, storage } from '../../firebase';
 import { setCardStatement } from '../../services/finances';
-import { getMonthName } from '../../utils';
 
-// Mapea código de error de Firebase Storage a un mensaje en español.
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 function getUploadErrorMessage(error) {
-  if (error.code === 'storage/unauthorized') {
-    return 'Esta función requiere configuración adicional. Por favor, contacta al administrador.';
-  }
-  let msg = 'Error al subir el archivo. ';
-  if (error.code === 'storage/canceled') msg += 'La subida fue cancelada.';
-  else if (error.code === 'storage/unknown') msg += 'Ocurrió un error desconocido. Verifica tu conexión a internet.';
-  else if (error.code === 'storage/quota-exceeded') msg += 'Se ha excedido la cuota de almacenamiento permitida.';
-  else msg += error.message || 'Inténtalo de nuevo.';
-  return msg;
+  if (error.code === 'storage/unauthorized') return 'No tenés permisos para subir el archivo.';
+  if (error.code === 'storage/canceled') return 'La subida fue cancelada.';
+  if (error.code === 'storage/quota-exceeded') return 'Se excedió la cuota de almacenamiento.';
+  if (error.code === 'storage/unknown') return 'Error desconocido. Verificá tu conexión.';
+  return error.message || 'Error al subir el archivo.';
 }
 
 const CreditCardStatementUpload = ({
   userData,
-  selectedCard,
+  cardId,
   selectedMonth,
   selectedYear,
-  cards,
-  showAlert,
+  onSnack,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  // key para forzar reset del <input type="file"> después de cada upload exitoso
+  const [inputKey, setInputKey] = useState(0);
 
   const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-  const statement = userData?.creditCards?.[selectedCard]?.statements?.[yearMonth];
+  const statement = userData?.creditCards?.[cardId]?.statements?.[yearMonth];
 
-  const handleFileChange = (event) => {
+  const handleFileSelect = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
     if (file.type !== 'application/pdf') {
-      showAlert('Por favor selecciona un archivo PDF', 'error');
+      onSnack('Solo se aceptan archivos PDF', 'error');
       return;
     }
-    setSelectedFile(file);
-  };
 
-  const ensureCardSelected = () => {
-    if (!selectedCard || !cards.find((c) => c.id === selectedCard)) {
-      showAlert('Por favor, selecciona una tarjeta primero', 'warning');
-      return false;
+    if (file.size > MAX_FILE_SIZE) {
+      onSnack('El archivo supera el límite de 10MB', 'error');
+      return;
     }
-    return true;
-  };
 
-  const handleUpload = async () => {
-    if (!selectedFile || !selectedCard) return;
+    if (!cardId) {
+      onSnack('Tarjeta no seleccionada', 'warning');
+      return;
+    }
+
     setUploading(true);
     try {
-      if (!auth.currentUser) throw new Error('Usuario no autenticado');
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error('Usuario no autenticado');
 
-      const fileName = `${yearMonth}_${selectedCard}_${selectedFile.name.replace(/\s+/g, '_')}`;
-      const storagePath = `statements/${auth.currentUser.uid}/${selectedCard}/${yearMonth}/${fileName}`;
+      const safeName = file.name.replace(/\s+/g, '_');
+      const fileName = `${cardId}_${yearMonth}_${safeName}`;
+      const storagePath = `users/${uid}/summaries/${fileName}`;
       const storageRef = storage.ref(storagePath);
 
-      await storageRef.put(selectedFile, {
+      await storageRef.put(file, {
         contentType: 'application/pdf',
         customMetadata: {
-          userId: auth.currentUser.uid,
-          cardId: selectedCard,
+          userId: uid,
+          cardId: cardId,
           yearMonth,
-          month: String(selectedMonth),
-          year: String(selectedYear),
         },
       });
 
       const downloadURL = await storageRef.getDownloadURL();
-      const statementData = {
-        fileName: selectedFile.name,
+      await setCardStatement(cardId, yearMonth, {
+        fileName: file.name,
         uploadDate: new Date().toISOString(),
         downloadURL,
         storagePath,
         month: selectedMonth,
         year: selectedYear,
-      };
+      });
 
-      await setCardStatement(selectedCard, yearMonth, statementData);
-      showAlert('Resumen subido correctamente', 'success');
-      setSelectedFile(null);
+      onSnack(statement ? 'Resumen reemplazado' : 'Resumen subido', 'success');
+      setInputKey((k) => k + 1);
     } catch (error) {
       console.error('Error al subir el resumen:', error);
-      showAlert(getUploadErrorMessage(error), error.code === 'storage/unauthorized' ? 'warning' : 'error');
+      onSnack(getUploadErrorMessage(error), 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDownload = async (stmt) => {
-    if (!stmt || !stmt.downloadURL) {
-      showAlert('No se encuentra el archivo para descargar', 'error');
-      return;
-    }
+  const handleView = async () => {
+    if (!statement) return;
     try {
-      // Si guardamos el storagePath, pedimos URL fresca con token actualizado.
-      // Si no, caemos al downloadURL antiguo guardado en la base.
-      if (stmt.storagePath) {
-        const freshURL = await storage.ref(stmt.storagePath).getDownloadURL();
-        window.open(freshURL, '_blank');
-      } else {
-        window.open(stmt.downloadURL, '_blank');
+      if (statement.storagePath) {
+        const fresh = await storage.ref(statement.storagePath).getDownloadURL();
+        window.open(fresh, '_blank');
+      } else if (statement.downloadURL) {
+        window.open(statement.downloadURL, '_blank');
       }
     } catch (error) {
-      console.error('Error al descargar el archivo:', error);
-      const isAuthOrMissing =
-        error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found';
-      if (isAuthOrMissing && stmt.downloadURL) {
-        window.open(stmt.downloadURL, '_blank');
+      // Fallback al URL guardado si la fresh URL falla
+      if (statement.downloadURL) {
+        window.open(statement.downloadURL, '_blank');
       } else {
-        showAlert('Error al descargar el archivo. Intenta nuevamente más tarde.', 'error');
+        onSnack('No se pudo abrir el archivo', 'error');
       }
     }
   };
 
   return (
-    <Card
-      elevation={3}
-      sx={{
-        mb: 3,
-        borderRadius: 3,
-        overflow: 'hidden',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          transform: { xs: 'none', sm: 'translateY(-2px)' },
-          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
-        },
-      }}
-    >
-      <Box
-        sx={{
-          p: 3,
-          background: `linear-gradient(to right, ${theme.palette.secondary.dark}, ${theme.palette.secondary.main})`,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-        }}
+    <Box>
+      <Typography
+        variant="caption"
+        sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1.5 }}
       >
-        <Stack direction="row" spacing={2} alignItems="center">
+        RESUMEN DEL PERÍODO
+      </Typography>
+
+      {statement ? (
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: `1px solid ${theme.palette.divider}`,
+            p: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.12), color: theme.palette.error.main, width: 44, height: 44 }}>
+              <PictureAsPdfIcon />
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                {statement.fileName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Subido el {new Date(statement.uploadDate).toLocaleDateString('es-AR')}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+            <Button
+              fullWidth
+              size="small"
+              startIcon={<OpenInNewIcon fontSize="small" />}
+              onClick={handleView}
+              sx={{
+                borderRadius: 999,
+                textTransform: 'none',
+                fontWeight: 600,
+                bgcolor: theme.palette.primary.main,
+                color: 'white',
+                '&:hover': { bgcolor: theme.palette.primary.dark },
+              }}
+            >
+              Ver
+            </Button>
+            <Button
+              fullWidth
+              size="small"
+              component="label"
+              disabled={uploading}
+              startIcon={
+                uploading ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />
+              }
+              sx={{
+                borderRadius: 999,
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: theme.palette.divider,
+                color: theme.palette.text.primary,
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              {uploading ? 'Subiendo...' : 'Reemplazar'}
+              <input
+                key={inputKey}
+                type="file"
+                accept="application/pdf"
+                hidden
+                onChange={handleFileSelect}
+              />
+            </Button>
+          </Stack>
+        </Card>
+      ) : (
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: `1.5px dashed ${alpha(theme.palette.divider, 0.7)}`,
+            p: 3,
+            textAlign: 'center',
+            bgcolor: alpha(theme.palette.background.default, 0.4),
+          }}
+        >
           <Avatar
             sx={{
-              bgcolor: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              width: { xs: 36, sm: 40 },
-              height: { xs: 36, sm: 40 },
+              bgcolor: alpha(theme.palette.primary.main, 0.1),
+              color: theme.palette.primary.main,
+              width: 56,
+              height: 56,
+              mx: 'auto',
+              mb: 1.5,
             }}
           >
-            <ReceiptIcon />
+            <InsertDriveFileIcon />
           </Avatar>
-          <Box>
-            <Typography variant={isMobile ? 'subtitle1' : 'h6'} fontWeight="bold" color="white">
-              Resumen del Mes
-            </Typography>
-            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-              Estado de cuenta y documentos
-            </Typography>
-          </Box>
-        </Stack>
-      </Box>
-
-      <CardContent sx={{ p: 3 }}>
-        {statement ? (
-          <Card elevation={1} sx={{ borderRadius: 2, border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-            <CardContent sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
-                  <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), width: 48, height: 48 }}>
-                    <PictureAsPdfIcon color="error" />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight="600">
-                      {statement.fileName}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Subido el {new Date(statement.uploadDate).toLocaleDateString()}
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flexShrink: 0 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<DownloadIcon />}
-                    onClick={() => handleDownload(statement)}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Descargar
-                  </Button>
-
-                  <Button
-                    variant="outlined"
-                    endIcon={<ArrowRightAltIcon />}
-                    component={Link}
-                    href={statement.downloadURL}
-                    target="_blank"
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Ver
-                  </Button>
-                </Stack>
-              </Box>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card
-            elevation={1}
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+            Subir resumen PDF
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+            Solo PDF · Máximo 10MB
+          </Typography>
+          <Button
+            component="label"
+            disabled={uploading}
+            startIcon={uploading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <UploadFileIcon />}
             sx={{
-              borderRadius: 2,
-              border: `2px dashed ${alpha(theme.palette.divider, 0.3)}`,
-              bgcolor: alpha(theme.palette.background.paper, 0.5),
+              bgcolor: theme.palette.primary.main,
+              color: 'white',
+              borderRadius: 999,
+              px: 2.5,
+              py: 0.75,
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': { bgcolor: theme.palette.primary.dark },
+              '&.Mui-disabled': { bgcolor: alpha(theme.palette.primary.main, 0.3), color: 'white' },
             }}
           >
-            <CardContent sx={{ p: 4, textAlign: 'center' }}>
-              {uploading ? (
-                <Box>
-                  <CircularProgress size={48} sx={{ mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary">
-                    Subiendo archivo...
-                  </Typography>
-                </Box>
-              ) : selectedFile ? (
-                <Box>
-                  <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), width: 64, height: 64, mx: 'auto', mb: 2 }}>
-                    <PictureAsPdfIcon sx={{ fontSize: 32, color: theme.palette.error.main }} />
-                  </Avatar>
-                  <Typography variant="h6" sx={{ mb: 1 }}>
-                    {selectedFile.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    {(selectedFile.size / 1024).toFixed(2)} KB
-                  </Typography>
-                  <Stack direction="row" spacing={2} justifyContent="center">
-                    <Button variant="outlined" onClick={() => setSelectedFile(null)}>
-                      Cambiar
-                    </Button>
-                    <Button
-                      variant="contained"
-                      startIcon={<UploadFileIcon />}
-                      onClick={handleUpload}
-                      disabled={uploading}
-                    >
-                      Subir Resumen
-                    </Button>
-                  </Stack>
-                </Box>
-              ) : (
-                <Box>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    style={{ display: 'none' }}
-                    id="pdf-file-input"
-                    onChange={(e) => {
-                      if (ensureCardSelected()) handleFileChange(e);
-                    }}
-                  />
-
-                  <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), width: 64, height: 64, mx: 'auto', mb: 2 }}>
-                    <InsertDriveFileIcon sx={{ fontSize: 32, color: theme.palette.primary.main }} />
-                  </Avatar>
-
-                  <Typography variant="h6" sx={{ mb: 1 }}>
-                    No hay resumen disponible
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Sube el resumen de tu tarjeta para {getMonthName(selectedMonth)} {selectedYear}
-                  </Typography>
-
-                  <label htmlFor="pdf-file-input">
-                    <Button
-                      variant="contained"
-                      component="span"
-                      startIcon={<UploadFileIcon />}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Seleccionar PDF
-                    </Button>
-                  </label>
-
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                    Solo archivos PDF • Máximo 10MB
-                  </Typography>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </CardContent>
-    </Card>
+            {uploading ? 'Subiendo...' : 'Subir'}
+            <input
+              key={inputKey}
+              type="file"
+              accept="application/pdf"
+              hidden
+              onChange={handleFileSelect}
+            />
+          </Button>
+        </Card>
+      )}
+    </Box>
   );
 };
 

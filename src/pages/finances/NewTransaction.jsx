@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -10,19 +10,18 @@ import {
   Grid,
   Card,
   CardContent,
-  Stack,
   Fade,
   ToggleButton,
   ToggleButtonGroup,
-  Divider,
+  Snackbar,
+  Alert,
   alpha,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
-import CheckIcon from '@mui/icons-material/Check';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import EditIcon from '@mui/icons-material/Edit';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import LocalGroceryStoreIcon from '@mui/icons-material/LocalGroceryStore';
@@ -48,10 +47,8 @@ import { getDate } from '../../utils';
 
 // ── Helpers a nivel módulo ──────────────────────────────────────────────────
 
-// Extrae categorías y subcategorías únicas del historial de transacciones
 const extractCategories = (financesNode, kind) => {
-  // kind: 'expenses' | 'incomes'
-  const map = new Map(); // category → Set of subcategories
+  const map = new Map();
   const yearsNode = financesNode?.[kind] || {};
   Object.values(yearsNode).forEach((year) => {
     const months = year?.months || {};
@@ -71,23 +68,12 @@ const extractCategories = (financesNode, kind) => {
     .map(([name, subs]) => ({ name, subcategories: Array.from(subs).sort((a, b) => a.localeCompare(b, 'es')) }));
 };
 
-// Mapeo de íconos por categoría conocida — fallback MoreHoriz
 const CATEGORY_ICONS = {
-  Supermercado: LocalGroceryStoreIcon,
-  Transporte: CommuteIcon,
-  Auto: DirectionsCarIcon,
-  Salidas: RestaurantIcon,
-  Indoor: LocalFloristIcon,
-  Porro: LightbulbIcon,
-  Hogar: HomeIcon,
-  Entretenimiento: SportsEsportsIcon,
-  Viajes: FlightIcon,
-  Educacion: SchoolIcon,
-  Salud: LocalHospitalIcon,
-  Extras: MoreHorizIcon,
-  Sueldo: WorkIcon,
-  Freelance: LaptopIcon,
-  Camila: PeopleIcon,
+  Supermercado: LocalGroceryStoreIcon, Transporte: CommuteIcon, Auto: DirectionsCarIcon,
+  Salidas: RestaurantIcon, Indoor: LocalFloristIcon, Porro: LightbulbIcon,
+  Hogar: HomeIcon, Entretenimiento: SportsEsportsIcon, Viajes: FlightIcon,
+  Educacion: SchoolIcon, Salud: LocalHospitalIcon, Extras: MoreHorizIcon,
+  Sueldo: WorkIcon, Freelance: LaptopIcon, Camila: PeopleIcon,
 };
 
 const renderCategoryIcon = (name, props = {}) => {
@@ -95,7 +81,6 @@ const renderCategoryIcon = (name, props = {}) => {
   return <IconComp {...props} />;
 };
 
-// Formato del monto: "−$ 18.450,00" para gasto, "+$ 18.450,00" para ingreso
 const formatAmountDisplay = (raw, currency, type) => {
   if (!raw || raw === '0') return type === 'expense' ? '−$ 0' : '+$ 0';
   const parts = raw.split(',');
@@ -108,10 +93,9 @@ const formatAmountDisplay = (raw, currency, type) => {
   return `${sign}${symbol} ${formatted}`;
 };
 
-// Convierte "18450,50" a 18450.50
 const parseAmount = (raw) => {
   if (!raw) return 0;
-  const normalized = raw.replace('.', '').replace(',', '.');
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
   const n = parseFloat(normalized);
   return isNaN(n) ? 0 : n;
 };
@@ -122,6 +106,7 @@ const formatUSD = (n) => `US$ ${n.toLocaleString('es-AR', { minimumFractionDigit
 // ── Componente ──────────────────────────────────────────────────────────────
 
 const INSTALLMENT_OPTIONS = [1, 3, 4, 6, 9, 12, 18, 24];
+const TOTAL_STEPS = 3;
 
 const NewTransaction = ({ type: initialType = 'expense' }) => {
   const theme = useTheme();
@@ -131,7 +116,7 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   // Wizard state
   const [step, setStep] = useState(1);
   const [type, setType] = useState(initialType);
-  const [amount, setAmount] = useState(''); // string de teclado, ej "18450,50"
+  const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('ARS');
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
@@ -140,28 +125,18 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   const [selectedCard, setSelectedCard] = useState('');
   const [installments, setInstallments] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  const [savedSnapshot, setSavedSnapshot] = useState(null); // { savingsAfter } para Paso 5
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
+  const [error, setError] = useState('');
 
-  // Color del tipo
   const typeColor = type === 'expense' ? theme.palette.error.main : theme.palette.success.main;
   const typeColorBg = type === 'expense' ? theme.palette.error.dark : theme.palette.success.dark;
 
-  // Tarjetas disponibles
   const availableCards = useMemo(() => {
     const cards = userData?.creditCards;
     if (!cards) return [];
-    return Object.keys(cards)
-      .filter((k) => k !== 'transactions')
-      .map((id) => ({ id, ...cards[id] }));
+    return Object.keys(cards).filter((k) => k !== 'transactions').map((id) => ({ id, ...cards[id] }));
   }, [userData]);
 
-  useEffect(() => {
-    if (availableCards.length > 0 && !selectedCard) {
-      setSelectedCard(availableCards[0].id);
-    }
-  }, [availableCards, selectedCard]);
-
-  // Categorías y subcategorías reales del usuario
   const categoriesByType = useMemo(() => {
     const expenseCats = extractCategories(userData?.finances, 'expenses');
     const incomeCats = extractCategories(userData?.finances, 'incomes');
@@ -169,12 +144,11 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   }, [userData]);
 
   const currentCategories = categoriesByType[type] || [];
-  const currentSubcategories = useMemo(() => {
+  const currentSubs = useMemo(() => {
     const cat = currentCategories.find((c) => c.name === category);
     return cat?.subcategories || [];
   }, [currentCategories, category]);
 
-  // Cálculos derivados
   const parsedAmount = parseAmount(amount);
   const rate = dollarRate?.venta || 1;
   const amountInARS = currency === 'ARS' ? parsedAmount : parsedAmount * rate;
@@ -189,135 +163,91 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   const savingsAfterARS = currency === 'ARS' ? currentSavingsARS + sign * parsedAmount : currentSavingsARS;
   const savingsAfterUSD = currency === 'USD' ? currentSavingsUSD + sign * parsedAmount : currentSavingsUSD;
 
-  // ── Handlers de teclado ───────────────────────────────────────────────────
-  const handleKeyPress = (key) => {
-    if (key === 'backspace') {
-      setAmount((prev) => prev.slice(0, -1));
-      return;
-    }
+  // Fix: resetear categoría y subcategoría cuando cambia el tipo
+  const handleTypeChange = (e, v) => {
+    if (!v) return;
+    setType(v);
+    setCategory('');
+    setSubcategory('');
+    if (v === 'income') setPaymentMethod('cash');
+  };
+
+  // ── Teclado numérico + paste ──────────────────────────────────────────────
+  const handleKeyPress = useCallback((key) => {
+    if (key === 'backspace') { setAmount((p) => p.slice(0, -1)); return; }
     if (key === ',') {
       if (amount.includes(',')) return;
-      if (!amount) {
-        setAmount('0,');
-        return;
-      }
-      setAmount(amount + ',');
-      return;
+      if (!amount) { setAmount('0,'); return; }
+      setAmount(amount + ','); return;
     }
-    // dígitos 0-9
-    if (amount === '0' && key !== ',') {
-      setAmount(key);
-      return;
-    }
-    // limitar 2 decimales
-    if (amount.includes(',')) {
-      const decimals = amount.split(',')[1];
-      if (decimals.length >= 2) return;
-    }
+    if (amount === '0' && key !== ',') { setAmount(key); return; }
+    if (amount.includes(',')) { const decimals = amount.split(',')[1]; if (decimals.length >= 2) return; }
     setAmount(amount + key);
+  }, [amount]);
+
+  // Paste: convierte cualquier input numérico pegado a formato interno "XX,YY"
+  const handleAmountPaste = (raw) => {
+    const cleaned = raw.replace(/[^\d,.]/g, '');
+    const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+    const num = parseFloat(normalized);
+    if (isNaN(num)) return;
+    const [int, dec] = num.toFixed(2).split('.');
+    const intClean = int.replace(/^0+/, '') || '0';
+    setAmount(dec ? `${intClean},${dec}` : intClean);
   };
 
   // ── Navegación ────────────────────────────────────────────────────────────
-  const goToStep = (n) => setStep(n);
+  const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS));
+  const goBack = () => setStep((s) => Math.max(s - 1, 1));
   const handleClose = () => navigate('/Finanzas');
-  const handleEditAll = () => setStep(1);
 
-  // Validaciones por paso
-  const canAdvanceFromStep1 = parsedAmount > 0;
-  const canAdvanceFromStep2 = !!category;
-  const canAdvanceFromStep3 =
-    description.trim().length > 0 &&
-    (!!subcategory || currentSubcategories.length === 0) &&
-    (paymentMethod === 'cash' || (paymentMethod === 'creditCard' && !!selectedCard));
+  // Validaciones
+  const canStep1 = parsedAmount > 0;
+  const canStep2 = !!category && description.trim().length > 0 && (paymentMethod === 'cash' || (paymentMethod === 'creditCard' && !!selectedCard));
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
-
+    setError('');
     try {
       if (type === 'expense') {
         if (paymentMethod === 'cash') {
-          addExpense({
-            amount: amountInARS,
-            amountUSD: amountInUSD,
-            category,
-            subcategory,
-            date: getDate(),
-            description,
-            valorUSD: rate,
-            paymentMethod: 'cash',
-          });
-
-          updateSavingsWithHistory({
-            currency,
-            amount: -parsedAmount,
-            currentBalance: currency === 'ARS' ? currentSavingsARS : currentSavingsUSD,
-          });
+          addExpense({ amount: amountInARS, amountUSD: amountInUSD, category, subcategory, date: getDate(), description, valorUSD: rate, paymentMethod: 'cash' });
+          await updateSavingsWithHistory({ currency, amount: -parsedAmount, currentBalance: currency === 'ARS' ? currentSavingsARS : currentSavingsUSD });
         } else {
-          // Crédito: itera cuotas
-          const installmentAmountARS = amountInARS / installments;
-          const installmentAmountUSD = amountInUSD / installments;
+          // Fix: redondeo de cuotas
+          const rawInstallmentARS = amountInARS / installments;
+          const rawInstallmentUSD = amountInUSD / installments;
+          const installmentAmountARS = Math.round(rawInstallmentARS * 100) / 100;
+          const installmentAmountUSD = Math.round(rawInstallmentUSD * 100) / 100;
           const now = new Date();
 
           for (let i = 0; i < installments; i++) {
             const d = new Date(now);
             d.setMonth(now.getMonth() + i);
             const formattedDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
-
             const txData = {
-              amount: installmentAmountARS,
-              amountUSD: installmentAmountUSD,
-              category,
-              subcategory,
-              date: formattedDate,
+              amount: installmentAmountARS, amountUSD: installmentAmountUSD,
+              category, subcategory, date: formattedDate,
               description: `${description} - Cuota ${String(i + 1).padStart(2, '0')}/${String(installments).padStart(2, '0')}`,
-              valorUSD: rate,
-              paymentMethod: 'creditCard',
-              cardId: selectedCard,
-              installments,
-              currentInstallment: i + 1,
+              valorUSD: rate, paymentMethod: 'creditCard', cardId: selectedCard,
+              installments, currentInstallment: i + 1,
             };
-
             addCardTransaction(selectedCard, txData);
-            addExpense({
-              ...txData,
-              creditCardTransaction: true,
-              excludeFromTotal: true,
-              hiddenFromList: false,
-            });
+            addExpense({ ...txData, creditCardTransaction: true, excludeFromTotal: true, hiddenFromList: false });
           }
         }
       } else {
-        // Ingreso
-        addIncome({
-          amount: amountInARS,
-          amountUSD: amountInUSD,
-          category,
-          subcategory,
-          date: getDate(),
-          description,
-          valorUSD: rate,
-        });
-
-        updateSavingsWithHistory({
-          currency,
-          amount: parsedAmount,
-          currentBalance: currency === 'ARS' ? currentSavingsARS : currentSavingsUSD,
-        });
+        addIncome({ amount: amountInARS, amountUSD: amountInUSD, category, subcategory, date: getDate(), description, valorUSD: rate });
+        await updateSavingsWithHistory({ currency, amount: parsedAmount, currentBalance: currency === 'ARS' ? currentSavingsARS : currentSavingsUSD });
       }
 
-      setSavedSnapshot({
-        savingsAfterARS,
-        savingsAfterUSD,
-        amountText: formatAmountDisplay(amount, currency, type),
-        category,
-        subcategory,
-        type,
-      });
-      setStep(5);
-    } catch (error) {
-      console.error('Error al guardar la transacción:', error);
+      setSavedSnapshot({ savingsAfterARS, savingsAfterUSD, amountText: formatAmountDisplay(amount, currency, type), category, subcategory, type });
+      setStep(4); // éxito
+    } catch (err) {
+      console.error('Error al guardar la transacción:', err);
+      setError(err?.message || 'Error al guardar. Reintentá.');
     } finally {
       setSubmitting(false);
     }
@@ -328,44 +258,28 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
     setStep(1);
     setAmount('');
     setCurrency('ARS');
-    setCategory('');
-    setSubcategory('');
     setDescription('');
     setPaymentMethod('cash');
     setInstallments(1);
     setSavedSnapshot(null);
+    // Mantiene type y category para cargas rápidas del mismo tipo
   };
 
-  // ── UI auxiliar: barra superior + resumen ─────────────────────────────────
-  const renderTopBar = (stepNumber, totalSteps = 4) => (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        px: 2,
-        py: 1.5,
-        borderBottom: `1px solid ${theme.palette.divider}`,
-      }}
-    >
-      <IconButton onClick={stepNumber === 1 ? handleClose : () => goToStep(stepNumber - 1)} size="small">
-        <CloseIcon />
+  // ── UI: barra superior + dots ─────────────────────────────────────────────
+  const renderHeader = (showBack, title) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+      <IconButton onClick={showBack ? goBack : handleClose} size="small">
+        {showBack ? <ArrowBackIcon fontSize="small" /> : <CloseIcon />}
       </IconButton>
-      <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 1, color: 'text.secondary' }}>
-        PASO {stepNumber} DE {totalSteps}
+      <Typography variant="body2" sx={{ fontWeight: 600, letterSpacing: 0.3 }}>
+        {title}
       </Typography>
-      {stepNumber > 1 && stepNumber <= 4 ? (
-        <Button size="small" onClick={handleEditAll} sx={{ textTransform: 'none' }}>
-          Editar
-        </Button>
-      ) : (
-        <Box sx={{ width: 64 }} />
-      )}
+      <Box sx={{ width: 36 }} />
     </Box>
   );
 
   const renderSummaryBanner = () => (
-    <Box sx={{ px: 3, py: 2 }}>
+    <Box sx={{ px: 2, py: 1.5 }}>
       <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
         {type === 'expense' ? 'GASTO' : 'INGRESO'}
       </Typography>
@@ -375,193 +289,113 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
     </Box>
   );
 
-  // ── STEP 1 ────────────────────────────────────────────────────────────────
+  // ── STEP 1: Monto ─────────────────────────────────────────────────────────
   const renderStep1 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {renderTopBar(1)}
+      {renderHeader(false, 'Nuevo')}
 
-      {/* Toggle tipo */}
-      <Box sx={{ px: 3, pt: 3 }}>
-        <ToggleButtonGroup
-          value={type}
-          exclusive
-          onChange={(_e, v) => v && setType(v)}
-          fullWidth
+      {/* Progress dots */}
+      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, py: 2 }}>
+        {[1, 2, 3].map((n) => (
+          <Box key={n} sx={{ width: n === 1 ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
+        ))}
+      </Box>
+
+      {/* Type toggle */}
+      <Box sx={{ px: 3 }}>
+        <ToggleButtonGroup value={type} exclusive onChange={handleTypeChange} fullWidth
           sx={{
-            '& .MuiToggleButton-root': {
-              border: `1px solid ${theme.palette.divider}`,
-              color: 'text.secondary',
-              fontWeight: 600,
-              textTransform: 'none',
-              py: 1.2,
-            },
-            '& .MuiToggleButton-root.Mui-selected[value="expense"]': {
-              bgcolor: theme.palette.error.main,
-              color: 'white',
-              '&:hover': { bgcolor: theme.palette.error.dark },
-            },
-            '& .MuiToggleButton-root.Mui-selected[value="income"]': {
-              bgcolor: theme.palette.success.main,
-              color: 'white',
-              '&:hover': { bgcolor: theme.palette.success.dark },
-            },
-          }}
-        >
+            '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, color: 'text.secondary', fontWeight: 600, textTransform: 'none', py: 1.2 },
+            '& .MuiToggleButton-root.Mui-selected[value="expense"]': { bgcolor: theme.palette.error.main, color: 'white', '&:hover': { bgcolor: theme.palette.error.dark } },
+            '& .MuiToggleButton-root.Mui-selected[value="income"]': { bgcolor: theme.palette.success.main, color: 'white', '&:hover': { bgcolor: theme.palette.success.dark } },
+          }}>
           <ToggleButton value="expense">Gasto</ToggleButton>
           <ToggleButton value="income">Ingreso</ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
-      {/* Monto display */}
+      {/* Amount display */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
-          MONTO
-        </Typography>
-        <Typography
-          variant="h2"
-          sx={{
-            fontWeight: 700,
-            color: typeColor,
-            mt: 1,
-            fontSize: { xs: '2.5rem', sm: '3.5rem' },
-            textAlign: 'center',
-            wordBreak: 'break-all',
-          }}
-        >
+        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>MONTO</Typography>
+        <Typography variant="h2" sx={{ fontWeight: 700, color: typeColor, mt: 1, fontSize: { xs: '2.5rem', sm: '3.5rem' }, textAlign: 'center', wordBreak: 'break-all' }}>
           {formatAmountDisplay(amount, currency, type)}
         </Typography>
 
-        {/* Toggle ARS/USD */}
-        <ToggleButtonGroup
-          value={currency}
-          exclusive
-          onChange={(_e, v) => v && setCurrency(v)}
-          size="small"
+        <ToggleButtonGroup value={currency} exclusive onChange={(_e, v) => v && setCurrency(v)} size="small"
           sx={{
-            mt: 2,
-            '& .MuiToggleButton-root': {
-              border: `1px solid ${theme.palette.divider}`,
-              borderRadius: 999,
-              px: 2.5,
-              py: 0.4,
-              textTransform: 'none',
-              fontWeight: 600,
-            },
-            '& .MuiToggleButton-root.Mui-selected': {
-              bgcolor: alpha(typeColor, 0.1),
-              color: typeColor,
-              borderColor: typeColor,
-            },
-          }}
-        >
+            mt: 2, '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, borderRadius: 999, px: 2.5, py: 0.4, textTransform: 'none', fontWeight: 600 },
+            '& .MuiToggleButton-root.Mui-selected': { bgcolor: alpha(typeColor, 0.1), color: typeColor, borderColor: typeColor },
+          }}>
           <ToggleButton value="ARS">ARS</ToggleButton>
           <ToggleButton value="USD">USD</ToggleButton>
         </ToggleButtonGroup>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-          {parsedAmount > 0 ? equivalentText : ' '}
-        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>{parsedAmount > 0 ? equivalentText : ' '}</Typography>
       </Box>
 
-      {/* Teclado numérico */}
+      {/* Numpad + paste */}
       <Box sx={{ px: 3, pb: 2 }}>
         <Grid container spacing={1}>
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'backspace'].map((key) => (
             <Grid item xs={4} key={key}>
-              <Button
-                fullWidth
-                onClick={() => handleKeyPress(key)}
-                sx={{
-                  py: 2,
-                  fontSize: '1.5rem',
-                  color: 'text.primary',
-                  fontWeight: 500,
-                  '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.4) },
-                }}
-              >
+              <Button fullWidth onClick={() => handleKeyPress(key)}
+                sx={{ py: 2, fontSize: '1.5rem', color: 'text.primary', fontWeight: 500, '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.4) } }}>
                 {key === 'backspace' ? <BackspaceIcon /> : key}
               </Button>
             </Grid>
           ))}
         </Grid>
+        {/* Paste helper */}
+        <TextField
+          value={amount}
+          onChange={(e) => handleAmountPaste(e.target.value)}
+          placeholder="O pegá el monto acá"
+          size="small"
+          fullWidth
+          sx={{ mt: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+          inputProps={{ inputMode: 'decimal', autoComplete: 'off' }}
+        />
       </Box>
 
-      {/* Botón siguiente */}
       <Box sx={{ px: 3, pb: 3 }}>
-        <Button
-          fullWidth
-          variant="contained"
-          size="large"
-          disabled={!canAdvanceFromStep1}
-          onClick={() => goToStep(2)}
-          sx={{
-            bgcolor: typeColor,
-            color: 'white',
-            borderRadius: 999,
-            py: 1.5,
-            fontWeight: 600,
-            textTransform: 'none',
-            fontSize: '1rem',
-            '&:hover': { bgcolor: typeColorBg },
-            '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' },
-          }}
-        >
+        <Button fullWidth variant="contained" size="large" disabled={!canStep1} onClick={goNext}
+          sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem',
+            '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
           Siguiente →
         </Button>
       </Box>
     </Box>
   );
 
-  // ── STEP 2 ────────────────────────────────────────────────────────────────
+  // ── STEP 2: Categoría + Detalle ───────────────────────────────────────────
   const renderStep2 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {renderTopBar(2)}
+      {renderHeader(true, 'Detalles')}
       {renderSummaryBanner()}
 
-      <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          {type === 'expense' ? '¿En qué gastaste?' : '¿De dónde viene?'}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Elegí una categoría.
-        </Typography>
+      <Box sx={{ flex: 1, px: 3, overflowY: 'auto', pb: 2 }}>
+        {/* Progress dots */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, pb: 2 }}>
+          {[1, 2, 3].map((n) => (
+            <Box key={n} sx={{ width: n === 2 ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
+          ))}
+        </Box>
 
+        {/* Category grid */}
+        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>CATEGORÍA</Typography>
         {currentCategories.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-            Aún no tenés categorías en tu historial.
-          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>Aún no tenés categorías en tu historial.</Typography>
         ) : (
-          <Grid container spacing={1.5}>
+          <Grid container spacing={1} sx={{ mb: 2.5 }}>
             {currentCategories.map((cat) => {
               const isSelected = category === cat.name;
               return (
                 <Grid item xs={4} key={cat.name}>
-                  <Card
-                    elevation={0}
-                    onClick={() => setCategory(cat.name)}
-                    sx={{
-                      cursor: 'pointer',
-                      border: `1.5px solid ${isSelected ? typeColor : theme.palette.divider}`,
-                      bgcolor: isSelected ? alpha(typeColor, 0.06) : 'transparent',
-                      borderRadius: 2,
-                      transition: 'all 0.15s ease',
-                      '&:hover': { borderColor: typeColor },
-                    }}
-                  >
-                    <CardContent sx={{ p: 2, textAlign: 'center', '&:last-child': { pb: 2 } }}>
-                      {renderCategoryIcon(cat.name, { sx: { fontSize: 28, color: isSelected ? typeColor : 'text.secondary' } })}
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          display: 'block',
-                          mt: 0.5,
-                          fontWeight: isSelected ? 600 : 500,
-                          color: isSelected ? typeColor : 'text.primary',
-                          fontSize: '0.78rem',
-                        }}
-                      >
-                        {cat.name}
-                      </Typography>
+                  <Card elevation={0} onClick={() => setCategory(cat.name)}
+                    sx={{ cursor: 'pointer', border: `1.5px solid ${isSelected ? typeColor : theme.palette.divider}`, bgcolor: isSelected ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, transition: 'all 0.15s', '&:hover': { borderColor: typeColor } }}>
+                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
+                      {renderCategoryIcon(cat.name, { sx: { fontSize: 24, color: isSelected ? typeColor : 'text.secondary' } })}
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: isSelected ? 600 : 500, color: isSelected ? typeColor : 'text.primary', fontSize: '0.72rem' }}>{cat.name}</Typography>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -569,184 +403,74 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
             })}
           </Grid>
         )}
-      </Box>
 
-      <Box sx={{ px: 3, pb: 3, pt: 2 }}>
-        <Button
-          fullWidth
-          variant="contained"
-          size="large"
-          disabled={!canAdvanceFromStep2}
-          onClick={() => goToStep(3)}
-          sx={{
-            bgcolor: typeColor,
-            color: 'white',
-            borderRadius: 999,
-            py: 1.5,
-            fontWeight: 600,
-            textTransform: 'none',
-            '&:hover': { bgcolor: typeColorBg },
-            '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' },
-          }}
-        >
-          Siguiente →
-        </Button>
-      </Box>
-    </Box>
-  );
-
-  // ── STEP 3 ────────────────────────────────────────────────────────────────
-  const renderStep3 = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {renderTopBar(3)}
-      {renderSummaryBanner()}
-
-      <Box sx={{ flex: 1, px: 3, overflowY: 'auto', pb: 2 }}>
-        <Chip
-          icon={renderCategoryIcon(category, { sx: { fontSize: 18 } })}
-          label={category}
-          sx={{
-            bgcolor: alpha(typeColor, 0.1),
-            color: typeColor,
-            fontWeight: 600,
-            mb: 2.5,
-            '& .MuiChip-icon': { color: typeColor },
-          }}
-        />
-
-        {/* Subcategoría */}
-        {currentSubcategories.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
-              SUBCATEGORÍA
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, mt: 1, overflowX: 'auto', pb: 1, flexWrap: 'wrap' }}>
-              {currentSubcategories.map((sub) => {
-                const isSelected = subcategory === sub;
+        {/* Subcategory (optional) */}
+        {currentSubs.length > 0 && (
+          <Box sx={{ mb: 2.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>SUBCATEGORÍA</Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Chip label="Sin subcategoría" onClick={() => setSubcategory('')}
+                sx={{ bgcolor: !subcategory ? typeColor : 'transparent', color: !subcategory ? 'white' : 'text.primary', border: `1px solid ${!subcategory ? typeColor : theme.palette.divider}`, fontWeight: !subcategory ? 600 : 500, '&:hover': { bgcolor: !subcategory ? typeColorBg : alpha(typeColor, 0.06) } }} />
+              {currentSubs.map((sub) => {
+                const isSel = subcategory === sub;
                 return (
-                  <Chip
-                    key={sub}
-                    label={sub}
-                    onClick={() => setSubcategory(sub)}
-                    sx={{
-                      bgcolor: isSelected ? typeColor : 'transparent',
-                      color: isSelected ? 'white' : 'text.primary',
-                      border: `1px solid ${isSelected ? typeColor : theme.palette.divider}`,
-                      fontWeight: isSelected ? 600 : 500,
-                      '&:hover': { bgcolor: isSelected ? typeColorBg : alpha(typeColor, 0.06) },
-                    }}
-                  />
+                  <Chip key={sub} label={sub} onClick={() => setSubcategory(sub)}
+                    sx={{ bgcolor: isSel ? typeColor : 'transparent', color: isSel ? 'white' : 'text.primary', border: `1px solid ${isSel ? typeColor : theme.palette.divider}`, fontWeight: isSel ? 600 : 500, '&:hover': { bgcolor: isSel ? typeColorBg : alpha(typeColor, 0.06) } }} />
                 );
               })}
             </Box>
           </Box>
         )}
 
-        {/* Descripción */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
-            DESCRIPCIÓN
-          </Typography>
-          <TextField
-            fullWidth
-            multiline
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value.slice(0, 120))}
+        {/* Description */}
+        <Box sx={{ mb: 2.5 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>DESCRIPCIÓN</Typography>
+          <TextField fullWidth multiline rows={2} value={description}
+            onChange={(e) => {
+              if (e.target.value.length <= 120) setDescription(e.target.value);
+            }}
             placeholder={type === 'expense' ? 'Ej: Compra semanal Coto' : 'Ej: Sueldo de enero'}
-            sx={{ mt: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-            {description.length} caracteres
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+          <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: description.length >= 120 ? 'error.main' : 'text.secondary', fontWeight: description.length >= 120 ? 600 : 400 }}>
+            {description.length}/120
           </Typography>
         </Box>
 
-        {/* Método de pago (solo gasto) */}
+        {/* Payment method (only expenses) */}
         {type === 'expense' && (
           <Box>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
-              MÉTODO DE PAGO
-            </Typography>
-            <Stack spacing={1.5} sx={{ mt: 1 }}>
-              <Card
-                elevation={0}
-                onClick={() => setPaymentMethod('cash')}
-                sx={{
-                  cursor: 'pointer',
-                  border: `1.5px solid ${paymentMethod === 'cash' ? typeColor : theme.palette.divider}`,
-                  bgcolor: paymentMethod === 'cash' ? alpha(typeColor, 0.06) : 'transparent',
-                  borderRadius: 2,
-                  '&:hover': { borderColor: typeColor },
-                }}
-              >
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <AccountBalanceWalletIcon sx={{ color: paymentMethod === 'cash' ? typeColor : 'text.secondary' }} />
-                  <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      Efectivo
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Pesos en mano
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>MÉTODO DE PAGO</Typography>
 
-              {availableCards.map((card) => {
-                const isSelected = paymentMethod === 'creditCard' && selectedCard === card.id;
-                return (
-                  <Card
-                    key={card.id}
-                    elevation={0}
-                    onClick={() => {
-                      setPaymentMethod('creditCard');
-                      setSelectedCard(card.id);
-                    }}
-                    sx={{
-                      cursor: 'pointer',
-                      border: `1.5px solid ${isSelected ? typeColor : theme.palette.divider}`,
-                      bgcolor: isSelected ? alpha(typeColor, 0.06) : 'transparent',
-                      borderRadius: 2,
-                      '&:hover': { borderColor: typeColor },
-                    }}
-                  >
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <CreditCardIcon sx={{ color: isSelected ? typeColor : 'text.secondary' }} />
-                      <Box>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                          {card.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          **** {card.lastFourDigits}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </Stack>
+            <Card elevation={0} onClick={() => setPaymentMethod('cash')}
+              sx={{ cursor: 'pointer', border: `1.5px solid ${paymentMethod === 'cash' ? typeColor : theme.palette.divider}`, bgcolor: paymentMethod === 'cash' ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, mb: 1, '&:hover': { borderColor: typeColor } }}>
+              <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <AccountBalanceWalletIcon sx={{ color: paymentMethod === 'cash' ? typeColor : 'text.secondary', fontSize: 20 }} />
+                <Box><Typography variant="body2" sx={{ fontWeight: 600 }}>Efectivo</Typography><Typography variant="caption" color="text.secondary">Pesos en mano</Typography></Box>
+              </CardContent>
+            </Card>
 
-            {/* Selector de cuotas si paga con tarjeta */}
+            {availableCards.map((card) => {
+              const isSel = paymentMethod === 'creditCard' && selectedCard === card.id;
+              return (
+                <Card key={card.id} elevation={0} onClick={() => { setPaymentMethod('creditCard'); setSelectedCard(card.id); }}
+                  sx={{ cursor: 'pointer', border: `1.5px solid ${isSel ? typeColor : theme.palette.divider}`, bgcolor: isSel ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, mb: 1, '&:hover': { borderColor: typeColor } }}>
+                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <CreditCardIcon sx={{ color: isSel ? typeColor : 'text.secondary', fontSize: 20 }} />
+                    <Box><Typography variant="body2" sx={{ fontWeight: 600 }}>{card.name}</Typography><Typography variant="caption" color="text.secondary">**** {card.lastFourDigits}</Typography></Box>
+                  </CardContent>
+                </Card>
+              );
+            })}
+
             {paymentMethod === 'creditCard' && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
-                  CUOTAS
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+              <Box sx={{ mt: 1.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>CUOTAS</Typography>
+                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
                   {INSTALLMENT_OPTIONS.map((n) => {
-                    const isSelected = installments === n;
+                    const isSel = installments === n;
                     return (
-                      <Chip
-                        key={n}
-                        label={`${n}x`}
-                        onClick={() => setInstallments(n)}
-                        sx={{
-                          bgcolor: isSelected ? typeColor : 'transparent',
-                          color: isSelected ? 'white' : 'text.primary',
-                          border: `1px solid ${isSelected ? typeColor : theme.palette.divider}`,
-                          fontWeight: isSelected ? 600 : 500,
-                        }}
-                      />
+                      <Chip key={n} label={`${n}x`} onClick={() => setInstallments(n)}
+                        sx={{ bgcolor: isSel ? typeColor : 'transparent', color: isSel ? 'white' : 'text.primary', border: `1px solid ${isSel ? typeColor : theme.palette.divider}`, fontWeight: isSel ? 600 : 500, '&:hover': { bgcolor: isSel ? typeColorBg : alpha(typeColor, 0.06) } }} />
                     );
                   })}
                 </Box>
@@ -757,169 +481,92 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
       </Box>
 
       <Box sx={{ px: 3, pb: 3, pt: 1 }}>
-        <Button
-          fullWidth
-          variant="contained"
-          size="large"
-          disabled={!canAdvanceFromStep3}
-          onClick={() => goToStep(4)}
-          sx={{
-            bgcolor: typeColor,
-            color: 'white',
-            borderRadius: 999,
-            py: 1.5,
-            fontWeight: 600,
-            textTransform: 'none',
-            '&:hover': { bgcolor: typeColorBg },
-            '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' },
-          }}
-        >
+        <Button fullWidth variant="contained" size="large" disabled={!canStep2} onClick={goNext}
+          sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none',
+            '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
           Revisar
         </Button>
       </Box>
     </Box>
   );
 
-  // ── STEP 4 ────────────────────────────────────────────────────────────────
-  const renderStep4 = () => {
+  // ── STEP 3: Revisar + Guardar ─────────────────────────────────────────────
+  const renderStep3 = () => {
     const now = new Date();
-    const timeStr = `Hoy, ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const timeStr = `Hoy, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const methodLabel = type === 'expense'
-      ? paymentMethod === 'cash'
-        ? `Efectivo (${currency})`
-        : (() => {
-            const c = availableCards.find((x) => x.id === selectedCard);
-            return c ? `${c.name} **** ${c.lastFourDigits}${installments > 1 ? ` · ${installments}x` : ''}` : 'Tarjeta';
-          })()
+      ? paymentMethod === 'cash' ? `Efectivo (${currency})`
+        : (() => { const c = availableCards.find((x) => x.id === selectedCard); return c ? `${c.name} **** ${c.lastFourDigits}${installments > 1 ? ` · ${installments}x` : ''}` : 'Tarjeta'; })()
       : `Ingreso (${currency})`;
-
     const deltaText = type === 'expense'
       ? (currency === 'ARS' ? `−${formatARS(parsedAmount)}` : `−${formatUSD(parsedAmount)}`)
       : (currency === 'ARS' ? `+${formatARS(parsedAmount)}` : `+${formatUSD(parsedAmount)}`);
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {renderTopBar(4)}
+        {renderHeader(true, 'Confirmar')}
         {renderSummaryBanner()}
 
         <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Revisar
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Confirmá los datos antes de guardar.
-          </Typography>
+          {/* Progress dots */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, pb: 2 }}>
+            {[1, 2, 3].map((n) => (
+              <Box key={n} sx={{ width: n === 3 ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
+            ))}
+          </Box>
 
-          {/* Card total */}
-          <Card
-            elevation={0}
-            sx={{
-              bgcolor: alpha(typeColor, 0.05),
-              border: `1px solid ${alpha(typeColor, 0.2)}`,
-              borderRadius: 3,
-              mb: 3,
-              textAlign: 'center',
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
-                TOTAL A REGISTRAR
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: typeColor, mt: 1 }}>
-                {formatAmountDisplay(amount, currency, type)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                {currency === 'ARS' ? `≈ ${formatUSD(amountInUSD)}` : `≈ ${formatARS(amountInARS)}`}
-              </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Revisar</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>Confirmá los datos antes de guardar.</Typography>
+
+          <Card elevation={0} sx={{ bgcolor: alpha(typeColor, 0.05), border: `1px solid ${alpha(typeColor, 0.2)}`, borderRadius: 3, mb: 2.5, textAlign: 'center' }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>TOTAL A REGISTRAR</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: typeColor, mt: 0.5 }}>{formatAmountDisplay(amount, currency, type)}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{currency === 'ARS' ? `≈ ${formatUSD(amountInUSD)}` : `≈ ${formatARS(amountInARS)}`}</Typography>
             </CardContent>
           </Card>
 
-          {/* Lista de datos */}
-          <Stack divider={<Divider />} spacing={0}>
-            {[
-              ['Categoría', subcategory ? `${category} · ${subcategory}` : category],
-              ['Descripción', description],
-              ['Método', methodLabel],
-              ['Fecha', timeStr],
-            ].map(([label, value]) => (
-              <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, alignItems: 'center', gap: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {label}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>
-                  {value}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
+          <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden', mb: 2.5 }}>
+            <Box sx={{ p: 2.5 }}>
+              {[
+                ['Categoría', subcategory ? `${category} · ${subcategory}` : category],
+                ['Descripción', description],
+                ['Método', methodLabel],
+                ['Fecha', timeStr],
+              ].map(([label, value]) => (
+                <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${theme.palette.divider}`, '&:last-child': { borderBottom: 'none' }, alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">{label}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{value}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Card>
 
-          {/* Card ahorros después */}
-          <Card
-            elevation={0}
-            sx={{
-              mt: 3,
-              border: `1px solid ${theme.palette.divider}`,
-              borderRadius: 3,
-            }}
-          >
+          <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3 }}>
             <CardContent sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', '&:last-child': { pb: 2.5 } }}>
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Ahorros después
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {currency === 'ARS' ? formatARS(savingsAfterARS) : formatUSD(savingsAfterUSD)}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Ahorros después</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>{currency === 'ARS' ? formatARS(savingsAfterARS) : formatUSD(savingsAfterUSD)}</Typography>
               </Box>
-              <Chip
-                label={deltaText}
-                size="small"
-                sx={{
-                  bgcolor: alpha(typeColor, 0.12),
-                  color: typeColor,
-                  fontWeight: 600,
-                }}
-              />
+              <Chip label={deltaText} size="small" sx={{ bgcolor: alpha(typeColor, 0.12), color: typeColor, fontWeight: 600 }} />
             </CardContent>
           </Card>
         </Box>
 
         <Box sx={{ px: 3, pb: 3, pt: 2 }}>
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            disabled={submitting}
-            onClick={handleSubmit}
-            startIcon={<CheckIcon />}
-            sx={{
-              bgcolor: typeColor,
-              color: 'white',
-              borderRadius: 999,
-              py: 1.5,
-              fontWeight: 600,
-              textTransform: 'none',
-              '&:hover': { bgcolor: typeColorBg },
-              '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' },
-            }}
-          >
-            {submitting ? 'Guardando...' : type === 'expense' ? 'Guardar gasto' : 'Guardar ingreso'}
+          <Button fullWidth variant="contained" size="large" disabled={submitting} onClick={handleSubmit}
+            sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem',
+              '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
+            {submitting ? 'Guardando...' : type === 'expense' ? 'Confirmar gasto' : 'Confirmar ingreso'}
           </Button>
-          <Button
-            fullWidth
-            onClick={handleEditAll}
-            startIcon={<EditIcon fontSize="small" />}
-            sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}
-          >
-            Editar datos
-          </Button>
+          <Button fullWidth onClick={() => setStep(1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Editar datos</Button>
         </Box>
       </Box>
     );
   };
 
-  // ── STEP 5 ────────────────────────────────────────────────────────────────
-  const renderStep5 = () => {
+  // ── Éxito ────────────────────────────────────────────────────────────────
+  const renderSuccess = () => {
     if (!savedSnapshot) return null;
     const snap = savedSnapshot;
     const snapColor = snap.type === 'expense' ? theme.palette.error.main : theme.palette.success.main;
@@ -927,91 +574,36 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', px: 4, textAlign: 'center' }}>
-        <Box
-          sx={{
-            width: 96,
-            height: 96,
-            borderRadius: '50%',
-            bgcolor: alpha(snapColor, 0.1),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mb: 3,
-          }}
-        >
+        <Box sx={{ width: 96, height: 96, borderRadius: '50%', bgcolor: alpha(snapColor, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
           <CheckCircleIcon sx={{ fontSize: 64, color: snapColor }} />
         </Box>
-
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-          {snap.type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!'}
-        </Typography>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: snapColor, mb: 0.5 }}>
-          {snap.amountText}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          {snap.subcategory ? `${snap.category} · ${snap.subcategory}` : snap.category}
-        </Typography>
-
-        <Chip
-          label={`Ahorros  ${formatARS(snap.savingsAfterARS)}`}
-          sx={{
-            bgcolor: alpha(theme.palette.text.primary, 0.06),
-            color: 'text.primary',
-            fontWeight: 600,
-            px: 1,
-            mb: 4,
-          }}
-        />
-
-        <Button
-          fullWidth
-          variant="contained"
-          size="large"
-          onClick={handleLoadAnother}
-          sx={{
-            maxWidth: 320,
-            bgcolor: snapColor,
-            color: 'white',
-            borderRadius: 999,
-            py: 1.5,
-            fontWeight: 600,
-            textTransform: 'none',
-            '&:hover': { bgcolor: snapColorBg },
-          }}
-        >
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>{snap.type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!'}</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: snapColor, mb: 0.5 }}>{snap.amountText}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{snap.subcategory ? `${snap.category} · ${snap.subcategory}` : snap.category}</Typography>
+        <Chip label={`Ahorros  ${formatARS(snap.savingsAfterARS)}`} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.06), color: 'text.primary', fontWeight: 600, px: 1, mb: 4 }} />
+        <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
+          sx={{ maxWidth: 320, bgcolor: snapColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: snapColorBg } }}>
           Cargar otro
         </Button>
-        <Button
-          onClick={() => navigate('/Finanzas')}
-          sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}
-        >
-          Volver a Finanzas
-        </Button>
+        <Button onClick={() => navigate('/Finanzas')} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver a Finanzas</Button>
       </Box>
     );
   };
 
-  // ── Layout principal ──────────────────────────────────────────────────────
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        inset: 0,
-        bgcolor: theme.palette.background.paper,
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: theme.zIndex.modal,
-      }}
-    >
+    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       <Fade in key={step} timeout={250}>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
-          {step === 4 && renderStep4()}
-          {step === 5 && renderStep5()}
+          {step === 4 && renderSuccess()}
         </Box>
       </Fade>
+
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity="error" variant="filled" onClose={() => setError('')} sx={{ width: '100%', borderRadius: 2 }}>{error}</Alert>
+      </Snackbar>
     </Box>
   );
 };

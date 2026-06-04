@@ -1,648 +1,300 @@
 import React, { useState } from "react";
 import Layout from '../../components/layout/Layout';
-import { 
-  Grid, 
-  Button, 
-  TextField, 
-  Typography, 
+import {
+  Button,
+  TextField,
+  Typography,
   Box,
   Card,
   CardContent,
-  Divider,
-  Stack,
   InputAdornment,
   Chip,
-  Tooltip,
-  Paper,
   Container,
   LinearProgress,
-  IconButton
+  ToggleButtonGroup,
+  ToggleButton,
+  alpha,
 } from '@mui/material';
 import { useNavigate } from "react-router-dom";
 import { addExpense, addIncome } from '../../services/finances';
 import { updateSavingsWithHistory } from '../../services/savings';
-import { useStore } from '../../store'; 
+import { useStore } from '../../store';
 import { getDate, formatAmount } from '../../utils';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import SwapHorizontalCircleIcon from '@mui/icons-material/SwapHorizontalCircle';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import { useTheme } from '@mui/material/styles';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 const Exchange = () => {
   const { userData, dollarRate } = useStore();
   const navigate = useNavigate();
   const theme = useTheme();
 
+  const [operation, setOperation] = useState("Compra");
   const [exRate, setExRate] = useState("");
   const [amountUSD, setAmountUSD] = useState("");
   const [amountARS, setAmountARS] = useState("");
-  const [operationType, setOperationType] = useState("");
-  const [step, setStep] = useState(1); // 1: Operación, 2: Montos
-  const [loading, setLoading] = useState(false); // Para mostrar feedback visual
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const isCompra = operation === "Compra";
+  const accentColor = isCompra ? theme.palette.info.main : theme.palette.warning.main;
+  const accentBg = isCompra ? theme.palette.info.dark : theme.palette.warning.dark;
 
-    if (!operationType || !exRate || !amountUSD || !amountARS) {
-      setLoading(false);
+  const currentARS = userData?.savings?.amountARS || 0;
+  const currentUSD = userData?.savings?.amountUSD || 0;
+
+  const parsedARS = parseFloat(amountARS) || 0;
+  const parsedUSD = parseFloat(amountUSD) || 0;
+  const parsedRate = parseFloat(exRate) || 0;
+
+  const afterARS = isCompra ? currentARS - parsedARS : currentARS + parsedARS;
+  const afterUSD = isCompra ? currentUSD + parsedUSD : currentUSD - parsedUSD;
+
+  const canSubmit = exRate && amountUSD && amountARS && !loading;
+  const hasBalance = isCompra ? parsedARS <= currentARS : parsedUSD <= currentUSD;
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    if (!hasBalance) {
+      setError(isCompra ? "No tenés suficientes ARS para esta compra" : "No tenés suficientes USD para esta venta");
       return;
     }
+    setError("");
+    setLoading(true);
 
-    const isCompra = operationType === "Compra";
-    const arsAmount = parseFloat(amountARS);
-    const usdAmount = parseFloat(amountUSD);
+    const usdAmount = parsedUSD;
+    const arsAmount = parsedARS;
+    const rate = parsedRate;
 
     if (isCompra) {
       addExpense({
-        operationType: operationType,
-        amount: arsAmount,
-        amountUSD: parseFloat(amountARS / exRate),
-        category: 'Exchange',
-        date: getDate(),
-        valorUSD: exRate,
+        operationType: "Compra", amount: arsAmount,
+        amountUSD: parseFloat((arsAmount / rate).toFixed(2)),
+        category: 'Exchange', date: getDate(), valorUSD: rate,
       });
     } else {
       addIncome({
-        operationType: operationType,
-        amount: arsAmount,
-        amountUSD: -parseFloat(amountARS / exRate),
-        category: 'Exchange',
-        date: getDate(),
-        valorUSD: exRate,
+        operationType: "Venta", amount: arsAmount,
+        amountUSD: -parseFloat((arsAmount / rate).toFixed(2)),
+        category: 'Exchange', date: getDate(), valorUSD: rate,
       });
     }
 
-    // Actualizar saldos + history en USD y ARS según el sentido del exchange
     updateSavingsWithHistory({
-      currency: 'USD',
-      amount: isCompra ? usdAmount : -usdAmount,
-      currentBalance: userData.savings.amountUSD,
-      operationType: operationType,
-      amount_ars: arsAmount,
+      currency: 'USD', amount: isCompra ? usdAmount : -usdAmount,
+      currentBalance: currentUSD, operationType: operation, amount_ars: arsAmount,
+    });
+    updateSavingsWithHistory({
+      currency: 'ARS', amount: isCompra ? -arsAmount : arsAmount,
+      currentBalance: currentARS,
     });
 
-    updateSavingsWithHistory({
-      currency: 'ARS',
-      amount: isCompra ? -arsAmount : arsAmount,
-      currentBalance: userData.savings.amountARS,
-    });
-
-    // Simular un pequeño retraso para feedback visual
     setTimeout(() => {
-      setExRate("");
-      setAmountUSD("");
-      setAmountARS("");
-      setOperationType("");
-      setStep(1);
       setLoading(false);
       navigate("/finanzas");
-    }, 800);
-  };
-  
-  const handleChangeOperationType = (type) => {
-    setOperationType(type);
-    setAmountUSD("");
-    setAmountARS("");
-    setExRate("");
-    setStep(2);
+    }, 600);
   };
 
-  const handleChangeAmount = (e) => {
-    const value = e.target.value;
-    setAmountUSD(value);
-    if (exRate) {
-      setAmountARS((value * exRate).toFixed(2));
-    }
+  const setAmountFromUSD = (usd) => {
+    setAmountUSD(usd);
+    if (exRate) setAmountARS((parseFloat(usd) * parseFloat(exRate)).toFixed(2));
+    else setAmountARS("");
   };
 
-  const handleChangeExRate = (e) => {
-    const value = e.target.value;
-    setExRate(value);
-    if (amountUSD) {
-      setAmountARS((amountUSD * value).toFixed(2));
-    }
+  const setAmountFromARS = (ars) => {
+    setAmountARS(ars);
+    if (exRate) setAmountUSD((parseFloat(ars) / parseFloat(exRate)).toFixed(2));
+    else setAmountUSD("");
   };
 
-  const handleStepChange = (direction) => {
-    if (direction === 'back') {
-      if (step === 2) {
-        setOperationType("");
-        setStep(1);
-      } else {
-        navigate('/finanzas');
-      }
-    }
+  const setRate = (val) => {
+    setExRate(val);
+    if (amountUSD) setAmountARS((parseFloat(amountUSD) * parseFloat(val)).toFixed(2));
   };
 
-  // Función para auto-completar con la tasa de cambio actual
   const useCurrentRate = () => {
-    setExRate(dollarRate['venta']);
-    if (amountUSD) {
-      setAmountARS((amountUSD * dollarRate['venta']).toFixed(2));
-    }
+    const r = String(dollarRate?.venta || "");
+    setRate(r);
   };
 
-  const renderStep1 = () => (
-    <Box>
-      <Typography variant="h5" fontWeight="bold" gutterBottom align="center" sx={{ mb: 3 }}>
-        Selecciona el tipo de operación
-      </Typography>
-      
-      {/* Cards resumen de estado actual */}
-      <Box sx={{ mb: 4, p: 2, bgcolor: 'background.paper', borderRadius: 2, boxShadow: theme.shadows[1] }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-          Estado actual de tus ahorros
-        </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} divider={<Divider orientation="vertical" flexItem />}>
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">ARS</Typography>
-            <Typography variant="h6" fontWeight="bold" color="primary">
-              ${formatAmount(userData?.savings?.amountARS || 0).replace('$', '')}
-            </Typography>
-          </Box>
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">USD</Typography>
-            <Typography variant="h6" fontWeight="bold" color="success.main">
-              ${formatAmount(userData?.savings?.amountUSD || 0).replace('$', '')}
-            </Typography>
-          </Box>
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Tasa actual</Typography>
-            <Typography variant="h6" fontWeight="bold" color="info.main">
-              ${formatAmount(dollarRate['venta']).replace('$', '')}
-            </Typography>
-          </Box>
-        </Stack>
-      </Box>
-      
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6}>
-          <Card 
-            elevation={3} 
-            onClick={() => handleChangeOperationType('Compra')}
-            sx={{ 
-              cursor: 'pointer', 
-              height: '100%',
-              transition: 'all 0.2s ease',
-              borderRadius: 2,
-              position: 'relative',
-              overflow: 'hidden',
-              '&:hover': {
-                transform: 'translateY(-5px)',
-                boxShadow: 6
-              },
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: 5,
-                height: '100%',
-                backgroundColor: theme.palette.info.main
-              }
-            }}
-          >
-            <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Box
-                sx={{
-                  mb: 2,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  width: 70,
-                  height: 70,
-                  borderRadius: '50%',
-                  bgcolor: `${theme.palette.info.main}15`,
-                  mx: 'auto'
-                }}
-              >
-                <ArrowUpwardIcon sx={{ fontSize: 36, color: theme.palette.info.main }} />
-              </Box>
-              <Typography variant="h6" fontWeight="medium" gutterBottom>
-                Compra de USD
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Entregar ARS para recibir USD
-              </Typography>
-              
-              <Box sx={{ mt: 2, p: 1, bgcolor: `${theme.palette.info.main}08`, borderRadius: 1 }}>
-                <Typography variant="caption" display="block" align="center">
-                  <Box component="span" fontWeight="medium" color="info.main">ARS ↓</Box> &nbsp;•&nbsp; <Box component="span" fontWeight="medium" color="success.main">USD ↑</Box>
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Card 
-            elevation={3} 
-            onClick={() => handleChangeOperationType('Venta')}
-            sx={{ 
-              cursor: 'pointer', 
-              height: '100%',
-              transition: 'all 0.2s ease',
-              borderRadius: 2,
-              position: 'relative',
-              overflow: 'hidden',
-              '&:hover': {
-                transform: 'translateY(-5px)',
-                boxShadow: 6
-              },
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: 5,
-                height: '100%',
-                backgroundColor: theme.palette.warning.main
-              }
-            }}
-          >
-            <CardContent sx={{ p: 3, textAlign: 'center' }}>
-              <Box
-                sx={{
-                  mb: 2,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  width: 70,
-                  height: 70,
-                  borderRadius: '50%',
-                  bgcolor: `${theme.palette.warning.main}15`,
-                  mx: 'auto'
-                }}
-              >
-                <ArrowDownwardIcon sx={{ fontSize: 36, color: theme.palette.warning.main }} />
-              </Box>
-              <Typography variant="h6" fontWeight="medium" gutterBottom>
-                Venta de USD
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Entregar USD para recibir ARS
-              </Typography>
-              
-              <Box sx={{ mt: 2, p: 1, bgcolor: `${theme.palette.warning.main}08`, borderRadius: 1 }}>
-                <Typography variant="caption" display="block" align="center">
-                  <Box component="span" fontWeight="medium" color="primary.main">ARS ↑</Box> &nbsp;•&nbsp; <Box component="span" fontWeight="medium" color="warning.main">USD ↓</Box>
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          onClick={() => handleStepChange('back')}
-          size="large"
-          sx={{ 
-            px: 3,
-            borderRadius: 2,
-            borderWidth: 2,
-            '&:hover': {
-              borderWidth: 2
-            }
-          }}
-        >
-          Volver
-        </Button>
-      </Box>
-    </Box>
-  );
-
-  const renderStep2 = () => (
-    <Box>
-      <Box mb={4}>
-        <Chip
-          icon={operationType === "Compra" ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
-          label={operationType === "Compra" ? "Compra de USD" : "Venta de USD"}
-          sx={{ 
-            bgcolor: operationType === "Compra" ? 
-              `${theme.palette.info.main}15` : 
-              `${theme.palette.warning.main}15`,
-            color: operationType === "Compra" ? 
-              theme.palette.info.main : 
-              theme.palette.warning.main,
-            fontWeight: 'medium',
-            mb: 2,
-            py: 1,
-            px: 2,
-            height: 'auto',
-            fontSize: '1rem'
-          }}
-        />
-        <Typography variant="h5" fontWeight="bold">
-          Detalles de la operación
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {operationType === "Compra" 
-            ? "Ingresa la tasa y los montos para completar tu compra de dólares" 
-            : "Ingresa la tasa y los montos para completar tu venta de dólares"}
-        </Typography>
-      </Box>
-      
-      <form onSubmit={handleSubmit}>
-        <Card 
-          elevation={1} 
-          sx={{ 
-            mb: 4, 
-            p: 2, 
-            borderRadius: 2, 
-            bgcolor: 'background.paper',
-            border: `1px solid ${theme.palette.divider}`
-          }}
-        >
-          <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-            <Typography variant="subtitle1" fontWeight="bold" color="text.primary">
-              Tasa de conversión
-            </Typography>
-            <Tooltip title="Usar tasa actual">
-              <Chip 
-                label={formatAmount(dollarRate['venta']).replace('$', '')} 
-                size="small" 
-                color="primary" 
-                variant="outlined"
-                onClick={useCurrentRate}
-                clickable
-                sx={{ ml: 'auto', cursor: 'pointer' }}
-              />
-            </Tooltip>
-          </Stack>
-          
-          <TextField
-            type="number"
-            value={exRate}
-            onChange={handleChangeExRate}
-            required
-            fullWidth
-            placeholder="Ingresa la tasa de cambio"
-            variant="outlined"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <CompareArrowsIcon color="action" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ 
-              mb: 1,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '& fieldset': { borderWidth: 2 },
-                '&:hover fieldset': { borderWidth: 2 }
-              }
-            }}
-          />
-        </Card>
-
-        <Card 
-          elevation={1} 
-          sx={{ 
-            mb: 4, 
-            p: 2, 
-            borderRadius: 2, 
-            bgcolor: 'background.paper',
-            border: `1px solid ${theme.palette.divider}`
-          }}
-        >
-          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-            {operationType === "Compra" ? "Cantidad a recibir en USD" : "Cantidad a entregar en USD"}
-          </Typography>
-          
-          <TextField
-            type="number"
-            value={amountUSD}
-            onChange={handleChangeAmount}
-            required
-            fullWidth
-            placeholder="Ingresa el monto en dólares"
-            variant="outlined"
-            disabled={!exRate}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <AttachMoneyIcon color={exRate ? "action" : "disabled"} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ 
-              mb: 3,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '& fieldset': { borderWidth: 2 },
-                '&:hover fieldset': { borderWidth: 2 }
-              }
-            }}
-          />
-          
-          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-            {operationType === "Compra" ? "Cantidad a entregar en ARS" : "Cantidad a recibir en ARS"}
-          </Typography>
-          
-          <TextField
-            type="number"
-            value={amountARS}
-            onChange={(e) => {
-              const value = e.target.value;
-              setAmountARS(value);
-              if (exRate) {
-                setAmountUSD((value / exRate).toFixed(2));
-              }
-            }}
-            required
-            fullWidth
-            placeholder="Ingresa el monto en pesos"
-            variant="outlined"
-            disabled={!exRate}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <MonetizationOnIcon color={exRate ? "action" : "disabled"} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ 
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '& fieldset': { borderWidth: 2 },
-                '&:hover fieldset': { borderWidth: 2 }
-              }
-            }}
-          />
-        </Card>
-        
-        {exRate && amountUSD && amountARS && (
-          <Card 
-            elevation={3}
-            sx={{ 
-              mb: 4, 
-              p: 3, 
-              borderRadius: 2, 
-              background: operationType === "Compra" ? 
-                `linear-gradient(135deg, ${theme.palette.info.light}05, ${theme.palette.info.light}15)` : 
-                `linear-gradient(135deg, ${theme.palette.warning.light}05, ${theme.palette.warning.light}15)`,
-              border: `1px solid ${operationType === "Compra" ? 
-                theme.palette.info.light : 
-                theme.palette.warning.light}`
-            }}
-          >
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-              Resumen de la operación
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Stack spacing={2}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body1">{operationType === "Compra" ? "Entregar:" : "Recibir:"}</Typography>
-                <Typography variant="h6" fontWeight="medium">{formatAmount(amountARS).replace('$', '')} ARS</Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body1">{operationType === "Compra" ? "Recibir:" : "Entregar:"}</Typography>
-                <Typography variant="h6" fontWeight="medium">{formatAmount(amountUSD).replace('$', '')} USD</Typography>
-              </Stack>
-              <Divider />
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body1">Tasa de cambio:</Typography>
-                <Typography variant="h6" fontWeight="medium">{formatAmount(exRate).replace('$', '')} ARS/USD</Typography>
-              </Stack>
-              
-              <Box sx={{ pt: 1 }}>
-                <Typography variant="body2" color="text.secondary" align="center">
-                  {operationType === "Compra"
-                    ? `Tus ahorros en pesos disminuirán ${formatAmount(amountARS).replace('$', '')} y tus ahorros en dólares aumentarán ${formatAmount(amountUSD).replace('$', '')}`
-                    : `Tus ahorros en pesos aumentarán ${formatAmount(amountARS).replace('$', '')} y tus ahorros en dólares disminuirán ${formatAmount(amountUSD).replace('$', '')}`
-                  }
-                </Typography>
-              </Box>
-            </Stack>
-          </Card>
-        )}
-        
-        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Button
-            variant="outlined"
-            onClick={() => handleStepChange('back')}
-            size="large"
-            sx={{ 
-              px: 3,
-              borderRadius: 2,
-              borderWidth: 2,
-              '&:hover': {
-                borderWidth: 2
-              }
-            }}
-          >
-            Volver
-          </Button>
-          <Button 
-            variant="contained" 
-            color={operationType === "Compra" ? "info" : "warning"}
-            type="submit" 
-            disabled={!exRate || !amountUSD || !amountARS || loading}
-            startIcon={loading ? null : <SwapHorizontalCircleIcon />}
-            size="large"
-            sx={{ 
-              px: 4,
-              py: 1.5,
-              borderRadius: 2,
-              boxShadow: 3
-            }}
-          >
-            {loading ? "Procesando..." : "Completar Operación"}
-          </Button>
-        </Box>
-      </form>
-    </Box>
-  );
+  const progress = (!!exRate ? 0.33 : 0) + (!!amountUSD ? 0.33 : 0) + (!!amountARS ? 0.34 : 0);
 
   return (
-    <Layout title="Cambio de Divisas">
-      <Container maxWidth="sm" sx={{ py: 4, minHeight: '100vh' }}>
-        {loading && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}
-        
-        <Card elevation={4} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-          <Box 
-            sx={{ 
-              px: 2, 
-              py: 2, 
-              bgcolor: theme.palette.primary.main, 
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <Box 
-              sx={{ 
-                display: 'flex',
-                alignItems: 'center', 
-                justifyContent: 'center',
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                mr: 2
-              }}
-            >
-              <SwapHorizontalCircleIcon />
-            </Box>
-            <Box>
-              <Typography variant="h6" fontWeight="bold">
-                Cambio de Divisas
-              </Typography>
-              <Typography variant="caption">
-                {step === 1 ? 'Selecciona el tipo de operación' : 'Completa los detalles'}
-              </Typography>
-            </Box>
-            <Box 
-              sx={{ 
-                ml: 'auto', 
-                display: 'flex', 
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-              }}
-            >
-              {step}
-            </Box>
+    <Layout title="Exchange">
+      <Container maxWidth="sm" sx={{ py: 2 }}>
+        {loading && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }} />}
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Progress bar */}
+          <Box sx={{ height: 3, borderRadius: 1, bgcolor: alpha(accentColor, 0.1), overflow: 'hidden' }}>
+            <Box sx={{ height: '100%', borderRadius: 1, bgcolor: accentColor, width: `${progress * 100}%`, transition: 'width 0.3s' }} />
           </Box>
-          
-          {step === 2 && (
-            <Box 
-              sx={{ 
-                position: 'relative',
-                height: 6, 
-                width: '100%',
-                bgcolor: theme.palette.grey[300]
-              }}
-            >
-              <Box 
-                sx={{ 
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  height: '100%',
-                  width: exRate && amountUSD && amountARS ? '100%' : (exRate ? '50%' : '0%'),
-                  bgcolor: operationType === "Compra" ? theme.palette.info.main : theme.palette.warning.main,
-                  transition: 'width 0.3s ease'
-                }}
+
+          {/* Toggle Compra/Venta */}
+          <ToggleButtonGroup value={operation} exclusive onChange={(_, v) => { if (v) { setOperation(v); setAmountUSD(""); setAmountARS(""); setExRate(""); setError(""); } }} fullWidth
+            sx={{
+              '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, color: 'text.secondary', fontWeight: 600, textTransform: 'none', py: 1.2 },
+              '& .MuiToggleButton-root.Mui-selected[value="Compra"]': { bgcolor: theme.palette.info.main, color: 'white', '&:hover': { bgcolor: theme.palette.info.dark } },
+              '& .MuiToggleButton-root.Mui-selected[value="Venta"]': { bgcolor: theme.palette.warning.main, color: 'white', '&:hover': { bgcolor: theme.palette.warning.dark } },
+            }}>
+            <ToggleButton value="Compra">Comprar USD</ToggleButton>
+            <ToggleButton value="Venta">Vender USD</ToggleButton>
+          </ToggleButtonGroup>
+
+          {/* Current savings */}
+          <Card variant="outlined" sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ p: 2, display: 'flex', justifyContent: 'space-around', alignItems: 'center', '&:last-child': { pb: 2 } }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">ARS</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>$ {formatAmount(currentARS)}</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">USD</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>US$ {formatAmount(currentUSD)}</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">TC</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  $ {formatAmount(dollarRate?.venta || 0)}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Rate */}
+          <Card variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>TASA DE CONVERSIÓN</Typography>
+              <Chip
+                icon={<CompareArrowsIcon sx={{ fontSize: 14 }} />}
+                label={`Usar TC ${formatAmount(dollarRate?.venta || 0)}`}
+                size="small"
+                onClick={useCurrentRate}
+                sx={{ fontWeight: 600, fontSize: 11, cursor: 'pointer', '&:hover': { bgcolor: alpha(accentColor, 0.1) } }}
               />
             </Box>
+            <TextField
+              fullWidth
+              type="number"
+              value={exRate}
+              onChange={(e) => setRate(e.target.value)}
+              placeholder="Ej: 1250"
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><CompareArrowsIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
+                sx: { borderRadius: 2 },
+              }}
+              inputProps={{ inputMode: 'decimal', step: '0.01' }}
+            />
+          </Card>
+
+          {/* Amounts */}
+          <Card variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1.5 }}>
+              {isCompra ? 'COMPRAR USD' : 'VENDER USD'}
+            </Typography>
+
+            <TextField
+              fullWidth
+              type="number"
+              value={amountUSD}
+              onChange={(e) => setAmountFromUSD(e.target.value)}
+              placeholder="Cantidad en USD"
+              disabled={!exRate}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><AttachMoneyIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
+                sx: { borderRadius: 2 },
+              }}
+              inputProps={{ inputMode: 'decimal', step: '0.01' }}
+              sx={{ mb: 1.5 }}
+            />
+
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>
+              o ingresá el monto en ARS
+            </Typography>
+
+            <TextField
+              fullWidth
+              type="number"
+              value={amountARS}
+              onChange={(e) => setAmountFromARS(e.target.value)}
+              placeholder="Equivalente en ARS"
+              disabled={!exRate}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><MonetizationOnIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
+                sx: { borderRadius: 2 },
+              }}
+              inputProps={{ inputMode: 'decimal', step: '0.01' }}
+            />
+          </Card>
+
+          {/* Preview after exchange */}
+          {parsedARS > 0 && parsedUSD > 0 && (
+            <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: alpha(accentColor, 0.04), borderColor: alpha(accentColor, 0.2) }}>
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: accentColor, display: 'block', mb: 1.5 }}>
+                  DESPUÉS DEL EXCHANGE
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <MonetizationOnIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">ARS</Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>$ {formatAmount(afterARS)}</Typography>
+                    <Typography variant="caption" sx={{ color: isCompra ? 'error.light' : 'success.light', fontWeight: 600 }}>
+                      {isCompra ? `−$ ${formatAmount(parsedARS)}` : `+$ ${formatAmount(parsedARS)}`}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AttachMoneyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">USD</Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>US$ {formatAmount(afterUSD)}</Typography>
+                    <Typography variant="caption" sx={{ color: isCompra ? 'success.light' : 'error.light', fontWeight: 600 }}>
+                      {isCompra ? `+US$ ${formatAmount(parsedUSD)}` : `−US$ ${formatAmount(parsedUSD)}`}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
           )}
-          
-          <CardContent sx={{ p: 3 }}>
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-          </CardContent>
-        </Card>
+
+          {/* Error */}
+          {error && (
+            <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 600, textAlign: 'center' }}>
+              {error}
+            </Typography>
+          )}
+
+          {/* Submit */}
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+            startIcon={isCompra ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
+            sx={{
+              bgcolor: accentColor,
+              color: 'white',
+              borderRadius: 999,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '1rem',
+              '&:hover': { bgcolor: accentBg },
+              '&.Mui-disabled': { bgcolor: alpha(accentColor, 0.3), color: 'white' },
+            }}
+          >
+            {loading ? 'Procesando...' : isCompra ? 'Comprar USD' : 'Vender USD'}
+          </Button>
+        </Box>
       </Container>
     </Layout>
   );

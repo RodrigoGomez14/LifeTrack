@@ -134,6 +134,29 @@ function EventDetailsBody({ event, theme }) {
             </Typography>
           </HighlightBox>
 
+          {(event.details.ph !== undefined || event.details.ec !== undefined || event.details.ppm !== undefined) && (
+            <Box sx={{ display: 'flex', gap: 1.5, mt: 2, justifyContent: 'center' }}>
+              {event.details.ph !== undefined && (
+                <Box sx={{ textAlign: 'center', bgcolor: alpha('#4CAF50', 0.08), borderRadius: 2, p: 1.5, flex: 1 }}>
+                  <Typography variant="caption" color="text.secondary">pH</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#4CAF50' }}>{event.details.ph}</Typography>
+                </Box>
+              )}
+              {event.details.ec !== undefined && (
+                <Box sx={{ textAlign: 'center', bgcolor: alpha('#2196F3', 0.08), borderRadius: 2, p: 1.5, flex: 1 }}>
+                  <Typography variant="caption" color="text.secondary">EC</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#2196F3' }}>{event.details.ec} mS/cm</Typography>
+                </Box>
+              )}
+              {event.details.ppm !== undefined && (
+                <Box sx={{ textAlign: 'center', bgcolor: alpha('#FF9800', 0.08), borderRadius: 2, p: 1.5, flex: 1 }}>
+                  <Typography variant="caption" color="text.secondary">PPM</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#FF9800' }}>{event.details.ppm}</Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+
           {event.details.aditives?.length > 0 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>

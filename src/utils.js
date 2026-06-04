@@ -113,8 +113,12 @@ export function getPreviousMonday() {
 
 // CHECK IF SEARCH CONTAINS WHITE SPACES
 export const checkSearch =(search)=>{
-  let aux = checkWhiteSpace(search.slice(1).toString())
-  return aux
+  if (!search) return '';
+  const raw = search.charAt(0) === '?' ? search.slice(1) : search;
+  if (raw.includes('=')) {
+    return new URLSearchParams(raw).get('id') || '';
+  }
+  return checkWhiteSpace(raw);
 }
 
 const checkWhiteSpace =(text)=>{

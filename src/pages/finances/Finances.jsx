@@ -1,29 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Box, Typography, SpeedDial, SpeedDialIcon, SpeedDialAction } from '@mui/material';
+import {
+  Box,
+  SpeedDial,
+  SpeedDialIcon,
+  SpeedDialAction,
+  CircularProgress,
+} from '@mui/material';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
-import { formatAmount } from '../../utils';
+import { formatAmount, getMonthName } from '../../utils';
 import RefundDialog from '../../components/finances/RefundDialog';
-import FinancesTimeNavigator from '../../components/finances/FinancesTimeNavigator';
-import MonthlySummaryCard from '../../components/finances/MonthlySummaryCard';
-import MonthlyTransactionsList from '../../components/finances/MonthlyTransactionsList';
-import AnnualTrends from '../../components/finances/AnnualTrends';
-import SavingsEvolutionCard from '../../components/finances/SavingsEvolutionCard';
-import { getMonthName } from '../../utils';
+import FinancesHeader from '../../components/finances/FinancesHeader';
+import FinancesMonthSummary from '../../components/finances/FinancesMonthSummary';
+import FinancesCharts from '../../components/finances/FinancesCharts';
+import FinancesTransactionsList from '../../components/finances/FinancesTransactionsList';
 
 const Finances = () => {
   const { userData, dollarRate } = useStore();
   const navigate = useNavigate();
 
-  // Selectores compartidos por todos los hijos del dashboard
+  // Selectores principales
   const [dataType, setDataType] = useState('expenses');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
-  // Datos derivados (recalculados por useEffect cuando cambian los selectores)
+  // Derivados (recalculados por los 2 useEffect)
   const [monthlyData, setMonthlyData] = useState(null);
   const [monthlyTrendsData, setMonthlyTrendsData] = useState({
     months: [],
@@ -35,7 +40,7 @@ const Finances = () => {
   // SpeedDial flotante
   const [openSpeedDial, setOpenSpeedDial] = useState(false);
 
-  // Dialog de devolución (lo abre el listado, lo cierra el dialog)
+  // Dialog de devolución
   const [openRefundDialog, setOpenRefundDialog] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
@@ -45,22 +50,7 @@ const Finances = () => {
     setOpenRefundDialog(true);
   };
 
-  const handleCloseRefund = () => {
-    setOpenRefundDialog(false);
-    setSelectedTransaction(null);
-  };
-
-  const handlePreviousMonth = () => {
-    if (selectedMonth === 1) {
-      setSelectedMonth(12);
-      setSelectedYear((prev) => prev - 1);
-    } else {
-      setSelectedMonth((prev) => prev - 1);
-    }
-  };
-
-  // Recalcula `monthlyData` (resumen + categorías del mes) cuando cambia el período/tipo.
-  // Se ejecuta solo si el shape de userData.finances está disponible.
+  // ── Cálculo de monthlyData (categorías + total efectivo del mes) ──
   useEffect(() => {
     if (!userData?.finances) return;
 
@@ -81,27 +71,25 @@ const Finances = () => {
           categoryData[category] = { total: 0, percentage: 0, subcategories: {} };
         }
 
-        // Detectar transacciones con fecha futura → no las contamos en totales
+        // Descartar futuras
         let isFutureTransaction = false;
         if (transaction.date) {
-          let transactionDate;
+          let txDate;
           if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
             const [day, month, year] = transaction.date.split('/').map(Number);
-            transactionDate = new Date(year, month - 1, day);
+            txDate = new Date(year, month - 1, day);
           } else {
-            transactionDate = new Date(transaction.date);
+            txDate = new Date(transaction.date);
           }
-          if (!isNaN(transactionDate.getTime()) && transactionDate > today) {
-            isFutureTransaction = true;
-          }
+          if (!isNaN(txDate.getTime()) && txDate > today) isFutureTransaction = true;
         }
 
         if (!transaction.hiddenFromList && !isFutureTransaction && !transaction.excludeFromTotal) {
-          const effectiveAmount = (transaction.amount || 0) - (transaction.refundAmount || 0);
-          categoryData[category].total += effectiveAmount;
+          const effective = (transaction.amount || 0) - (transaction.refundAmount || 0);
+          categoryData[category].total += effective;
           if (transaction.subcategory) {
             categoryData[category].subcategories[transaction.subcategory] =
-              (categoryData[category].subcategories[transaction.subcategory] || 0) + effectiveAmount;
+              (categoryData[category].subcategories[transaction.subcategory] || 0) + effective;
           }
         }
       });
@@ -119,7 +107,7 @@ const Finances = () => {
         sortedCategories: Object.entries(categoryData).sort((a, b) => b[1].total - a[1].total),
       });
     } else if (monthData.categories) {
-      // Estructura legacy: categorías ya pre-procesadas
+      // Legacy: categorías ya pre-procesadas
       const total = monthData.total || 0;
       Object.entries(monthData.categories).forEach(([category, data]) => {
         categoryData[category] = {
@@ -140,7 +128,7 @@ const Finances = () => {
     }
   }, [userData, selectedYear, selectedMonth, dataType, dollarRate]);
 
-  // Recalcula `monthlyTrendsData` (gastos/ingresos/balance por mes del año seleccionado).
+  // ── Cálculo de monthlyTrendsData (gastos/ingresos/balance por mes del año) ──
   useEffect(() => {
     if (!userData?.finances) return;
 
@@ -151,14 +139,14 @@ const Finances = () => {
       entries
         .filter((t) => {
           if (t.date) {
-            let transactionDate;
+            let txDate;
             if (typeof t.date === 'string' && t.date.includes('/')) {
-              const [day, month, year] = t.date.split('/').map(Number);
-              transactionDate = new Date(year, month - 1, day);
+              const [d, m, y] = t.date.split('/').map(Number);
+              txDate = new Date(y, m - 1, d);
             } else {
-              transactionDate = new Date(t.date);
+              txDate = new Date(t.date);
             }
-            if (!isNaN(transactionDate.getTime()) && transactionDate > today) return false;
+            if (!isNaN(txDate.getTime()) && txDate > today) return false;
           }
           return !t.hiddenFromList && !t.excludeFromTotal;
         })
@@ -169,21 +157,19 @@ const Finances = () => {
 
     if (userData.finances.expenses?.[selectedYear]?.months) {
       Object.keys(userData.finances.expenses[selectedYear].months).forEach((month) => {
-        const monthIndex = parseInt(month) - 1;
-        const monthData = userData.finances.expenses[selectedYear].months[month];
-        expenseData[monthIndex] = (monthData.data && Array.isArray(monthData.data))
-          ? sumVisible(monthData.data)
-          : (monthData.total || 0);
+        const i = parseInt(month, 10) - 1;
+        const md = userData.finances.expenses[selectedYear].months[month];
+        expenseData[i] = md.data && Array.isArray(md.data) ? sumVisible(md.data) : md.total || 0;
       });
     }
 
     if (userData.finances.incomes?.[selectedYear]?.months) {
       Object.keys(userData.finances.incomes[selectedYear].months).forEach((month) => {
-        const monthIndex = parseInt(month) - 1;
-        const monthData = userData.finances.incomes[selectedYear].months[month];
-        incomeData[monthIndex] = (monthData.data && Array.isArray(monthData.data))
-          ? sumVisible(monthData.data.filter((t) => !t.hiddenFromList))
-          : (monthData.total || 0);
+        const i = parseInt(month, 10) - 1;
+        const md = userData.finances.incomes[selectedYear].months[month];
+        incomeData[i] = md.data && Array.isArray(md.data)
+          ? sumVisible(md.data.filter((t) => !t.hiddenFromList))
+          : md.total || 0;
       });
     }
 
@@ -195,75 +181,79 @@ const Finances = () => {
     });
   }, [userData, selectedYear]);
 
-  // Loading state mientras llega userData
+  // Loading state
   if (!userData || !userData.finances || !userData.savings) {
     return (
-      <Layout title="Análisis Financiero">
-        <Grid container spacing={3} justifyContent="center" alignItems="center" style={{ minHeight: '80vh' }}>
-          <Grid item>
-            <Typography variant="h5" color="textSecondary">
-              Cargando datos financieros, por favor espere...
-            </Typography>
-          </Grid>
-        </Grid>
+      <Layout title="Finanzas">
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <CircularProgress />
+        </Box>
       </Layout>
     );
   }
 
   return (
-    <Layout title="Análisis Financiero">
-      <Box sx={{ minHeight: '100vh', width: '100%', position: 'relative', pt: 0, pb: 4 }}>
-        <FinancesTimeNavigator
+    <Layout title="Finanzas">
+      <Box sx={{ minHeight: '100vh', pb: 12 }}>
+        {/* 1. Header con toggle y navegador */}
+        <FinancesHeader
           dataType={dataType}
           setDataType={setDataType}
           selectedYear={selectedYear}
-          setSelectedYear={setSelectedYear}
           selectedMonth={selectedMonth}
+          setSelectedYear={setSelectedYear}
           setSelectedMonth={setSelectedMonth}
-          handlePreviousMonth={handlePreviousMonth}
-          monthlyData={monthlyData}
         />
 
-        <Grid container spacing={3} sx={{ px: { xs: 2, sm: 2 }, mt: 0 }}>
-          <Grid item xs={12} md={6}>
-            <MonthlySummaryCard
-              monthlyData={monthlyData}
-              dataType={dataType}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
-            />
-          </Grid>
+        {/* 2. Resumen del mes */}
+        <FinancesMonthSummary
+          monthlyData={monthlyData}
+          monthlyTrendsData={monthlyTrendsData}
+          dataType={dataType}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          dollarRate={dollarRate}
+          onSeeAllCategories={() => {
+            // Scroll a la lista de transacciones — placeholder hasta tener una vista dedicada
+            const el = document.getElementById('finances-transactions-anchor');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
 
-          <Grid item xs={12} md={6}>
-            <MonthlyTransactionsList
-              userData={userData}
-              dataType={dataType}
-              selectedYear={selectedYear}
-              selectedMonth={selectedMonth}
-              dollarRate={dollarRate}
-              onOpenRefund={handleOpenRefund}
-            />
-          </Grid>
+        {/* 3. Gráficos */}
+        <FinancesCharts
+          dataType={dataType}
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          monthlyData={monthlyData}
+          monthlyTrendsData={monthlyTrendsData}
+        />
 
-          <AnnualTrends
-            monthlyTrendsData={monthlyTrendsData}
-            dollarRate={dollarRate}
-          />
-
-          <SavingsEvolutionCard
+        {/* 4. Movimientos */}
+        <Box id="finances-transactions-anchor">
+          <FinancesTransactionsList
             userData={userData}
+            dataType={dataType}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
             dollarRate={dollarRate}
+            onOpenRefund={handleOpenRefund}
           />
-        </Grid>
+        </Box>
 
+        {/* Dialog de devolución (sin cambios) */}
         <RefundDialog
           open={openRefundDialog}
           transaction={selectedTransaction}
           dollarRate={dollarRate}
           currentSavings={userData?.savings?.amountARS}
-          onClose={handleCloseRefund}
+          onClose={() => {
+            setOpenRefundDialog(false);
+            setSelectedTransaction(null);
+          }}
         />
 
+        {/* SpeedDial flotante */}
         <SpeedDial
           ariaLabel="Acciones rápidas de finanzas"
           sx={{ position: 'fixed', bottom: 24, right: 24 }}
@@ -275,14 +265,20 @@ const Finances = () => {
           <SpeedDialAction
             key="nuevoGasto"
             icon={<TrendingDownIcon />}
-            tooltipTitle="Nuevo Gasto"
+            tooltipTitle="Nuevo gasto"
             onClick={() => navigate('/NuevoGasto')}
           />
           <SpeedDialAction
             key="nuevoIngreso"
             icon={<TrendingUpIcon />}
-            tooltipTitle="Nuevo Ingreso"
+            tooltipTitle="Nuevo ingreso"
             onClick={() => navigate('/NuevoIngreso')}
+          />
+          <SpeedDialAction
+            key="exchange"
+            icon={<CurrencyExchangeIcon />}
+            tooltipTitle="Exchange"
+            onClick={() => navigate('/exchange')}
           />
         </SpeedDial>
       </Box>

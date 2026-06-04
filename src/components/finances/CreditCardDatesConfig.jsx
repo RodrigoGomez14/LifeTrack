@@ -1,281 +1,181 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Card,
-  CardContent,
   Box,
   Typography,
-  Button,
-  Grid,
   Stack,
-  Avatar,
-  Alert,
+  Button,
   CircularProgress,
-  useMediaQuery,
+  Card,
+  alpha,
 } from '@mui/material';
-import { useTheme, alpha } from '@mui/material/styles';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import PaymentIcon from '@mui/icons-material/Payment';
-import SaveIcon from '@mui/icons-material/Save';
+import { useTheme } from '@mui/material/styles';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
+import CheckIcon from '@mui/icons-material/Check';
 import { isDateBeyondLimit } from './creditCardsHelpers';
 
+// Sub-componente expandible para configurar/editar las fechas de cierre y vencimiento
+// del período seleccionado. Las validaciones se preservan del componente viejo.
 const CreditCardDatesConfig = ({
-  closingDate,
-  dueDate,
-  onClosingChange,
-  onDueChange,
-  onSubmit,
+  initialClosingDate,
+  initialDueDate,
+  onSave,
+  onCancel,
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [closingDate, setClosingDate] = useState(initialClosingDate || '');
+  const [dueDate, setDueDate] = useState(initialDueDate || '');
   const [saving, setSaving] = useState(false);
-  const [updateError, setUpdateError] = useState('');
+  const [error, setError] = useState('');
 
-  // El cierre acepta cualquier fecha hasta el límite de 1 mes futuro.
+  useEffect(() => {
+    setClosingDate(initialClosingDate || '');
+    setDueDate(initialDueDate || '');
+  }, [initialClosingDate, initialDueDate]);
+
+  // No permitir fechas a más de 1 mes en el futuro
   const shouldDisableClosingDate = (date) => isDateBeyondLimit(date.toDate());
 
-  // El vencimiento debe ser posterior al cierre y caer en el mismo mes o el siguiente.
+  // Vencimiento: debe ser >= cierre y caer en el mismo mes o el siguiente, dentro del límite
   const shouldDisableDueDate = (date) => {
-    const jsDate = date.toDate();
-    if (!closingDate) return isDateBeyondLimit(jsDate);
+    const js = date.toDate();
+    if (!closingDate) return isDateBeyondLimit(js);
 
-    try {
-      const closingDateObj = new Date(closingDate);
-      if (jsDate < closingDateObj) return true;
+    const closingObj = new Date(closingDate);
+    if (js < closingObj) return true;
 
-      const closingYear = closingDateObj.getFullYear();
-      const closingMonth = closingDateObj.getMonth();
-      const nextMonth = (closingMonth + 1) % 12;
-      const nextMonthYear = closingMonth === 11 ? closingYear + 1 : closingYear;
-      const jsDateYear = jsDate.getFullYear();
-      const jsDateMonth = jsDate.getMonth();
-
-      const sameOrNextMonth =
-        (jsDateYear === closingYear && jsDateMonth === closingMonth) ||
-        (jsDateYear === nextMonthYear && jsDateMonth === nextMonth);
-      if (sameOrNextMonth) return false;
-
-      return isDateBeyondLimit(jsDate);
-    } catch (error) {
-      console.error('Error al procesar fecha de cierre:', error);
-      return isDateBeyondLimit(jsDate);
-    }
-  };
-
-  const handleClosingDateChange = (date) => {
-    if (date) onClosingChange(date.format('YYYY-MM-DD'));
-  };
-
-  const handleDueDateChange = (date) => {
-    if (date) onDueChange(date.format('YYYY-MM-DD'));
+    const cYear = closingObj.getFullYear();
+    const cMonth = closingObj.getMonth();
+    const nextMonth = (cMonth + 1) % 12;
+    const nextYear = cMonth === 11 ? cYear + 1 : cYear;
+    const jYear = js.getFullYear();
+    const jMonth = js.getMonth();
+    const sameOrNext =
+      (jYear === cYear && jMonth === cMonth) || (jYear === nextYear && jMonth === nextMonth);
+    if (sameOrNext) return false;
+    return isDateBeyondLimit(js);
   };
 
   const handleSubmit = async () => {
-    if (!closingDate || !dueDate) {
-      setUpdateError(
-        !closingDate
-          ? 'Por favor selecciona una fecha de cierre válida'
-          : 'Por favor selecciona una fecha de vencimiento válida'
-      );
+    if (!closingDate) {
+      setError('Seleccioná la fecha de cierre');
       return;
     }
+    if (!dueDate) {
+      setError('Seleccioná la fecha de vencimiento');
+      return;
+    }
+    setError('');
     setSaving(true);
-    setUpdateError('');
     try {
-      await onSubmit({ closingDate, dueDate });
-    } catch (error) {
-      console.error('Error al actualizar las fechas:', error);
-      setUpdateError('Error al actualizar las fechas. Inténtalo de nuevo.');
+      await onSave({ closingDate, dueDate });
+    } catch (e) {
+      console.error('Error al guardar fechas:', e);
+      setError('Error al guardar. Intentá de nuevo.');
     } finally {
       setSaving(false);
     }
   };
 
+  const datePickerSlotProps = {
+    textField: {
+      fullWidth: true,
+      size: 'small',
+      sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } },
+    },
+  };
+
   return (
     <Card
-      elevation={3}
+      elevation={0}
       sx={{
-        mb: 3,
         borderRadius: 3,
-        overflow: 'hidden',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          transform: { xs: 'none', sm: 'translateY(-2px)' },
-          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
-        },
+        border: `1px solid ${theme.palette.divider}`,
+        p: 2.5,
       }}
     >
-      <Box
-        sx={{
-          p: 3,
-          background: `linear-gradient(to right, ${theme.palette.warning.dark}, ${theme.palette.warning.main})`,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Avatar
-            sx={{
-              bgcolor: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              width: { xs: 36, sm: 40 },
-              height: { xs: 36, sm: 40 },
-            }}
-          >
-            <CalendarTodayIcon />
-          </Avatar>
-          <Box>
-            <Typography variant={isMobile ? 'subtitle1' : 'h6'} fontWeight="bold" color="white">
-              Configuración de Fechas
-            </Typography>
-            <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-              Configura las fechas de cierre y vencimiento
-            </Typography>
-          </Box>
-        </Stack>
-      </Box>
+      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
+        FECHAS DEL PERÍODO
+      </Typography>
 
-      <CardContent sx={{ p: 3 }}>
-        {updateError && (
-          <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-            {updateError}
-          </Alert>
+      <Stack spacing={2} sx={{ mt: 1.5 }}>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
+            Fecha de cierre
+          </Typography>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+            <DatePicker
+              value={closingDate ? dayjs(closingDate) : null}
+              onChange={(d) => d && setClosingDate(d.format('YYYY-MM-DD'))}
+              format="DD/MM/YYYY"
+              shouldDisableDate={shouldDisableClosingDate}
+              slotProps={datePickerSlotProps}
+            />
+          </LocalizationProvider>
+        </Box>
+
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
+            Fecha de vencimiento
+          </Typography>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+            <DatePicker
+              value={dueDate ? dayjs(dueDate) : null}
+              onChange={(d) => d && setDueDate(d.format('YYYY-MM-DD'))}
+              format="DD/MM/YYYY"
+              shouldDisableDate={shouldDisableDueDate}
+              slotProps={datePickerSlotProps}
+            />
+          </LocalizationProvider>
+        </Box>
+
+        {error && (
+          <Typography variant="caption" sx={{ color: theme.palette.error.main, fontWeight: 500 }}>
+            {error}
+          </Typography>
         )}
 
-        <Grid container spacing={3}>
-          {/* Fecha de cierre */}
-          <Grid item xs={12} md={6}>
-            <Card
-              elevation={1}
+        <Stack direction="row" spacing={1.5}>
+          {onCancel && (
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={onCancel}
+              disabled={saving}
               sx={{
-                borderRadius: 2,
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                height: '100%',
-                transition: 'all 0.3s ease',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] },
+                borderRadius: 999,
+                py: 1,
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: theme.palette.divider,
+                color: theme.palette.text.primary,
               }}
             >
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <CalendarTodayIcon color="primary" fontSize="small" />
-                  <Typography variant="h6" color="primary" fontWeight="bold">
-                    Fecha de Cierre
-                  </Typography>
-                </Box>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  La fecha de cierre es cuando finaliza el período de facturación.
-                </Typography>
-
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-                  <DatePicker
-                    label="Seleccionar fecha de cierre"
-                    value={closingDate ? dayjs(closingDate) : null}
-                    onChange={handleClosingDateChange}
-                    views={['year', 'month', 'day']}
-                    format="DD/MM/YYYY"
-                    shouldDisableDate={shouldDisableClosingDate}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        required: true,
-                        error: !closingDate,
-                        helperText: !closingDate ? 'Fecha requerida' : '',
-                        sx: { mt: 1 },
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
-
-                {closingDate && (
-                  <Alert severity="success" sx={{ mt: 2, borderRadius: 2 }}>
-                    <Typography variant="body2">
-                      {dayjs(closingDate).locale('es').format('DD [de] MMMM [de] YYYY')}
-                    </Typography>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Fecha de vencimiento */}
-          <Grid item xs={12} md={6}>
-            <Card
-              elevation={1}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                height: '100%',
-                transition: 'all 0.3s ease',
-                '&:hover': { transform: 'translateY(-2px)', boxShadow: theme.shadows[4] },
-              }}
-            >
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
-                  <PaymentIcon color="error" fontSize="small" />
-                  <Typography variant="h6" color="error" fontWeight="bold">
-                    Fecha de Vencimiento
-                  </Typography>
-                </Box>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Es el día límite para realizar el pago sin intereses.
-                </Typography>
-
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-                  <DatePicker
-                    label="Seleccionar fecha de vencimiento"
-                    value={dueDate ? dayjs(dueDate) : null}
-                    onChange={handleDueDateChange}
-                    views={['year', 'month', 'day']}
-                    format="DD/MM/YYYY"
-                    shouldDisableDate={shouldDisableDueDate}
-                    slotProps={{
-                      textField: {
-                        fullWidth: true,
-                        required: true,
-                        error: !dueDate,
-                        helperText: !dueDate ? 'Fecha requerida' : 'Debe ser posterior al cierre',
-                        sx: { mt: 1 },
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
-
-                {dueDate && (
-                  <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
-                    <Typography variant="body2">
-                      {dayjs(dueDate).locale('es').format('DD [de] MMMM [de] YYYY')}
-                    </Typography>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Alert severity="info" sx={{ flex: 1, mr: 2, borderRadius: 2 }}>
-                <Typography variant="body2">
-                  Solo puedes configurar fechas hasta un máximo de 1 mes en el futuro.
-                </Typography>
-              </Alert>
-
-              <Button
-                variant="contained"
-                onClick={handleSubmit}
-                disabled={saving || !closingDate || !dueDate}
-                startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                sx={{ borderRadius: 2, px: 4, py: 1.2, minWidth: 160 }}
-              >
-                {saving ? 'Guardando...' : 'Guardar Fechas'}
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
-      </CardContent>
+              Cancelar
+            </Button>
+          )}
+          <Button
+            fullWidth
+            onClick={handleSubmit}
+            disabled={saving || !closingDate || !dueDate}
+            startIcon={saving ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <CheckIcon />}
+            sx={{
+              bgcolor: theme.palette.primary.main,
+              color: 'white',
+              borderRadius: 999,
+              py: 1,
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': { bgcolor: theme.palette.primary.dark },
+              '&.Mui-disabled': { bgcolor: alpha(theme.palette.primary.main, 0.3), color: 'white' },
+            }}
+          >
+            {saving ? 'Guardando...' : 'Guardar fechas'}
+          </Button>
+        </Stack>
+      </Stack>
     </Card>
   );
 };

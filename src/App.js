@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import './App.css';
-import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/basics/Login.jsx';
 import Home from './pages/basics/Home.jsx';
 import Finances from './pages/finances/Finances.jsx';
@@ -9,39 +9,37 @@ import FundHistory from './pages/savings/FundHistory.jsx';
 import Loading from './pages/basics/Loading.jsx';
 import Habits from './pages/habits/Habits';
 import HabitsList from './pages/habits/HabitsList';
-import PlantsList from './pages/plants/PlantsList.jsx';
+import PlantDashboard from './pages/plants/PlantDashboard.jsx';
 import Plant from './pages/plants/Plant.jsx';
+import Jardin from './pages/plants/Jardin.jsx';
 import NewPlant from './pages/plants/NewPlant.jsx';
 import NewIrrigation from './pages/plants/NewIrrigation.jsx';
-import NewInsecticide from './pages/plants/NewInsecticide.jsx';
-import NewPruning from './pages/plants/NewPruning.jsx';
-import NewTransplant from './pages/plants/NewTransplant.jsx';
+import NuevaAccion from './pages/plants/NuevaAccion.jsx';
 import Aditives from './pages/plants/Aditives.jsx';
 import NewAditive from './pages/plants/NewAditive.jsx';
 import NewTransaction from './pages/finances/NewTransaction.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
-import { subscribeToAuthChanges, getCurrentUser } from './services/auth';
+import { subscribeToAuthChanges } from './services/auth';
 import { subscribeToUserData } from './services/database';
 import { useStore } from './store'; 
-import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
-import { indigo, teal } from '@mui/material/colors';
+import theme from './theme';
 import NewHabit from './pages/habits/NewHabit';
 import EditHabit from './pages/habits/EditHabit';
 import HabitDetailPage from './pages/habits/HabitDetail';
 import CreditCards from './pages/finances/CreditCards.jsx';
-import NewCard from './pages/finances/NewCard';
-import EditCard from './pages/finances/EditCard';
-import UpdateCardDates from './pages/finances/UpdateCardDates.jsx';
+import CreditCardDetail from './pages/finances/CreditCardDetail.jsx';
 import Configuracion from './pages/basics/Configuracion';
 import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
 import NewPhoto from './pages/plants/NewPhoto.jsx';
-import NewLog from './pages/plants/NewLog.jsx';
-import Timeline from './pages/plants/Timeline.jsx';
+import RegistrarMedicion from './pages/plants/RegistrarMedicion.jsx';
+import LogPlantaWizard from './pages/plants/LogPlantaWizard.jsx';
+import RegularPh from './pages/plants/RegularPh.jsx';
 
 function App() {
-  const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate, userData } = useStore();
+  const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
 
   const filterData = (data) => {
     // El nodo del usuario puede no existir (cuenta nueva) → snapshot.val() es null
@@ -213,62 +211,6 @@ function App() {
     };
   };
 
-  // Tema fijo indigo + teal — solo respetamos el flag darkMode
-  const theme = useMemo(() => {
-    const isDarkMode = userData?.config?.theme?.darkMode || false;
-
-    return createTheme({
-      palette: {
-        mode: isDarkMode ? 'dark' : 'light',
-        primary: {
-          main: indigo[500],
-        },
-        secondary: {
-          main: teal[500],
-          dark: teal[700],
-        },
-        background: {
-          default: isDarkMode ? '#121212' : '#f5f5f5',
-          paper: isDarkMode ? '#1e1e1e' : '#ffffff',
-        },
-      },
-      typography: {
-        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-        h1: {
-          fontWeight: 500,
-        },
-        h2: {
-          fontWeight: 500,
-        },
-        h3: {
-          fontWeight: 500,
-        },
-        h4: {
-          fontWeight: 500,
-        },
-        h5: {
-          fontWeight: 500,
-        },
-        h6: {
-          fontWeight: 500,
-        },
-      },
-      shape: {
-        borderRadius: 8,
-      },
-      components: {
-        MuiButton: {
-          styleOverrides: {
-            root: {
-              textTransform: 'none',
-              borderRadius: 8,
-            },
-          },
-        },
-      },
-    });
-  }, [userData]);  // Regenerar el tema cuando cambie userData
-
   useEffect(() => {
     let unsubscribeData = null;
     const unsubscribe = subscribeToAuthChanges((user) => {
@@ -278,15 +220,16 @@ function App() {
         unsubscribeData = null;
       }
       if (user) {
+        // Reactivar loading mientras esperamos el primer snapshot del data del user.
+        // Esto evita el flash de /login entre signIn() exitoso y la llegada del data.
+        setIsLoading(true);
+
         // Obtener el valor del dólar blue
         fetch('https://dolarapi.com/v1/dolares/blue')
-        .then((response) => response.json())
-        .then((data) => {
-          setDollarRate(data);
-        })
-        .catch((error) => {
-          console.error('Error fetching dollar rate:', error);
-        });
+          .then((response) => response.json())
+          .then((data) => setDollarRate(data))
+          .catch((error) => console.error('Error fetching dollar rate:', error));
+
         unsubscribeData = subscribeToUserData((data) => {
           const filteredData = filterData(data);
           setUserData(filteredData);
@@ -294,6 +237,8 @@ function App() {
           setIsLoading(false);
         });
       } else {
+        // Logout o estado inicial sin sesión: limpiar todo y terminar loading.
+        setUserData(null);
         setUserLoggedIn(false);
         setIsLoading(false);
       }
@@ -305,13 +250,16 @@ function App() {
     };
   }, [setUserData, setUserLoggedIn, setIsLoading, setDollarRate]);
 
+  // Gate principal: mientras isLoading sea true no renderizamos Routes en absoluto.
+  // PrivateRoute por extensión nunca evalúa con auth indeterminada.
   if (isLoading) {
-    return <Loading />;
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Loading />
+      </ThemeProvider>
+    );
   }
-
-  const PrivateRoute = ({ children }) => {
-    return getCurrentUser() ? children : <Navigate to="/login" />;
-  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -330,28 +278,27 @@ function App() {
           <Route path="/DetalleHabito/:habitId" element={<HabitDetailPage />} />
           <Route path="/Habitos" element={<Habits />} />
           <Route path="/HabitosList" element={<HabitsList />} />
-          <Route path="/TarjetasCredito" element={<CreditCards />} />
-          <Route path="/NuevaTarjeta" element={<NewCard />} />
-          <Route path="/EditarTarjeta/:cardId" element={<EditCard />} />
-          <Route path="/ActualizarFechasTarjeta/:cardId" element={<UpdateCardDates />} />
+          <Route path="/tarjetas" element={<CreditCards />} />
+          <Route path="/tarjeta" element={<CreditCardDetail />} />
           <Route path="/Configuracion" element={<Configuracion />} />
           <Route path="/Perfil" element={<Perfil />} />
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/ayuda" element={<Ayuda />} />
           <Route path="/register" element={<Login />} />
-          <Route path="/Plantas" element={<PlantsList />} />
+          <Route path="/Plantas" element={<PlantDashboard />} />
           <Route path="/Planta" element={<Plant />} />
+          <Route path="/Jardin" element={<Jardin />} />
+          <Route path="/Ambientes" element={<Navigate to="/Jardin" />} />
           <Route path="/NuevaPlanta" element={<NewPlant />} />
           <Route path="/NuevoRiego" element={<NewIrrigation />} />
-          <Route path="/NuevaPoda" element={<NewPruning />} />
-          <Route path="/NuevoInsecticida" element={<NewInsecticide />} />
-          <Route path="/NuevoTransplante" element={<NewTransplant />} />
+          <Route path="/NuevaAccion" element={<NuevaAccion />} />
           <Route path="/Aditivos" element={<Aditives />} />
           <Route path="/NuevoAditivo" element={<NewAditive />} />
           <Route path="/NuevaFoto" element={<NewPhoto />} />
-          <Route path="/NuevoLog" element={<NewLog />} />
-          <Route path="/LineaTiempo" element={<Timeline />} />
+          <Route path="/Registrar" element={<RegistrarMedicion />} />
+          <Route path="/LogPlanta" element={<LogPlantaWizard />} />
+          <Route path="/RegularPh" element={<RegularPh />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

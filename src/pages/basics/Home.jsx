@@ -14,10 +14,12 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
-import { getMonthName } from '../../utils';
-import OverviewCardsRow from '../../components/home/OverviewCardsRow';
+import { getMonthName, formatAmount } from '../../utils';
+import { MiniCard, SectionCard } from '../../design-system';
 import DollarRatesRow from '../../components/home/DollarRatesRow';
 import FinancialEvolutionChart from '../../components/home/FinancialEvolutionChart';
 import SavingsEvolutionChart from '../../components/home/SavingsEvolutionChart';
@@ -25,6 +27,14 @@ import MonthlyIncomeCard from '../../components/home/MonthlyIncomeCard';
 import MonthlyExpenseCard from '../../components/home/MonthlyExpenseCard';
 import CreditCardsSummaryCard from '../../components/home/CreditCardsSummaryCard';
 import HabitsSection from '../../components/home/HabitsSection';
+
+const MONTHS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+const DAYS = [
+  'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado',
+];
 
 // Parser tolerante: DD/MM/YYYY o ISO. Devuelve null si no parsea.
 const parseDate = (dateStr) => {
@@ -139,9 +149,6 @@ const Home = () => {
           justifyContent="center"
           minHeight="80vh"
           p={3}
-          sx={{
-            background: `linear-gradient(45deg, ${alpha(theme.palette.primary.dark, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.1)} 100%)`
-          }}
         >
           <Box
             sx={{
@@ -152,7 +159,7 @@ const Home = () => {
               height: 90,
               borderRadius: '50%',
               bgcolor: alpha(theme.palette.primary.main, 0.1),
-              mb: 3
+              mb: 3,
             }}
           >
             <DashboardIcon color="primary" style={{ fontSize: 50, opacity: 0.7 }} />
@@ -192,25 +199,47 @@ const Home = () => {
   const incomeChange = getPercentChange(incomeTotal, previousIncome);
   const expenseChange = getPercentChange(expenseTotal, previousExpense);
 
+  const savingsARS = userData?.savings?.amountARS || 0;
+  const savingsUSD = userData?.savings?.amountUSD || 0;
+
+  const now = new Date();
+  const todayLabel = `${DAYS[now.getDay()]} ${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;
+
   return (
     <Layout title="Home">
-      <Box
-        sx={{
-          maxWidth: { xs: 1200, md: 1400, lg: 1600 },
-          mx: 'auto',
-          width: '100%',
-          px: { xs: 1, sm: 2, md: 3 }
-        }}
-      >
-        {/* Fila superior: Overview financiero */}
-        <OverviewCardsRow
-          userData={userData}
-          dollarRate={dollarRate}
-          balance={balance}
-        />
+      <Box sx={{ maxWidth: 1400, mx: 'auto', p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <Box>
+            <Typography variant="h5" fontWeight={800}>Panel de control</Typography>
+            <Typography variant="caption" color="text.secondary">{todayLabel}</Typography>
+          </Box>
+        </Box>
 
-        {/* Fila inferior: Ingresos, Gastos y Tarjetas de Crédito */}
-        <Grid container spacing={{ xs: 2, sm: 3 }}>
+        {/* MiniCards — métricas principales */}
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2, '& > *': { flex: '1 1 150px', minWidth: 150 } }}>
+          <MiniCard icon={<TrendingDownIcon />} label="Gastos del mes" value={`$${formatAmount(expenseTotal)}`} color="error" link="/finanzas" />
+          <MiniCard icon={<TrendingUpIcon />} label="Ingresos del mes" value={`$${formatAmount(incomeTotal)}`} color="success" link="/finanzas" />
+          <MiniCard icon={<AttachMoneyIcon />} label="Balance" value={`$${formatAmount(balance)}`} color={balance >= 0 ? 'success' : 'error'} />
+          <MiniCard icon={<SavingsOutlinedIcon />} label="Ahorros ARS" value={`$${formatAmount(savingsARS)}`} color="info" link="/ahorros" />
+          <MiniCard icon={<SavingsOutlinedIcon />} label="Ahorros USD" value={`USD ${formatAmount(savingsUSD)}`} color="primary" link="/ahorros" />
+        </Box>
+
+        {/* Charts */}
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} lg={8}>
+            <SectionCard title="Evolución financiera" icon={<TrendingUpIcon sx={{ fontSize: 18, color: '#fff' }} />}>
+              <FinancialEvolutionChart userData={userData} />
+            </SectionCard>
+          </Grid>
+          <Grid item xs={12} lg={4}>
+            <SectionCard title="Evolución de ahorros" icon={<SavingsOutlinedIcon sx={{ fontSize: 18, color: '#fff' }} />}>
+              <SavingsEvolutionChart userData={userData} />
+            </SectionCard>
+          </Grid>
+        </Grid>
+
+        {/* Ingresos, Gastos, Tarjetas */}
+        <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mt: 0.5 }}>
           <MonthlyIncomeCard
             incomeTotal={incomeTotal}
             incomeChange={incomeChange}
@@ -239,10 +268,6 @@ const Home = () => {
             currentMonthName={currentMonthName}
           />
         </Grid>
-
-        <FinancialEvolutionChart userData={userData} />
-
-        <SavingsEvolutionChart userData={userData} />
 
         <HabitsSection userData={userData} />
 

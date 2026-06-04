@@ -9,7 +9,10 @@
       "Bash(sed -i '700,704d' C:/Users/rodri/desktop/lifetrack/src/pages/basics/Home.jsx)",
       "Bash(sed -i '369,644d' C:/Users/rodri/desktop/lifetrack/src/pages/basics/Home.jsx)",
       "Bash(sed -n '1076,1732p' C:/Users/rodri/desktop/lifetrack/src/pages/habits/Habits.jsx)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(grep -A 3 \"FinancesCharts.jsx\\\\|FinancesHeader.jsx\\\\|FinancesMonthSummary.jsx\\\\|finances\\\\\\\\\\\\\\\\Finances.jsx\\\\|finances/Finances.jsx\")",
+      "Bash(grep -A 2 \"finances/Finances.jsx\\\\|finances\\\\\\\\\\\\\\\\Finances.jsx\")",
+      "Bash(grep -A 3 \"pages\\\\\\\\\\\\\\\\finances\\\\\\\\\\\\\\\\Finances\\\\|pages/finances/Finances\")"
     ]
   }
 }

@@ -1239,6 +1239,465 @@ npm test           # Correr tests
 
 ---
 
+### 2026-05-12 — Rediseño de Login.jsx con onboarding wizard
+
+**Qué se hizo:**
+- Reescritura completa de `src/pages/basics/Login.jsx` (1088 → **1044 líneas**, −44). Estructura nueva: 3 pantallas (`welcome` | `register` | `login`) + 4 pasos internos en `register`.
+- **Pantalla Welcome**: fondo degradado `linear-gradient(160deg, primary.main → primary.dark)`. 3 cards blancas apiladas con rotaciones leves (`-2°, +2°, -4°`) simulando un stack, cada una con su ícono+métrica:
+  - Finanzas (frente): `AttachMoneyIcon` verde + "$1.840" + chip "+12%"
+  - Hábitos (medio): `CheckIcon` índigo + "6 de 8 hoy"
+  - Plantas (atrás): `LocalFloristIcon` verde + "Riego en 2 días"
+  - Brand "LifeTrack" + tagline "Tu vida, en un solo lugar." debajo
+  - 2 CTAs al fondo: blanco "Crear cuenta" + outline transparente "Ya tengo cuenta"
+- **Wizard de registro (4 pasos)**:
+  - **Paso 1 — Email**: header con back circular + progress dots (1 ancho, 3 cortos). Botón negro "Continuar con Apple" (decorativo, sin handler) + botón blanco "Continuar con Google" (llama `signInWithGoogle()`). Divisor "o continúa con email", TextField email con borde índigo en focus, botón Continuar deshabilitado si email no válido. Disclaimer legal abajo.
+  - **Paso 2 — Contraseña**: TextField con ícono ojo (`VisibilityIcon`/`VisibilityOffIcon`). Barra de fuerza de 4 segmentos colored según score (rojo<=1, amarillo=2, verde>=3) + label textual (Débil/Media/Fuerte/Muy fuerte). Checklist con 4 requisitos (8 chars, mayúscula, número, símbolo opcional) — los 3 primeros bloquean el avance.
+  - **Paso 3 — Nombre y foto**: Avatar 112×112 con inicial sobre fondo teal claro. Botón `PhotoCameraIcon` verde superpuesto bottom-right que dispara file input. Preview con `URL.createObjectURL(file)`. Campos "Nombre" (requerido) + "Apellido (opcional)". Al hacer click en Continuar: `signUp({email, password, displayName: nombre+apellido})`, luego sube foto si hay archivo, luego avanza a paso 4.
+  - **Paso 4 — Done**: sin header. Círculo teal grande con `CheckCircleIcon` + halo exterior (`boxShadow` con teal alpha). Título "¡Todo listo, {name}!" + chips "Finanzas" (índigo) y "Hábitos" (teal) + botón "Empezar a usar LifeTrack" que navega a `/Home`.
+- **Pantalla Login** (no wizard): back circular + título "Bienvenido de vuelta". Campos email + contraseña con ojo, link "¿Olvidaste tu contraseña?" alineado a la derecha que llama `sendPasswordReset(loginEmail)` y muestra info banner. Botón "Iniciar sesión" índigo + divisor "o" + botón Google. Footer "¿No tenés cuenta? Crear una" → vuelve a welcome.
+- **Helpers module-level**: `validateEmail`, `calculatePasswordStrength` (devuelve `{score, label, requirements}`), `mapFirebaseError` (10 códigos a mensajes en español, incluye `auth/invalid-credential` que la versión vieja no manejaba), `uploadProfilePhoto`.
+- Build verificado limpio. Bundle: 1.05 MB (+2.28 kB por el nuevo flow — avatares, cards, iconos nuevos).
+
+**Por qué se hizo así:**
+- **Pantalla completa con `position: fixed; inset: 0`** en lugar de Layout/Container: el spec pidió pantalla completa sin AppBar. Cada pantalla del wizard ocupa toda la viewport, escrolea internamente si hace falta.
+- **`Fade` con `key={currentScreen}-${step}`**: animación entre pantallas/pasos sin Slide horizontal (consistente con NewTransaction de la sesión anterior, simple y sin deps extra).
+- **Mismo `useAuth()` que la versión vieja**: preserva firmas exactas (`signIn`, `signUp`, `signInWithGoogle`, `sendPasswordReset`, `updatePhotoURL`). Cero cambios en `services/auth.js` o `hooks/useAuth.js`.
+- **Foto se sube *después* del `signUp`**: en step 3 el flujo es secuencial:
+  1. `signUp({email, password, displayName})` → crea el usuario, ahora `auth.currentUser.uid` está disponible
+  2. Si `photoFile`: `uploadProfilePhoto(file)` (sube a `profileImages/${uid}/${filename}`) → `updatePhotoURL(downloadURL)`
+  3. `goToStep(4)`
+  El paso 2 está envuelto en try/catch interno — si la subida de foto falla, no bloquea el flujo (el usuario ya existe, puede subir foto después desde Configuración). Solo se loguea un warning.
+- **Disclaimer de paso 1 sin links funcionales**: el spec dice "sin links funcionales por ahora". Renderizado como Typography simple.
+- **Botón Apple sin onClick**: spec lo pidió decorativo. Si en el futuro se implementa Apple Sign-In, se conecta a un handler nuevo.
+- **`mapFirebaseError` centralizado**: la versión vieja tenía 2 switch separados (login + register) con mensajes ligeramente distintos. Unificado en un solo helper module-level. Incluye `auth/invalid-credential` (error nuevo de Firebase que la versión vieja caía en el default).
+- **Validaciones explícitas por paso** (`canAdvanceStep1/2/3`): el botón Continuar queda deshabilitado hasta que se cumplan. Step 2 requiere `length + upper + number` (símbolo opcional). Step 3 solo requiere nombre.
+- **State separado para login** (`loginEmail`/`loginPassword`/`showLoginPassword`): no comparte con el wizard de registro porque el usuario podría alternar entre pantallas sin perder lo escrito.
+- **`info` banner para "Te enviamos un correo"**: el éxito del reset de contraseña usa un banner verde local en vez de Snackbar. Más simple y se ve in-context.
+
+**Archivos modificados:**
+- `src/pages/basics/Login.jsx` (reescrito completo, 1088 → 1044 líneas)
+
+**Decisiones importantes tomadas:**
+- **NO se borró nada de `services/auth.js`** — la versión nueva consume las mismas funciones. Single source of truth para Firebase Auth se mantiene.
+- **Foto opcional, no bloqueante**: si la subida falla, el usuario sigue siendo válido. Decisión deliberada para evitar trampas de UX donde una red lenta impide completar el onboarding.
+- **Apple decorativo**: el botón existe pero no hace nada. Puede confundir, pero el spec lo pidió así para mantener la estética. Si en producción no se implementa Apple Sign-In, considerar borrarlo.
+- **Welcome con cards hardcodeadas**: los datos "$1.840", "+12%", "6 de 8 hoy", "Riego en 2 días" son mockup. Son texto decorativo en la pantalla de bienvenida, no se conectan a datos reales (el usuario aún no se autenticó).
+- **No se reusó nada del Login viejo**: el `BackgroundDecorator` con SVG/blobs, las pestañas Login/Register, el panel lateral en desktop, etc., todo descartado. Diseño nuevo desde cero.
+- **Bundle +2.28 kB**: aceptable. Viene de los iconos nuevos (Apple, LocalFlorist, AttachMoney, TrendingUp, PhotoCamera, etc.) y el JSX adicional. Por contraste, en sesión anterior la limpieza de Configuracion bajó −6 kB.
+
+**Pendiente para la próxima sesión:**
+- **Apple Sign-In real** o borrar el botón decorativo si no se va a implementar.
+- **Testear el flujo en navegador**:
+  - Welcome → Crear cuenta → 4 pasos → Home
+  - Welcome → Ya tengo cuenta → Login → Home
+  - Welcome → Login → ¿Olvidaste contraseña? → reset email
+  - Google sign-in desde paso 1 vs. desde login
+  - Subida de foto en paso 3 con red lenta (debería no bloquear)
+  - Validaciones de email malformado y contraseña débil
+- **Romper `NewHabit.jsx`** (1.425 líneas) — sigue siendo el último componente monstruo.
+- **Hook `useConfigState`** para bajar `Configuracion.jsx` de 266 a ~150 líneas.
+- **Capa `services/storage.js`**: con el patrón `uploadProfilePhoto` ya casi extraído en `Login.jsx`, sería natural moverlo + los otros uploads (Configuracion, NewPhoto, CreditCardStatementUpload) a una sola capa.
+- **Memoización con `useMemo`** en los 6 componentes ya rotos + Login.
+- **Implementar pH/EC/PPM en Plants** (feature núcleo).
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `PrivateRoute` muerto en App.js, borrar `updateSavings` obsoleto de store.js.
+
+---
+
+### 2026-05-12 — Rediseño completo del módulo Tarjetas de Crédito
+
+**Qué se hizo:**
+- Rediseño visual completo del módulo en **5 vistas navegables internamente** (sin react-router para las vistas — `useState` interno mantiene el contexto de mes y tarjeta seleccionada entre transiciones):
+  - **Vista 1 — Lista**: header con "+" para agregar, navegador de mes inline, lista de cards con gradiente según tipo (Visa azul, Master rojo, otra gris), badge de estado (Pagada/Pendiente/Sin gastos) y total del período. Banner flotante warning al fondo si hay pago pendiente que ofrece atajo de pago global.
+  - **Vista 2 — Detalle**: header con nombre+tipo+últimos 4 dígitos, card de período (TOTAL/MÍNIMO/CUOTAS PRÓX.) con navegación a período anterior, dos botones acción (Registrar pago + Ver cuotas), lista de movimientos con avatar de categoría, chip de cuota "N/Total" y monto en rojo.
+  - **Vista 3 — Cuotas**: card "COMPROMETIDO A FUTURO" con monto + cantidad de meses + **gráfico de barras de ApexCharts** (mes actual destacado en color más oscuro). Lista de "COMPRAS EN CUOTAS ACTIVAS" con avatar, cuota actual/total, monto/mes, indicador "Restan N" en color (verde si ≤3, índigo si más) y barra de progreso.
+  - **Vista 4 — Registrar pago**: card central con monto seleccionable vía 3 pills (Mínimo 30%/Total/Otro+input numérico). Selector de fuente "PAGAR DESDE" (Efectivo ARS / USD) con radio button. Sección de fecha (hoy). Card teal "DESPUÉS DEL PAGO" que recalcula el saldo según fuente+monto. Botón "Confirmar pago".
+  - **Vista 5 — Agregar tarjeta**: preview en vivo de la tarjeta arriba (gradiente cambia según tipo seleccionado). Form con nombre del banco, 3 cards selector de tipo (Visa/Master/Otra), input de últimos 4 dígitos con validación numérica.
+- **Animación Fade** entre vistas con `key={currentView + selectedCard}` (consistente con NewTransaction y Login).
+
+**Lógica preservada al 100%:**
+- `getCardTotal`, `getCardDates`, `getAllCardsTotal`, `isCardPaid`, `areCardsActuallyPaid` — todas las funciones de cálculo del orquestador viejo migradas tal cual.
+- `handleProcessPayment` usa `buildPaymentUpdates` + `bulkUpdate` + `generateKey` igual que antes. **Cero cambios en el shape de Firebase**: `creditCards/{id}/payments/{YYYY-MM}`, `creditCardPayments/{YYYY-MM}`, `expenses/{id}` y `savings/amountARS` se persisten exactamente igual.
+- `getCardClosingDates` + `filterAndSortBillingPeriodTransactions` siguen siendo la fuente de verdad para el período de facturación.
+- Servicios `addCreditCard`, `updateCreditCard`, `addCardTransaction`, `setCardDatesForMonth` intactos.
+
+**Helpers extendidos** (`creditCardsHelpers.js`, 259 → 358 líneas):
+- **Movidos** desde el componente viejo `CreditCardsList`: `getCardType`, `getCardGradient`, `getCardLabel` — ahora pure functions reusables desde cualquier vista.
+- **Nuevos**:
+  - `stripInstallmentSuffix(description)` — quita "- Cuota XX/YY" del final de una descripción para identificar la compra base.
+  - `extractActiveInstallments(cardTransactions, today)` — agrupa transacciones por descripción base + installments + monto, calcula cuotas pagadas (fecha ≤ hoy) y restantes, devuelve `[{description, category, installments, installmentAmount, paid, remaining, totalRemaining, futureDates}]` ordenado por monto remanente descendente.
+  - `buildFutureCommitmentByMonth(activeInstallments)` — agrupa las `futureDates` por mes (YYYY-MM) y devuelve `[{key, label, total}]` ordenado cronológicamente para el gráfico de barras.
+
+**Componentes viejos borrados** (8 archivos):
+- `src/pages/finances/CreditCardMovements.jsx` (421 líneas — reemplazado por lista inline en `CreditCardDetailView`)
+- `src/components/finances/CreditCardsMonthNavigator.jsx` (124 — reemplazado por nav inline en `CreditCardListView`)
+- `src/components/finances/CreditCardsTotalBar.jsx` (banner pendiente movido a `CreditCardListView`)
+- `src/components/finances/CreditCardsList.jsx` (reemplazado por `CreditCardListView`)
+- `src/components/finances/CreditCardStatusInfo.jsx` (status ahora se muestra como chip en cada card)
+- `src/components/finances/CreditCardDatesConfig.jsx` (deferred — las fechas ahora siguen usando defaults; la edición específica por mes queda como pendiente)
+- `src/components/finances/CreditCardPaymentDialog.jsx` (reemplazado por `CreditCardPaymentView` full-screen)
+- `src/components/finances/CreditCardStatementUpload.jsx` (subida de PDFs deferred — flagged en pendientes)
+
+**Build verificado limpio**: bundle 1.05 MB sin delta. Warnings cero en archivos nuevos (limpié 3 imports muertos en `CreditCardPaymentView`: `Chip`, `Divider`, `calculateNextFridays`).
+
+**Por qué se hizo así:**
+- **Navegación interna con useState, no react-router**: las 5 vistas comparten contexto (mes, tarjeta seleccionada, tarjetas, transacciones). Si fueran rutas separadas, navegar entre ellas remontaría el componente y obligaría a re-calcular `useMemo`s y re-renderizar. Con `useState` el contexto persiste y la transición es instantánea + Fade animado. La página `/TarjetasCredito` sigue siendo la única ruta — toda la complejidad vive ahí dentro.
+- **`Fade` con key compuesta**: `currentView + selectedCard` cambia al transicionar entre vistas o tarjetas; React remonta el inner Box y dispara la animación. Simple y sin libs adicionales.
+- **Pago simplificado a 1 cuota fija**: el flujo viejo permitía dividir el pago en 1/2/3 cuotas con viernes calculados. El nuevo `CreditCardPaymentView` siempre paga en 1 transacción a fecha de hoy. La función `handleProcessPayment` se mantiene compatible (acepta `numberOfPayments=1`, `paymentDates=[hoy]`, `paymentAmounts=[total]`), así el shape de Firebase no cambia.  
+  Si en el futuro se quiere recuperar el split de cuotas, hay que agregar UI en el `PaymentView`; el backend ya lo soporta.
+- **`extractActiveInstallments` agrupa por monto**: dos compras a 12 cuotas con la misma descripción pero distinto monto son compras diferentes (ej. dos viajes en diferentes meses). El monto redondeado a centavos (`Math.round(amount * 100)`) discrimina.
+- **Chart de barras destaca el mes actual**: comparar `byMonth[i].key === currentMonthKey` y aplicar `theme.palette.primary.dark` vs `primary.main`. Sin tooltip de mes actual especial — solo el color destaca.
+- **Container `maxWidth="sm"`**: el módulo nuevo está pensado mobile-first. Las cards se ven bien hasta 600px. En desktop quedan centradas con margen — coherente con el rediseño de NewTransaction y Login en sesiones anteriores.
+- **Estado "Pagada" deshabilita el botón**: si `isPaid(cardId)` es true, el botón "Registrar pago" en la vista detail queda gris con label "Pagada". Evita doble pago.
+- **`getCardDates` fallback a defaults**: si el usuario no configuró fechas para un mes específico, se usan `defaultClosingDay` y `defaultDueDay` de la tarjeta. La UI no fuerza al usuario a configurar fechas cada mes (a diferencia del flujo viejo que mostraba un `CreditCardDatesConfig` bloqueante).
+- **Edit tarjeta sigue siendo ruta separada**: el botón de editar en `CreditCardDetailView` navega a `/EditarTarjeta/${id}` (`EditCard.jsx` legacy, intacto). Mismo para `NewCard.jsx` (ruta `/NuevaTarjeta`) que queda como fallback pero ya no se usa desde el módulo nuevo.
+
+**Archivos creados** (5):
+- `src/components/finances/CreditCardListView.jsx` (283 líneas)
+- `src/components/finances/CreditCardDetailView.jsx` (270 líneas)
+- `src/components/finances/CreditCardInstallmentsView.jsx` (224 líneas)
+- `src/components/finances/CreditCardPaymentView.jsx` (270 líneas)
+- `src/components/finances/CreditCardAddView.jsx` (187 líneas)
+
+**Archivos modificados:**
+- `src/pages/finances/CreditCards.jsx` (580 → **300 líneas**, **−280 / −48%**) — reescrito como orquestador puro con state de vista.
+- `src/components/finances/creditCardsHelpers.js` (259 → 358 líneas, +99 con 5 helpers nuevos).
+
+**Archivos borrados** (8):
+- `src/pages/finances/CreditCardMovements.jsx` (421 líneas)
+- `src/components/finances/CreditCardsMonthNavigator.jsx`
+- `src/components/finances/CreditCardsTotalBar.jsx`
+- `src/components/finances/CreditCardsList.jsx`
+- `src/components/finances/CreditCardStatusInfo.jsx`
+- `src/components/finances/CreditCardDatesConfig.jsx`
+- `src/components/finances/CreditCardPaymentDialog.jsx`
+- `src/components/finances/CreditCardStatementUpload.jsx`
+
+**Decisiones importantes tomadas:**
+- **CreditCardMovements.jsx eliminado como página**: era el sub-componente que renderizaba los acordeones por día con buscador. La lista nueva en `CreditCardDetailView` es más simple (sin agrupación por día, sin búsqueda, sin acordeón), porque el período de facturación ya filtra y el usuario raramente necesita buscar dentro de ≤30 transacciones de un mes.
+- **`CreditCardStatementUpload` borrado**: el feature de subir PDFs de resúmenes queda **postponed**. No estaba en el spec del rediseño. Si se quiere recuperar, hay que crear una vista específica (ej. "Vista 6 — Resúmenes PDF") o agregarlo como sección colapsable en el Detail. Flagged abajo.
+- **`CreditCardDatesConfig` borrado**: la UI de editar fechas de cierre/vencimiento por mes específico desaparece. El nuevo flujo usa los defaults de la tarjeta (`defaultClosingDay`, `defaultDueDay`). Si el usuario necesita ajustar fechas específicas, debe ir a Editar tarjeta (`/EditarTarjeta/{id}` legacy). Esto simplifica el detail view considerablemente.
+- **Pago siempre en 1 cuota**: el flujo viejo dividía pagos en hasta 3 viernes futuros. El nuevo paga en una sola transacción a fecha de hoy. Cambio de UX intencional — más simple y refleja mejor cómo paga la gente en realidad. La función `buildPaymentUpdates` se mantiene flexible por si se quiere recuperar.
+- **Mínimo calculado al 30%**: el spec mostraba "$ 86.200" de $287.340 (~30%). Lo implementé como `Math.round(total * 0.3)`. Si en el futuro se quiere leer el mínimo real del resumen PDF, se reemplaza esa línea.
+- **Bundle sin cambio**: el conteo neto de líneas bajó (~2800 líneas en 9 archivos → ~1900 en 7 archivos), pero el bundle queda igual porque MUI tree-shakea las re-imports correctamente y los componentes nuevos usan los mismos iconos/componentes que los viejos.
+
+**Pendiente para la próxima sesión:**
+- **Restaurar feature de subida de PDFs de resúmenes** si se quiere mantener — recrear como sub-vista del Detail o vista 6 dedicada. Lógica del `CreditCardStatementUpload` borrado está en git history.
+- **Configurar fechas de cierre/vencimiento por mes** desde la UI nueva — actualmente solo se editan vía `/EditarTarjeta/{id}` (defaults globales). Si se necesita override por mes, agregar formulario en el Detail.
+- **Split de pagos en cuotas** si se necesita recuperar — agregar UI en `CreditCardPaymentView` (`buildPaymentUpdates` ya lo soporta).
+- **Mínimo real del resumen**: hoy se aproxima a 30% del total. Si se quiere leer del PDF (cuando se agregue parsing), se reemplaza la fórmula en `CreditCardDetailView`.
+- **Date picker en `CreditCardPaymentView`**: la fecha hoy es fija. Si se necesita pagar con fecha pasada/futura, agregar un date picker.
+- **Eliminar tarjeta**: la opción "Eliminar tarjeta" del menu viejo no se migró. Si se necesita, agregar botón rojo en el Detail.
+- **Probar en navegador**:
+  - Lista → Detail → Cuotas → Back → Detail → Pago → Confirmar
+  - Lista → Pagar (banner pendiente) → Confirmar
+  - Lista → "+" → Agregar tarjeta → Volver a lista
+  - Chart de cuotas con tarjeta sin cuotas activas (empty state)
+  - Tarjeta sin gastos (chip "Sin gastos")
+- **Romper `NewHabit.jsx`** (1.425 líneas) — sigue siendo el único componente monstruo.
+- **Hook `useConfigState`** para bajar Configuracion a ~150 líneas.
+- **Capa `services/storage.js`** — sigue pendiente para los uploads remanentes.
+- **Memoización con `useMemo`** en los 7 componentes ya rotos.
+- **Implementar pH/EC/PPM en Plants**.
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `PrivateRoute` muerto en App.js, borrar `updateSavings` obsoleto de store.js.
+
+---
+
+### 2026-05-12 — Fix bug de timing en auth + rediseño de Loading.jsx
+
+**Qué se hizo (parte 1 — fix del bug):**
+- **Bug raíz identificado**: el `useEffect` de auth en `App.js` solo bajaba `isLoading` a `false` cuando llegaba el primer snapshot del user data, pero **nunca lo volvía a subir a `true`** en re-logins posteriores. Resultado:
+  - Estado inicial (boot): `isLoading=true` → muestra Loading mientras `onAuthStateChanged` resuelve. ✓
+  - Después del primer login: `isLoading=false`, `userLoggedIn=true`. ✓
+  - **Logout** y **re-login** (o login después de una sesión expirada): entre el `signIn()` exitoso y la llegada del data, `userLoggedIn` seguía siendo `false` mientras `isLoading` también era `false` → se renderizaba el bloque `else` con `<Login />` → **flash de /login** antes de saltar a /Home. ✗
+- **Fix aplicado** en `App.js` (`src/App.js:272-307`): el callback de `subscribeToAuthChanges` ahora llama `setIsLoading(true)` **antes** de iniciar la suscripción al user data cuando hay usuario. El `setIsLoading(false)` se mantiene donde estaba (después del primer snapshot). Como consecuencia, durante el intervalo `signIn → primer data`, `isLoading=true` y el componente early-returnea `<Loading />` — sin posibilidad de renderizar Routes.
+- **Limpieza adicional**: el `else` (user null) ahora también llama `setUserData(null)` para limpiar el data del usuario anterior en logout. Antes solo bajaba `userLoggedIn` y `isLoading`.
+- **Loading envuelto en `<ThemeProvider>`** durante el early return: el bloque `if (isLoading) return <Loading />` ahora envuelve `<Loading />` en `<ThemeProvider theme={theme}>` + `<CssBaseline />` para que el theme MUI (indigo/teal) esté disponible. Antes Loading se renderizaba fuera del ThemeProvider y dependía de los defaults de MUI.
+- **`PrivateRoute` muerto borrado**: estaba flagged como pendiente desde varias sesiones. Como `isLoading` gateaba todo Routes, el `PrivateRoute` definido pero nunca usado fue eliminado. También se removió el import de `getCurrentUser` que solo lo usaba esa función muerta.
+- **Imports muertos adicionales borrados**: `useState` y `useNavigate` en App.js — flagged por ESLint después del cleanup.
+
+**Qué se hizo (parte 2 — Loading.jsx):**
+- Reescritura completa de `src/pages/basics/Loading.jsx`: **315 → 38 líneas (−277, −88%)**.
+- **Diseño nuevo**:
+  - Fondo `linear-gradient(160deg, primary.main → primary.dark)` (mismo gradiente del Welcome de Login).
+  - Logo "LifeTrack" centrado, blanco, `fontWeight: 800`, `letterSpacing: -1.5`, responsive 3rem (móvil) / 4rem (desktop).
+  - `<CircularProgress>` blanco debajo, size 36, thickness 4.
+  - Sin texto adicional, sin mensajes rotativos, sin íconos flotantes, sin animaciones de pulse/shine/float.
+- **Borrado todo lo decorativo**:
+  - 4 keyframes (`pulse`, `float`, `shine`, `progressPulse`).
+  - 5 styled components (`StyledTitle`, `ProgressWrapper`, `FloatingIcon`, `Background`, `Card`).
+  - Array `loadingMessages` con 5 mensajes rotativos.
+  - State `messageIndex` + `progress` con 2 setIntervals.
+  - 6 íconos flotantes (`MonetizationOnIcon`, `DirectionsCarIcon`, `LocalFloristIcon`, `SavingsIcon`, `AccountBalanceWalletIcon`, `LightbulbIcon`).
+  - "Optimizando tu experiencia..." y otros textos.
+
+**Build verificado limpio**: cero warnings en App.js y Loading.jsx. Bundle 1.05 MB (sin delta significativo).
+
+**Por qué se hizo así:**
+- **Subir `isLoading=true` en cada disparo de auth con user**: el bug original era una asunción válida solo para el boot inicial. Generalizar a "cada vez que auth resuelve un usuario, esperá el data antes de mostrar la UI" es la corrección correcta. Cubre login, re-login, switch de cuenta y refresh con sesión activa.
+- **`setUserData(null)` en logout**: si no se limpia, después de un logout + login con otra cuenta, podría aparecer brevemente el data del usuario anterior. Limpiar es defensivo.
+- **`<ThemeProvider>` envolviendo Loading**: el Loading nuevo usa `theme.palette.primary.main/dark` para el gradiente. Sin ThemeProvider en el early return, los valores caerían a los defaults de MUI (índigo casual, no el del proyecto). Envolver es la opción más limpia.
+- **`<CircularProgress>` en vez de dots animados**: el spec dice "Spinner o dots animados". El `CircularProgress` de MUI ya está disponible y se ve bien en blanco contra el gradiente. Dots animados requerirían un keyframe + 3 Boxes — más código sin ganancia visual.
+- **Borrado wholesale del Loading viejo**: las animaciones, íconos flotantes y mensajes rotativos eran ruido. El Loading se muestra entre 100ms y 2s en el peor caso — nadie tiene tiempo de leer "Sincronizando tus ahorros..." y seguro genera ansiedad si parece que tarda. Una marca + spinner es la convención esperada (Spotify, Discord, etc.).
+- **No se modificó el flujo de Login.jsx**: el `navigate('/Home')` después del signIn sigue ahí. No importa qué pathname tenga el browser — mientras `isLoading=true` solo se renderiza Loading. Cuando baje, ya estaremos en /Home con userLoggedIn=true.
+
+**Archivos modificados:**
+- `src/App.js` — fix del useEffect de auth + early return con ThemeProvider + cleanup de imports muertos + `PrivateRoute` borrado
+- `src/pages/basics/Loading.jsx` — reescrito completo (315 → 38 líneas)
+
+**Decisiones importantes tomadas:**
+- **`PrivateRoute` eliminado del todo**: estaba definido pero nunca usado. El gating por `isLoading` + el bloque ternario `userLoggedIn ? <Routes>: <Routes login-only>` cubren la lógica. Si en el futuro se necesita `PrivateRoute` (por ej. rutas mixtas públicas/privadas), se vuelve a crear.
+- **Loading no tiene mensaje de progreso**: la transición es lo suficientemente rápida que mostrar "X%" introduce más ruido que valor. El usuario ve "LifeTrack + spinner" y entiende. Se prioriza calma sobre información.
+- **El theme del Loading usa `primary.main/dark` (indigo)** — coherente con Welcome de Login y los headers del resto de la app. Una vez que la app cargue con `darkMode=true`, el Loading también se vería en modo oscuro (porque toma el theme actualizado).
+
+**Pendiente para la próxima sesión:**
+- **Probar en navegador el fix**:
+  - Logout → Login (debería ir directo a /Home sin flash de /login).
+  - Login con red lenta (debería mostrar Loading entre signIn y data llegado, no flash de pantallas).
+  - Refresh F5 con sesión activa (debería ir directo a /Home).
+  - Refresh F5 sin sesión (debería ir directo a /login).
+  - Cerrar sesión desde Configuración → Privacidad → eliminar cuenta (debería limpiar userData y navegar a /).
+- **Romper `NewHabit.jsx`** (1.425 líneas) — sigue siendo el único componente monstruo.
+- **Hook `useConfigState`** para bajar Configuracion a ~150 líneas.
+- **Capa `services/storage.js`** — sigue pendiente.
+- **Restaurar feature de PDFs de tarjetas** si se quiere.
+- **Memoización con `useMemo`** en los 7 componentes ya rotos.
+- **Implementar pH/EC/PPM en Plants**.
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `updateSavings` obsoleto de store.js.
+
+---
+
+### 2026-05-12 — Restaurar features en Tarjetas (PDF + fechas por mes) + ajustes de UI
+
+**Qué se hizo:**
+- **Restaurada subida de PDF del resumen mensual** (`CreditCardStatementUpload.jsx`, 230 líneas). Sub-componente integrado al final de la Vista Detalle bajo el label "RESUMEN DEL PERÍODO":
+  - **Empty state**: card con borde punteado + avatar/ícono + botón "Subir" (file picker que acepta solo PDF). Texto guía "Solo PDF · Máximo 10MB".
+  - **Estado con PDF**: card sólida con avatar rojo PDF + nombre del archivo + fecha de subida + 2 botones ("Ver" abre en nueva pestaña con URL fresca refresheado de Storage, "Reemplazar" abre file picker para sobrescribir).
+  - **Validaciones**: rechaza archivos que no sean `application/pdf` y archivos >10MB con snackbar de error.
+  - **Path Storage**: `users/${uid}/summaries/${cardId}_${yearMonth}_${safeName}` — sigue el spec literal `users/{uid}/summaries/{filename}` pero incluye discriminadores en el filename para evitar colisiones cross-card/cross-month.
+  - **Path RTDB**: `creditCards/${cardId}/statements/${yearMonth}` (vía `setCardStatement` del servicio existente).
+  - **Custom metadata** en Storage: `userId`, `cardId`, `yearMonth` para queries futuras.
+  - Reset del `<input type="file">` después de cada upload exitoso vía `key` que se incrementa (truco para limpiar el value del input nativo).
+- **Restaurada configuración de fechas por mes** (`CreditCardDatesConfig.jsx`, 175 líneas). Sub-componente collapsible que se muestra en la Vista Detalle según estado:
+  - **Si `!datesConfigured`**: banner naranja arriba del card de período con icono `WarningAmberIcon` y texto "Configurá las fechas de este período". Al tocar, expande un `<Collapse>` con el form.
+  - **Si `datesConfigured`**: ícono lápiz al lado del chevron de "Período actual" — al tocar, muestra el form en modo edición con botones Cancelar + Guardar fechas.
+  - **Validaciones preservadas** del componente viejo: `shouldDisableClosingDate` (1 mes futuro límite) y `shouldDisableDueDate` (debe ser ≥ cierre + caer en el mismo mes o el siguiente). Usa `isDateBeyondLimit` del helpers.
+  - **DatePickers** con `@mui/x-date-pickers` + `AdapterDayjs` + locale `es`. Format `DD/MM/YYYY`. Persiste vía `setCardDatesForMonth(cardId, monthKey, {closingDate, dueDate})`.
+- **Ajustes de UI en `CreditCardListView`**:
+  - **Borrado**: el header con "Mis tarjetas" + botón "+" que ocupaba la parte superior.
+  - **Movido el banner "PAGO PENDIENTE"** desde un `position: absolute` al fondo de la lista hacia **el tope de la vista**, encima del navegador de mes. Cuando no hay pendiente, no se renderiza nada en ese slot.
+  - **Reemplazo del botón "+"**: card "+ Agregar tarjeta" con borde punteado al final de la lista de tarjetas. Aparece después de la última tarjeta y abre la Vista Add. Mantiene el acceso sin un header dedicado.
+
+**Lógica preservada al 100%:**
+- `addCreditCard`, `addCardTransaction`, `setCardStatement`, `setCardDatesForMonth` — todos los servicios de `services/finances.js` se siguen consumiendo igual.
+- `isDateBeyondLimit` del helpers — la validación de "no más de 1 mes futuro" funciona igual que antes.
+- El shape de RTDB y Storage no cambia. Datos viejos siguen siendo legibles.
+
+**Orquestador actualizado** (`CreditCards.jsx`):
+- Agregada función `areDatesConfigured(cardId)` que chequea `userData?.creditCards?.[cardId]?.dates?.[monthKey]?.closingDate && dueDate`.
+- Agregada función `handleSaveDates({closingDate, dueDate})` que llama `setCardDatesForMonth` y muestra snackbar.
+- Pasa `datesConfigured`, `onSaveDates`, `userData`, `onSnack` al `CreditCardDetailView`.
+
+**Build verificado**: bundle 1.05 MB (+2.59 kB por DatePickers + 2 sub-componentes nuevos). Cero warnings en los archivos tocados.
+
+**Por qué se hizo así:**
+- **PDF subida inline en el Detail, no en vista separada**: el spec pidió "agregar una sección debajo de los movimientos". Mantener el flujo dentro del Detail evita una sexta vista — el PDF queda asociado visualmente al período/mes que se está viendo.
+- **Path `users/{uid}/summaries/{filename}` con discriminadores**: el spec dice exactamente ese path. Para garantizar 1 PDF por tarjeta por mes sin colisiones cross-card (varias tarjetas pueden tener el mismo nombre original de archivo), incluyo `${cardId}_${yearMonth}_${safeName}` en el filename. El RTDB sigue siendo SSOT del "cuál PDF corresponde a qué tarjeta/mes" — Storage es solo blob.
+- **`Collapse` para el formulario de fechas, no Bottom Sheet**: el spec ofreció ambas opciones. `Collapse` es más simple (sin dependencias, sin gestión de modal) y mantiene el contexto visual (el form aparece donde va a ir el dato). En móvil ocupa la misma pantalla sin perder el header.
+- **Card "+ Agregar tarjeta" al final, no FAB**: un FAB flotante sobre la lista impediría ver el último item y obligaría a una decisión adicional de UX (¿esconder al scrollear?, ¿posición exacta?). Card al final del scroll es discoverable (el usuario llega cuando recorre todas sus tarjetas) y tipo "ghost card" coincide visualmente con las cards reales.
+- **Banner pendiente arriba**: ahora es lo primero que el usuario ve cuando hay pago pendiente. Anchorando al top en vez de flotando al fondo se evita superposición con el último ítem de la lista y se da más jerarquía visual al "call to action" de pagar.
+- **Subida que rechaza no-PDF antes de iniciar upload**: el `file.type !== 'application/pdf'` early-return evita un round-trip a Storage para fallar. Mismo para el límite de 10MB.
+- **`storagePath` guardado en RTDB**: permite pedir URL fresca con token actualizado al hacer "Ver" — si el `downloadURL` original expiró, todavía se puede abrir el PDF.
+- **`useEffect` que sincroniza `[initialClosingDate, initialDueDate]`** en DatesConfig: si el orquestador cambia los defaults (ej. al cambiar de mes), el form se actualiza. Sin esto, el form quedaría con valores stale.
+
+**Archivos creados** (2):
+- `src/components/finances/CreditCardStatementUpload.jsx` (230 líneas — recreado, no se restauró el viejo)
+- `src/components/finances/CreditCardDatesConfig.jsx` (175 líneas — recreado, validaciones del viejo preservadas)
+
+**Archivos modificados** (3):
+- `src/components/finances/CreditCardDetailView.jsx` (+banner naranja + Collapse + sección Resumen + props nuevas)
+- `src/components/finances/CreditCardListView.jsx` (banner pendiente movido al tope, header borrado, card "+ Agregar tarjeta" al final)
+- `src/pages/finances/CreditCards.jsx` (+`areDatesConfigured`, `handleSaveDates`, props nuevas al DetailView, +import de `setCardDatesForMonth`)
+
+**Decisiones importantes tomadas:**
+- **NO restaurar `CreditCardStatementUpload.jsx` del git history**: el componente viejo (354 líneas) era full-card con gradiente y muchos detalles visuales. El nuevo (230 líneas) está adaptado al estilo del módulo rediseñado — compacto, inline, sin gradientes coloridos. El path de Storage también cambió (era `statements/{uid}/{cardId}/{yearMonth}/...`, ahora `users/{uid}/summaries/...` per spec).
+- **NO restaurar `CreditCardDatesConfig.jsx` viejo**: era full-card con dos sub-cards visuales por DatePicker. El nuevo es un Card compacto con 2 DatePickers en stack vertical + botones Cancelar/Guardar. Mismas validaciones, una décima parte del JSX.
+- **Bundle +2.59 kB justificado**: los DatePickers (`@mui/x-date-pickers`) y `dayjs` ya estaban en bundle (UpdateCardDates.jsx los usa). El delta viene del JSX adicional de los 2 sub-componentes + uso de `Collapse` en DetailView.
+- **Acceso al "Agregar tarjeta" no se pierde**: el card ghost al final de la lista cumple el rol del botón "+" del header eliminado. En empty state (sin tarjetas) sigue el botón centrado del placeholder.
+
+**Pendiente para la próxima sesión:**
+- **Testear en navegador los flujos restaurados**:
+  - Mes nuevo sin fechas configuradas → banner naranja → expandir → guardar → desaparece banner.
+  - Mes con fechas configuradas → click icono lápiz → editar → cancelar / guardar.
+  - Subir PDF (válido / no-PDF / >10MB).
+  - Reemplazar PDF subido.
+  - Ver PDF subido en otra pestaña.
+- **Tocar la Vista Lista** verificando que el banner pendiente queda arriba del navegador de mes, que el card "+ Agregar tarjeta" aparece al final y funciona.
+- **Romper `NewHabit.jsx`** (1.425 líneas).
+- **Hook `useConfigState`** para bajar Configuracion a ~150 líneas.
+- **Capa `services/storage.js`** — `CreditCardStatementUpload` es ahora el 5° componente que importa `auth, storage` directos.
+- **Memoización con `useMemo`** en los 7 componentes ya rotos.
+- **Implementar pH/EC/PPM en Plants**.
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `updateSavings` obsoleto de store.js.
+
+---
+
+### 2026-05-12 — Rediseño completo de AppBar + Drawer + Layout
+
+**Qué se hizo:**
+- **`AppBar.jsx` reescrito** (375 → **163 líneas**, **−212 / −57%**) con estilo iOS minimalista:
+  - **Fondo blanco** (`background.paper`) en modo claro / `grey.900` en modo oscuro. Texto en `text.primary`.
+  - Sin elevación fuerte: `elevation={0}` + `borderBottom: 1px solid divider` + sombra muy sutil `0 1px 2px rgba(0,0,0,0.04)`.
+  - Heights: 56px mobile / 64px desktop.
+  - **Layout en grid de 3 columnas** (`1fr auto 1fr`) para centrar el título perfectamente independiente del ancho de los slots laterales.
+  - **Izquierda**: hamburguesa color índigo (`primary.main`) con hover sutil.
+  - **Centro**: título en `text.primary` con ellipsis si overflowa.
+  - **Derecha**: avatar circular (foto o inicial sobre fondo `primary.main` con 15% alpha) que abre un Menu con:
+    - Nombre + email del usuario en el header del menu
+    - `Configuración` → `/Configuracion`
+    - `Cerrar sesión` (texto rojo, ícono rojo)
+  - **Borrados** del AppBar viejo: Paper con saldos ARS/USD, botón "Acción rápida" con menú de quick actions (Nuevo gasto/ingreso/exchange/planta/aditivo), opción "Mi perfil", opción "Ayuda".
+- **`Drawer.jsx` reescrito** (432 → **248 líneas**, **−184 / −43%**) con menú agrupado plano:
+  - Ancho 280px. Fondo `background.paper` en modo claro / `grey.900` en modo oscuro.
+  - **Sin header oscuro con gradiente**: ahora el header es limpio sobre fondo blanco con avatar 64×64 centrado + nombre del usuario en bold + email en `text.secondary` debajo. Divider sutil debajo.
+  - **Menú agrupado en `MENU_GROUPS`** (estructura declarativa a nivel módulo): 4 grupos con `label` opcional:
+    - Sin label: Home
+    - "FINANZAS": Finanzas / Tarjetas / Exchange / Ahorros
+    - "VIDA": Hábitos / Plantas
+    - "CUENTA": Configuración / Ayuda
+  - **Items planos sin submenús**: `Aditivos` y `HabitosList` ahora se acceden desde sus respectivas vistas raíz (`Plantas` y `Hábitos`), eliminando los Collapse/expand del Drawer viejo.
+  - **Item activo**: fondo `primary.main` con 8% alpha + texto color `primary.main` + **borde izquierdo índigo 4px**. Hover incrementa el alpha al 12%.
+  - **`isItemActive` helper** module-level: matchea exact + prefijos (ej. `/ahorros/fondo/123` activa Ahorros), pero Home (`/`) solo si es exact match.
+  - **Footer**: divider + botón "Cerrar sesión" en `text-only style` con texto + ícono rojo (`error.main`), centrado, sin fondo. Hover muestra fondo rojo con 8% alpha.
+- **`Layout.jsx` ajustado** (27 → **23 líneas**):
+  - Eliminado el `Grid mt={5}` con `bgcolor: secondary.dark` (el `mt={5}` (40px) no compensaba el AppBar de 56-64px causando que el contenido quedara semi-tapado, y el bgcolor oscuro chocaba con el nuevo AppBar blanco).
+  - Reemplazado por `<Box>` con `pt: { xs: '56px', sm: '64px' }` que compensa exactamente el alto del AppBar fijo.
+- **Build verificado limpio**. **Bundle bajó −1.33 kB** (limpieza de imports MUI y desuso de varios iconos del AppBar viejo).
+
+**Por qué se hizo así:**
+- **Grid de 3 columnas en el Toolbar**: la forma estándar de `<Toolbar>` con `<Stack direction="row">` no centra el título porque las zonas izquierda/derecha tienen anchos variables. Un `display: 'grid'` con `1fr auto 1fr` garantiza que el slot central (donde va el título) ocupa el espacio restante y se centra perfectamente sin importar el ancho de los lados.
+- **`MENU_GROUPS` declarativo a nivel módulo**: la lista de items vive fuera del componente, sin closures sobre theme/state. Si en el futuro se agrega un ítem, es una entrada en el array — el `renderItem` no cambia. Cada grupo tiene `label` opcional y un array `items`.
+- **`isItemActive` con prefix matching**: cuando el usuario está en `/ahorros/fondo/abc123`, el item "Ahorros" debe quedar marcado como activo. Un exact match no lo cubre. Pero Home (`/`) requiere exact match para evitar que TODOS los paths matcheen el prefijo `/`.
+- **Sin submenús expandibles**: la versión vieja tenía 3 grupos con sub-items (Finanzas/Hábitos/Plantas). Eso requería state `expandedItems`, lógica de auto-expand al cargar la ruta, `<Collapse>` con animación, etc. El diseño nuevo plano elimina toda esa complejidad. Los accesos a Aditivos y HabitosList se mueven dentro de las propias vistas raíz (decisión coherente con el patrón mobile-first del resto del rediseño).
+- **AppBar sin saldos ni "Acción rápida"**: el spec lo pidió explícitamente. Las acciones ahora viven en cada pantalla (Finances tiene su SpeedDial, NewTransaction es una pantalla completa que se navega desde el wizard). El AppBar queda como chrome puro de navegación.
+- **`text.primary` para el título (no color blanco)**: con fondo blanco/dark, el título debe respetar el color de texto del theme. En modo claro queda gris oscuro; en modo oscuro queda blanco automáticamente.
+- **Layout sin `<Grid>` wrapper**: el `<Grid container>` del Layout viejo agregaba 0 valor (no había grid de columnas, solo un wrapper). Reemplazado por `<Box>` simple. El `bgcolor: secondary.dark` que aplicaba a todo el wrapper se eliminó porque hacía que páginas que no setean su propio fondo (ej. PlantsList) se vieran con un fondo turquesa raro.
+
+**Archivos modificados:**
+- `src/components/layout/AppBar.jsx` (375 → 163, **−212 líneas**)
+- `src/components/layout/Drawer.jsx` (432 → 248, **−184 líneas**)
+- `src/components/layout/Layout.jsx` (27 → 23 líneas)
+
+**Decisiones importantes tomadas:**
+- **Drawer siempre temporal** (no persistente en desktop): el spec dijo "puede ser persistente" pero no es obligatorio. Mantener temporal en todas las resoluciones simplifica el layout y es coherente con el patrón mobile-first del resto del rediseño. Si en el futuro se quiere persistente en desktop, es un `variant` condicional de 1 línea.
+- **`useStore` para `displayName` mantenido en el Drawer**: aunque `useAuth()` ya da `user.displayName`, el Drawer también lee de `userData.displayName` (Zustand) que se actualiza al guardar desde Configuración antes de que Firebase Auth refresque el token. Esto evita un flash donde el sidebar muestre el nombre viejo después de cambiarlo.
+- **Aditivos y HabitosList sin link en el Drawer**: cambio de UX. El usuario llega vía la vista raíz (Plantas → ver aditivos, Hábitos → ver lista). Si se necesita acceso directo, agregar al `MENU_GROUPS`.
+- **Borrado de "Mi perfil" del AppBar menu**: el menú profile del AppBar viejo tenía 3 opciones (Mi Perfil, Configuración, Ayuda). El spec nuevo pide solo "Ir a Configuración" + "Cerrar sesión". "Ayuda" sigue accesible desde el Drawer; "Mi Perfil" desaparece (la ruta `/Perfil` sigue funcionando pero sin acceso desde el AppBar).
+- **No se tocó `useAuth()` ni `services/auth.js`**: el `signOut()` se invoca igual que antes. El `user.photoURL` y `user.displayName` se leen igual.
+
+**Pendiente para la próxima sesión:**
+- **Probar en navegador**:
+  - AppBar: hamburguesa abre Drawer / avatar abre menú / "Configuración" navega / "Cerrar sesión" hace logout
+  - Drawer: items navegan + cierran drawer / item activo tiene borde índigo izq / cerrar sesión funciona
+  - Layout: el contenido empieza debajo del AppBar sin quedar tapado
+  - Modo oscuro: AppBar y Drawer cambian a `grey.900` correctamente
+- **Romper `NewHabit.jsx`** (1.425 líneas).
+- **Hook `useConfigState`** para bajar Configuracion a ~150 líneas.
+- **Capa `services/storage.js`**.
+- **Memoización con `useMemo`** en los 7 componentes ya rotos.
+- **Implementar pH/EC/PPM en Plants**.
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `updateSavings` obsoleto de store.js.
+
+---
+
+### 2026-05-13 — Rediseño completo de la pantalla Finanzas
+
+**Qué se hizo:**
+- Reescritura completa de la página Finanzas siguiendo la estética iOS de los rediseños anteriores. **4 sub-componentes nuevos** + orquestador limpio + borrado de 5 componentes viejos.
+- **Orquestador `Finances.jsx`** (294 → **289 líneas**): preserva al 100% los 2 `useEffect` de cálculo (`monthlyData` y `monthlyTrendsData`) y el manejo de `RefundDialog` + `SpeedDial`. Solo compone las 4 nuevas secciones verticalmente.
+- **Sección 1 — `FinancesHeader.jsx`** (135 líneas): toggle Gastos/Ingresos con `ToggleButtonGroup` redondeado pill-style (rojo cuando expense, verde cuando income) + navegador `< Mes Año >` grande con chevrons. Validación `isFutureMonth` para deshabilitar el `>` si el siguiente mes es futuro.
+- **Sección 2 — `FinancesMonthSummary.jsx`** (254 líneas): card con gradiente suave del color del tipo (rojo/verde tenue). Layout:
+  - Monto total grande (`h2`, fontWeight 800) con signo `−`/`+` y color acento
+  - Equivalente USD debajo en gris
+  - 3 métricas en grid: TRANSACCIONES / PROMEDIO POR DÍA / VS MES ANTERIOR (con flecha arriba/abajo según signo)
+  - Top 3 categorías con avatar circular coloreado + nombre + `LinearProgress` del % + monto a la derecha
+  - Botón "Ver todas las categorías (N)" si hay más de 3
+- **Sección 3 — `FinancesCharts.jsx`** (276 líneas): 2 charts navegables con swipe horizontal + dots indicator:
+  - **Chart A**: Evolución últimos 6 meses, tipo `area` con gradient (ApexCharts). Color rojo o verde según `dataType`. Helper `buildLastNMonths` retrocede mes-a-mes desde el seleccionado.
+  - **Chart B**: Top 6 categorías del mes actual, barras horizontales (ApexCharts). Cada barra usa el color de la categoría desde `getCategoryColor`.
+  - Navegación: chevrons `<` / `>` en el header + swipe táctil (`onTouchStart/Move/End` con threshold 40px) + click en dots
+- **Sección 4 — `FinancesTransactionsList.jsx`** (367 líneas): lista de transacciones con buscador + agrupado por fecha + expand al tocar:
+  - **Buscador** pill-style con ícono lupa, filtra en vivo por descripción/categoría/subcategoría/monto/método
+  - **Agrupado por fecha** con etiquetas inteligentes "Hoy" / "Ayer" / "13 may"
+  - Cada grupo tiene su total agregado a la derecha del label de fecha
+  - **Cada transacción**: avatar coloreado con ícono de categoría, descripción bold, categoría · subcategoría, chip "N/12" si es cuota, ícono pequeño de método de pago, monto a la derecha en color del tipo con signo
+  - **Expand al tocar**: muestra descripción completa, fecha "lunes 13 de mayo de 2026", equivalente USD + TC, método, y botón "Registrar devolución" (solo en gastos en efectivo sin refund previa)
+  - Helpers internos `parseFechaFlexible`, `labelFromDate`, `fullDateLabel` — preserva la lógica de fechas flexibles del componente viejo
+
+**Lógica preservada al 100%:**
+- Los 2 `useEffect` para `monthlyData` y `monthlyTrendsData` quedan idénticos al original (filtrado de transacciones futuras, `excludeFromTotal`, `hiddenFromList`, `refundAmount`).
+- `RefundDialog` se mantiene sin cambios — el orquestador lo monta igual.
+- `addExpense`/`addIncome`/`updateSavingsWithHistory` no se tocan (no se llaman desde acá; vienen vía NewTransaction).
+- `getCategoryIcon` / `getCategoryColor` del helpers se reusan.
+
+**Componentes viejos borrados** (5):
+- `FinancesTimeNavigator.jsx` (549 líneas — reemplazado por FinancesHeader 135)
+- `MonthlySummaryCard.jsx` (372 — reemplazado por FinancesMonthSummary 254 con el pie chart sustituido por top 3 + barras)
+- `MonthlyTransactionsList.jsx` (745 — reemplazado por FinancesTransactionsList 367 sin acordeones por fecha, ahora expand inline por transacción)
+- `AnnualTrends.jsx` (293 — reemplazado por FinancesCharts 276)
+- `SavingsEvolutionCard.jsx` (341 — eliminado del módulo, ya está en Home según spec)
+
+**Build verificado limpio**. Bundle **bajó −4.53 kB** (de 1.05 → 1.04 MB) — neto positivo a pesar de 4 archivos nuevos. La ganancia viene del borrado de 5 componentes pesados y el unshare de imports de MUI/iconos no usados.
+
+**Por qué se hizo así:**
+- **Layout vertical de 4 secciones**: el spec pide pantalla con scroll vertical, no más layout en columnas Grid. Permite mejor UX en mobile (donde se usa más) y elimina la complejidad de breakpoints.
+- **`FinancesHeader` con `isFutureMonth` no `isBeyondFutureLimit`**: la pantalla Finanzas no permite navegar al futuro (a diferencia de Tarjetas que sí permite 1 mes adelante para configurar pagos). Función inline simple — no necesita helper compartido.
+- **`monthlyTrendsData` se pasa a ambos `FinancesMonthSummary` y `FinancesCharts`**: ambos lo consumen — Summary para "vs mes anterior", Charts para evolución 6 meses. Calcular una vez en el orquestador y pasar como prop evita doble cómputo.
+- **`buildLastNMonths` con fallback a 0 cross-year**: si el usuario navega a enero/febrero, los últimos 6 meses cruzan el cambio de año. Como `monthlyTrendsData` es solo del año seleccionado, los meses del año anterior aparecen como 0. Aceptable para esta versión — flagged en pendiente para mejora futura (necesitaría leer `userData.finances.expenses[prevYear]` también).
+- **Top 3 categorías + barra de progreso en lugar de pie chart**: el `MonthlySummaryCard` viejo tenía un pie chart con top 3 + "Otras". El diseño nuevo prefiere barras horizontales más legibles y compactas, alineadas con el resto del módulo (chart B usa barras también).
+- **Expand inline por transacción en lugar de acordeón por fecha**: el componente viejo agrupaba por fecha con `<Accordion>` y mostraba todo el detalle dentro. El nuevo usa `<Collapse>` por transacción individual — más granular y permite ver el detalle sin colapsar/expandir grupos enteros.
+- **Botón "Registrar devolución" solo en condiciones específicas**: visible cuando `isExpense && !hasRefund && !isCreditCard`. La regla viene del flujo viejo (RefundDialog solo aplica a gastos en efectivo sin devolución previa). `e.stopPropagation()` evita que el click cierre el expand de la transacción.
+- **Swipe horizontal con `useRef`** en charts: evita re-renderizar en cada movimiento del dedo. Threshold de 40px filtra clicks accidentales.
+
+**Archivos creados** (4):
+- `src/components/finances/FinancesHeader.jsx` (135 líneas)
+- `src/components/finances/FinancesMonthSummary.jsx` (254 líneas)
+- `src/components/finances/FinancesCharts.jsx` (276 líneas)
+- `src/components/finances/FinancesTransactionsList.jsx` (367 líneas)
+
+**Archivos modificados:**
+- `src/pages/finances/Finances.jsx` (294 → 289 líneas, reescrito como orquestador limpio)
+
+**Archivos borrados** (5):
+- `FinancesTimeNavigator.jsx`, `MonthlySummaryCard.jsx`, `MonthlyTransactionsList.jsx`, `AnnualTrends.jsx`, `SavingsEvolutionCard.jsx`
+
+**Resultado neto**: ~2378 líneas eliminadas, ~1032 líneas nuevas (4 componentes nuevos), **−1346 líneas / −57%** en el módulo de pantalla principal de Finanzas.
+
+**Decisiones importantes tomadas:**
+- **`SavingsEvolutionCard` eliminado del módulo Finanzas**: el spec lo permitió explícitamente porque ya existe en Home. Si en el futuro se quiere recuperarlo, está en git history.
+- **SpeedDial agregó botón Exchange**: el viejo solo tenía Nuevo gasto / Nuevo ingreso. Agregué Exchange porque el sidebar nuevo lo expone como sección de Finanzas — coherente tener acceso rápido.
+- **`onSeeAllCategories` scroll al ancla de transacciones**: el spec dice "Link 'Ver todas' al final" sin definir qué hace. Implementé scroll suave a la lista de transacciones (donde se ven todas las categorías filtrables). Si en el futuro se quiere vista dedicada, hay que crearla.
+- **Expand inline en transacciones, no Dialog/Drawer**: mantiene contexto, es más rápido, y coherente con el patrón del rediseño (Tarjetas usa expand inline también para fechas).
+- **Bundle −4.53 kB**: el borrado de los 5 componentes (con muchos imports MUI redundantes) más que compensa los 4 archivos nuevos. Tree-shaking de los imports de MUI usados.
+
+**Pendiente para la próxima sesión:**
+- **Probar en navegador**:
+  - Toggle Gastos/Ingresos cambia color + recalcula datos
+  - Navegador de mes deshabilita `>` cuando es mes actual
+  - Swipe entre los 2 charts en mobile
+  - Buscar transacciones en vivo
+  - Expand de una transacción muestra detalle + botón devolución (en gastos efectivo)
+  - Registrar devolución abre el RefundDialog correctamente
+  - SpeedDial con 3 acciones (Gasto/Ingreso/Exchange) navega correctamente
+- **`buildLastNMonths` cross-year**: leer `userData.finances.expenses[prevYear]` si el rango cruza enero.
+- **Vista "Ver todas las categorías"**: hoy hace scroll al ancla. Considerar página dedicada con filtros si se necesita.
+- **Romper `NewHabit.jsx`** (1.425 líneas) — único componente monstruo que queda.
+- **Hook `useConfigState`**, capa `services/storage.js`.
+- **Memoización con `useMemo`** en los componentes ya rotos.
+- **Implementar pH/EC/PPM en Plants**.
+- Sigue pendiente: migrar `dayjs` → `date-fns`, auditar reglas Firebase, borrar `updateSavings` obsoleto de store.js.
+
+---
+
 ### [Fecha] — [Módulo trabajado]
 **Qué se hizo:**
 -
