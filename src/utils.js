@@ -26,7 +26,7 @@ export const formatAmount = (amount, isUSD = false) => {
   // Para valores más grandes, usar notación abreviada
   let absValue = Math.abs(amount);
   let sign = amount < 0 ? '-' : '';
-  let symbol = isUSD ? 'USD ' : '';
+  let symbol = isUSD ? 'USD ' : '$ ';
   
   if (absValue >= 1000000000) {
     // Mil millones o más (B)
@@ -38,6 +38,27 @@ export const formatAmount = (amount, isUSD = false) => {
     // Miles (K)
     return `${sign}${symbol}${(absValue / 1000).toFixed(1)}k`;
   }
+};
+
+// Formatea string raw del teclado ("1500,50" → "$ 1.500,50")
+export const formatAmountStr = (raw) => {
+  if (!raw || raw === '0') return '$ 0';
+  const parts = raw.split(',');
+  const int = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return parts[1] !== undefined ? `$ ${int},${parts[1]}` : `$ ${int}`;
+};
+
+// Formatea un número sin símbolo de moneda (el prefijo lo pone el template)
+// { abbreviate: true } → abrevia con k/M/B (para ARS)
+// { abbreviate: false } → muestra número completo con separador de miles (para USD)
+export const formatNumber = (amount, { abbreviate = true } = {}) => {
+  if (amount === null || amount === undefined) return '0';
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '−' : '';
+  if (abbreviate && abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toFixed(2)}B`;
+  if (abbreviate && abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(2)}M`;
+  if (abbreviate && abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)}k`;
+  return `${sign}${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(abs)}`;
 };
   
 // Función para obtener el nombre del mes a partir de su número (1 para enero, 2 para febrero, etc.)

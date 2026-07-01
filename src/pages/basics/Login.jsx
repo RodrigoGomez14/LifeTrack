@@ -587,7 +587,7 @@ const Login = () => {
           startIcon={<GoogleIcon />}
           sx={{
             bgcolor: 'white',
-            color: theme.palette.text.primary,
+            color: '#333',
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 999,
             py: 1.4,
@@ -988,7 +988,7 @@ const Login = () => {
           startIcon={<GoogleIcon />}
           sx={{
             bgcolor: 'white',
-            color: theme.palette.text.primary,
+            color: '#333',
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 999,
             py: 1.4,

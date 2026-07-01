@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  Divider, 
-  Grid, 
-  Typography, 
+import {
+  Box,
+  Card,
+  Divider,
+  Grid,
+  Typography,
   Button,
   IconButton,
   Chip,
@@ -16,103 +14,80 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Paper,
-  useTheme
+  alpha,
+  Stack,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Link } from 'react-router-dom';
 import { useStore } from '../../store';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import RepeatIcon from '@mui/icons-material/Repeat';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import MoreTimeIcon from '@mui/icons-material/MoreTime';
 
 const HabitDetail = ({ habitId, onBack }) => {
   const { userData } = useStore();
+  const theme = useTheme();
   const [habit, setHabit] = useState(null);
   const [completionHistory, setCompletionHistory] = useState([]);
-  const [stats, setStats] = useState({ 
-    totalCompleted: 0, 
-    completionRate: 0, 
-    currentStreak: 0, 
-    longestStreak: 0 
+  const [stats, setStats] = useState({
+    totalCompleted: 0,
+    completionRate: 0,
+    currentStreak: 0,
+    longestStreak: 0,
   });
-  
-  const theme = useTheme();
-  
+
   useEffect(() => {
     if (userData && userData.habits && habitId && userData.habits[habitId]) {
       const habitData = { ...userData.habits[habitId], id: habitId };
       setHabit(habitData);
-      
-      // Cargar historial de completado
+
       if (userData.habits.completed) {
         const history = [];
-        
-        // Recorrer todas las fechas en las que hay registros
-        Object.keys(userData.habits.completed).forEach(dateStr => {
+        Object.keys(userData.habits.completed).forEach((dateStr) => {
           const dateCompletions = userData.habits.completed[dateStr];
-          
-          // Si este hábito está marcado como completado en esta fecha
           if (dateCompletions[habitId]) {
             history.push({
               date: dateStr,
               completed: true,
-              completedAt: dateCompletions[habitId].completedAt
+              completedAt: dateCompletions[habitId].completedAt,
             });
           }
         });
-        
-        // Ordenar el historial por fecha (más reciente primero)
         history.sort((a, b) => new Date(b.date) - new Date(a.date));
         setCompletionHistory(history);
-        
-        // Calcular estadísticas
         calculateStats(history, habitData);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData, habitId]);
-  
-  // Calcular estadísticas del hábito
+
   const calculateStats = (history, habitData) => {
     const totalCompleted = history.length;
-    
-    // Calcular racha actual
     let currentStreak = 0;
     let previousDate = null;
     let longestStreak = habitData.streak || 0;
-    
-    // Ordenar historia por fecha (más reciente primero)
+
     const sortedHistory = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    // Calcular la racha actual
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     for (let i = 0; i < sortedHistory.length; i++) {
       const completionDate = new Date(sortedHistory[i].date);
-      
-      // Si es la primera entrada, verificar si es hoy o ayer
       if (i === 0) {
-        if (completionDate.getTime() === today.getTime() || 
-            completionDate.getTime() === yesterday.getTime()) {
+        if (completionDate.getTime() === today.getTime() || completionDate.getTime() === yesterday.getTime()) {
           currentStreak = 1;
           previousDate = completionDate;
         } else {
-          // Si la última vez que se completó no fue hoy ni ayer, no hay racha actual
           break;
         }
       } else {
-        // Para el resto de entradas, verificar si son días consecutivos
         const expectedPreviousDate = new Date(previousDate);
         expectedPreviousDate.setDate(expectedPreviousDate.getDate() - 1);
-        
         if (completionDate.getTime() === expectedPreviousDate.getTime()) {
           currentStreak++;
           previousDate = completionDate;
@@ -121,243 +96,254 @@ const HabitDetail = ({ habitId, onBack }) => {
         }
       }
     }
-    
-    // Calcular tasa de finalización (completados / días desde creación)
+
     const creationDate = habitData.createdAt ? new Date(habitData.createdAt) : new Date();
     const daysSinceCreation = Math.max(1, Math.floor((today - creationDate) / (1000 * 60 * 60 * 24)));
     const completionRate = Math.round((totalCompleted / daysSinceCreation) * 100);
-    
-    setStats({
-      totalCompleted,
-      completionRate,
-      currentStreak,
-      longestStreak
-    });
+
+    setStats({ totalCompleted, completionRate, currentStreak, longestStreak });
   };
-  
-  // Formatear fecha para mostrar
-  const formatDate = (dateStr) => {
+
+  const formatFullDate = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('es-ES', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   };
-  
-  // Formatear hora para mostrar
+
   const formatTime = (dateTimeStr) => {
     const date = new Date(dateTimeStr);
-    return date.toLocaleTimeString('es-ES', { 
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
+    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   };
-  
-  // Obtener texto para la frecuencia
-  const getFrequencyText = (frequency, customDays) => {
-    switch (frequency) {
-      case 'daily':
-        return 'Todos los días';
-      case 'weekdays':
-        return 'Días laborables (Lun-Vie)';
-      case 'weekends':
-        return 'Fines de semana (Sáb-Dom)';
-      case 'custom':
-        if (customDays && customDays.length > 0) {
-          const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-          const selectedDays = customDays.map(day => days[day]).join(', ');
-          return `Personalizado: ${selectedDays}`;
-        }
-        return 'Personalizado';
-      default:
-        return 'No especificada';
-    }
-  };
-  
+
   if (!habit) {
     return (
       <Box textAlign="center" py={4}>
-        <Typography variant="body1" color="textSecondary">
+        <Typography variant="body2" color="text.secondary">
           Cargando información del hábito...
         </Typography>
       </Box>
     );
   }
-  
+
+  const habitColor = theme.palette[habit.color]?.main || theme.palette.primary.main;
+
   return (
-    <Card elevation={3}>
-      <CardHeader
-        title={
-          <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Box display="flex" alignItems="center">
-              <IconButton 
-                onClick={onBack} 
-                sx={{ mr: 1 }}
-                size="small"
-              >
-                <ArrowBackIcon />
-              </IconButton>
-              <Typography variant="h6">{habit.name}</Typography>
-            </Box>
-            <Button
-              component={Link}
-              to={`/EditarHabito?id=${habitId}`}
-              startIcon={<EditIcon />}
-              size="small"
-              variant="outlined"
+    <Box>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton onClick={onBack} size="small" sx={{ color: 'text.secondary' }}>
+            <ArrowBackIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            {habit.name}
+          </Typography>
+        </Box>
+        <Button
+          component={Link}
+          to={`/EditarHabito/${habitId}`}
+          startIcon={<EditIcon />}
+          size="small"
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            borderRadius: 999,
+            color: 'text.secondary',
+            '&:hover': { color: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.08) },
+          }}
+        >
+          Editar
+        </Button>
+      </Box>
+
+      {/* Stats grid */}
+      <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+        <Grid item xs={6}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 2,
+              border: `1px solid ${theme.palette.divider}`,
+              p: 2,
+              textAlign: 'center',
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.12),
+                color: theme.palette.primary.main,
+                width: 40,
+                height: 40,
+                mx: 'auto',
+                mb: 1,
+              }}
             >
-              Editar
-            </Button>
-          </Box>
-        }
-      />
-      <Divider />
-      <CardContent>
-        <Grid container spacing={3}>
-          
-          {/* Estadísticas */}
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
-              <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-                Estadísticas
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Box textAlign="center" p={1}>
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: theme.palette.primary.main, 
-                        margin: '0 auto',
-                        width: 48,
-                        height: 48,
-                        mb: 1
-                      }}
-                    >
-                      <CheckCircleIcon />
-                    </Avatar>
-                    <Typography variant="h5">{stats.totalCompleted}</Typography>
-                    <Typography variant="body2" color="textSecondary">Completados</Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Box textAlign="center" p={1}>
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: theme.palette.secondary.main, 
-                        margin: '0 auto',
-                        width: 48,
-                        height: 48,
-                        mb: 1
-                      }}
-                    >
-                      <LocalFireDepartmentIcon />
-                    </Avatar>
-                    <Typography variant="h5">{stats.currentStreak}</Typography>
-                    <Typography variant="body2" color="textSecondary">Racha actual</Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Box textAlign="center" p={1}>
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: theme.palette.warning.main, 
-                        margin: '0 auto',
-                        width: 48,
-                        height: 48,
-                        mb: 1
-                      }}
-                    >
-                      <EmojiEventsIcon />
-                    </Avatar>
-                    <Typography variant="h5">{stats.longestStreak}</Typography>
-                    <Typography variant="body2" color="textSecondary">Racha más larga</Typography>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <Box textAlign="center" p={1}>
-                    <Box position="relative" display="inline-block" mb={1}>
-                      <Avatar 
-                        sx={{ 
-                          bgcolor: theme.palette.info.main, 
-                          margin: '0 auto',
-                          width: 48,
-                          height: 48
-                        }}
-                      >
-                        <MoreTimeIcon />
-                      </Avatar>
-                      <Box position="absolute" bottom={0} right={0} width="100%" height="100%">
-                        <Box 
-                          position="absolute" 
-                          bottom={0} 
-                          width="100%" 
-                          height={`${stats.completionRate}%`} 
-                          bgcolor={`${theme.palette.info.main}50`}
-                          borderRadius={1}
-                        />
-                      </Box>
-                    </Box>
-                    <Typography variant="h5">{stats.completionRate}%</Typography>
-                    <Typography variant="body2" color="textSecondary">Tasa de éxito</Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            </Paper>
-          </Grid>
-          
-          {/* Historial de completados */}
-          <Grid item xs={12}>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom fontWeight="medium">
-                Historial de Completados
-              </Typography>
-              
-              {completionHistory.length > 0 ? (
-                <List disablePadding>
-                  {completionHistory.slice(0, 10).map((entry, index) => (
-                    <React.Fragment key={entry.date}>
-                      <ListItem>
-                        <ListItemIcon>
-                          <CheckCircleIcon color="success" />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={formatDate(entry.date)} 
-                          secondary={entry.completedAt ? `Completado a las ${formatTime(entry.completedAt)}` : null}
-                        />
-                      </ListItem>
-                      {index < completionHistory.length - 1 && <Divider component="li" />}
-                    </React.Fragment>
-                  ))}
-                  
-                  {completionHistory.length > 10 && (
-                    <Box textAlign="center" mt={2}>
-                      <Chip 
-                        label={`+ ${completionHistory.length - 10} más`} 
-                        color="primary" 
-                        variant="outlined" 
-                      />
-                    </Box>
+              <CheckCircleIcon fontSize="small" />
+            </Avatar>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {stats.totalCompleted}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Completados
+            </Typography>
+          </Card>
+        </Grid>
+
+        <Grid item xs={6}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 2,
+              border: `1px solid ${theme.palette.divider}`,
+              p: 2,
+              textAlign: 'center',
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.warning.main, 0.12),
+                color: theme.palette.warning.main,
+                width: 40,
+                height: 40,
+                mx: 'auto',
+                mb: 1,
+              }}
+            >
+              <LocalFireDepartmentIcon fontSize="small" />
+            </Avatar>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {stats.currentStreak}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Racha actual
+            </Typography>
+          </Card>
+        </Grid>
+
+        <Grid item xs={6}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 2,
+              border: `1px solid ${theme.palette.divider}`,
+              p: 2,
+              textAlign: 'center',
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.info.main, 0.12),
+                color: theme.palette.info.main,
+                width: 40,
+                height: 40,
+                mx: 'auto',
+                mb: 1,
+              }}
+            >
+              <EmojiEventsIcon fontSize="small" />
+            </Avatar>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {stats.longestStreak}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Racha más larga
+            </Typography>
+          </Card>
+        </Grid>
+
+        <Grid item xs={6}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 2,
+              border: `1px solid ${theme.palette.divider}`,
+              p: 2,
+              textAlign: 'center',
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.success.main, 0.12),
+                color: theme.palette.success.main,
+                width: 40,
+                height: 40,
+                mx: 'auto',
+                mb: 1,
+              }}
+            >
+              <MoreTimeIcon fontSize="small" />
+            </Avatar>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {stats.completionRate}%
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Tasa de éxito
+            </Typography>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Historial */}
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: `1px solid ${theme.palette.divider}`,
+        }}
+      >
+        <Box sx={{ px: 2.5, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Typography variant="body2" fontWeight={700}>
+            Historial de Completados
+          </Typography>
+        </Box>
+        <Box sx={{ p: 1 }}>
+          {completionHistory.length > 0 ? (
+            <List disablePadding>
+              {completionHistory.slice(0, 10).map((entry, index) => (
+                <Box key={entry.date}>
+                  <ListItem>
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      <CheckCircleIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={formatFullDate(entry.date)}
+                      secondary={entry.completedAt ? `Completado a las ${formatTime(entry.completedAt)}` : null}
+                      primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                  </ListItem>
+                  {index < Math.min(completionHistory.length, 10) - 1 && (
+                    <Divider component="li" />
                   )}
-                </List>
-              ) : (
-                <Box textAlign="center" py={2}>
-                  <Typography variant="body2" color="textSecondary">
-                    Aún no hay registros de completado para este hábito
-                  </Typography>
+                </Box>
+              ))}
+
+              {completionHistory.length > 10 && (
+                <Box textAlign="center" mt={1.5} mb={0.5}>
+                  <Chip
+                    label={`+ ${completionHistory.length - 10} más`}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontWeight: 600 }}
+                  />
                 </Box>
               )}
-            </Paper>
-          </Grid>
-        </Grid>
-      </CardContent>
-    </Card>
+            </List>
+          ) : (
+            <Box textAlign="center" py={3}>
+              <Typography variant="body2" color="text.secondary">
+                Aún no hay registros de completado
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </Card>
+    </Box>
   );
 };
 
-export default HabitDetail; 
+export default HabitDetail;

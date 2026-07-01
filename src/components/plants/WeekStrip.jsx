@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Box, Typography, IconButton } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
-const DAYS_SHORT = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+const DAYS_SHORT = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const DAYS_FULL = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 
 const getWeekDates = (weekOffset = 0) => {
@@ -21,7 +22,6 @@ const getWeekDates = (weekOffset = 0) => {
   });
 };
 
-const addDays = (date, n) => { const d = new Date(date); d.setDate(d.getDate() + n); return d; };
 const sameDay = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 const getDayKey = (date) => {
@@ -52,7 +52,7 @@ const DayCell = ({ date, isToday, isSelected, indicators, label, onClick }) => (
       fontSize: 12, fontWeight: 700,
       bgcolor: isSelected ? '#D4A017' : isToday ? alpha('#3f51b5', 0.2) : 'transparent',
       color: isSelected ? '#fff' : isToday ? '#7986cb' : 'text.secondary',
-      transition: 'all 0.1s',
+      transition: 'background-color 0.1s, color 0.1s',
     }}>
       {date.getDate()}
     </Box>
@@ -69,10 +69,9 @@ const DayCell = ({ date, isToday, isSelected, indicators, label, onClick }) => (
 
 const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, selectedDay, onDaySelect, showLabels = true }) => {
   const theme = useTheme();
-  const touchRef = useRef({ startX: 0, currentX: 0, hasAutoSelected: false });
+  const touchRef = useRef({ startX: 0, currentX: 0 });
   const [internalOffset, setInternalOffset] = useState(0);
-  const [translateX, setTranslateX] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isGrabbing, setIsGrabbing] = useState(false);
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -83,6 +82,9 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
   const currDates = useMemo(() => getWeekDates(offset), [offset]);
   const nextDates = useMemo(() => getWeekDates(offset + 1), [offset]);
 
+  const containerWidthRef = useRef(containerWidth);
+  useEffect(() => { containerWidthRef.current = containerWidth; }, [containerWidth]);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -91,9 +93,11 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
     return () => ro.disconnect();
   }, []);
 
-  const navigateWeek = useCallback((direction, finalDelta = 0) => {
-    setTranslateX(finalDelta);
-    setIsDragging(false);
+  const translateX = useMotionValue(0);
+  const totalX = useTransform(translateX, (t) => -containerWidth + t);
+
+  const navigateWeek = useCallback((direction) => {
+    const cw = containerWidthRef.current || 0;
     const newOffset = offset + direction;
     if (externalOffset !== undefined) {
       onWeekChange?.(newOffset);
@@ -101,49 +105,45 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
       setInternalOffset(newOffset);
       onWeekChange?.(newOffset);
     }
-    // Esperar 2 frames: garantiza que el browser pintó las semanas nuevas
-    // en translateX=finalDelta ANTES de disparar la animación al centro
+    translateX.set(direction > 0 ? -cw : cw);
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTranslateX(0);
-      });
+      animate(translateX, 0, { type: 'spring', stiffness: 250, damping: 30, mass: 0.8 });
     });
-  }, [offset, externalOffset, onWeekChange]);
-
-  const commitSwipe = useCallback((deltaX) => {
-    if (Math.abs(deltaX) > 40) {
-      navigateWeek(deltaX > 0 ? -1 : 1, deltaX);
-    } else {
-      setIsDragging(false);
-      setTranslateX(0);
-    }
-  }, [navigateWeek]);
+  }, [offset, externalOffset, onWeekChange, translateX]);
 
   const handleTouchStart = (e) => {
-    touchRef.current = { startX: e.touches[0].clientX, currentX: e.touches[0].clientX, hasAutoSelected: false };
-    setIsDragging(true);
+    touchRef.current = { startX: e.touches[0].clientX, currentX: e.touches[0].clientX };
+    setIsGrabbing(true);
   };
 
   const handleTouchMove = (e) => {
     if (!touchRef.current) return;
     const delta = e.touches[0].clientX - touchRef.current.startX;
     touchRef.current.currentX = e.touches[0].clientX;
-    setTranslateX(delta);
-    // Auto-seleccionar día apenas el swipe cruce el umbral
-    if (!touchRef.current.hasAutoSelected && Math.abs(delta) > 40) {
-      touchRef.current.hasAutoSelected = true;
-      if (delta > 0) {
-        onDaySelect?.(prevDates[6]); // domingo semana anterior
-      } else {
-        onDaySelect?.(nextDates[0]); // lunes semana siguiente
-      }
-    }
+    translateX.set(delta);
   };
 
   const handleTouchEnd = () => {
     if (!touchRef.current) return;
+    setIsGrabbing(false);
     const delta = touchRef.current.currentX - touchRef.current.startX;
-    commitSwipe(delta);
+    const threshold = 40;
+    if (Math.abs(delta) > threshold) {
+      const dir = delta > 0 ? -1 : 1;
+      const newOffset = offset + dir;
+      if (externalOffset !== undefined) {
+        onWeekChange?.(newOffset);
+      } else {
+        setInternalOffset(newOffset);
+        onWeekChange?.(newOffset);
+      }
+      translateX.set(delta);
+      requestAnimationFrame(() => {
+        animate(translateX, 0, { type: 'spring', stiffness: 250, damping: 30, mass: 0.8 });
+      });
+    } else {
+      animate(translateX, 0, { type: 'spring', stiffness: 350, damping: 35, mass: 0.6 });
+    }
     touchRef.current = null;
   };
 
@@ -210,20 +210,14 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          sx={{ flex: 1, overflow: 'hidden', cursor: isDragging ? 'grabbing' : 'grab', position: 'relative' }}
+          sx={{ flex: 1, overflow: 'hidden', cursor: isGrabbing ? 'grabbing' : 'grab', position: 'relative' }}
         >
           {containerWidth > 0 && (
-            <Box
-              sx={{
-                display: 'flex',
-                transform: `translateX(${-containerWidth + translateX}px)`,
-                transition: !isDragging ? 'transform 0.25s ease' : 'none',
-              }}
-            >
+            <motion.div style={{ display: 'flex', x: totalX }}>
               {renderWeekRow(prevDates)}
               {renderWeekRow(currDates)}
               {renderWeekRow(nextDates)}
-            </Box>
+            </motion.div>
           )}
         </Box>
 

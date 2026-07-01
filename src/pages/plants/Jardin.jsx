@@ -5,49 +5,50 @@ import {
   Typography,
   TextField,
   InputAdornment,
-  Tabs,
-  Tab,
-  Fab,
-  Card,
   alpha,
   Collapse,
+  Tabs,
+  Tab,
+  Chip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
-import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import LightModeIcon from "@mui/icons-material/LightMode";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
 import Layout from "../../components/layout/Layout";
+import { DashedAddCard, AnimatedGroup, AnimatedItem } from "../../design-system";
 import { useStore } from "../../store";
 import { PlantRow, STAGES } from "../../components/plants/PlantShared";
-import AmbienteForm from "../../components/plants/AmbienteForm";
-import * as db from "../../services/database";
-
-const STAGE_LABELS = {
-  Vegetativo: "VEGE", Floracion: "FLORA", Germinacion: "GERME",
-  Secado: "SECADO", Enfrascado: "ENFRAS",
-};
 
 const Jardin = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { userData } = useStore();
-  const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
-  const [showAmbienteForm, setShowAmbienteForm] = useState(false);
-  const [editingAmbiente, setEditingAmbiente] = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [tab, setTab] = useState(0);
 
-  const { allPlants, environments } = useMemo(() => {
-    const active = userData?.plants?.active
+  const allPlants = useMemo(() => {
+    return userData?.plants?.active
       ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
       : [];
-    const envs = userData?.plants?.environments
-      ? Object.entries(userData.plants.environments).map(([id, e]) => ({ id, ...e }))
-      : [];
-    return { allPlants: active, environments: envs };
+  }, [userData]);
+
+  const archivedPlants = useMemo(() => {
+    const list = [];
+    const sources = { history: userData?.plants?.history, archived: userData?.plants?.archived };
+    for (const key in sources) {
+      const source = sources[key];
+      if (source && typeof source === 'object') {
+        for (const id in source) {
+          if (source[id] && typeof source[id] === 'object' && source[id].name) {
+            list.push({ id, ...source[id], isArchived: true });
+          }
+        }
+      }
+    }
+    return list;
   }, [userData]);
 
   const filtered = allPlants.filter(
@@ -57,7 +58,8 @@ const Jardin = () => {
   const groupedPlants = useMemo(() => {
     const groups = {};
     filtered.forEach((p) => {
-      const stage = p.etapa || "Germinacion";
+      const stageRaw = p.etapa || "Germinacion";
+      const stage = stageRaw === 'Enfrascado' ? 'Curado' : stageRaw;
       if (!groups[stage]) groups[stage] = [];
       groups[stage].push(p);
     });
@@ -71,127 +73,116 @@ const Jardin = () => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleSaveAmbiente = async (data) => {
-    if (data.id) {
-      await db.update(`plants/environments/${data.id}`, { name: data.name, type: data.type, lightSchedule: data.lightSchedule });
-    } else {
-      await db.push("plants/environments", { name: data.name, type: data.type, lightSchedule: data.lightSchedule, createdAt: new Date().toISOString() });
-    }
-  };
-
   return (
-    <Layout title="Jardín">
+    <Layout title="Plantas">
       <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, pb: 8 }}>
-        {/* Search */}
-        <TextField
-          fullWidth size="small" placeholder="Buscar..."
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          InputProps={{
-            startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment>,
-            sx: { borderRadius: 2 },
-          }}
-          sx={{ mb: 2 }}
-        />
-
-        {/* Tabs */}
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-          <Tab label="Plantas" />
-          <Tab label="Ambientes" />
+        <Tabs
+          value={tab}
+          onChange={(e, v) => setTab(v)}
+          variant="fullWidth"
+          sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600, fontSize: '0.85rem' } }}
+        >
+          <Tab label="Activas" />
+          <Tab label="Archivo" />
         </Tabs>
 
-        {/* Tab Plantas */}
         {tab === 0 && (
-          groupedPlants.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 6 }}>
-              <Typography variant="body2" color="text.secondary">No hay plantas activas</Typography>
-            </Box>
-          ) : (
-            groupedPlants.map((group) => (
-              <Box key={group.key} sx={{ mb: 1.5 }}>
-                {/* Group header */}
-                <Box
-                  onClick={() => toggleGroup(group.key)}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    px: 1.5,
-                    py: 0.75,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    bgcolor: alpha(group.color, 0.06),
-                    '&:hover': { bgcolor: alpha(group.color, 0.1) },
-                    mb: 0.5,
-                  }}
-                >
-                  <group.icon sx={{ fontSize: 18, color: group.color }} />
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: group.color, flex: 1 }}>
-                    {STAGE_LABELS[group.key] || group.key.toUpperCase()} ({group.plants.length})
+          <>
+            <TextField
+              fullWidth size="small" placeholder="Buscar planta..."
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment>,
+                sx: { borderRadius: 2 },
+              }}
+              sx={{ mb: 2 }}
+            />
+
+            {groupedPlants.length === 0 ? (
+              <AnimatedItem>
+                <Box sx={{ textAlign: 'center', py: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {search ? 'Sin resultados' : 'No hay plantas activas'}
                   </Typography>
-                  {collapsedGroups[group.key] ? <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
                 </Box>
-
-                {/* Plants */}
-                <Collapse in={!collapsedGroups[group.key]}>
-                  {group.plants.map((plant) => (
-                    <PlantRow key={plant.id} plant={plant} onClick={() => navigate(`/Planta/?${plant.id}`)} />
-                  ))}
-                </Collapse>
-              </Box>
-            ))
-          )
-        )}
-
-        {/* Tab Ambientes */}
-        {tab === 1 && (
-          <Box>
-            {environments.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>No hay ambientes creados</Typography>
-              </Box>
+              </AnimatedItem>
             ) : (
-              environments.map((env) => (
-                <Card key={env.id} variant="outlined" sx={{ mb: 1, p: 2, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 44, height: 44, borderRadius: '50%', bgcolor: env.type === 'indoor' ? alpha(theme.palette.primary.main, 0.1) : alpha('#4CAF50', 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', color: env.type === 'indoor' ? 'primary.main' : '#4CAF50', fontSize: 20 }}>
-                    <LightModeIcon />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{env.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {env.type === 'indoor' ? 'Indoor' : env.type === 'outdoor' ? 'Outdoor' : 'Invernadero'} · {env.lightSchedule}
-                    </Typography>
-                  </Box>
-                  <Box onClick={() => { setEditingAmbiente(env); setShowAmbienteForm(true); }} sx={{ cursor: 'pointer', color: 'text.secondary', p: 0.5 }}>
-                    <EditOutlinedIcon fontSize="small" />
-                  </Box>
-                </Card>
-              ))
+              <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column' }}>
+                {groupedPlants.map((group) => (
+                  <AnimatedItem key={group.key}>
+                    <Box sx={{ mb: 1.5 }}>
+                      <Box
+                        onClick={() => toggleGroup(group.key)}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 1.5,
+                          py: 0.75,
+                          borderRadius: 2,
+                          cursor: 'pointer',
+                          bgcolor: alpha(group.color, 0.06),
+                          '&:hover': { bgcolor: alpha(group.color, 0.1) },
+                          mb: 0.5,
+                        }}
+                      >
+                        <group.icon sx={{ fontSize: 18, color: group.color }} />
+                        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: group.color, flex: 1 }}>
+                          {group.key} ({group.plants.length})
+                        </Typography>
+                        {collapsedGroups[group.key] ? <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
+                      </Box>
+
+                      <Collapse in={!collapsedGroups[group.key]}>
+                        {group.plants.map((plant) => (
+                          <PlantRow key={plant.id} plant={plant} onClick={() => navigate(`/Planta/?${plant.id}`)} />
+                        ))}
+                      </Collapse>
+                    </Box>
+                  </AnimatedItem>
+                ))}
+              </AnimatedGroup>
             )}
 
-            <Card
-              variant="outlined"
-              onClick={() => { setEditingAmbiente(null); setShowAmbienteForm(true); }}
-              sx={{ p: 2, borderRadius: 2, textAlign: 'center', cursor: 'pointer', borderStyle: 'dashed', '&:hover': { borderColor: 'primary.light', bgcolor: 'action.hover' } }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>+ Agregar ambiente</Typography>
-              <Typography variant="caption" color="text.secondary">Indoor, outdoor o invernadero</Typography>
-            </Card>
-          </Box>
+            <AnimatedItem>
+              <Box sx={{ mt: 2 }}>
+                <DashedAddCard
+                  label="Nueva planta"
+                  desc="Registrá una nueva planta"
+                  onClick={() => navigate('/NuevaPlanta')}
+                />
+              </Box>
+            </AnimatedItem>
+          </>
+        )}
+
+        {tab === 1 && (
+          <>
+            {archivedPlants.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <ArchiveOutlinedIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1.5 }} />
+                <Typography variant="body2" color="text.secondary">
+                  No hay plantas archivadas
+                </Typography>
+              </Box>
+            ) : (
+              archivedPlants.map((plant) => (
+                <Box key={plant.id} sx={{ mb: 0.5 }}>
+                  <PlantRow plant={plant} onClick={() => navigate(`/Planta/?${plant.id}`)} />
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', pr: 1, mt: -0.5, mb: 0.5 }}>
+                    <Chip
+                      icon={<ArchiveOutlinedIcon sx={{ fontSize: 14 }} />}
+                      label="Archivada"
+                      size="small"
+                      sx={{ height: 20, fontSize: '0.65rem', bgcolor: alpha(theme.palette.text.disabled, 0.08), color: 'text.secondary' }}
+                    />
+                  </Box>
+                </Box>
+              ))
+            )}
+          </>
         )}
       </Box>
-
-      {/* FAB */}
-      {tab === 0 && (
-        <Fab color="primary" sx={{ position: 'fixed', bottom: 24, right: 24 }} onClick={() => navigate('/NuevaPlanta')}>
-          <AddIcon />
-        </Fab>
-      )}
-
-      <AmbienteForm
-        open={showAmbienteForm}
-        onClose={() => setShowAmbienteForm(false)}
-        editData={editingAmbiente}
-        onSave={handleSaveAmbiente}
-      />
     </Layout>
   );
 };

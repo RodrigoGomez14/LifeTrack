@@ -36,3 +36,11 @@
     transform: rotate(360deg);
   }
 }
+
+/* Ocultar scrollbars en toda la app */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}

@@ -1,181 +1,220 @@
 import React from 'react';
-import { Box, Typography, IconButton, Card, Chip, alpha } from '@mui/material';
+import { Box, Typography, Card, Button, Chip, Divider, alpha } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { formatAmount, getMonthName } from '../../utils';
+import { formatNumber, getMonthName } from '../../utils';
 import {
   getCardType, getCardGradient, getCardLabel,
-  isBeyondFutureLimit, extractActiveInstallments,
 } from './creditCardsHelpers';
-import { DashedAddCard } from '../../design-system';
+import { DashedAddCard, AnimatedGroup, AnimatedItem } from '../../design-system';
 
-const getDueLabel = (card, year, month) => {
-  const mKey = `${year}-${String(month).padStart(2, '0')}`;
-  const configured = card.dates?.[mKey];
-  const day = configured?.dueDate
-    ? (() => { const d = new Date(configured.dueDate); return d.getDate(); })()
-    : card.defaultDueDay || 25;
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  let m = month;
-  if (day <= (configured?.closingDate ? new Date(configured.closingDate).getDate() : card.defaultClosingDay || 10)) {
-    m = month === 12 ? 1 : month + 1;
-  }
-  return `Vence ${day} ${months[m - 1]}`;
-};
+const DAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 const TarjetasListView = ({
   cards,
   selectedYear,
   selectedMonth,
-  setSelectedYear,
-  setSelectedMonth,
+  cardDates,
   getCardTotal,
+  getCardTotalNativeUSD,
   isCardPaid,
-  getAllCardsTotal,
+  displayTotal,
   areCardsActuallyPaid,
   onCardClick,
   onAddCard,
   onOpenPayment,
-  onSwipePay,
-  cardTransactions,
 }) => {
   const theme = useTheme();
-  const monthName = getMonthName(selectedMonth);
 
-  const goPrevMonth = () => {
-    if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear((y) => y - 1); }
-    else setSelectedMonth((m) => m - 1);
-  };
-  const goNextMonth = () => {
-    if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear((y) => y + 1); }
-    else setSelectedMonth((m) => m + 1);
-  };
+  const today = new Date();
+  const todayDay = today.getDate();
 
-  const isNextDisabled = isBeyondFutureLimit(
-    selectedMonth === 12 ? selectedYear + 1 : selectedYear,
-    selectedMonth === 12 ? 1 : selectedMonth + 1,
-    3
-  );
+  const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1;
 
-  const totalPendiente = getAllCardsTotal();
-  const showPaymentBanner = !areCardsActuallyPaid() && totalPendiente > 0;
+  const prevMonth = today.getMonth() === 0 ? 12 : today.getMonth();
+  const prevYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
+  const isCurrentOrPrevMonth =
+    (selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1) ||
+    (selectedYear === prevYear && selectedMonth === prevMonth);
 
-  const getStatusChip = (cardId) => {
-    const paid = isCardPaid(cardId);
-    const total = getCardTotal(cardId);
-    if (paid) return { label: 'Pagada', color: 'success' };
-    if (total === 0) return { label: 'Sin gastos', color: 'default' };
-    return { label: 'Pendiente', color: 'warning' };
-  };
+  const isPastClosing = cards.some((card) => {
+    const total = getCardTotal(card.id);
+    const dates = cardDates[card.id];
+    return total > 0 && dates && todayDay >= dates.closingDay;
+  });
 
-  const getActiveInstallmentCount = (cardId) => {
-    const allTx = cardTransactions?.[cardId];
-    if (!allTx) return 0;
-    const active = extractActiveInstallments(allTx);
-    return active.length;
-  };
+  const totalPendiente = displayTotal;
+  const showPaymentButton = isCurrentMonth && isPastClosing && !areCardsActuallyPaid() && totalPendiente > 0;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      {/* Month navigator */}
-      <Card variant="outlined" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, py: 1, borderRadius: 2 }}>
-        <IconButton size="small" onClick={goPrevMonth} sx={{ color: 'text.secondary' }}><ChevronLeftIcon fontSize="small" /></IconButton>
-        <Typography variant="body1" sx={{ fontWeight: 700, letterSpacing: 0.5 }}>{monthName} {selectedYear}</Typography>
-        <IconButton size="small" onClick={goNextMonth} disabled={isNextDisabled} sx={{ color: isNextDisabled ? 'text.disabled' : 'text.secondary' }}>
-          <ChevronRightIcon fontSize="small" />
-        </IconButton>
-      </Card>
-
-      {/* Pending banner */}
-      {showPaymentBanner && (
-        <Card variant="outlined" onClick={onOpenPayment} sx={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderRadius: 2,
-          bgcolor: alpha(theme.palette.warning.main, 0.08), borderColor: alpha(theme.palette.warning.main, 0.3),
-          cursor: 'pointer', transition: '0.15s', '&:hover': { borderColor: theme.palette.warning.main },
+    <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      {/* Total global card — siempre visible si hay tarjetas */}
+      {cards.length > 0 && (
+        <AnimatedItem>
+        <Card variant="outlined" sx={{
+          borderRadius: 2,
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+          borderColor: alpha(theme.palette.primary.main, 0.15),
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          overflow: 'hidden',
         }}>
-          <Box>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: theme.palette.warning.main, letterSpacing: 0.5 }}>PAGO PENDIENTE</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.warning.light }}>$ {formatAmount(totalPendiente)}</Typography>
+          <Box sx={{ px: 2.5, py: 2, flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5, color: 'text.secondary' }}>
+              Total del período
+            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -1, mt: 0.25 }}>
+              $ {formatNumber(totalPendiente)}
+            </Typography>
           </Box>
-          <Chip label="Pagar" size="small" sx={{ bgcolor: theme.palette.warning.main, color: '#fff', fontWeight: 700, fontSize: 11, height: 28, px: 1 }} />
+          {showPaymentButton && (
+            <Button
+              variant="contained"
+              onClick={onOpenPayment}
+              sx={{
+                bgcolor: theme.palette.warning.main,
+                color: '#fff',
+                borderRadius: 0,
+                px: 3,
+                fontWeight: 700,
+                textTransform: 'none',
+                fontSize: '0.95rem',
+                minWidth: 'auto',
+                '&:hover': { bgcolor: theme.palette.warning.dark },
+              }}
+            >
+              Pagar
+            </Button>
+          )}
         </Card>
+        </AnimatedItem>
       )}
 
       {/* Cards */}
       {cards.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>No tenés tarjetas de crédito</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            No tenés tarjetas de crédito
+          </Typography>
           <DashedAddCard label="Agregar tarjeta" desc="Registrá tu primera tarjeta" onClick={onAddCard} />
         </Box>
       ) : (
-        cards.map((card) => {
-          const cardType = getCardType(card.cardType || card.name);
-          const gradient = getCardGradient(cardType);
-          const label = getCardLabel(cardType);
-          const total = getCardTotal(card.id);
-          const status = getStatusChip(card.id);
-          const instCount = getActiveInstallmentCount(card.id);
-          const dueLabel = getDueLabel(card, selectedYear, selectedMonth);
+        <>
+          {cards.map((card) => {
+            const cardTypeKey = getCardType(card.cardType || card.name);
+            const gradient = getCardGradient(cardTypeKey);
+            const label = getCardLabel(cardTypeKey);
+            const total = getCardTotal(card.id);
+            const nativeUSD = getCardTotalNativeUSD ? getCardTotalNativeUSD(card.id) : 0;
+            const paid = isCardPaid(card.id);
+            const dates = cardDates[card.id];
 
-          return (
-            <Card key={card.id} variant="outlined"
-              onClick={() => onCardClick(card.id)}
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.75, borderRadius: 2,
-                cursor: 'pointer', transition: '0.15s', position: 'relative', overflow: 'hidden',
-                '&:hover': { borderColor: theme.palette.primary.light },
-              }}>
-              {/* Left color indicator */}
-              <Box sx={{ width: 4, minHeight: 52, borderRadius: 2, background: gradient, flexShrink: 0, alignSelf: 'stretch' }} />
+            const isPending = total > 0 && !paid && dates && todayDay >= dates.closingDay && isCurrentOrPrevMonth;
+            const isInactive = total === 0 && !paid;
 
-              {/* Info */}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>{card.name || 'Sin nombre'}</Typography>
-                <Typography variant="caption" color="text.secondary">{label}{card.lastFourDigits ? ` ····${card.lastFourDigits}` : ''}</Typography>
-                <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
-                  {total > 0 && (
-                    <Typography variant="caption" sx={{ color: theme.palette.warning.light, fontWeight: 500, fontSize: 10 }}>
-                      ⏰ {dueLabel}
-                    </Typography>
-                  )}
-                  {instCount > 0 && (
-                    <Chip label={`${instCount} cuota${instCount > 1 ? 's' : ''}`} size="small"
-                      sx={{ height: 18, fontSize: 9, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.light', fontWeight: 600 }} />
-                  )}
-                </Box>
-              </Box>
+            const shortClosing = (() => {
+              if (!dates) return null;
+              const d = new Date(selectedYear, selectedMonth - 1, dates.closingDay);
+              return `${DAYS_SHORT[d.getDay()]} ${dates.closingDay} ${getMonthName(selectedMonth).substring(0, 3)}`;
+            })();
 
-              {/* Amount + status */}
-              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: total > 0 ? theme.palette.error.light : theme.palette.text.secondary, lineHeight: 1.2 }}>
-                  $ {formatAmount(total)}
-                </Typography>
-                <Chip label={status.label} size="small" color={status.color} sx={{ height: 20, fontSize: 10, fontWeight: 600, mt: 0.25 }} />
-              </Box>
+            const shortDue = (() => {
+              if (!dates) return null;
+              const dueYear = (selectedMonth === 12 && dates.dueMonth === 1) ? selectedYear + 1 : selectedYear;
+              const d = new Date(dueYear, dates.dueMonth - 1, dates.dueDay);
+              return `${DAYS_SHORT[d.getDay()]} ${dates.dueDay} ${getMonthName(dates.dueMonth).substring(0, 3)}`;
+            })();
 
-              {/* Swipe-to-pay indicator (right edge) */}
-              {total > 0 && !status.label.includes('Pagada') && (
-                <Box
-                  onClick={(e) => { e.stopPropagation(); onSwipePay?.(card.id); }}
-                  sx={{
-                    position: 'absolute', right: 0, top: 0, bottom: 0,
-                    width: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    bgcolor: alpha(theme.palette.warning.main, 0.12), cursor: 'pointer',
-                    opacity: 0, transition: 'opacity 0.15s',
-                    '&:hover': { opacity: 1 },
-                    '.MuiCard-root:hover &': { opacity: 0.7 },
-                  }}>
-                  <Box sx={{ color: theme.palette.warning.main, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Typography sx={{ fontSize: 18, lineHeight: 1 }}>$</Typography>
+            return (
+              <AnimatedItem key={card.id}>
+              <Box
+                key={card.id}
+                onClick={() => onCardClick(card.id)}
+                sx={{
+                  width: '100%',
+                  borderRadius: 3,
+                  background: gradient,
+                  p: 2.5,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+                  },
+                  '&:active': { transform: 'scale(0.98)' },
+                }}
+              >
+                {/* Top: amount + status + card type */}
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box>
+                      <Typography variant="h5" sx={{ color: '#fff', fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.2 }}>
+                        $ {formatNumber(total)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ color: '#fff', fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.2, mt: 0.5, mb: 0.5 }}>
+                        USD {formatNumber(nativeUSD, { abbreviate: false })}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, ml: 1 }}>
+                      {isPending && (
+                        <Chip label="PENDIENTE" size="small"
+                          sx={{ bgcolor: 'warning.main', color: '#fff', fontWeight: 700, fontSize: 10, height: 22, letterSpacing: 0.3 }} />
+                      )}
+                      {paid && (
+                        <Chip label="PAGADA" size="small"
+                          sx={{ bgcolor: 'success.main', color: '#fff', fontWeight: 700, fontSize: 10, height: 22, letterSpacing: 0.3 }} />
+                      )}
+                      {isInactive && (
+                        <Chip label="SIN GASTOS" size="small"
+                          sx={{ bgcolor: alpha('#fff', 0.15), color: alpha('#fff', 0.7), fontWeight: 600, fontSize: 10, height: 22, letterSpacing: 0.3 }} />
+                      )}
+                    </Box>
                   </Box>
+                  <Typography variant="body2" sx={{ color: alpha('#fff', 0.85), fontWeight: 700, letterSpacing: 3 }}>
+                    {label}
+                  </Typography>
                 </Box>
-              )}
-            </Card>
-          );
-        })
+
+                {/* Bottom: dates — siempre visible para altura uniforme */}
+                <>
+                  <Divider sx={{ borderColor: alpha('#fff', 0.1), my: 1.5 }} />
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 600, letterSpacing: 0.5 }}>
+                        CIERRE
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mt: 0.25 }}>
+                        {dates.isConfigured ? shortClosing : '−'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center', borderLeft: `1px solid ${alpha('#fff', 0.1)}` }}>
+                      <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 600, letterSpacing: 0.5 }}>
+                        VENCE
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mt: 0.25 }}>
+                        {dates.isConfigured ? shortDue : '−'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </>
+              </Box>
+              </AnimatedItem>
+            );
+          })}
+
+          {/* Add card ghost — al final del listado */}
+          <AnimatedItem>
+          <Box sx={{ mt: 1.5 }}>
+            <DashedAddCard label="Agregar tarjeta" onClick={onAddCard} />
+          </Box>
+          </AnimatedItem>
+        </>
       )}
-    </Box>
+    </AnimatedGroup>
   );
 };
 

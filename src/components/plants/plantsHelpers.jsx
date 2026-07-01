@@ -4,9 +4,9 @@ import GrassIcon from '@mui/icons-material/Grass';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ParkIcon from '@mui/icons-material/Park';
 import ForestIcon from '@mui/icons-material/Forest';
+import WavesIcon from '@mui/icons-material/Waves';
 
-// Lista canónica de etapas y orden cronológico.
-export const STAGES_ORDER = ['Germinacion', 'Vegetativo', 'Floracion', 'Secado', 'Enfrascado'];
+export const STAGES_ORDER = ['Germinacion', 'Vegetativo', 'Floracion', 'Lavado de Raices', 'Secado', 'Curado'];
 
 // Convierte "DD/MM/YYYY" a "Lunes, 5 de mayo de 2026" (capitalizada).
 export function convertToDetailedDate(dateString) {
@@ -91,10 +91,18 @@ export function calculateDaysInStage(plant, stageName) {
     }
   }
   if (stageName === 'Floracion' && plant.inicioFloracion) {
-    if (plant.inicioSecado) {
-      return calculateDaysBetween(plant.inicioFloracion, plant.inicioSecado);
+    if (plant.inicioLavado) {
+      return calculateDaysBetween(plant.inicioFloracion, plant.inicioLavado);
     }
     return calculateDaysBetween(plant.inicioFloracion);
+  }
+  if (stageName === 'Lavado de Raices' && plant.inicioLavado) {
+    if (plant.inicioSecado) {
+      return calculateDaysBetween(plant.inicioLavado, plant.inicioSecado);
+    }
+    if (plant.etapa === 'Lavado de Raices') {
+      return calculateDaysBetween(plant.inicioLavado);
+    }
   }
   if (stageName === 'Secado' && plant.inicioSecado) {
     if (plant.finalSecado) {
@@ -102,6 +110,12 @@ export function calculateDaysInStage(plant, stageName) {
     }
     if (plant.etapa === 'Secado') {
       return calculateDaysBetween(plant.inicioSecado);
+    }
+  }
+  if (stageName === 'Curado') {
+    const inicio = plant.inicioCurado || plant.inicioEnfrascado;
+    if (inicio) {
+      return calculateDaysBetween(inicio);
     }
   }
   return null;
@@ -129,8 +143,14 @@ export function getStageInfo(plant, stageName) {
       break;
     case 'Floracion':
       startDate = plant.inicioFloracion;
-      endDate = plant.inicioSecado;
+      endDate = plant.inicioLavado;
       isActive = plant.etapa === 'Floracion';
+      isCompleted = !!plant.inicioLavado;
+      break;
+    case 'Lavado de Raices':
+      startDate = plant.inicioLavado;
+      endDate = plant.inicioSecado;
+      isActive = plant.etapa === 'Lavado de Raices';
       isCompleted = !!plant.inicioSecado;
       break;
     case 'Secado':
@@ -139,11 +159,11 @@ export function getStageInfo(plant, stageName) {
       isActive = plant.etapa === 'Secado';
       isCompleted = !!plant.finalSecado;
       break;
-    case 'Enfrascado':
-      startDate = plant.finalSecado || plant.inicioEnfrascado;
+    case 'Curado':
+      startDate = plant.finalSecado || plant.inicioCurado || plant.inicioEnfrascado;
       endDate = null;
-      isActive = plant.etapa === 'Enfrascado';
-      isCompleted = plant.etapa === 'Enfrascado';
+      isActive = plant.etapa === 'Curado' || plant.etapa === 'Enfrascado';
+      isCompleted = plant.etapa === 'Curado' || plant.etapa === 'Enfrascado';
       break;
     default:
       break;
@@ -162,9 +182,11 @@ export function getStageIcon(stage, fontSize = 'small') {
       return <GrassIcon fontSize={fontSize} />;
     case 'Floracion':
       return <LocalFloristIcon fontSize={fontSize} />;
+    case 'Lavado de Raices':
+      return <WavesIcon fontSize={fontSize} />;
     case 'Secado':
       return <ParkIcon fontSize={fontSize} />;
-    case 'Enfrascado':
+    case 'Curado':
       return <ForestIcon fontSize={fontSize} />;
     default:
       return <ForestIcon fontSize={fontSize} />;
@@ -172,17 +194,20 @@ export function getStageIcon(stage, fontSize = 'small') {
 }
 
 // Mapping etapa actual → siguiente etapa + campo de fecha asociado.
-// Devuelve { newStage, dateField } o null si ya está en Enfrascado.
+// Devuelve { newStage, dateField } o null si ya está en Curado (terminal).
 export function getNextStage(currentStage) {
-  switch (currentStage) {
+  const etapa = currentStage === 'Enfrascado' ? 'Curado' : currentStage;
+  switch (etapa) {
     case 'Germinacion':
       return { newStage: 'Vegetativo', dateField: 'inicioVegetativo' };
     case 'Vegetativo':
       return { newStage: 'Floracion', dateField: 'inicioFloracion' };
     case 'Floracion':
+      return { newStage: 'Lavado de Raices', dateField: 'inicioLavado' };
+    case 'Lavado de Raices':
       return { newStage: 'Secado', dateField: 'inicioSecado' };
     case 'Secado':
-      return { newStage: 'Enfrascado', dateField: 'inicioEnfrascado' };
+      return { newStage: 'Curado', dateField: 'inicioCurado' };
     default:
       return null;
   }

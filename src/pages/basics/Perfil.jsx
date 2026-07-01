@@ -26,6 +26,7 @@ import {
   Alert,
   Tooltip
 } from '@mui/material';
+import { AnimatedGroup, AnimatedItem } from '../../design-system';
 
 // Iconos
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
@@ -441,8 +442,8 @@ const Perfil = () => {
         </Grid>
       </Paper>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
+      <Grid container spacing={3} component={AnimatedGroup}>
+        <Grid item xs={12} md={6} component={AnimatedItem}>
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
               <AccountBalanceWalletIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
@@ -497,7 +498,7 @@ const Perfil = () => {
               variant="outlined" 
               color="primary" 
               fullWidth
-              onClick={() => navigate('/finanzas')}
+              onClick={() => navigate('/Gastos')}
               sx={{ mt: 1 }}
             >
               Ver Detalles Financieros
@@ -505,7 +506,7 @@ const Perfil = () => {
           </Paper>
         </Grid>
         
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={6} component={AnimatedItem}>
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
               <EmojiEventsIcon sx={{ mr: 1, color: theme.palette.warning.main }} />
@@ -556,8 +557,8 @@ const Perfil = () => {
   
   const renderStatsTab = () => (
     <Box>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={7}>
+      <Grid container spacing={3} component={AnimatedGroup}>
+        <Grid item xs={12} md={7} component={AnimatedItem}>
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
               <BarChartIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
@@ -599,7 +600,7 @@ const Perfil = () => {
                 <Button 
                   variant="text" 
                   color="primary" 
-                  onClick={() => navigate('/finanzas')}
+                  onClick={() => navigate('/Gastos')}
                   sx={{ mt: 1 }}
                 >
                   Ver Todas las Categorías
@@ -660,7 +661,7 @@ const Perfil = () => {
           </Paper>
         </Grid>
         
-        <Grid item xs={12} md={5}>
+        <Grid item xs={12} md={5} component={AnimatedItem}>
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, mb: 3 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
               <SavingsIcon sx={{ mr: 1, color: theme.palette.success.main }} />
@@ -793,7 +794,7 @@ const Perfil = () => {
                   variant="outlined" 
                   color="primary" 
                   size="small"
-                  onClick={() => navigate('/NuevaTarjeta')}
+                  onClick={() => navigate('/nuevaTarjeta')}
                   sx={{ mt: 2 }}
                 >
                   Agregar Tarjeta

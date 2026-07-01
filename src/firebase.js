@@ -2,6 +2,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/database';
 import 'firebase/compat/storage';
+import 'firebase/compat/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCTHOI-Xv3aNLiSsEr2R7PtPGwhfNVTYO4",
@@ -20,4 +21,12 @@ if (!firebase.apps.length) {
 export const auth = firebase.auth();
 export const database = firebase.database();
 export const storage = firebase.storage();
+
+let messaging;
+try {
+  messaging = firebase.messaging();
+} catch (e) {
+  // Messaging no disponible (ej. Node SSR o browser sin soporte)
+}
+export { messaging };
 

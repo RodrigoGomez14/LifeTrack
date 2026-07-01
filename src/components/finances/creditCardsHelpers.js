@@ -279,7 +279,9 @@ export function defaultDueDateString(card, year, month) {
 
 // Formato de fecha amigable usado para registros en RTDB: D/M/YYYY (sin padding).
 function formatDayMonthYear(date) {
-  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+  const d = date instanceof Date ? date : parseFlexibleDate(date);
+  if (!d) return '';
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
 // Construye el objeto `updates` para `bulkUpdate` que persiste el pago de tarjetas.
@@ -332,10 +334,12 @@ export function buildPaymentUpdates({
     }
   });
 
+  const isUSD = source === 'usd';
+
   for (let i = 0; i < numberOfPayments; i++) {
     updates[`expenses/${expenseKeys[i]}`] = {
-      amount: paymentAmounts[i],
-      amountUSD: paymentAmounts[i] / dollarRateVenta,
+      amount: isUSD ? paymentAmounts[i] * dollarRateVenta : paymentAmounts[i],
+      amountUSD: isUSD ? paymentAmounts[i] : paymentAmounts[i] / dollarRateVenta,
       category: 'Tarjetas de credito',
       subcategory: '',
       date: formatDayMonthYear(paymentDates[i]),
@@ -347,7 +351,6 @@ export function buildPaymentUpdates({
     };
   }
 
-  const isUSD = source === 'usd';
   const savingsPath = isUSD ? 'savings/amountUSD' : 'savings/amountARS';
   const historyPath = isUSD ? 'savings/amountUSDHistory' : 'savings/amountARSHistory';
 

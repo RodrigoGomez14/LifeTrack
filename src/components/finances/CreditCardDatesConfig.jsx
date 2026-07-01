@@ -14,7 +14,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import CheckIcon from '@mui/icons-material/Check';
-import { isDateBeyondLimit } from './creditCardsHelpers';
+import { isDateBeyondLimit, parseFlexibleDate } from './creditCardsHelpers';
 
 // Sub-componente expandible para configurar/editar las fechas de cierre y vencimiento
 // del período seleccionado. Las validaciones se preservan del componente viejo.
@@ -43,7 +43,7 @@ const CreditCardDatesConfig = ({
     const js = date.toDate();
     if (!closingDate) return isDateBeyondLimit(js);
 
-    const closingObj = new Date(closingDate);
+    const closingObj = parseFlexibleDate(closingDate);
     if (js < closingObj) return true;
 
     const cYear = closingObj.getFullYear();

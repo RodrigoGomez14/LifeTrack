@@ -76,7 +76,6 @@ export const getCategoryColor = (cat, theme, dataType) => {
     case 'Viajes': return '#00BCD4';
     case 'Educacion': return '#9C27B0';
     case 'Salud': return '#4CAF50';
-    case 'Extras': return theme.palette.grey[600];
     case 'Salidas': return '#FF9800';
     default:
       return dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main;

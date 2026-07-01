@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, TextField, Card, CardContent,
-  Snackbar, Alert, alpha, Chip, CircularProgress, LinearProgress,
+  Snackbar, Alert, alpha, Chip, CircularProgress, LinearProgress, Button,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -20,6 +20,7 @@ import { useStore } from '../../store';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
+import { AnimatedSuccess } from '../../design-system';
 
 const MAX_IMAGES = 10;
 const STEPS_TOTAL = 4;
@@ -92,6 +93,7 @@ const NewPhoto = () => {
 
   // Upload state
   const [uploading, setUploading] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, percent: 0 });
   const [snack, setSnack] = useState('');
 
@@ -189,15 +191,7 @@ const NewPhoto = () => {
         setUploadProgress({ current: i + 1, total: selectedImages.length, percent: Math.round(((i + 1) / selectedImages.length) * 100) });
       }
 
-      setSnack(`${successCount} foto${successCount !== 1 ? 's' : ''} subida${successCount !== 1 ? 's' : ''}`);
-      setTimeout(() => {
-        if (selectedPlantIds.size === 1) {
-          const id = Array.from(selectedPlantIds)[0];
-          navigate(`/Planta/?${id}`);
-        } else {
-          navigate('/Plantas');
-        }
-      }, 800);
+      setSavedSnapshot({ count: successCount, photoDate, description, plantCount: selectedPlantIds.size, singlePlantId: selectedPlantIds.size === 1 ? Array.from(selectedPlantIds)[0] : null });
     } catch (e) {
       console.error(e);
       setSnack('Error al subir');
@@ -205,20 +199,50 @@ const NewPhoto = () => {
     setUploading(false);
   };
 
+  const handleLoadAnother = () => {
+    setStep(0);
+    setSelectedImages([]);
+    setImagePreviews([]);
+    setPhotoDate(new Date());
+    setDescription('');
+    setSavedSnapshot(null);
+  };
+
   const selectedPlants = activePlants.filter((p) => selectedPlantIds.has(p.id));
   const canSubmit = selectedImages.length > 0 && selectedPlantIds.size > 0;
 
+  const renderSuccess = () => {
+    if (!savedSnapshot) return null;
+    const n = savedSnapshot;
+    const COLOR = '#FF9800';
+    return (
+      <AnimatedSuccess color={COLOR} title="¡Fotos subidas!">
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+          {n.plantCount > 1 ? `${n.plantCount} plantas` : '1 planta'} · {n.count} foto{n.count !== 1 ? 's' : ''}
+        </Typography>
+        {n.description && <Typography variant="caption" color="text.disabled" sx={{ mb: 3, maxWidth: 280 }}>"{n.description}"</Typography>}
+        <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
+          sx={{ maxWidth: 320, bgcolor: COLOR, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: '#f57c00' }, mt: n.description ? 0 : 3 }}>
+          Subir más
+        </Button>
+        <Button onClick={() => { if (n.singlePlantId) navigate(`/Planta/?${n.singlePlantId}`); else navigate('/plantas'); }} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver</Button>
+      </AnimatedSuccess>
+    );
+  };
+
   return (
-    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+      {savedSnapshot ? renderSuccess() : (
+        <>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
         {step > 0 ? (
           <IconButton onClick={goBack} size="small"><ArrowBackIcon /></IconButton>
-        ) : (
-          <IconButton onClick={() => navigate(-1)} size="small"><CloseIcon /></IconButton>
-        )}
+) : (
+            <Box sx={{ width: 36 }} />
+          )}
         <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>Nueva foto</Typography>
-        <Box sx={{ width: 36 }} />
+        <IconButton onClick={() => navigate(-1)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
       </Box>
 
       <WizardProgressDots total={STEPS_TOTAL} current={step} color="#FF9800" />
@@ -394,10 +418,10 @@ const NewPhoto = () => {
       )}
 
       <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity={snack.startsWith('Error') ? 'error' : 'success'} variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>
-          {snack}
-        </Alert>
+        <Alert severity="error" variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>{snack}</Alert>
       </Snackbar>
+          </>
+        )}
     </Box>
   );
 };

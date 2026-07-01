@@ -17,6 +17,7 @@ import {
   Stack,
   useMediaQuery
 } from '@mui/material';
+import { AnimatedGroup, AnimatedItem } from '../../design-system';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CategoryIcon from '@mui/icons-material/Category';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -413,7 +414,7 @@ const TransactionsTabs = ({ data, type }) => {
                   <Typography variant="subtitle1" gutterBottom fontWeight="medium" sx={{ mt: 2 }}>
                     Resumen por Categoría
                   </Typography>
-                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid container spacing={2} sx={{ mt: 1 }} component={AnimatedGroup}>
                     {categories.map(category => {
                       const categoryTotal = hasCurrentMonthData 
                         ? sumTransactionsByCategory(data[currentYear].months[currentMonth].data, category) 
@@ -426,7 +427,7 @@ const TransactionsTabs = ({ data, type }) => {
                         : 0;
                       
                       return (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={category}>
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={category} component={AnimatedItem}>
                           <Paper 
                             elevation={2} 
                             sx={{ 
@@ -508,7 +509,7 @@ const TransactionsTabs = ({ data, type }) => {
                         <Typography variant="subtitle1" gutterBottom fontWeight="medium">
                           {year} - Total: {formatAmount(data[year].total)} 
                           <Typography component="span" variant="body2" color="textSecondary" sx={{ ml: 1 }}>
-                            (USD {formatAmount(data[year].totalUSD)})
+                                                        ({formatAmount(data[year].totalUSD, true)})
                           </Typography>
                         </Typography>
                         
@@ -566,7 +567,7 @@ const TransactionsTabs = ({ data, type }) => {
                                             color="textSecondary"
                                             sx={{ ml: 1 }}
                                           >
-                                            (USD {formatAmount(data[year].months[month].totalUSD)})
+                                                                                        ({formatAmount(data[year].months[month].totalUSD, true)})
                                           </Typography>
                                         </Box>
                                       </Box>
@@ -659,9 +660,9 @@ const TransactionsTabs = ({ data, type }) => {
   return (
     <Box sx={{ pb: 4 }}>
       {/* Header con información básica */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }} component={AnimatedGroup}>
         {/* Valor del dólar */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} component={AnimatedItem}>
           <Paper elevation={2} sx={{ 
             p: 2, 
             height: '100%',
@@ -683,7 +684,7 @@ const TransactionsTabs = ({ data, type }) => {
         
         {/* Total mes actual */}
         {hasCurrentMonthData && (
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={3} component={AnimatedItem}>
             <Paper elevation={2} sx={{ 
               p: 2, 
               height: '100%',
@@ -701,14 +702,14 @@ const TransactionsTabs = ({ data, type }) => {
                 {formatAmount(data[currentYear].months[currentMonth].total)}
               </Typography>
               <Typography variant="body2" color="textSecondary">
-                USD {formatAmount(data[currentYear].months[currentMonth].totalUSD)}
+                                {formatAmount(data[currentYear].months[currentMonth].totalUSD, true)}
               </Typography>
             </Paper>
           </Grid>
         )}
         
         {/* Total anual */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} component={AnimatedItem}>
           <Paper elevation={2} sx={{ 
             p: 2, 
             height: '100%',
@@ -726,13 +727,13 @@ const TransactionsTabs = ({ data, type }) => {
               {data[currentYear] ? formatAmount(data[currentYear].total) : 'N/A'}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              USD {data[currentYear] ? formatAmount(data[currentYear].totalUSD) : 'N/A'}
+                            {data[currentYear] ? formatAmount(data[currentYear].totalUSD, true) : 'N/A'}
             </Typography>
           </Paper>
         </Grid>
         
         {/* Promedio mensual */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={3} component={AnimatedItem}>
           <Paper elevation={2} sx={{ 
             p: 2, 
             height: '100%',

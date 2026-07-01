@@ -9,20 +9,20 @@ import {
   Avatar,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { AnimatedItem } from '../../design-system';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   getCardType,
   getCardGradient,
   getCardLabel,
 } from './creditCardsHelpers';
-import { formatAmount, getMonthName } from '../../utils';
+import { formatAmount } from '../../utils';
 import { parseFlexibleDate } from './creditCardsHelpers';
 import CreditCardDatesConfig from './CreditCardDatesConfig';
 import CreditCardStatementUpload from './CreditCardStatementUpload';
+import MonthNav from '../shared/MonthNav';
 
 const CATEGORY_META = {
   Supermercado: { icon: '🛒', color: '#4CAF50' },
@@ -78,22 +78,12 @@ const TarjetasDetailSheet = ({
   onDelete,
 }) => {
   const theme = useTheme();
-  const monthName = getMonthName(selectedMonth);
 
   if (!card) return null;
 
   const cardType = getCardType(card.cardType || card.name);
   const gradient = getCardGradient(cardType);
   const label = getCardLabel(cardType);
-
-  const goPrevMonth = () => {
-    if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear((y) => y - 1); }
-    else setSelectedMonth((m) => m - 1);
-  };
-  const goNextMonth = () => {
-    if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear((y) => y + 1); }
-    else setSelectedMonth((m) => m + 1);
-  };
 
   return (
     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
@@ -111,18 +101,20 @@ const TarjetasDetailSheet = ({
       </Box>
 
       {/* Month nav */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.5, py: 1 }}>
-        <IconButton size="small" onClick={goPrevMonth} sx={{ color: 'text.secondary' }}><ChevronLeftIcon fontSize="small" /></IconButton>
-        <Typography variant="body1" sx={{ fontWeight: 700 }}>{monthName} {selectedYear}</Typography>
-        <IconButton size="small" onClick={goNextMonth} sx={{ color: 'text.secondary' }}><ChevronRightIcon fontSize="small" /></IconButton>
-      </Box>
+      <MonthNav
+        year={selectedYear}
+        month={selectedMonth}
+        onYearChange={setSelectedYear}
+        onMonthChange={setSelectedMonth}
+      />
 
       {/* Summary */}
-      <Card variant="outlined" sx={{ mx: 1.5, mb: 1, p: 2, borderRadius: 2 }}>
+      <AnimatedItem>
+        <Card variant="outlined" sx={{ mx: 1.5, mb: 1, p: 2, borderRadius: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
           <Box sx={{ textAlign: 'center', flex: 1 }}>
             <Typography variant="caption" color="text.secondary">TOTAL</Typography>
-            <Typography variant="body1" sx={{ fontWeight: 800, color: 'primary.main' }}>$ {formatAmount(cardTotal)}</Typography>
+            <Typography variant="body1" sx={{ fontWeight: 800, color: 'text.primary' }}>{formatAmount(cardTotal)}</Typography>
           </Box>
           <Box sx={{ textAlign: 'center', flex: 1 }}>
             <Typography variant="caption" color="text.secondary">CIERRE</Typography>
@@ -165,17 +157,19 @@ const TarjetasDetailSheet = ({
                 <Box key={tx.id || i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
                   <Avatar sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: alpha(meta.color, 0.15), fontSize: 16 }}>{meta.icon}</Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>{tx.description || 'Sin descripción'}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>{tx.description || 'Sin descripción'}</Typography>
+                      {tx.installments > 1 && (
+                        <Chip label={`${tx.currentInstallment}/${tx.installments}`} size="small" sx={{ height: 22, fontWeight: 700, flexShrink: 0, bgcolor: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.main }} />
+                      )}
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                       <Typography variant="caption" color="text.secondary">{tx.category || 'Sin categoría'}</Typography>
                       <Typography variant="caption" color="text.disabled">·</Typography>
                       <Typography variant="caption" color="text.disabled">{formatTxDate(tx.date)}</Typography>
-                      {tx.installments > 1 && (
-                        <Chip label={`${tx.currentInstallment}/${tx.installments}`} size="small" sx={{ height: 18, fontSize: 9, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.light' }} />
-                      )}
                     </Box>
                   </Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.light' }}>-$ {formatAmount(tx.amount || 0)}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.light' }}>−{formatAmount(tx.amount || 0)}</Typography>
                 </Box>
               );
             })}
@@ -186,12 +180,14 @@ const TarjetasDetailSheet = ({
         <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2, pb: 2 }}>
           <CreditCardDatesConfig initialClosingDate={closingDate} initialDueDate={dueDate} onSave={onSaveDates} onCancel={() => {}} />
           <CreditCardStatementUpload userData={userData} cardId={card.id} selectedYear={selectedYear} selectedMonth={selectedMonth} onSnack={onSnack} />
-          <Card variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: alpha(theme.palette.error.main, 0.2) }}>
+          <AnimatedItem>
+            <Card variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: alpha(theme.palette.error.main, 0.2) }}>
             <Box onClick={onDelete} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', color: theme.palette.error.main }}>
               <DeleteOutlineIcon fontSize="small" />
               <Typography variant="body2" sx={{ fontWeight: 600 }}>Eliminar tarjeta</Typography>
             </Box>
-          </Card>
+      </Card>
+      </AnimatedItem>
         </Box>
       </Box>
     </Box>

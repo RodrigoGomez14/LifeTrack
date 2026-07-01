@@ -1,140 +1,266 @@
-import React, { useState } from "react";
-import Layout from '../../components/layout/Layout';
+import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
+  Box,
+  Typography,
+  IconButton,
   Button,
   TextField,
-  Typography,
-  Box,
+  Grid,
   Card,
   CardContent,
-  InputAdornment,
   Chip,
-  Container,
-  LinearProgress,
-  ToggleButtonGroup,
+  Fade,
   ToggleButton,
+  ToggleButtonGroup,
+  Snackbar,
+  Alert,
   alpha,
 } from '@mui/material';
-import { useNavigate } from "react-router-dom";
-import { addExpense, addIncome } from '../../services/finances';
-import { updateSavingsWithHistory } from '../../services/savings';
-import { useStore } from '../../store';
-import { getDate, formatAmount } from '../../utils';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import { useTheme } from '@mui/material/styles';
+import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import { useTheme } from '@mui/material/styles';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+
+import { useStore } from '../../store';
+import { addExchange } from '../../services/exchanges';
+import { updateSavingsWithHistory } from '../../services/savings';
+import { formatAmount, getDate } from '../../utils';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+
+// ── Helpers a nivel módulo ──────────────────────────────────────────────────
+
+const formatARS = (n) => `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatUSD = (n) => `USD ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const parseAmount = (raw) => {
+  if (!raw) return 0;
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(normalized);
+  return isNaN(n) ? 0 : n;
+};
+
+const toDateInput = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return '';
+  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+};
+
+const fromDateInput = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return '';
+  return `${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}/${parts[0]}`;
+};
+
+// ── Componente ──────────────────────────────────────────────────────────────
+
+const TOTAL_STEPS = 3;
 
 const Exchange = () => {
-  const { userData, dollarRate } = useStore();
-  const navigate = useNavigate();
   const theme = useTheme();
+  const navigate = useNavigate();
+  const { userData, dollarRate } = useStore();
 
-  const [operation, setOperation] = useState("Compra");
-  const [exRate, setExRate] = useState("");
-  const [amountUSD, setAmountUSD] = useState("");
-  const [amountARS, setAmountARS] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // Wizard state
+  const [step, setStep] = useState(1);
+  const [operation, setOperation] = useState('Compra');
+  const [amountUSD, setAmountUSD] = useState('');
+  const [exRate, setExRate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
+  const [error, setError] = useState('');
+  const [customDate, setCustomDate] = useState(null);
+  const [dateEditing, setDateEditing] = useState(false);
 
-  const isCompra = operation === "Compra";
-  const accentColor = isCompra ? theme.palette.info.main : theme.palette.warning.main;
-  const accentBg = isCompra ? theme.palette.info.dark : theme.palette.warning.dark;
+  const isCompra = operation === 'Compra';
+  const typeColor = isCompra ? theme.palette.info.main : theme.palette.warning.main;
+  const typeColorBg = isCompra ? theme.palette.info.dark : theme.palette.warning.dark;
+  const arsColor = isCompra ? theme.palette.error.main : theme.palette.success.main;
+  const usdColor = isCompra ? theme.palette.success.main : theme.palette.error.main;
 
   const currentARS = userData?.savings?.amountARS || 0;
   const currentUSD = userData?.savings?.amountUSD || 0;
+  const marketRate = dollarRate?.venta || 1;
 
-  const parsedARS = parseFloat(amountARS) || 0;
-  const parsedUSD = parseFloat(amountUSD) || 0;
-  const parsedRate = parseFloat(exRate) || 0;
+  const parsedUSD = parseAmount(amountUSD);
+  const parsedRate = parseAmount(exRate) || 0;
+  const amountARS = parsedRate ? parseFloat((parsedUSD * parsedRate).toFixed(2)) : 0;
 
-  const afterARS = isCompra ? currentARS - parsedARS : currentARS + parsedARS;
+  const afterARS = isCompra ? currentARS - amountARS : currentARS + amountARS;
   const afterUSD = isCompra ? currentUSD + parsedUSD : currentUSD - parsedUSD;
 
-  const canSubmit = exRate && amountUSD && amountARS && !loading;
-  const hasBalance = isCompra ? parsedARS <= currentARS : parsedUSD <= currentUSD;
+  const hasBalance = isCompra ? amountARS <= currentARS : parsedUSD <= currentUSD;
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
+  // ── Navegación ────────────────────────────────────────────────────────────
+  const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS));
+  const goBack = () => {
+    setDateEditing(false);
+    setStep((s) => Math.max(s - 1, 1));
+  };
+  const handleClose = () => navigate(-1);
+
+  const canStep1 = parsedUSD > 0;
+  const canStep2 = parsedRate > 0;
+
+  const handleOperationChange = (e, v) => {
+    if (!v) return;
+    setOperation(v);
+    setAmountUSD('');
+    setExRate('');
+    setError('');
+  };
+
+  // ── Teclado numérico + paste ──────────────────────────────────────────────
+  const handleKeyPress = useCallback((key) => {
+    if (key === 'backspace') { setAmountUSD((p) => p.slice(0, -1)); return; }
+    if (key === ',') {
+      if (amountUSD.includes(',')) return;
+      if (!amountUSD) { setAmountUSD('0,'); return; }
+      setAmountUSD(amountUSD + ','); return;
+    }
+    if (amountUSD === '0' && key !== ',') { setAmountUSD(key); return; }
+    if (amountUSD.includes(',')) { const decimals = amountUSD.split(',')[1]; if (decimals.length >= 2) return; }
+    setAmountUSD(amountUSD + key);
+  }, [amountUSD]);
+
+  const handleAmountPaste = (raw) => {
+    const cleaned = raw.replace(/[^\d,.]/g, '');
+    const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+    const num = parseFloat(normalized);
+    if (isNaN(num)) return;
+    const [int, dec] = num.toFixed(2).split('.');
+    const intClean = int.replace(/^0+/, '') || '0';
+    setAmountUSD(dec ? `${intClean},${dec}` : intClean);
+  };
+
+  const handleRateKeyPress = useCallback((key) => {
+    if (key === 'backspace') { setExRate((p) => p.slice(0, -1)); return; }
+    if (key === ',') {
+      if (exRate.includes(',')) return;
+      if (!exRate) { setExRate('0,'); return; }
+      setExRate(exRate + ','); return;
+    }
+    if (exRate === '0' && key !== ',') { setExRate(key); return; }
+    if (exRate.includes(',')) { const decimals = exRate.split(',')[1]; if (decimals.length >= 2) return; }
+    setExRate(exRate + key);
+  }, [exRate]);
+
+  const handleRatePaste = (raw) => {
+    const cleaned = raw.replace(/[^\d,.]/g, '');
+    const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+    const num = parseFloat(normalized);
+    if (isNaN(num)) return;
+    const [int, dec] = num.toFixed(2).split('.');
+    const intClean = int.replace(/^0+/, '') || '0';
+    setExRate(dec ? `${intClean},${dec}` : intClean);
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (submitting) return;
     if (!hasBalance) {
-      setError(isCompra ? "No tenés suficientes ARS para esta compra" : "No tenés suficientes USD para esta venta");
+      setError(isCompra ? 'No tenés suficientes ARS para esta compra' : 'No tenés suficientes USD para esta venta');
       return;
     }
-    setError("");
-    setLoading(true);
+    setSubmitting(true);
+    setError('');
+    const transactionDate = customDate || getDate();
+    try {
+      const usd = parsedUSD;
+      const ars = amountARS;
+      const rate = parsedRate;
 
-    const usdAmount = parsedUSD;
-    const arsAmount = parsedARS;
-    const rate = parsedRate;
+      addExchange({
+        operationType: operation,
+        amountARS: ars,
+        amountUSD: usd,
+        rate,
+        date: transactionDate,
+      });
 
-    if (isCompra) {
-      addExpense({
-        operationType: "Compra", amount: arsAmount,
-        amountUSD: parseFloat((arsAmount / rate).toFixed(2)),
-        category: 'Exchange', date: getDate(), valorUSD: rate,
+      updateSavingsWithHistory({
+        currency: 'USD', amount: isCompra ? usd : -usd,
+        currentBalance: currentUSD, operationType: operation, amount_ars: ars,
       });
-    } else {
-      addIncome({
-        operationType: "Venta", amount: arsAmount,
-        amountUSD: -parseFloat((arsAmount / rate).toFixed(2)),
-        category: 'Exchange', date: getDate(), valorUSD: rate,
+      updateSavingsWithHistory({
+        currency: 'ARS', amount: isCompra ? -ars : ars,
+        currentBalance: currentARS,
       });
+
+      setSavedSnapshot({
+        operation, amountARS: ars, amountUSD: usd,
+        afterARS, afterUSD, rate,
+      });
+      setStep(TOTAL_STEPS + 1);
+    } catch (err) {
+      console.error('Error al registrar exchange:', err);
+      setError(err?.message || 'Error al guardar. Reintentá.');
+    } finally {
+      setSubmitting(false);
     }
-
-    updateSavingsWithHistory({
-      currency: 'USD', amount: isCompra ? usdAmount : -usdAmount,
-      currentBalance: currentUSD, operationType: operation, amount_ars: arsAmount,
-    });
-    updateSavingsWithHistory({
-      currency: 'ARS', amount: isCompra ? -arsAmount : arsAmount,
-      currentBalance: currentARS,
-    });
-
-    setTimeout(() => {
-      setLoading(false);
-      navigate("/finanzas");
-    }, 600);
   };
 
-  const setAmountFromUSD = (usd) => {
-    setAmountUSD(usd);
-    if (exRate) setAmountARS((parseFloat(usd) * parseFloat(exRate)).toFixed(2));
-    else setAmountARS("");
+  // ── Reset para "Cargar otro" ──────────────────────────────────────────────
+  const handleLoadAnother = () => {
+    setStep(1);
+    setAmountUSD('');
+    setExRate('');
+    setCustomDate(null);
+    setDateEditing(false);
+    setSavedSnapshot(null);
   };
 
-  const setAmountFromARS = (ars) => {
-    setAmountARS(ars);
-    if (exRate) setAmountUSD((parseFloat(ars) / parseFloat(exRate)).toFixed(2));
-    else setAmountUSD("");
-  };
+  // ── UI: barra superior + dots ─────────────────────────────────────────────
+  const renderHeader = (showBack, title) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+      {showBack ? (
+        <IconButton onClick={goBack} size="small"><ArrowBackIcon fontSize="small" /></IconButton>
+      ) : (
+        <Box sx={{ width: 36 }} />
+      )}
+      <Typography variant="body2" sx={{ fontWeight: 600, letterSpacing: 0.3 }}>
+        {title}
+      </Typography>
+      <IconButton onClick={handleClose} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
+    </Box>
+  );
 
-  const setRate = (val) => {
-    setExRate(val);
-    if (amountUSD) setAmountARS((parseFloat(amountUSD) * parseFloat(val)).toFixed(2));
-  };
+  const renderProgressDots = (activeStep) => (
+    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, pt: 1.5, pb: 2 }}>
+      {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((n) => (
+        <Box key={n} sx={{ width: n === activeStep ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
+      ))}
+    </Box>
+  );
 
-  const useCurrentRate = () => {
-    const r = String(dollarRate?.venta || "");
-    setRate(r);
-  };
+  const renderActionButton = (label, onClick, disabled = false, loading = false) => (
+    <Button fullWidth variant="contained" size="large" disabled={disabled || loading} onClick={onClick}
+      sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem',
+        '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
+      {loading ? 'Guardando...' : label}
+    </Button>
+  );
 
-  const progress = (!!exRate ? 0.33 : 0) + (!!amountUSD ? 0.33 : 0) + (!!amountARS ? 0.34 : 0);
+  // ── STEP 1: Operación + Monto USD ─────────────────────────────────────────
+  const renderStep1 = () => {
+    const displayText = parsedUSD > 0 ? formatUSD(parsedUSD) : 'USD 0';
 
-  return (
-    <Layout title="Exchange">
-      <Container maxWidth="sm" sx={{ py: 2 }}>
-        {loading && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }} />}
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {renderHeader(false, 'Exchange')}
+        {renderProgressDots(1)}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Progress bar */}
-          <Box sx={{ height: 3, borderRadius: 1, bgcolor: alpha(accentColor, 0.1), overflow: 'hidden' }}>
-            <Box sx={{ height: '100%', borderRadius: 1, bgcolor: accentColor, width: `${progress * 100}%`, transition: 'width 0.3s' }} />
-          </Box>
-
-          {/* Toggle Compra/Venta */}
-          <ToggleButtonGroup value={operation} exclusive onChange={(_, v) => { if (v) { setOperation(v); setAmountUSD(""); setAmountARS(""); setExRate(""); setError(""); } }} fullWidth
+        <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        {/* Type toggle */}
+        <AnimatedItem>
+        <Box sx={{ px: 3 }}>
+          <ToggleButtonGroup value={operation} exclusive onChange={handleOperationChange} fullWidth
             sx={{
               '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, color: 'text.secondary', fontWeight: 600, textTransform: 'none', py: 1.2 },
               '& .MuiToggleButton-root.Mui-selected[value="Compra"]': { bgcolor: theme.palette.info.main, color: 'white', '&:hover': { bgcolor: theme.palette.info.dark } },
@@ -143,160 +269,303 @@ const Exchange = () => {
             <ToggleButton value="Compra">Comprar USD</ToggleButton>
             <ToggleButton value="Venta">Vender USD</ToggleButton>
           </ToggleButtonGroup>
+        </Box>
+        </AnimatedItem>
 
-          {/* Current savings */}
-          <Card variant="outlined" sx={{ borderRadius: 2 }}>
-            <CardContent sx={{ p: 2, display: 'flex', justifyContent: 'space-around', alignItems: 'center', '&:last-child': { pb: 2 } }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary">ARS</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>$ {formatAmount(currentARS)}</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary">USD</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>US$ {formatAmount(currentUSD)}</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary">TC</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                  $ {formatAmount(dollarRate?.venta || 0)}
-                </Typography>
+        {/* Amount display */}
+        <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
+            MONTO EN USD
+          </Typography>
+          <Typography variant="h2" sx={{ fontWeight: 700, color: typeColor, mt: 1, fontSize: { xs: '2.5rem', sm: '3.5rem' }, textAlign: 'center', wordBreak: 'break-all' }}>
+            {displayText}
+          </Typography>
+        </Box>
+        </AnimatedItem>
+
+        {/* Numpad + paste */}
+        <AnimatedItem>
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Grid container spacing={1}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'backspace'].map((key) => (
+              <Grid item xs={4} key={key}>
+                <Button fullWidth onClick={() => handleKeyPress(key)}
+                  sx={{ py: 2, fontSize: '1.5rem', color: 'text.primary', fontWeight: 500, '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.06) } }}>
+                  {key === 'backspace' ? <BackspaceIcon /> : key}
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
+          <TextField
+            value={amountUSD}
+            onChange={(e) => handleAmountPaste(e.target.value)}
+            placeholder="O pegá el monto acá"
+            size="small"
+            fullWidth
+            sx={{ mt: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            inputProps={{ inputMode: 'decimal', autoComplete: 'off' }}
+          />
+        </Box>
+        </AnimatedItem>
+
+        <AnimatedItem>
+        <Box sx={{ px: 3, pb: 3 }}>
+          {renderActionButton('Siguiente →', goNext, !canStep1)}
+        </Box>
+        </AnimatedItem>
+        </AnimatedGroup>
+      </Box>
+    );
+  };
+
+  // ── STEP 2: Tasa de cambio ────────────────────────────────────────────────
+  const renderStep2 = () => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {renderHeader(true, 'Tasa de cambio')}
+        {renderProgressDots(2)}
+
+        <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        {/* Rate display */}
+        <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
+            TASA DE CONVERSIÓN
+          </Typography>
+          <Typography variant="h2" sx={{ fontWeight: 700, color: typeColor, mt: 1, fontSize: { xs: '2.5rem', sm: '3.5rem' }, textAlign: 'center', wordBreak: 'break-all' }}>
+            {parsedRate > 0 ? formatARS(parsedRate) : '$ 0'}
+          </Typography>
+
+          {/* Chip TC mercado */}
+          <Chip
+            icon={<CompareArrowsIcon sx={{ fontSize: 14 }} />}
+            label={`Usar TC del mercado (${formatARS(marketRate).replace('$ ', '')})`}
+            onClick={() => setExRate(String(marketRate))}
+            sx={{ mt: 2, fontWeight: 600, '&:hover': { bgcolor: alpha(typeColor, 0.1) }, border: `1px solid ${theme.palette.divider}` }}
+          />
+        </Box>
+        </AnimatedItem>
+
+        {/* Numpad + paste */}
+        <AnimatedItem>
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Grid container spacing={1}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'backspace'].map((key) => (
+              <Grid item xs={4} key={key}>
+                <Button fullWidth onClick={() => handleRateKeyPress(key)}
+                  sx={{ py: 2, fontSize: '1.5rem', color: 'text.primary', fontWeight: 500, '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.06) } }}>
+                  {key === 'backspace' ? <BackspaceIcon /> : key}
+                </Button>
+              </Grid>
+            ))}
+          </Grid>
+          <TextField
+            value={exRate}
+            onChange={(e) => handleRatePaste(e.target.value)}
+            placeholder="O pegá la tasa acá"
+            size="small"
+            fullWidth
+            sx={{ mt: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            inputProps={{ inputMode: 'decimal', autoComplete: 'off' }}
+          />
+        </Box>
+        </AnimatedItem>
+
+        <AnimatedItem>
+        <Box sx={{ px: 3, pb: 3 }}>
+          {renderActionButton('Revisar', goNext, !canStep2)}
+        </Box>
+        </AnimatedItem>
+        </AnimatedGroup>
+    </Box>
+  );
+
+  // ── STEP 3: Confirmar ─────────────────────────────────────────────────────
+  const renderStep3 = () => {
+    const now = new Date();
+    const timeStr = `Hoy, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const dateDisplay = customDate || timeStr;
+
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {renderHeader(true, 'Confirmar')}
+        {renderProgressDots(3)}
+
+        <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Revisar</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>Confirmá los datos antes de guardar.</Typography>
+
+          <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {/* Card principal de operación */}
+          <AnimatedItem><Card elevation={0} sx={{ bgcolor: alpha(typeColor, 0.05), border: `1px solid ${alpha(typeColor, 0.2)}`, borderRadius: 3, mb: 0, textAlign: 'center' }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">{isCompra ? 'Pagás' : 'Recibís'}</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: isCompra ? 'error.main' : 'success.main' }}>
+                    {formatARS(amountARS)}
+                  </Typography>
+                </Box>
+                <CompareArrowsIcon sx={{ color: 'text.disabled' }} />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">{isCompra ? 'Recibís' : 'Pagás'}</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: isCompra ? 'success.main' : 'error.main' }}>
+                    {formatUSD(parsedUSD)}
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
-          </Card>
+          </Card></AnimatedItem>
 
-          {/* Rate */}
-          <Card variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>TASA DE CONVERSIÓN</Typography>
-              <Chip
-                icon={<CompareArrowsIcon sx={{ fontSize: 14 }} />}
-                label={`Usar TC ${formatAmount(dollarRate?.venta || 0)}`}
-                size="small"
-                onClick={useCurrentRate}
-                sx={{ fontWeight: 600, fontSize: 11, cursor: 'pointer', '&:hover': { bgcolor: alpha(accentColor, 0.1) } }}
-              />
+          {/* Datos de la operación */}
+          <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden', mb: 0 }}>
+            <Box sx={{ p: 2.5 }}>
+              {/* Tasa */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${theme.palette.divider}`, alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">Tasa</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{formatARS(parsedRate)}</Typography>
+              </Box>
+
+              {/* Fecha (clickeable para editar) */}
+              <Box onClick={() => setDateEditing(!dateEditing)}
+                sx={{ display: 'flex', justifyContent: 'space-between', py: 1, alignItems: 'center', gap: 1, cursor: 'pointer', borderRadius: 1, '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.04) } }}>
+                <Typography variant="body2" color="text.secondary">Fecha</Typography>
+                {dateEditing ? (
+                  <TextField type="date" size="small"
+                    value={toDateInput(customDate || getDate())}
+                    onChange={(e) => {
+                      if (e.target.value) setCustomDate(fromDateInput(e.target.value));
+                      setDateEditing(false);
+                    }}
+                    onBlur={() => setDateEditing(false)}
+                    autoFocus
+                    sx={{ width: 160, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    inputProps={{ style: { textAlign: 'right', paddingRight: 4 } }}
+                  />
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>
+                      {dateDisplay}
+                    </Typography>
+                    <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.5 }} />
+                  </Box>
+                )}
+              </Box>
             </Box>
-            <TextField
-              fullWidth
-              type="number"
-              value={exRate}
-              onChange={(e) => setRate(e.target.value)}
-              placeholder="Ej: 1250"
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><CompareArrowsIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
-                sx: { borderRadius: 2 },
-              }}
-              inputProps={{ inputMode: 'decimal', step: '0.01' }}
-            />
-          </Card>
+          </Card></AnimatedItem>
 
-          {/* Amounts */}
-          <Card variant="outlined" sx={{ borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1.5 }}>
-              {isCompra ? 'COMPRAR USD' : 'VENDER USD'}
+          {/* Balance insuficiente warning */}
+          {!hasBalance && (
+            <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 600, textAlign: 'center', mb: 2 }}>
+              {isCompra ? 'No tenés suficientes ARS para esta compra' : 'No tenés suficientes USD para esta venta'}
             </Typography>
+          )}
 
-            <TextField
-              fullWidth
-              type="number"
-              value={amountUSD}
-              onChange={(e) => setAmountFromUSD(e.target.value)}
-              placeholder="Cantidad en USD"
-              disabled={!exRate}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><AttachMoneyIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
-                sx: { borderRadius: 2 },
-              }}
-              inputProps={{ inputMode: 'decimal', step: '0.01' }}
-              sx={{ mb: 1.5 }}
-            />
-
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>
-              o ingresá el monto en ARS
-            </Typography>
-
-            <TextField
-              fullWidth
-              type="number"
-              value={amountARS}
-              onChange={(e) => setAmountFromARS(e.target.value)}
-              placeholder="Equivalente en ARS"
-              disabled={!exRate}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><MonetizationOnIcon sx={{ color: 'text.secondary' }} /></InputAdornment>,
-                sx: { borderRadius: 2 },
-              }}
-              inputProps={{ inputMode: 'decimal', step: '0.01' }}
-            />
-          </Card>
-
-          {/* Preview after exchange */}
-          {parsedARS > 0 && parsedUSD > 0 && (
-            <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: alpha(accentColor, 0.04), borderColor: alpha(accentColor, 0.2) }}>
-              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: accentColor, display: 'block', mb: 1.5 }}>
-                  DESPUÉS DEL EXCHANGE
+          {/* Ahorros ARS */}
+          <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${alpha(arsColor, 0.2)}`, borderRadius: 3, overflow: 'hidden', bgcolor: alpha(arsColor, 0.04), mb: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2.5, pt: 2.5, pb: 1 }}>
+              <MonetizationOnIcon sx={{ fontSize: 16, color: arsColor }} />
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>ARS</Typography>
+            </Box>
+            <Box sx={{ px: 2.5, pb: 1.5, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Ahorros actuales</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.25 }}>{formatAmount(currentARS)}</Typography>
+              <Box sx={{ display: 'inline-block', bgcolor: alpha(arsColor, 0.1), borderRadius: 2, px: 1.5, py: 0.25, mt: 0.75 }}>
+                <Typography variant="caption" sx={{ color: arsColor, fontWeight: 600 }}>
+                  {isCompra ? `− ${formatAmount(amountARS)}` : `+ ${formatAmount(amountARS)}`}
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <MonetizationOnIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                    <Typography variant="body2" color="text.secondary">ARS</Typography>
-                  </Box>
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>$ {formatAmount(afterARS)}</Typography>
-                    <Typography variant="caption" sx={{ color: isCompra ? 'error.light' : 'success.light', fontWeight: 600 }}>
-                      {isCompra ? `−$ ${formatAmount(parsedARS)}` : `+$ ${formatAmount(parsedARS)}`}
-                    </Typography>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AttachMoneyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                    <Typography variant="body2" color="text.secondary">USD</Typography>
-                  </Box>
-                  <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>US$ {formatAmount(afterUSD)}</Typography>
-                    <Typography variant="caption" sx={{ color: isCompra ? 'success.light' : 'error.light', fontWeight: 600 }}>
-                      {isCompra ? `+US$ ${formatAmount(parsedUSD)}` : `−US$ ${formatAmount(parsedUSD)}`}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          )}
+              </Box>
+            </Box>
+            <Box sx={{ borderTop: `1px solid ${alpha(arsColor, 0.1)}`, mx: 2.5 }} />
+            <Box sx={{ px: 2.5, py: 2.5, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Nuevos ahorros ARS</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.25, color: arsColor }}>{formatAmount(afterARS)}</Typography>
+            </Box>
+          </Card></AnimatedItem>
 
-          {/* Error */}
-          {error && (
-            <Typography variant="body2" sx={{ color: 'error.main', fontWeight: 600, textAlign: 'center' }}>
-              {error}
-            </Typography>
-          )}
-
-          {/* Submit */}
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-            startIcon={isCompra ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
-            sx={{
-              bgcolor: accentColor,
-              color: 'white',
-              borderRadius: 999,
-              py: 1.5,
-              fontWeight: 600,
-              textTransform: 'none',
-              fontSize: '1rem',
-              '&:hover': { bgcolor: accentBg },
-              '&.Mui-disabled': { bgcolor: alpha(accentColor, 0.3), color: 'white' },
-            }}
-          >
-            {loading ? 'Procesando...' : isCompra ? 'Comprar USD' : 'Vender USD'}
-          </Button>
+          {/* Ahorros USD */}
+          <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${alpha(usdColor, 0.2)}`, borderRadius: 3, overflow: 'hidden', bgcolor: alpha(usdColor, 0.04) }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2.5, pt: 2.5, pb: 1 }}>
+              <AttachMoneyIcon sx={{ fontSize: 16, color: usdColor }} />
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>USD</Typography>
+            </Box>
+            <Box sx={{ px: 2.5, pb: 1.5, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Ahorros actuales</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.25 }}>{formatAmount(currentUSD, true)}</Typography>
+              <Box sx={{ display: 'inline-block', bgcolor: alpha(usdColor, 0.1), borderRadius: 2, px: 1.5, py: 0.25, mt: 0.75 }}>
+                <Typography variant="caption" sx={{ color: usdColor, fontWeight: 600 }}>
+                  {isCompra ? `+ ${formatAmount(parsedUSD, true)}` : `− ${formatAmount(parsedUSD, true)}`}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ borderTop: `1px solid ${alpha(usdColor, 0.1)}`, mx: 2.5 }} />
+            <Box sx={{ px: 2.5, py: 2.5, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Nuevos ahorros USD</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.25, color: usdColor }}>{formatAmount(afterUSD, true)}</Typography>
+            </Box>
+          </Card></AnimatedItem>
+          </AnimatedGroup>
         </Box>
-      </Container>
-    </Layout>
+
+        <Box sx={{ px: 3, pb: 3, pt: 2 }}>
+          {renderActionButton(
+            isCompra ? 'Confirmar compra' : 'Confirmar venta',
+            handleSubmit,
+            !hasBalance,
+            submitting
+          )}
+          <Button fullWidth onClick={() => setStep(1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Editar datos</Button>
+        </Box>
+      </Box>
+    );
+  };
+
+  // ── Éxito ──────────────────────────────────────────────────────────────────
+  const renderSuccess = () => {
+    if (!savedSnapshot) return null;
+    const snap = savedSnapshot;
+    const snapColor = snap.operation === 'Compra' ? theme.palette.info.main : theme.palette.warning.main;
+    const snapColorBg = snap.operation === 'Compra' ? theme.palette.info.dark : theme.palette.warning.dark;
+
+    return (
+      <AnimatedSuccess color={snapColor} title="¡Exchange registrado!">
+        <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>
+          {snap.operation === 'Compra' ? 'Compraste USD' : 'Vendiste USD'}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <Typography variant="body1" sx={{ fontWeight: 700, color: snap.operation === 'Compra' ? 'error.main' : 'success.main' }}>
+            {formatARS(snap.amountARS)}
+          </Typography>
+          <CompareArrowsIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+          <Typography variant="body1" sx={{ fontWeight: 700, color: snap.operation === 'Compra' ? 'success.main' : 'error.main' }}>
+            {formatUSD(snap.amountUSD)}
+          </Typography>
+        </Box>
+        <Chip label={`Ahorros  ${formatARS(snap.afterARS)}`} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.06), color: 'text.primary', fontWeight: 600, px: 1, mb: 4 }} />
+        <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
+          sx={{ maxWidth: 320, bgcolor: snapColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: snapColorBg } }}>
+          Cargar otro
+        </Button>
+        <Button onClick={() => navigate(-1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver</Button>
+      </AnimatedSuccess>
+    );
+  };
+
+  return (
+    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+      <Fade in key={step} timeout={250}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+          {step === 4 && renderSuccess()}
+        </Box>
+      </Fade>
+
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity="error" variant="filled" onClose={() => setError('')} sx={{ width: '100%', borderRadius: 2 }}>{error}</Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

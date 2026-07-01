@@ -1,289 +1,216 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
-  SpeedDial,
-  SpeedDialIcon,
-  SpeedDialAction,
   CircularProgress,
 } from '@mui/material';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
-import { useNavigate } from 'react-router-dom';
-import Layout from '../../components/layout/Layout';
+import { motion, useMotionValue, animate } from 'framer-motion';
 import { useStore } from '../../store';
 import { formatAmount, getMonthName } from '../../utils';
-import RefundDialog from '../../components/finances/RefundDialog';
-import FinancesHeader from '../../components/finances/FinancesHeader';
+import { AnimatedGroup, AnimatedItem } from '../../design-system';
+import MonthNav from '../../components/shared/MonthNav';
 import FinancesMonthSummary from '../../components/finances/FinancesMonthSummary';
-import FinancesCharts from '../../components/finances/FinancesCharts';
 import FinancesTransactionsList from '../../components/finances/FinancesTransactionsList';
 
-const Finances = () => {
-  const { userData, dollarRate } = useStore();
-  const navigate = useNavigate();
+const calcMonthlyData = (financesNode, dataType, year, month, dollarRateVenta) => {
+  const monthData = financesNode?.[dataType]?.[year]?.months?.[month];
+  if (!monthData) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const categoryData = {};
+  if (monthData.data && Array.isArray(monthData.data)) {
+    monthData.data.forEach((tx) => {
+      const c = tx.category || 'Sin categoria';
+      if (!categoryData[c]) categoryData[c] = { total: 0, percentage: 0, subcategories: {} };
+      let isFuture = false;
+      if (tx.date) {
+        let txDate;
+        if (typeof tx.date === 'string' && tx.date.includes('/')) { const [d, m, y] = tx.date.split('/').map(Number); txDate = new Date(y, m - 1, d); }
+        else { txDate = new Date(tx.date); }
+        if (!isNaN(txDate.getTime()) && txDate > today) isFuture = true;
+      }
+      if (!tx.hiddenFromList && !isFuture && !tx.excludeFromTotal) {
+        const eff = (tx.amount || 0) - (tx.refundAmount || 0);
+        categoryData[c].total += eff;
+        if (tx.subcategory) categoryData[c].subcategories[tx.subcategory] = (categoryData[c].subcategories[tx.subcategory] || 0) + eff;
+      }
+    });
+    const total = Object.values(categoryData).reduce((s, c) => s + c.total, 0);
+    Object.keys(categoryData).forEach((c) => { categoryData[c].percentage = total > 0 ? (categoryData[c].total / total) * 100 : 0; });
+    return { ...monthData, formattedTotal: formatAmount(total), formattedTotalUSD: formatAmount(total / (dollarRateVenta || 1)), categoryData, sortedCategories: Object.entries(categoryData).sort((a, b) => b[1].total - a[1].total) };
+  }
+  if (monthData.categories) {
+    const total = monthData.total || 0;
+    Object.entries(monthData.categories).forEach(([c, d]) => { categoryData[c] = { total: d.total, percentage: total > 0 ? (d.total / total) * 100 : 0, subcategories: { ...d.subcategories } }; });
+    return { ...monthData, formattedTotal: formatAmount(total), formattedTotalUSD: formatAmount(total / (dollarRateVenta || 1)), categoryData, sortedCategories: Object.entries(categoryData).sort((a, b) => b[1].total - a[1].total) };
+  }
+  return null;
+};
 
-  // Selectores principales
-  const [dataType, setDataType] = useState('expenses');
+const Panel = ({ monthlyData, monthlyTrendsData, userData, dataType, selectedYear, selectedMonth, dollarRate }) => (
+  <Box sx={{ maxWidth: 600, mx: 'auto', width: '100%' }}>
+    <AnimatedGroup>
+      <AnimatedItem>
+        <FinancesMonthSummary monthlyData={monthlyData} monthlyTrendsData={monthlyTrendsData} dataType={dataType} selectedYear={selectedYear} selectedMonth={selectedMonth} dollarRate={dollarRate} />
+      </AnimatedItem>
+      <AnimatedItem>
+        <Box id="finances-transactions-anchor">
+          <FinancesTransactionsList userData={userData} dataType={dataType} selectedYear={selectedYear} selectedMonth={selectedMonth} dollarRate={dollarRate} />
+        </Box>
+      </AnimatedItem>
+    </AnimatedGroup>
+  </Box>
+);
+
+export const FinancesPage = ({ dataType, title }) => {
+  const { userData, dollarRate } = useStore();
+
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
-  // Derivados (recalculados por los 2 useEffect)
-  const [monthlyData, setMonthlyData] = useState(null);
-  const [monthlyTrendsData, setMonthlyTrendsData] = useState({
-    months: [],
-    expenses: [],
-    incomes: [],
-    balance: [],
-  });
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isDragging = useRef(false);
+  const animatingRef = useRef(false);
 
-  // SpeedDial flotante
-  const [openSpeedDial, setOpenSpeedDial] = useState(false);
+  const [panelW, setPanelW] = useState(typeof window !== 'undefined' ? window.innerWidth : 375);
+  useEffect(() => { const cb = () => setPanelW(window.innerWidth); window.addEventListener('resize', cb); return () => window.removeEventListener('resize', cb); }, []);
 
-  // Dialog de devolución
-  const [openRefundDialog, setOpenRefundDialog] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const panelWRef = useRef(panelW);
+  useEffect(() => { panelWRef.current = panelW; }, [panelW]);
 
-  const handleOpenRefund = (transaction) => {
-    if (dataType !== 'expenses') return;
-    setSelectedTransaction(transaction);
-    setOpenRefundDialog(true);
-  };
+  const panX = useMotionValue(-panelW);
+  useEffect(() => { panX.set(-panelW); }, [panelW, panX]);
 
-  // ── Cálculo de monthlyData (categorías + total efectivo del mes) ──
+  const [monthlyTrendsData, setMonthlyTrendsData] = useState({ months: [], expenses: [], incomes: [], balance: [] });
   useEffect(() => {
     if (!userData?.finances) return;
-
-    const monthData = userData.finances?.[dataType]?.[selectedYear]?.months?.[selectedMonth];
-    if (!monthData) {
-      setMonthlyData(null);
-      return;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const categoryData = {};
-
-    if (monthData.data && Array.isArray(monthData.data)) {
-      monthData.data.forEach((transaction) => {
-        const category = transaction.category || 'Sin categoría';
-        if (!categoryData[category]) {
-          categoryData[category] = { total: 0, percentage: 0, subcategories: {} };
-        }
-
-        // Descartar futuras
-        let isFutureTransaction = false;
-        if (transaction.date) {
-          let txDate;
-          if (typeof transaction.date === 'string' && transaction.date.includes('/')) {
-            const [day, month, year] = transaction.date.split('/').map(Number);
-            txDate = new Date(year, month - 1, day);
-          } else {
-            txDate = new Date(transaction.date);
-          }
-          if (!isNaN(txDate.getTime()) && txDate > today) isFutureTransaction = true;
-        }
-
-        if (!transaction.hiddenFromList && !isFutureTransaction && !transaction.excludeFromTotal) {
-          const effective = (transaction.amount || 0) - (transaction.refundAmount || 0);
-          categoryData[category].total += effective;
-          if (transaction.subcategory) {
-            categoryData[category].subcategories[transaction.subcategory] =
-              (categoryData[category].subcategories[transaction.subcategory] || 0) + effective;
-          }
-        }
-      });
-
-      const total = Object.values(categoryData).reduce((sum, cat) => sum + cat.total, 0);
-      Object.keys(categoryData).forEach((category) => {
-        categoryData[category].percentage = total > 0 ? (categoryData[category].total / total) * 100 : 0;
-      });
-
-      setMonthlyData({
-        ...monthData,
-        formattedTotal: formatAmount(total),
-        formattedTotalUSD: formatAmount(total / (dollarRate?.venta || 1)),
-        categoryData,
-        sortedCategories: Object.entries(categoryData).sort((a, b) => b[1].total - a[1].total),
-      });
-    } else if (monthData.categories) {
-      // Legacy: categorías ya pre-procesadas
-      const total = monthData.total || 0;
-      Object.entries(monthData.categories).forEach(([category, data]) => {
-        categoryData[category] = {
-          total: data.total,
-          percentage: total > 0 ? (data.total / total) * 100 : 0,
-          subcategories: { ...data.subcategories },
-        };
-      });
-      setMonthlyData({
-        ...monthData,
-        formattedTotal: formatAmount(total),
-        formattedTotalUSD: formatAmount(total / (dollarRate?.venta || 1)),
-        categoryData,
-        sortedCategories: Object.entries(categoryData).sort((a, b) => b[1].total - a[1].total),
-      });
-    } else {
-      setMonthlyData(null);
-    }
-  }, [userData, selectedYear, selectedMonth, dataType, dollarRate]);
-
-  // ── Cálculo de monthlyTrendsData (gastos/ingresos/balance por mes del año) ──
-  useEffect(() => {
-    if (!userData?.finances) return;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const sumVisible = (entries) =>
-      entries
-        .filter((t) => {
-          if (t.date) {
-            let txDate;
-            if (typeof t.date === 'string' && t.date.includes('/')) {
-              const [d, m, y] = t.date.split('/').map(Number);
-              txDate = new Date(y, m - 1, d);
-            } else {
-              txDate = new Date(t.date);
-            }
-            if (!isNaN(txDate.getTime()) && txDate > today) return false;
-          }
-          return !t.hiddenFromList && !t.excludeFromTotal;
-        })
-        .reduce((sum, t) => sum + ((t.amount || 0) - (t.refundAmount || 0)), 0);
-
-    const expenseData = Array(12).fill(0);
-    const incomeData = Array(12).fill(0);
-
-    if (userData.finances.expenses?.[selectedYear]?.months) {
-      Object.keys(userData.finances.expenses[selectedYear].months).forEach((month) => {
-        const i = parseInt(month, 10) - 1;
-        const md = userData.finances.expenses[selectedYear].months[month];
-        expenseData[i] = md.data && Array.isArray(md.data) ? sumVisible(md.data) : md.total || 0;
-      });
-    }
-
-    if (userData.finances.incomes?.[selectedYear]?.months) {
-      Object.keys(userData.finances.incomes[selectedYear].months).forEach((month) => {
-        const i = parseInt(month, 10) - 1;
-        const md = userData.finances.incomes[selectedYear].months[month];
-        incomeData[i] = md.data && Array.isArray(md.data)
-          ? sumVisible(md.data.filter((t) => !t.hiddenFromList))
-          : md.total || 0;
-      });
-    }
-
-    setMonthlyTrendsData({
-      months: Array.from({ length: 12 }, (_, i) => getMonthName(i + 1).substring(0, 3)),
-      expenses: expenseData,
-      incomes: incomeData,
-      balance: incomeData.map((income, i) => income - expenseData[i]),
-    });
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const sumV = (entries) => entries
+      .filter((t) => {
+        if (t.date) { let txD; if (typeof t.date === 'string' && t.date.includes('/')) { const [d, m, y] = t.date.split('/').map(Number); txD = new Date(y, m - 1, d); } else txD = new Date(t.date); if (!isNaN(txD.getTime()) && txD > today) return false; }
+        return !t.hiddenFromList && !t.excludeFromTotal;
+      })
+      .reduce((s, t) => s + ((t.amount || 0) - (t.refundAmount || 0)), 0);
+    const exp = Array(12).fill(0), inc = Array(12).fill(0);
+    if (userData.finances.expenses?.[selectedYear]?.months) Object.keys(userData.finances.expenses[selectedYear].months).forEach((m) => { const md = userData.finances.expenses[selectedYear].months[m]; exp[parseInt(m, 10) - 1] = md.data && Array.isArray(md.data) ? sumV(md.data) : md.total || 0; });
+    if (userData.finances.incomes?.[selectedYear]?.months) Object.keys(userData.finances.incomes[selectedYear].months).forEach((m) => { const md = userData.finances.incomes[selectedYear].months[m]; inc[parseInt(m, 10) - 1] = md.data && Array.isArray(md.data) ? sumV(md.data.filter((t) => !t.hiddenFromList)) : md.total || 0; });
+    setMonthlyTrendsData({ months: Array.from({ length: 12 }, (_, i) => getMonthName(i + 1).substring(0, 3)), expenses: exp, incomes: inc, balance: inc.map((v, i) => v - exp[i]) });
   }, [userData, selectedYear]);
 
-  // Loading state
+  const cur = useMemo(() => userData ? calcMonthlyData(userData.finances, dataType, selectedYear, selectedMonth, dollarRate?.venta) : null, [userData, dataType, selectedYear, selectedMonth, dollarRate]);
+  const pM = selectedMonth === 1 ? 12 : selectedMonth - 1;
+  const pY = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+  const nM = selectedMonth === 12 ? 1 : selectedMonth + 1;
+  const nY = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+  const prevMD = useMemo(() => userData ? calcMonthlyData(userData.finances, dataType, pY, pM, dollarRate?.venta) : null, [userData, dataType, pY, pM, dollarRate]);
+  const nextMD = useMemo(() => userData ? calcMonthlyData(userData.finances, dataType, nY, nM, dollarRate?.venta) : null, [userData, dataType, nY, nM, dollarRate]);
+
   if (!userData || !userData.finances || !userData.savings) {
-    return (
-      <Layout title="Finanzas">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <CircularProgress />
-        </Box>
-      </Layout>
-    );
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
   }
 
+  const today = new Date();
+  const nxtM = selectedMonth === 12 ? 1 : selectedMonth + 1;
+  const nxtY = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+  const dNext = nxtY > today.getFullYear() || (nxtY === today.getFullYear() && nxtM > today.getMonth() + 1);
+
+  const handleMonthChange = (m) => {
+    if (animatingRef.current) { setSelectedMonth(m); return; }
+    const dir = m > selectedMonth ? 1 : -1;
+    const target = dir > 0 ? -panelWRef.current * 2 : 0;
+    animatingRef.current = true;
+    animate(panX, target, { type: 'spring', stiffness: 200, damping: 28 }).then(() => {
+      panX.jump(-panelWRef.current);
+      animatingRef.current = false;
+      setSelectedMonth(m);
+    });
+  };
+
+  const handleYearChange = (y) => {
+    if (animatingRef.current) { setSelectedYear(y); return; }
+    const dir = y > selectedYear ? 1 : -1;
+    const target = dir > 0 ? -panelWRef.current * 2 : 0;
+    animatingRef.current = true;
+    animate(panX, target, { type: 'spring', stiffness: 200, damping: 28 }).then(() => {
+      panX.jump(-panelWRef.current);
+      animatingRef.current = false;
+      setSelectedYear(y);
+    });
+  };
+
+  const doPrev = () => {
+    if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(selectedYear - 1); }
+    else setSelectedMonth(selectedMonth - 1);
+  };
+  const doNext = () => {
+    if (dNext) return;
+    if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear(selectedYear + 1); }
+    else setSelectedMonth(selectedMonth + 1);
+  };
+
+  const onTouchStart = (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isDragging.current = false;
+  };
+
+  const onTouchMove = (e) => {
+    if (e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (!isDragging.current && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+      isDragging.current = true;
+    }
+    if (isDragging.current) panX.set(-panelW + dx);
+  };
+
+  const onTouchEnd = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const offset = panX.get() + panelW;
+    const threshold = panelW * 0.3;
+    if (offset < -threshold) {
+      animatingRef.current = true;
+      const target = -panelW * 2;
+      animate(panX, target, { type: 'spring', stiffness: 200, damping: 28 }).then(() => {
+        animatingRef.current = false;
+        panX.jump(-panelW);
+        doNext();
+      });
+    } else if (offset > threshold) {
+      animatingRef.current = true;
+      const target = 0;
+      animate(panX, target, { type: 'spring', stiffness: 200, damping: 28 }).then(() => {
+        animatingRef.current = false;
+        panX.jump(-panelW);
+        doPrev();
+      });
+    } else {
+      animate(panX, -panelW, { type: 'spring', stiffness: 300, damping: 30 });
+    }
+  };
+
   return (
-    <Layout title="Finanzas">
-      <Box sx={{ minHeight: '100vh', pb: 12 }}>
-        {/* 1. Header con toggle y navegador */}
-        <FinancesHeader
-          dataType={dataType}
-          setDataType={setDataType}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          setSelectedYear={setSelectedYear}
-          setSelectedMonth={setSelectedMonth}
-        />
+    <Box sx={{ minHeight: '100vh', pb: 12 }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      <MonthNav year={selectedYear} month={selectedMonth} onYearChange={handleYearChange} onMonthChange={handleMonthChange} disabledNext={dNext} />
 
-        {/* 2. Resumen del mes */}
-        <FinancesMonthSummary
-          monthlyData={monthlyData}
-          monthlyTrendsData={monthlyTrendsData}
-          dataType={dataType}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          dollarRate={dollarRate}
-          onSeeAllCategories={() => {
-            // Scroll a la lista de transacciones — placeholder hasta tener una vista dedicada
-            const el = document.getElementById('finances-transactions-anchor');
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
-
-        {/* 3. Gráficos */}
-        <FinancesCharts
-          dataType={dataType}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          monthlyData={monthlyData}
-          monthlyTrendsData={monthlyTrendsData}
-        />
-
-        {/* 4. Movimientos */}
-        <Box id="finances-transactions-anchor">
-          <FinancesTransactionsList
-            userData={userData}
-            dataType={dataType}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            dollarRate={dollarRate}
-            onOpenRefund={handleOpenRefund}
-          />
-        </Box>
-
-        {/* Dialog de devolución (sin cambios) */}
-        <RefundDialog
-          open={openRefundDialog}
-          transaction={selectedTransaction}
-          dollarRate={dollarRate}
-          currentSavings={userData?.savings?.amountARS}
-          onClose={() => {
-            setOpenRefundDialog(false);
-            setSelectedTransaction(null);
-          }}
-        />
-
-        {/* SpeedDial flotante */}
-        <SpeedDial
-          ariaLabel="Acciones rápidas de finanzas"
-          sx={{ position: 'fixed', bottom: 24, right: 24 }}
-          icon={<SpeedDialIcon />}
-          open={openSpeedDial}
-          onOpen={() => setOpenSpeedDial(true)}
-          onClose={() => setOpenSpeedDial(false)}
-        >
-          <SpeedDialAction
-            key="nuevoGasto"
-            icon={<TrendingDownIcon />}
-            tooltipTitle="Nuevo gasto"
-            onClick={() => navigate('/NuevoGasto')}
-          />
-          <SpeedDialAction
-            key="nuevoIngreso"
-            icon={<TrendingUpIcon />}
-            tooltipTitle="Nuevo ingreso"
-            onClick={() => navigate('/NuevoIngreso')}
-          />
-          <SpeedDialAction
-            key="exchange"
-            icon={<CurrencyExchangeIcon />}
-            tooltipTitle="Exchange"
-            onClick={() => navigate('/exchange')}
-          />
-        </SpeedDial>
+      <Box sx={{ overflow: 'hidden' }}>
+        <motion.div style={{ display: 'flex', x: panX, width: panelW * 3 }}>
+          <Box sx={{ minWidth: panelW }}>
+            <Panel monthlyData={prevMD} monthlyTrendsData={monthlyTrendsData} userData={userData} dataType={dataType} selectedYear={pY} selectedMonth={pM} dollarRate={dollarRate} />
+          </Box>
+          <Box sx={{ minWidth: panelW }}>
+            <Panel monthlyData={cur} monthlyTrendsData={monthlyTrendsData} userData={userData} dataType={dataType} selectedYear={selectedYear} selectedMonth={selectedMonth} dollarRate={dollarRate} />
+          </Box>
+          <Box sx={{ minWidth: panelW }}>
+            <Panel monthlyData={nextMD} monthlyTrendsData={monthlyTrendsData} userData={userData} dataType={dataType} selectedYear={nY} selectedMonth={nM} dollarRate={dollarRate} />
+          </Box>
+        </motion.div>
       </Box>
-    </Layout>
+    </Box>
   );
 };
-
-export default Finances;

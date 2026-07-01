@@ -29,30 +29,31 @@ en distintos grados de desarrollo.
 ```
 src/
   components/
+    config/         # Componentes del módulo configuración
     finances/       # Componentes del módulo finanzas
     habits/         # Componentes del módulo hábitos
+    home/           # Componentes del dashboard Home
     icons/          # Iconos reutilizables
     layout/         # Componentes de estructura (navbar, sidebar, etc.)
     plants/         # Componentes del módulo plantas
+  design-system/    # Componentes UI reutilizables (SectionCard, DashedAddCard)
+  hooks/            # Custom hooks (useAuth, etc.)
   pages/
-    basics/         # Página de datos básicos / perfil
-    finances/       # Página de finanzas
-    habits/         # Página de hábitos
-    plants/         # Página de plantas
-    savings/        # Página de ahorros
-  utils/            # Carpeta — actualmente CÓDIGO MUERTO (ver nota abajo)
+    basics/         # Páginas de datos básicos / perfil
+    finances/       # Páginas de finanzas
+    habits/         # Páginas de hábitos
+    plants/         # Páginas de plantas
+    savings/        # Páginas de ahorros
+  services/         # Capa de abstracción de Firebase (database, auth, plants, etc.)
   App.js            # Componente raíz y rutas
   App.css           # Boilerplate CRA sin uso real (pendiente de limpiar)
   firebase.js       # Configuración de Firebase — NO TOCAR sin consultar
   store.js          # Estado global con Zustand
-  utils.js          # Utilidades globales — éste es el que se usa
+  utils.js          # Utilidades globales
 ```
 
-> **Nota sobre `utils`:** existen `src/utils.js` (archivo) y `src/utils/` (carpeta).
-> Webpack resuelve `from '../../utils'` al **archivo** `utils.js`, así que la carpeta
-> `utils/` queda inalcanzable y es código muerto. Además, `utils/index.js` re-exporta
-> nombres que no están importados → si alguna vez se llega a resolver el directorio,
-> revienta. **Mientras no se decida unificar, agregar utilidades nuevas a `utils.js`.**
+> **Nota sobre `utils`:** existe `src/utils.js` como único archivo de utilidades globales.
+> Agregar nuevas utilidades a `utils.js`.
 
 ---
 
@@ -95,15 +96,43 @@ src/
 
 ---
 
+## Design System
+
+Componentes UI reutilizables en `src/design-system/`:
+- `SectionCard` — card con título, icono, acción opcional y contenido hijo
+- `DashedAddCard` — card con borde punteado para acciones "Agregar nuevo"
+- `SummaryCard` — card con icono, valor grande, label y color
+- `MiniCard` — card compacta con icono, label, valor y link opcional
+- `SelectableCard` — card seleccionable con check
+- `QuantityCard` — card con control de cantidad (+/−)
+- `ActionButton` / `ActionBar` — botones de acción con icono
+
+## Services Layer
+
+Capa de abstracción de Firebase en `src/services/`:
+- `database.js` — CRUD genérico: `read`, `write`, `push`, `update`, `remove`, `bulkUpdate`, `generateKey`, `transaction`, `subscribeToUserData`
+- `auth.js` — `signIn`, `signUp`, `signOut`, `sendPasswordReset`, etc.
+- `finances.js` — gastos, ingresos, tarjetas (12 funciones)
+- `savings.js` — fondos, transferencias, `updateSavingsWithHistory`
+- `habits.js` — CRUD + `toggleHabitCompletion`
+- `plants.js` — CRUD + `addPlantActivity`, `archivePlant`, `setPlantPotVolume`
+- `config.js` — perfil, tema, backups, `deleteAllUserData`
+- `exchanges.js` — `addExchange`, `updateExchange`, `removeExchange`
+
+**Patrón:** los servicios importan `* as db from './database'`. El uid se resuelve
+internamente vía `getCurrentUser()`. Los componentes pasan paths relativos al user.
+
+---
+
 ## Estado de Módulos
 
 | Módulo   | Completitud | Notas                                                              |
 |----------|-------------|--------------------------------------------------------------------|
 | Finances | ~75%        | CRUD + tarjetas + devoluciones. Carga de PDFs aún no implementada  |
-| Plants   | ~50%        | Más avanzado de lo que decía. Faltan pH/EC/PPM (feature núcleo)    |
+| Plants   | ~85%        | CRUD + riegos + suplementos + poda + insecticida + transplante + fotos + logs + pH/EC/PPM + pesos + etapas (Germ/Vege/Flora/Secado/Curado) |
 | Habits   | ~60%        | CRUD + calendario + stats. Hay duplicación de `HabitDetail`        |
 | Savings  | ~70%        | Fondos múltiples ARS/USD + historial. Lógica duplicada con Finances|
-| Basics   | ~70%        | Login, Home dashboard, Configuración (8 paletas), Perfil, Ayuda    |
+| Basics   | ~70%        | Login, Home dashboard, Configuración, Perfil, Ayuda    |
 
 ---
 
@@ -111,81 +140,76 @@ src/
 
 Es el corazón de la app. Debe permitir:
 - Registro de múltiples cultivos hidropónicos ✅
-- Mediciones diarias por cultivo: pH, EC, PPM ❌ **NO IMPLEMENTADO** — feature núcleo faltante
+- Mediciones diarias por cultivo: pH, EC, PPM ✅
 - Carga de fotos para comparación visual entre fechas ✅
 - Calendario de actividades por cultivo ✅
 - (Otras funciones a definir durante el desarrollo)
 
-**Estado real (~50%):** lo que hay es CRUD de plantas, riegos, podas, transplantes,
+**Estado real (~85%):** lo que hay es CRUD de plantas, riegos, podas, transplantes,
 insecticidas, fotos, logs, aditivos, peso húmedo/seco, calendario y timeline.
-**Lo que falta y bloquea el módulo:** captura de pH/EC/PPM. `NewIrrigation.jsx` solo
-guarda `quantity`, `aditives`, `notes`, `date` — no hay campos para las mediciones.
+**Ya implementado:** captura de pH/EC/PPM (wizards dedicados: /RegistrarMedicion,
+/LogPlanta, /RegularPh). Ciclo de vida completo: Germinacion → Vegetativo →
+Floracion → Secado → Curado (archivable).
 
-Antes de implementar pH/EC/PPM, diseñar la estructura del nodo en Firebase
-con `/plan` y esperar aprobación. Esto define el resto de la feature.
+**Cada acción tiene su wizard independiente:**
+- `/NuevoRiego` — 5 pasos (plantas → pH/EC/PPM → riego+aditivos → notas → revisar)
+- `/NuevoSuplemento` — 4 pasos (plantas → suplemento+dosis → notas → revisar)
+- `/NuevaPoda` — 4 pasos (plantas → tipo → notas → revisar)
+- `/NuevoInsecticida` — 5 pasos (plantas → tipo+método → insecticida+dosis → notas → revisar)
+- `/NuevoTransplante` — 4 pasos (plantas → maceta+volumen → notas → revisar)
+- `/CambiarEtapa` — 3 pasos (info → notas → confirmar)
+- `/LogPlanta` — 5 pasos (pH → EC → PPM → Temp → revisar)
+- `/RegularPh` — 2 pasos (plantas → pH numpad)
+
+**Patrón de wizards:** full-screen (`position: fixed; inset: 0`) con
+`WizardProgressDots` + `WizardFooter`, color por tipo de acción.
+
+**Componentes reutilizables en `PlantShared.jsx`:**
+- `STAGES` — array con las 5 etapas (`{key, label, icon, color, order}`)
+- `PlantRow` — fila compacta de planta con foto, nombre, icono de etapa, días/semanas
+- `ToolCircle` — botón circular con icono y label
+- `BubbleTooltip` — menú flotante de acciones rápidas
+- `LogEntry` — fila de log con tipo (pH/EC/PPM/riego/nota), valor, hora y color
+
+**Utilidad `checkSearch`:** extrae `?id=` o `?plant=` del query string.
+Usada por todos los wizards de Plants para recibir el ID de la planta.
 
 ---
 
 ## Deuda Técnica Conocida
 
-Bugs y problemas detectados en la auditoría del 2026-05-07. Si tocás un archivo
-afectado, considerá arreglar el bug en la misma pasada. No hace falta resolverlos
-todos a la vez, pero **no introducir código nuevo encima de estos bugs sin avisar**.
+### Problemas activos
 
-1. **`getMonthlySummary` no existe.** Importado en `src/pages/finances/CreditCards.jsx:47`,
-   pero nunca exportado desde `utils.js`. Crashea cuando se invoca.
+1. **3 librerías de fechas conviven.** `moment` (requerido por react-big-calendar),
+   `date-fns` (3 archivos), `dayjs` (2 archivos). Todas en `package.json` y uso activo.
 
-2. **`ColorModeContext` no existe.** Importado en `src/App.js:36` desde `'./utils'`,
-   pero no está exportado. No rompe solo porque no se usa más adelante.
+2. **NewHabit.jsx sigue siendo componente monstruo** (~1.425 líneas). Es el único
+   componente que queda sin romper. El resto (Finances, Home, Habits, Plant, Config,
+   CreditCards) ya están modularizados.
 
-3. **`src/utils/index.js` re-exporta sin importar.** Líneas `export { checkSearch, formatAmount, ... }`
-   sin los `import` correspondientes. El directorio `utils/` está fuera del path de
-   resolución (gana `utils.js`), así que es código muerto. Eliminar o unificar.
+3. **Reglas de Firebase no commiteadas.** No hay `database.rules.json` ni
+   `storage.rules` en el repo. Verificar en consola Firebase que no estén abiertas.
 
-4. **`src/App.test.js` busca "learn react"** que no existe en la app → `npm test` falla.
-   Reescribir o borrar.
+4. **Capa de Storage pendiente.** 6 archivos importan `auth, storage` directamente
+   desde `firebase.js`: `ConfigProfileTab.jsx`, `ConfigBackupTab.jsx`,
+   `CreditCardStatementUpload.jsx`, `TarjetasUploadWizard.jsx`, `NewPhoto.jsx`,
+   `Login.jsx`. Crear `services/storage.js` para unificar.
 
-5. **`src/components/layout/Sidebar.jsx` está incompleto.** Tiene un literal
-   `{/* ... existing code ... */}` en producción y usa `window.location` en vez de
-   `useLocation()`. No parece estar enrutado en `App.js` — candidato a borrar.
+5. **Código muerto en Aditivos.jsx** (~10 imports sin uso: Divider, ListItemText,
+   CardHeader, IconButton, Tooltip, Badge, ArrowBackIcon, FilterListIcon,
+   SearchIcon, secondaryColor). Limpiar cuando se rompa ese archivo.
 
-6. **`src/components/layout/AppBar.jsx` muestra USD hardcodeado** (`{ buy: 1250, sell: 1300 }`)
-   con un `useEffect` vacío y comentario "// En un caso real…". Debe leer `dollarRate`
-   del store, que ya se trae de `dolarapi.com` desde `App.js`.
+### Problemas resueltos (referencia histórica)
 
-7. **Doble `HabitDetail`.** Existe en `src/pages/habits/HabitDetail.jsx` y
-   `src/components/habits/HabitDetail.jsx`. La ruta `/DetalleHabito/:habitId`
-   apunta al de `components/`, que recibe props en vez de leer `useParams` →
-   posible bug de prop drilling. Decidir cuál es el canónico.
-
-8. **`filterData` en `src/App.js` asume estructura completa.** Si `data.plants`
-   existe pero `data.plants.aditives` no, hace `Object.keys(undefined)` y crashea
-   (líneas ~199–207). Falta defensa contra estructuras parciales.
-
-9. **`auth.onAuthStateChanged` no limpia el listener de RTDB.** En `App.js`,
-   `database.ref(user.uid).on('value', …)` nunca llama a `.off()`. Si el usuario
-   cambia de cuenta o reinicia auth, los listeners se acumulan → memoria + datos
-   pisándose. El `unsubscribe` actual solo desuscribe el authStateChanged.
-
-### Otros problemas no-bug pero de fondo
-
-- **Lógica de Firebase regada en componentes** (320 ocurrencias en 46 archivos).
-  Viola la regla "No escribir lógica de Firebase directamente en componentes".
-  Pendiente: capa `src/services/{plants,finances,habits,savings,auth}.js`.
-- **Componentes monstruo:** `Plant.jsx` 3.979 líneas, `Finances.jsx` 3.951,
-  `Home.jsx` 3.264, `Habits.jsx` 2.512, `Configuracion.jsx` 2.534, `NewHabit.jsx` 1.425.
-- **3 librerías de fechas conviven:** `moment` + `date-fns` + `dayjs`.
-- **Dependencias instaladas y nunca usadas:** `redux`, `react-redux`, `styled-components`,
-  `styled-jsx`, `react-pdf`, `@react-pdf/renderer`, `react-helmet`, `react-beautiful-dnd`,
-  `react-grid-layout`, `@dnd-kit/*`, `recharts`.
-- **Archivos de respaldo en árbol vivo:** `Plant_backup.jsx`, `Plant_backup_weights.jsx`,
-  `Plant_temp.jsx`, `Plant_temp_edit.jsx`, `CreditCards.temp.jsx`, `CreditCards.jsx.bak`,
-  `CreditCards.jsx.backup`, `backup/Finances.jsx.bak`, `NewCreditCard.jsx`, `newphoto.txt`
-  (UTF-16 en raíz). ~20.000 líneas de ruido.
-- **`NewPhoto.jsx` con variables globales mutables** (`IS_UPLOADING`, `UPLOAD_PROGRESS`)
-  y montaje manual de Dialog vía `document.createElement` — anti-React.
-- **Reglas de Firebase no commiteadas.** No hay `database.rules.json` ni `storage.rules`
-  en el repo. Confirmar en consola que no estén abiertas.
+- ~~Lógica de Firebase regada en componentes~~ → Capa `services/` completa.
+- ~~Componentes monstruo~~ → 6 de 7 rotos (Finances 293, Home 283, Habits 614,
+  Plant ~500, Config 266, CreditCards 300). Solo falta NewHabit.
+- ~~Dependencias no usadas~~ → 16 desinstaladas (redux, chart.js, recharts, etc.).
+- ~~Archivos de respaldo~~ → ~20k líneas de zombies eliminadas.
+- ~~Bugs #1-9 de la auditoría inicial~~ → Todos resueltos.
+- ~~PlantStageDialog, NuevaAccion, NewIrrigation~~ → Reemplazados por wizards dedicados.
+- ~~PlantDashboard.jsx~~ → Eliminado (reemplazado por Jardin con tabs).
+- ~~utils/ carpeta zombie~~ → Eliminada; solo existe `utils.js`.
 
 ---
 
@@ -198,12 +222,19 @@ todos a la vez, pero **no introducir código nuevo encima de estos bugs sin avis
 - No instalar dependencias nuevas sin consultarme
 - No generar tests automáticamente a menos que lo pida
 - El objetivo es que yo entienda todo el código generado — explicá los cambios importantes
+- **Borrar archivos y funciones que dejen de usarse** en cada refactor. El objetivo es llegar
+  lo más livianos posible a la auditoría final. Si un archivo o función queda huérfano, se
+  elimina en la misma sesión, no se deja "para después".
+- **En Plants:** cada tipo de acción (riego, suplemento, poda, insecticida, transplante,
+  cambio de etapa) tiene su propia ruta y wizard dedicado. No usar rutas genéricas con
+  parámetros `?tipo=`; cada acción es una ruta independiente.
 
 ---
 
 ## Testing
 
-- Existe `App.test.js` y `setupTests.js` de Create React App (Jest + React Testing Library)
+- Existe `setupTests.js` de Create React App (Jest + React Testing Library)
+- `App.test.js` fue borrado (era el test default de CRA, fallaba siempre)
 - Por ahora no hay tests escritos
 - Cuando se escriban, empezar por lógica en `utils.js` y explicar qué se está testeando
 
@@ -1698,18 +1729,394 @@ npm test           # Correr tests
 
 ---
 
-### [Fecha] — [Módulo trabajado]
+### 2026-06-30 — Animaciones UX/UI (Framer Motion)
+
 **Qué se hizo:**
--
+- Creado `src/design-system/AnimatedCard.jsx` con `AnimatedGroup` y `AnimatedItem`
+- Animaciones fade-in-up stagger aplicadas a ~20 archivos en todos los módulos
+- Swipe carrusel 3-panel con `useMotionValue` en `Finances.jsx`
+- Swipe `useMotionValue` en `WeekStrip.jsx` (navegador de semanas de Plants)
+- Scrollbars ocultos globalmente (`App.css`)
+- Animación slide horizontal al navegar meses con botones
 
-**Por qué se hizo así:**
--
+---
 
-**Archivos modificados:**
--
+## Patrones de Animación UX/UI — Referencia para replicar
+
+### Patrón 1: Fade-in-up stagger (listas de cards)
+
+**Archivos:** `src/design-system/AnimatedCard.jsx` (implementación), aplicado en 20+ archivos.
+
+**Uso básico — flex column:**
+```jsx
+import { AnimatedGroup, AnimatedItem } from '../../design-system';
+
+<AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+  <AnimatedItem><Card>...</Card></AnimatedItem>
+  <AnimatedItem><Card>...</Card></AnimatedItem>
+</AnimatedGroup>
+```
+
+**Uso con Grid de MUI:**
+```jsx
+<Grid container spacing={1} component={AnimatedGroup}>
+  {items.map(item => (
+    <Grid item xs={4} key={item.id} component={AnimatedItem}>
+      <Card>...</Card>
+    </Grid>
+  ))}
+</Grid>
+```
+
+**Uso con componente `component` en Stack:**
+```jsx
+<AnimatedGroup component={Stack} spacing={1.5}>
+  {items.map(item => (
+    <AnimatedItem key={item.id}><Card>...</Card></AnimatedItem>
+  ))}
+</AnimatedGroup>
+```
+
+**Uso standalone (una sola card):**
+```jsx
+<AnimatedItem><Card>...</Card></AnimatedItem>
+```
+
+**Parámetros de `AnimatedGroup`:**
+| Prop | Default | Descripción |
+|---|---|---|
+| `staggerDelay` | `0.05` | Segundos entre cada hijo |
+| `delay` | `0.05` | Delay inicial antes de empezar stagger |
+| `skipEnter` | `false` | Si `true`, desactiva la animación en este grupo Y todos los `AnimatedItem` anidados (vía contexto) |
+| `sx` | — | Props de estilo MUI (usa `<Box component={motion.div}>` internamente) |
+
+**Cómo funciona internamente:**
+- `AnimatedGroup` renderiza `<Box component={motion.div}>` con variantes de container (`staggerChildren`, `delayChildren`)
+- `AnimatedItem` renderiza `<Box component={motion.div}>` con variantes `hidden → show`: `y: 20→0, opacity: 0→1, duration: 0.3s easeOut`
+- `skipEnter` usa `createContext` para propagar la neutralización a TODOS los `AnimatedItem` nietos sin necesidad de pasarlo como prop a cada uno
+- Si un `AnimatedGroup` anidado NO tiene `skipEnter`, lee el contexto del padre y no crea un Provider propio → deja fluir el contexto
+
+**IMPORTANTE — El `sx` SÍ funciona:** Los componentes usan `<Box component={motion.div}>` de MUI, no `<motion.div>` nativo. El `sx` se procesa correctamente y se aplican `gap`, `display: flex`, `grid`, etc.
+
+---
+
+### Patrón 2: Swipe carrusel 3-panel (navegación mensual/semanal)
+
+**Archivo de referencia:** `src/pages/finances/Finances.jsx`
+
+**Cuándo usarlo:** Navegación entre items adyacentes (meses, semanas, días) donde querés feedback táctil en tiempo real y ver el panel adyacente durante el swipe.
+
+**Estructura:**
+```jsx
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+
+// 1. MotionValue para el offset de paneo
+const panelW = 375; // ancho de cada panel (usar window.innerWidth o ResizeObserver)
+const panX = useMotionValue(-panelW); // empieza centrado en el panel actual
+
+// 2. Calcular datos de paneles adyacentes (prev y next)
+const prevData = useMemo(() => computeData(prevMonth), [prevMonth]);
+const nextData = useMemo(() => computeData(nextMonth), [nextMonth]);
+
+// 3. Refs para estado de drag
+const touchStartX = useRef(0);
+const isDragging = useRef(false);
+const animatingRef = useRef(false);
+
+// 4. Handlers de touch
+const onTouchStart = (e) => {
+  touchStartX.current = e.touches[0].clientX;
+  isDragging.current = false;
+};
+
+const onTouchMove = (e) => {
+  const dx = e.touches[0].clientX - touchStartX.current;
+  if (!isDragging.current && Math.abs(dx) > 8) isDragging.current = true;
+  if (isDragging.current) panX.set(-panelW + dx);
+};
+
+const onTouchEnd = () => {
+  if (!isDragging.current) return;
+  isDragging.current = false;
+  const offset = panX.get() + panelW;
+  const threshold = panelW * 0.3;
+  
+  if (offset < -threshold) {
+    // Swipe a siguiente → animar a -panelW*2, jump, cambiar estado
+    animate(panX, -panelW * 2, { type: 'spring', stiffness: 200, damping: 28 })
+      .then(() => { panX.jump(-panelW); goNext(); });
+  } else if (offset > threshold) {
+    // Swipe a anterior → animar a 0, jump, cambiar estado
+    animate(panX, 0, { type: 'spring', stiffness: 200, damping: 28 })
+      .then(() => { panX.jump(-panelW); goPrev(); });
+  } else {
+    // Spring back al centro
+    animate(panX, -panelW, { type: 'spring', stiffness: 300, damping: 30 });
+  }
+};
+
+// 5. Navegación por botones (mismo patrón de animación)
+const goNext = () => {
+  if (animatingRef.current) return;
+  animatingRef.current = true;
+  animate(panX, -panelW * 2, { type: 'spring', stiffness: 200, damping: 28 })
+    .then(() => { panX.jump(-panelW); animatingRef.current = false; setMonth(next); });
+};
+
+// 6. Render: 3 paneles en flex row dentro de overflow:hidden
+<Box onTouchStart={...} onTouchMove={...} onTouchEnd={...}>
+  <Box sx={{ overflow: 'hidden' }}>
+    <motion.div style={{ display: 'flex', x: panX, width: panelW * 3 }}>
+      <Box sx={{ minWidth: panelW }}><PrevPanel /></Box>
+      <Box sx={{ minWidth: panelW }}><CurrentPanel /></Box>
+      <Box sx={{ minWidth: panelW }}><NextPanel /></Box>
+    </motion.div>
+  </Box>
+</Box>
+```
+
+**Para desktop** — cada panel debe tener `maxWidth` para no estirarse:
+```jsx
+<Box sx={{ minWidth: panelW, maxWidth: 600, mx: 'auto', width: '100%' }}>
+```
+
+**Patrón de animación de botones:**
+1. `animate(panX, target, spring)` → panel actual sale
+2. Al completar → `panX.jump(-panelW)` → reset instantáneo al centro
+3. Cambiar estado → re-render con nuevo panel en el centro
+
+---
+
+### Patrón 3: Navegador con `useMotionValue` (WeekStrip)
+
+**Archivo de referencia:** `src/components/plants/WeekStrip.jsx`
+
+**Cuándo usarlo:** Navegador horizontal compacto (semanas, tabs) con swipe + botones. Las 3 vistas se renderizan juntas y se deslizan con `useMotionValue`.
+
+**Estructura:**
+```jsx
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+
+const containerWidth = 300; // vía ResizeObserver
+const translateX = useMotionValue(0);
+const totalX = useTransform(translateX, (t) => -containerWidth + t);
+const containerWidthRef = useRef(containerWidth);
+
+// Botones: setear translateX al borde, rAF, animar a 0
+const navigate = (direction) => {
+  const cw = containerWidthRef.current;
+  setOffset(offset + direction);
+  translateX.set(direction > 0 ? -cw : cw);
+  requestAnimationFrame(() => {
+    animate(translateX, 0, { type: 'spring', stiffness: 250, damping: 30, mass: 0.8 });
+  });
+};
+
+// Touch: translateX sigue el dedo en tiempo real
+const onTouchMove = (e) => {
+  translateX.set(e.touches[0].clientX - startX);
+};
+
+const onTouchEnd = () => {
+  const delta = /* delta final */;
+  if (Math.abs(delta) > 40) {
+    // Swipe completado: cambiar offset, setear translateX al borde, rAF, animar a 0
+    setOffset(offset + (delta > 0 ? -1 : 1));
+    translateX.set(delta);
+    requestAnimationFrame(() => animate(translateX, 0, spring));
+  } else {
+    // Spring back
+    animate(translateX, 0, { type: 'spring', stiffness: 350, damping: 35, mass: 0.6 });
+  }
+};
+
+// Render: motion.div con x derivado de useTransform
+<motion.div style={{ display: 'flex', x: totalX }}>
+  <PrevWeek />
+  <CurrentWeek />
+  <NextWeek />
+</motion.div>
+```
+
+**Diferencia clave con Patrón 2:** Acá `translateX` representa el delta de arrastre desde el centro. `totalX = -containerWidth + translateX` deriva la posición absoluta. En el Patrón 2, `panX` es la posición absoluta directamente.
+
+---
+
+### Patrón 4: AnimatePresence slide (transiciones con key)
+
+**Archivo de referencia:** `Finances.jsx` (versión anterior, reemplazada por Patrón 2)
+
+**Cuándo usarlo:** Transiciones entre estados donde solo se muestra UN panel a la vez y el cambio de estado dispara la animación.
+
+```jsx
+import { motion, AnimatePresence } from 'framer-motion';
+
+const [selected, setSelected] = useState(0);
+const [direction, setDirection] = useState(1);
+
+const slideVariants = {
+  enter: (dir) => ({
+    x: dir * 40,
+    opacity: 0,
+    transition: {
+      x: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
+      opacity: { duration: 0.4, ease: 'easeOut' },
+    },
+  }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir) => ({
+    x: dir * -60,
+    opacity: 0,
+    transition: {
+      x: { duration: 0.35, ease: 'easeIn' },
+      opacity: { duration: 0.18, ease: 'easeIn', delay: 0.17 },
+    },
+  }),
+};
+
+<AnimatePresence custom={direction}>
+  <motion.div
+    key={selected}
+    custom={direction}
+    variants={slideVariants}
+    initial="enter"
+    animate="center"
+    exit="exit"
+  >
+    <Content />
+  </motion.div>
+</AnimatePresence>
+```
+
+**Timing asimétrico:** `enter` con opacidad que llega a 100% al ~50% del slide. `exit` con opacidad que se mantiene 100% hasta ~50% y luego se desvanece. Esto evita que se vea contenido "fantasma" durante el solapamiento.
+
+---
+
+### Patrón 5: Scrollbars ocultas
+
+**Archivo:** `src/App.css`
+
+```css
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+```
+
+---
+
+### Patrón 6: Numpad wizard steps (Monto + display centrado + numpad abajo)
+
+**Archivos de referencia:** `NewTransaction.jsx` Step 1, `Exchange.jsx` Steps 1-2, `ProcesarDevolucion.jsx` Step 0
+
+**Cuándo usarlo:** Pasos de wizard con toggle superior + display numérico centrado + numpad + botón de acción. El display debe centrarse verticalmente entre el toggle y el numpad, ocupando el espacio flexible.
+
+**Estructura:**
+```jsx
+// 1. El AnimatedGroup envuelve todo el contenido del paso, con flex: 1 y gap
+<AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+  
+  {/* 2. Toggle / switch — sin flex, tamaño natural */}
+  <AnimatedItem>
+    <Box sx={{ px: 3 }}>
+      <ToggleButtonGroup>...</ToggleButtonGroup>
+    </Box>
+  </AnimatedItem>
+
+  {/* 3. Display centrado — AnimatedItem con flex: 1 + display: flex */}
+  {/*    El display: flex es CLAVE: convierte el wrapper en contenedor flex */}
+  {/*    para que el Box interno con justifyContent: center funcione */}
+  <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+      <Typography>MONTO</Typography>
+      <Typography variant="h2">$ 1.840</Typography>
+      <Typography>≈ USD 1.23</Typography>
+    </Box>
+  </AnimatedItem>
+
+  {/* 4. Numpad + TextField — sin flex, tamaño natural */}
+  <AnimatedItem>
+    <Box sx={{ px: 3, pb: 2 }}>
+      <Grid container>{/* botones del numpad */}</Grid>
+      <TextField placeholder="O pegá el monto acá" />
+    </Box>
+  </AnimatedItem>
+
+  {/* 5. Botón de acción — sin flex, al fondo */}
+  <AnimatedItem>
+    <Box sx={{ px: 3, pb: 3 }}>
+      <Button>Siguiente →</Button>
+    </Box>
+  </AnimatedItem>
+</AnimatedGroup>
+```
+
+**El secreto:**
+- El `AnimatedGroup` tiene `flex: 1` para ocupar todo el alto disponible
+- Solo el `AnimatedItem` del display tiene `sx={{ flex: 1, display: 'flex' }}`
+- Los demás `AnimatedItem` no tienen flex → tamaño natural
+- El `display: 'flex'` en el AnimatedItem del display es **obligatorio**. Sin él, el Box interno con `justifyContent: 'center'` no centra porque el AnimatedItem es `display: block` por defecto.
+
+**Patrón equivalente sin numpad (solo display centrado):**
+```jsx
+<AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+  <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+      {/* Contenido centrado */}
+    </Box>
+  </AnimatedItem>
+  <AnimatedItem>
+    <Box sx={{ px: 3, pb: 3 }}>
+      {renderActionButton(...)}
+    </Box>
+  </AnimatedItem>
+</AnimatedGroup>
+```
+
+**Para steps de revisión (múltiples Cards sin numpad):**
+```jsx
+<Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
+  <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+    <AnimatedItem><Card>...</Card></AnimatedItem>
+    <AnimatedItem><Card>...</Card></AnimatedItem>
+  </AnimatedGroup>
+</Box>
+```
+Las Cards de revisión NO necesitan `flex: 1` — solo `gap` para espaciado entre ellas. El scroll lo maneja el Box padre.
+
+| Caso | Patrón | Archivo ejemplo |
+|---|---|---|
+| Lista de cards con entrada stagger | **Patrón 1** (`AnimatedGroup` + `AnimatedItem`) | `Home.jsx`, `HabitsStatCards.jsx`, `Savings.jsx` |
+| Card individual | **Patrón 1** (`AnimatedItem` standalone) | `CreditCardsGlance.jsx`, `FinancesMonthSummary.jsx` |
+| Swipe horizontal con feedback en tiempo real + preview del panel adyacente | **Patrón 2** (3-panel carrusel, `useMotionValue`) | `Finances.jsx` (meses) |
+| Navegador horizontal compacto con swipe (semanas, tabs) | **Patrón 3** (WeekStrip, `useMotionValue` + `useTransform`) | `WeekStrip.jsx` |
+| Transición simple entre estados con slide horizontal | **Patrón 4** (`AnimatePresence` + `custom` variants) | Cualquier toggle/routing interno |
+| Desactivar animaciones en una subsección | `skipEnter={true}` en `AnimatedGroup` | Cuando necesitás que solo el slide padre sea visible |
+| Paso de wizard con numpad y display centrado | **Patrón 6** (AnimatedGroup flex:1 + AnimatedItem display:flex en el display) | `NewTransaction.jsx` Step 1, `Exchange.jsx` Steps 1-2 |
 
 **Decisiones importantes tomadas:**
--
+- Los componentes de animación usan `<Box component={motion.div}>` de MUI, no `<motion.div>` nativo. Esto garantiza que `sx` funcione correctamente.
+- `skipEnter` usa React Context para propagarse automáticamente a `AnimatedItem` nietos sin necesidad de pasar la prop manualmente.
+- Para Grid de MUI, se usa `component={AnimatedGroup}` y `component={AnimatedItem}` en los Grid items.
+- En swipes, los `useRef` para `isDragging` y `animatingRef` evitan re-renders durante el drag (solo `useMotionValue` actualiza la posición vía la GPU).
+- `panX.jump()` es la forma de setear un MotionValue sin animación (equivalente a `set()` pero sin触发 transiciones).
+- **Todo input en un paso de wizard debe tener `autoFocus`** — el foco va al primer campo para que el usuario pueda tipear inmediatamente sin tocar la pantalla. Si no hay input (ej: selector de chips/cards), no aplica.
+
+**Archivos creados:**
+- `src/design-system/AnimatedCard.jsx`
+
+**Archivos modificados (~20):**
+- `src/design-system/index.js`
+- `src/pages/basics/Home.jsx`, `src/components/home/QuickActions.jsx`, `FinancesSnapshot.jsx`, `CreditCardsGlance.jsx`
+- `src/pages/finances/Finances.jsx`, `NewTransaction.jsx`, `ProcesarDevolucion.jsx`
+- `src/pages/finances/CreditCards.jsx`, `src/components/finances/TarjetasListView.jsx`
+- `src/components/finances/FinancesMonthSummary.jsx`, `FinancesCharts.jsx`, `FinancesTransactionsList.jsx`
+- `src/pages/habits/Habits.jsx`, `HabitsList.jsx`, `src/components/habits/HabitsStatCards.jsx`, `HabitsDayList.jsx`, `WeeklyEvolutionChart.jsx`
+- `src/pages/plants/Jardin.jsx`, `RegistrarMedicion.jsx`, `NuevaPoda.jsx`, `NuevoInsecticida.jsx`, `NuevoTransplante.jsx`, `NuevoSuplemento.jsx`, `CambiarEtapa.jsx`
+- `src/components/plants/WeekStrip.jsx`
+- `src/pages/savings/Savings.jsx`
+- `src/pages/basics/Configuracion.jsx`
+- `src/App.css`
 
 **Pendiente para la próxima sesión:**
--
+- Aplicar Patrón 2 o 3 al navegador de meses de Tarjetas
+- Aplicar Patrón 2 o 3 a la navegación de semanas en Habits
+- Evaluar swipe en otras listas (HabitsList, Exchanges, FundHistory)

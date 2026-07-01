@@ -1,31 +1,26 @@
 import React, { useState } from 'react';
 import Layout from '../../components/layout/Layout';
-import { 
-  Box, 
-  Button, 
-  Card, 
-  CardContent, 
-  Container,
-  Typography, 
-  TextField, 
+import {
+  Box,
+  Button,
+  Typography,
+  TextField,
   Stack,
   Chip,
   FormControl,
   FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   InputAdornment,
-  Select,
-  MenuItem,
   alpha,
-  Rating
+  Fade,
+  Rating,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { addHabit } from '../../services/habits';
+import { AnimatedSuccess } from '../../design-system';
 import { getCurrentUser } from '../../services/auth';
 import { useStore } from '../../store';
-import { useTheme } from '@mui/material/styles';
+import { SelectableCard } from '../../design-system/SelectableCard';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -33,20 +28,59 @@ import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import RepeatIcon from '@mui/icons-material/Repeat';
 import DescriptionIcon from '@mui/icons-material/Description';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import FormatPaintIcon from '@mui/icons-material/FormatPaint';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+
+const weekdays = [
+  { value: 1, label: 'Lun' },
+  { value: 2, label: 'Mar' },
+  { value: 3, label: 'Mié' },
+  { value: 4, label: 'Jue' },
+  { value: 5, label: 'Vie' },
+  { value: 6, label: 'Sáb' },
+  { value: 0, label: 'Dom' },
+];
+
+const monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
+const yearMonthsArr = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const colorOptions = [
+  { value: 'primary', label: 'Azul', hex: '#1976d2' },
+  { value: 'secondary', label: 'Verde', hex: '#2e7d32' },
+  { value: 'error', label: 'Rojo', hex: '#d32f2f' },
+  { value: 'warning', label: 'Naranja', hex: '#ed6c02' },
+  { value: 'info', label: 'Celeste', hex: '#0288d1' },
+];
+
+const difficultyOptions = [
+  { value: 1, label: 'Muy Fácil', desc: 'Algo que puedes hacer sin esfuerzo', multiplier: 1.0, color: '#4caf50', example: 'Beber un vaso de agua' },
+  { value: 2, label: 'Fácil', desc: 'Requiere un poco de atención', multiplier: 1.5, color: '#8bc34a', example: 'Leer 5 páginas' },
+  { value: 3, label: 'Moderado', desc: 'Necesita disciplina y esfuerzo', multiplier: 2.5, color: '#ff9800', example: 'Ejercicio 30 min' },
+  { value: 4, label: 'Difícil', desc: 'Requiere mucha determinación', multiplier: 4.0, color: '#f44336', example: 'Despertar a las 5 AM' },
+  { value: 5, label: 'Muy Difícil', desc: 'Un desafío extremo', multiplier: 6.0, color: '#9c27b0', example: 'Maratón diario' },
+];
+
+const FREQUENCY_OPTIONS = [
+  { value: 'daily', label: 'Diario', desc: 'Todos los días' },
+  { value: 'weekdays', label: 'Días laborables', desc: 'Lunes a viernes' },
+  { value: 'weekends', label: 'Fines de semana', desc: 'Sábados y domingos' },
+  { value: 'custom', label: 'Semanal', desc: 'Días específicos de la semana' },
+  { value: 'monthly', label: 'Mensual', desc: 'Uno o más días al mes' },
+  { value: 'yearly', label: 'Anual', desc: 'Uno o más días al año' },
+];
+
+const STEPS = ['Información', 'Frecuencia', 'Personalización', 'Finalizar'];
 
 const NewHabit = () => {
   const navigate = useNavigate();
   const { userData } = useStore();
   const theme = useTheme();
-  
-  // Estado para el formulario de múltiples pasos
+
   const [step, setStep] = useState(1);
-  
-  // Estados para los campos del hábito
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [frequency, setFrequency] = useState('daily');
@@ -58,197 +92,36 @@ const NewHabit = () => {
   const [reminderTime, setReminderTime] = useState('08:00');
   const [color, setColor] = useState('primary');
   const [difficulty, setDifficulty] = useState(1);
-  
-  // Opciones para los días de la semana
-  const weekdays = [
-    { value: 1, label: 'Lunes' },
-    { value: 2, label: 'Martes' },
-    { value: 3, label: 'Miércoles' },
-    { value: 4, label: 'Jueves' },
-    { value: 5, label: 'Viernes' },
-    { value: 6, label: 'Sábado' },
-    { value: 0, label: 'Domingo' }
-  ];
+  const [saving, setSaving] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
 
-  // Opciones para los días del mes
-  const monthDays = Array.from({ length: 31 }, (_, i) => ({
-    value: i + 1,
-    label: `Día ${i + 1}`
-  }));
+  const getDifficultyInfo = (val) => difficultyOptions.find((o) => o.value === val) || difficultyOptions[0];
 
-  // Opciones para los meses del año
-  const yearMonths = [
-    { value: 1, label: 'Enero' },
-    { value: 2, label: 'Febrero' },
-    { value: 3, label: 'Marzo' },
-    { value: 4, label: 'Abril' },
-    { value: 5, label: 'Mayo' },
-    { value: 6, label: 'Junio' },
-    { value: 7, label: 'Julio' },
-    { value: 8, label: 'Agosto' },
-    { value: 9, label: 'Septiembre' },
-    { value: 10, label: 'Octubre' },
-    { value: 11, label: 'Noviembre' },
-    { value: 12, label: 'Diciembre' }
-  ];
-  
-  // Opciones para colores
-  const colorOptions = [
-    { value: 'primary', label: 'Azul', hex: '#1976d2' },
-    { value: 'secondary', label: 'Verde', hex: '#2e7d32' },
-    { value: 'error', label: 'Rojo', hex: '#d32f2f' },
-    { value: 'warning', label: 'Naranja', hex: '#ed6c02' },
-    { value: 'info', label: 'Celeste', hex: '#0288d1' }
-  ];
+  const handleDayToggle = (day) => setCustomDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  const handleMonthlyDayToggle = (day) => setMonthlyDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  const handleYearlyMonthToggle = (m) => setYearlyMonths((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+  const handleYearlyDayToggle = (d) => setYearlyDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
 
-  // Opciones para niveles de dificultad
-  const difficultyOptions = [
-    { 
-      value: 1, 
-      label: 'Muy Fácil', 
-      description: 'Algo que puedes hacer sin esfuerzo',
-      multiplier: 1.0,
-      color: '#4caf50',
-      examples: 'Ej: Beber un vaso de agua, sonreír'
-    },
-    { 
-      value: 2, 
-      label: 'Fácil', 
-      description: 'Requiere un poco de atención pero es manejable',
-      multiplier: 1.5,
-      color: '#8bc34a',
-      examples: 'Ej: Leer 5 páginas, meditar 5 min'
-    },
-    { 
-      value: 3, 
-      label: 'Moderado', 
-      description: 'Necesita disciplina y esfuerzo constante',
-      multiplier: 2.5,
-      color: '#ff9800',
-      examples: 'Ej: Ejercicio 30 min, estudiar 1 hora'
-    },
-    { 
-      value: 4, 
-      label: 'Difícil', 
-      description: 'Requiere mucha determinación y sacrificio',
-      multiplier: 4.0,
-      color: '#f44336',
-      examples: 'Ej: Despertar a las 5 AM, dieta estricta'
-    },
-    { 
-      value: 5, 
-      label: 'Muy Difícil', 
-      description: 'Un desafío extremo que cambiará tu vida',
-      multiplier: 6.0,
-      color: '#9c27b0',
-      examples: 'Ej: Maratón diario, eliminar completamente el azúcar'
-    }
-  ];
-
-  // Función para obtener la información de dificultad
-  const getDifficultyInfo = (difficultyValue) => {
-    return difficultyOptions.find(option => option.value === difficultyValue) || difficultyOptions[0];
-  };
-  
-  // Manejar cambio en los días personalizados
-  const handleDayToggle = (day) => {
-    if (customDays.includes(day)) {
-      setCustomDays(customDays.filter(d => d !== day));
-    } else {
-      setCustomDays([...customDays, day]);
-    }
-  };
-
-  // Manejar cambio en los días del mes
-  const handleMonthlyDayToggle = (day) => {
-    if (monthlyDays.includes(day)) {
-      setMonthlyDays(monthlyDays.filter(d => d !== day));
-    } else {
-      setMonthlyDays([...monthlyDays, day]);
-    }
-  };
-
-  // Manejar cambio en los meses del año
-  const handleYearlyMonthToggle = (month) => {
-    if (yearlyMonths.includes(month)) {
-      setYearlyMonths(yearlyMonths.filter(m => m !== month));
-    } else {
-      setYearlyMonths([...yearlyMonths, month]);
-    }
-  };
-
-  // Manejar cambio en los días del mes para hábitos anuales
-  const handleYearlyDayToggle = (day) => {
-    if (yearlyDays.includes(day)) {
-      setYearlyDays(yearlyDays.filter(d => d !== day));
-    } else {
-      setYearlyDays([...yearlyDays, day]);
-    }
-  };
-  
-  // Validación específica para el paso 3
   const isStep3Valid = () => {
-    if (frequency === 'custom' && customDays.length === 0) {
-      return false;
-    }
-    if (frequency === 'monthly' && monthlyDays.length === 0) {
-      return false;
-    }
-    if (frequency === 'yearly' && (yearlyMonths.length === 0 || yearlyDays.length === 0)) {
-      return false;
-    }
+    if (frequency === 'custom' && customDays.length === 0) return false;
+    if (frequency === 'monthly' && monthlyDays.length === 0) return false;
+    if (frequency === 'yearly' && (yearlyMonths.length === 0 || yearlyDays.length === 0)) return false;
     return true;
   };
-  
-  // Determinar si el formulario es válido
+
   const isFormValid = () => {
-    if (!name.trim()) {
-      console.log('Validation failed: name is empty');
-      return false;
-    }
-    
-    if (frequency === 'custom' && customDays.length === 0) {
-      console.log('Validation failed: custom frequency but no days selected');
-      return false;
-    }
-    
-    if (frequency === 'monthly' && monthlyDays.length === 0) {
-      console.log('Validation failed: monthly frequency but no days selected');
-      return false;
-    }
-    
-    if (frequency === 'yearly') {
-      if (yearlyMonths.length === 0) {
-        console.log('Validation failed: yearly frequency but no months selected');
-        return false;
-      }
-      if (yearlyDays.length === 0) {
-        console.log('Validation failed: yearly frequency but no days selected');
-        return false;
-      }
-    }
-    
-    console.log('Form validation passed');
-    return true;
+    if (!name.trim()) return false;
+    return isStep3Valid();
   };
-  
-  // Guardar el hábito
-  const saveHabit = () => {
-    console.log('Attempting to save habit...');
-    console.log('Form validation result:', isFormValid());
-    
-    if (!isFormValid()) {
-      console.log('Cannot save habit: form validation failed');
-      return;
-    }
-    
-    // Verificar autenticación
+
+  const saveHabit = async () => {
+    if (!isFormValid()) return;
     if (!getCurrentUser()) {
-      console.error('No authenticated user found');
-      alert('Error: Usuario no autenticado. Por favor, inicia sesión de nuevo.');
+      alert('Error: Usuario no autenticado.');
       return;
     }
-    
+    setSaving(true);
+
     const habitData = {
       name,
       description,
@@ -264,1163 +137,610 @@ const NewHabit = () => {
       difficultyMultiplier: getDifficultyInfo(difficulty).multiplier,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      streak: 0
+      streak: 0,
     };
-    
-    console.log('Habit data to save:', habitData);
 
-    addHabit(habitData)
-      .then((key) => {
-        console.log('Habit saved successfully:', key);
-        navigate('/Habitos');
-      })
-      .catch(error => {
-        console.error('Error al crear hábito:', error);
-        console.error('Error details:', error.message, error.code);
-        alert('Error al crear el hábito. Por favor, intenta de nuevo.');
-      });
-  };
-  
-  // Avanzar o retroceder pasos en el formulario
-  const handleStepChange = (direction) => {
-    if (direction === 'back') {
-      if (step === 1) {
-        navigate('/Habitos');
-      } else {
-        setStep(step - 1);
-      }
-    } else if (direction === 'next') {
-      if (step < 4) {
-        setStep(step + 1);
-      } else {
-        // Estamos en el paso 4, crear el hábito
-        saveHabit();
-      }
+    try {
+      await addHabit(habitData);
+      setSavedSnapshot({ name, frequency, difficulty, color, reminder, reminderTime });
+    } catch (error) {
+      console.error('Error al crear hábito:', error);
+      setSaving(false);
     }
   };
-  
-  // Obtener color según la selección
-  const getColorObject = (colorValue) => {
-    return colorOptions.find(option => option.value === colorValue) || colorOptions[0];
+
+  const handleLoadAnother = () => {
+    setStep(1);
+    setName('');
+    setDescription('');
+    setFrequency('daily');
+    setCustomDays([]);
+    setMonthlyDays([]);
+    setYearlyMonths([]);
+    setYearlyDays([]);
+    setReminder(false);
+    setReminderTime('08:00');
+    setColor('primary');
+    setDifficulty(1);
+    setSavedSnapshot(null);
+    setSaving(false);
   };
-  
-  // Renderizado del paso 1: Información básica
-  const renderStep1 = () => (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h5" fontWeight="bold" gutterBottom>
-        ¿Qué hábito deseas crear?
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Los buenos hábitos son la clave para alcanzar tus metas. Define el tuyo.
-      </Typography>
-      
-      <Card 
-        elevation={2}
-        sx={{ 
-          p: 3, 
-          borderRadius: 3,
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden',
-          mt: 2
-        }}
-      >
-        <Box 
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            bgcolor: theme.palette.primary.main
-          }}
-        />
-        
-        <Stack spacing={4}>
-          <Box>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Nombre del hábito
-            </Typography>
-            <TextField
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              fullWidth
-              placeholder="Ej: Beber agua, Meditar, Leer..."
-              variant="outlined"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Typography variant="h6" color="primary">
-                      <DescriptionIcon />
-                    </Typography>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ 
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  bgcolor: 'background.paper',
-                  '& fieldset': {
-                    borderWidth: 2,
-                  },
-                  '&:hover fieldset': {
-                    borderWidth: 2,
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderWidth: 2,
-                  }
-                }
-              }}
-            />
-          </Box>
-          
-          <Box>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Descripción (opcional)
-            </Typography>
-            <TextField
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              fullWidth
-              multiline
-              rows={3}
-              placeholder="Describe este hábito y por qué es importante para ti"
-              variant="outlined"
-              sx={{ 
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  bgcolor: 'background.paper',
-                  '& fieldset': {
-                    borderWidth: 2,
-                  },
-                  '&:hover fieldset': {
-                    borderWidth: 2,
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderWidth: 2,
-                  }
-                }
-              }}
-            />
-          </Box>
-        </Stack>
-      </Card>
-      
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          onClick={() => handleStepChange('back')}
-          startIcon={<ArrowBackIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            borderWidth: 2,
-            '&:hover': {
-              borderWidth: 2
-            }
-          }}
-        >
-          Volver
-        </Button>
-        <Button 
-          variant="contained" 
-          color="primary"
-          onClick={() => handleStepChange('next')}
-          disabled={!name.trim()}
-          endIcon={<ArrowForwardIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            boxShadow: 2
-          }}
-        >
-          Continuar
-        </Button>
-      </Box>
-    </Box>
-  );
-  
-  // Renderizado del paso 2: Frecuencia
-  const renderStep2 = () => (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box mb={3}>
-        <Typography variant="h5" fontWeight="bold" gutterBottom>
-          ¿Con qué frecuencia realizarás este hábito?
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Chip
-            icon={<DescriptionIcon />}
-            label={name}
-            sx={{ 
-              bgcolor: `${theme.palette.primary.main}15`,
-              color: theme.palette.primary.main,
-              fontWeight: 'medium',
-              height: 32
-            }}
-          />
-          <Typography variant="body1" color="text.secondary">
-            Define la frecuencia para tu seguimiento
-          </Typography>
-        </Stack>
-      </Box>
-      
-      <Card 
-        elevation={2}
-        sx={{ 
-          p: 3, 
-          borderRadius: 3,
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        <Box 
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            bgcolor: theme.palette.primary.main
-          }}
-        />
-        
-        <FormControl component="fieldset" sx={{ width: '100%' }}>
-          <FormLabel component="legend" sx={{ fontWeight: 'bold', fontSize: '1rem', mb: 2 }}>
-            Selecciona la frecuencia
-          </FormLabel>
-          
-          <Stack spacing={2}>
-            {[
-              { value: 'daily', label: 'Diario', description: 'Todos los días de la semana' },
-              { value: 'weekdays', label: 'Días laborables', description: 'De lunes a viernes' },
-              { value: 'weekends', label: 'Fines de semana', description: 'Sábados y domingos' },
-              { value: 'custom', label: 'Semanal', description: 'Selecciona días específicos de la semana' },
-              { value: 'monthly', label: 'Mensual', description: 'Una o varias veces al mes' },
-              { value: 'yearly', label: 'Anual', description: 'Una o varias veces al año' }
-            ].map((option) => (
-              <Card
-                key={option.value}
-                elevation={frequency === option.value ? 3 : 1}
-                onClick={() => setFrequency(option.value)}
-                sx={{ 
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  transition: 'all 0.3s ease',
-                  transform: frequency === option.value ? 'scale(1.02)' : 'scale(1)',
-                  border: `2px solid ${frequency === option.value ? theme.palette.primary.main : 'transparent'}`,
-                  '&:hover': {
-                    transform: 'scale(1.02)',
-                    boxShadow: 3
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Box 
-                      sx={{ 
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        borderRadius: '50%',
-                        p: 1.5,
-                        color: theme.palette.primary.main
-                      }}
-                    >
-                      <RepeatIcon fontSize="large" />
-                    </Box>
-                    <Box flex={1}>
-                      <Typography variant="h6" fontWeight="bold">
-                        {option.label}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {option.description}
-                      </Typography>
-                    </Box>
-                    <Radio 
-                      checked={frequency === option.value}
-                      sx={{ 
-                        color: theme.palette.primary.main,
-                        '&.Mui-checked': {
-                          color: theme.palette.primary.main
-                        }
-                      }}
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        </FormControl>
-      </Card>
-      
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          onClick={() => handleStepChange('back')}
-          startIcon={<ArrowBackIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            borderWidth: 2,
-            '&:hover': {
-              borderWidth: 2
-            }
-          }}
-        >
-          Volver
-        </Button>
-        <Button 
-          variant="contained" 
-          color="primary"
-          onClick={() => handleStepChange('next')}
-          endIcon={<ArrowForwardIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            boxShadow: 2
-          }}
-        >
-          Continuar
-        </Button>
-      </Box>
-    </Box>
-  );
-  
-  // Renderizado del paso 3: Días personalizados (si aplica), dificultad y recordatorio
-  const renderStep3 = () => (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box mb={3}>
-        <Typography variant="h5" fontWeight="bold" gutterBottom>
-          Personaliza tu hábito
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Chip
-            icon={<DescriptionIcon />}
-            label={name}
-            sx={{ 
-              bgcolor: `${theme.palette.primary.main}15`,
-              color: theme.palette.primary.main,
-              fontWeight: 'medium',
-              height: 32
-            }}
-          />
-          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
-          <Chip
-            icon={<RepeatIcon />}
-            label={frequency === 'daily' ? 'Diario' : 
-                  frequency === 'weekdays' ? 'Días laborables' : 
-                  frequency === 'weekends' ? 'Fines de semana' : 
-                  frequency === 'monthly' ? 'Mensual' :
-                  frequency === 'yearly' ? 'Anual' : 'Semanal'}
-            sx={{ 
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main,
-              fontWeight: 'medium',
-              height: 32
-            }}
-          />
-        </Stack>
-      </Box>
-      
-      <Card 
-        elevation={2}
-        sx={{ 
-          p: 3, 
-          borderRadius: 3,
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        <Box 
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            bgcolor: theme.palette.primary.main
-          }}
-        />
-        
-        <Stack spacing={4}>
-          {/* Días personalizados - solo mostrar si la frecuencia es personalizada */}
-          {frequency === 'custom' && (
-            <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Selecciona los días de la semana
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Elige en qué días de la semana realizarás este hábito
-              </Typography>
-              
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
-                {weekdays.map((day) => (
-                  <Chip
-                    key={day.value}
-                    label={day.label}
-                    onClick={() => handleDayToggle(day.value)}
-                    color={customDays.includes(day.value) ? 'primary' : 'default'}
-                    variant={customDays.includes(day.value) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mb: 1,
-                      borderWidth: 2,
-                      fontWeight: customDays.includes(day.value) ? 'bold' : 'normal',
-                      '&:hover': {
-                        borderWidth: 2,
-                        opacity: 0.9
-                      }
-                    }}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
 
-          {/* Días mensuales - solo mostrar si la frecuencia es mensual */}
-          {frequency === 'monthly' && (
-            <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Selecciona los días del mes
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Elige en qué días del mes realizarás este hábito (por ejemplo, el día 1, el día 15, etc.)
-              </Typography>
-              
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
-                {monthDays.map((day) => (
-                  <Chip
-                    key={day.value}
-                    label={day.value}
-                    onClick={() => handleMonthlyDayToggle(day.value)}
-                    color={monthlyDays.includes(day.value) ? 'primary' : 'default'}
-                    variant={monthlyDays.includes(day.value) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mb: 1,
-                      borderWidth: 2,
-                      fontWeight: monthlyDays.includes(day.value) ? 'bold' : 'normal',
-                      '&:hover': {
-                        borderWidth: 2,
-                        opacity: 0.9
-                      }
-                    }}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {/* Meses anuales - solo mostrar si la frecuencia es anual */}
-          {frequency === 'yearly' && (
-            <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Selecciona los meses del año
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Elige en qué meses del año realizarás este hábito
-              </Typography>
-              
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
-                {yearMonths.map((month) => (
-                  <Chip
-                    key={month.value}
-                    label={month.label}
-                    onClick={() => handleYearlyMonthToggle(month.value)}
-                    color={yearlyMonths.includes(month.value) ? 'primary' : 'default'}
-                    variant={yearlyMonths.includes(month.value) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mb: 1,
-                      borderWidth: 2,
-                      fontWeight: yearlyMonths.includes(month.value) ? 'bold' : 'normal',
-                      '&:hover': {
-                        borderWidth: 2,
-                        opacity: 0.9
-                      }
-                    }}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {/* Días del mes para hábitos anuales - solo mostrar si la frecuencia es anual */}
-          {frequency === 'yearly' && (
-            <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Selecciona los días del mes
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Elige en qué días del mes realizarás este hábito en los meses seleccionados (por ejemplo: el día 5, el día 15, etc.)
-              </Typography>
-              
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
-                {monthDays.map((day) => (
-                  <Chip
-                    key={day.value}
-                    label={day.value}
-                    onClick={() => handleYearlyDayToggle(day.value)}
-                    color={yearlyDays.includes(day.value) ? 'primary' : 'default'}
-                    variant={yearlyDays.includes(day.value) ? 'filled' : 'outlined'}
-                    sx={{ 
-                      mb: 1,
-                      borderWidth: 2,
-                      fontWeight: yearlyDays.includes(day.value) ? 'bold' : 'normal',
-                      '&:hover': {
-                        borderWidth: 2,
-                        opacity: 0.9
-                      }
-                    }}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {/* Nivel de Dificultad */}
-          <Box>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Nivel de Dificultad
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              La dificultad afectará la puntuación de tus estadísticas. Los hábitos más difíciles valen más puntos.
-            </Typography>
-            
-            <Stack spacing={2}>
-              {difficultyOptions.map((option) => (
-                <Card
-                  key={option.value}
-                  elevation={difficulty === option.value ? 3 : 1}
-                  onClick={() => setDifficulty(option.value)}
-                  sx={{ 
-                    cursor: 'pointer',
-                    borderRadius: 2,
-                    transition: 'all 0.3s ease',
-                    transform: difficulty === option.value ? 'scale(1.02)' : 'scale(1)',
-                    border: `2px solid ${difficulty === option.value ? option.color : 'transparent'}`,
-                    '&:hover': {
-                      transform: 'scale(1.02)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  <CardContent sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Box 
-                        sx={{ 
-                          bgcolor: alpha(option.color, 0.2),
-                          borderRadius: '50%',
-                          p: 1.5,
-                          color: option.color,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Rating
-                          value={option.value}
-                          max={5}
-                          readOnly
-                          size="small"
-                          icon={<FitnessCenterIcon fontSize="inherit" />}
-                          emptyIcon={<FitnessCenterIcon fontSize="inherit" sx={{ opacity: 0.3 }} />}
-                          sx={{ 
-                            '& .MuiRating-iconFilled': {
-                              color: option.color,
-                            },
-                            '& .MuiRating-iconEmpty': {
-                              color: alpha(option.color, 0.3),
-                            },
-                            fontSize: '1rem'
-                          }}
-                        />
-                      </Box>
-                      <Box flex={1}>
-                        <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
-                          <Typography variant="h6" fontWeight="bold">
-                            {option.label}
-                          </Typography>
-                          <Chip
-                            label={`${option.multiplier}x puntos`}
-                            size="small"
-                            sx={{ 
-                              bgcolor: alpha(option.color, 0.1),
-                              color: option.color,
-                              fontWeight: 'bold',
-                              fontSize: '0.7rem'
-                            }}
-                          />
-                        </Stack>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                          {option.description}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                          {option.examples}
-                        </Typography>
-                      </Box>
-                      <Radio 
-                        checked={difficulty === option.value}
-                        sx={{ 
-                          color: option.color,
-                          '&.Mui-checked': {
-                            color: option.color
-                          }
-                        }}
-                      />
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
-          </Box>
-          
-          {/* Recordatorio */}
-          <Box>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Recordatorio
-            </Typography>
-            
-            <Card
-              elevation={reminder ? 3 : 1}
-              onClick={() => setReminder(!reminder)}
-              sx={{ 
-                cursor: 'pointer',
-                borderRadius: 2,
-                transition: 'all 0.3s ease',
-                transform: reminder ? 'scale(1.02)' : 'scale(1)',
-                border: `2px solid ${reminder ? theme.palette.primary.main : 'transparent'}`,
-                mb: 2,
-                '&:hover': {
-                  transform: 'scale(1.02)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardContent sx={{ p: 2 }}>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Box 
-                    sx={{ 
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      borderRadius: '50%',
-                      p: 1.5,
-                      color: theme.palette.primary.main
-                    }}
-                  >
-                    <NotificationsActiveIcon fontSize="large" />
-                  </Box>
-                  <Box flex={1}>
-                    <Typography variant="h6" fontWeight="bold">
-                      Activar recordatorio
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Recibe notificaciones para no olvidar este hábito
-                    </Typography>
-                  </Box>
-                  <Radio 
-                    checked={reminder}
-                    sx={{ 
-                      color: theme.palette.primary.main,
-                      '&.Mui-checked': {
-                        color: theme.palette.primary.main
-                      }
-                    }}
-                  />
-                </Stack>
-              </CardContent>
-            </Card>
-            
-            {reminder && (
-              <Card
-                elevation={1}
-                sx={{ 
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.primary.main, 0.05),
-                  border: `1px dashed ${theme.palette.primary.main}`
-                }}
-              >
-                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                  Hora del recordatorio
-                </Typography>
-                <TextField
-                  type="time"
-                  value={reminderTime}
-                  onChange={(e) => setReminderTime(e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <AccessTimeIcon color="primary" />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{ 
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      bgcolor: 'background.paper',
-                      '& fieldset': {
-                        borderWidth: 2,
-                      },
-                      '&:hover fieldset': {
-                        borderWidth: 2,
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderWidth: 2,
-                      }
-                    }
-                  }}
-                />
-              </Card>
-            )}
-          </Box>
-        </Stack>
-      </Card>
-      
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          onClick={() => handleStepChange('back')}
-          startIcon={<ArrowBackIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            borderWidth: 2,
-            '&:hover': {
-              borderWidth: 2
-            }
-          }}
-        >
-          Volver
-        </Button>
-        <Button 
-          variant="contained" 
-          color="primary"
-          onClick={() => handleStepChange('next')}
-          disabled={!isStep3Valid()}
-          endIcon={<ArrowForwardIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            boxShadow: 2
-          }}
-        >
-          Continuar
-        </Button>
-      </Box>
-    </Box>
-  );
-  
-  // Renderizado del paso 4: Color y Confirmación
-  const renderStep4 = () => (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box mb={3}>
-        <Typography variant="h5" fontWeight="bold" gutterBottom>
-          Finaliza la creación
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Chip
-            icon={<DescriptionIcon />}
-            label={name}
-            sx={{ 
-              bgcolor: `${theme.palette.primary.main}15`,
-              color: theme.palette.primary.main,
-              fontWeight: 'medium',
-              height: 32,
-              mb: 1
-            }}
-          />
-          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
-          <Chip
-            icon={<RepeatIcon />}
-            label={frequency === 'daily' ? 'Diario' : 
-                  frequency === 'weekdays' ? 'Días laborables' : 
-                  frequency === 'weekends' ? 'Fines de semana' : 
-                  frequency === 'monthly' ? 'Mensual' :
-                  frequency === 'yearly' ? 'Anual' : 'Semanal'}
-            sx={{ 
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              color: theme.palette.primary.main,
-              fontWeight: 'medium',
-              height: 32,
-              mb: 1
-            }}
-          />
-          <ChevronRightIcon sx={{ color: 'text.secondary' }} />
-          <Chip
-            icon={<TrendingUpIcon />}
-            label={getDifficultyInfo(difficulty).label}
-            sx={{ 
-              bgcolor: alpha(getDifficultyInfo(difficulty).color, 0.1),
-              color: getDifficultyInfo(difficulty).color,
-              fontWeight: 'medium',
-              height: 32,
-              mb: 1
-            }}
-          />
-          {reminder && (
-            <>
-              <ChevronRightIcon sx={{ color: 'text.secondary' }} />
-              <Chip
-                icon={<NotificationsActiveIcon />}
-                label={`Recordatorio: ${reminderTime}`}
-                sx={{ 
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main,
-                  fontWeight: 'medium',
-                  height: 32,
-                  mb: 1
-                }}
-              />
-            </>
-          )}
-        </Stack>
-      </Box>
-      
-      <Card 
-        elevation={2}
-        sx={{ 
-          p: 3, 
-          borderRadius: 3,
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        <Box 
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            bgcolor: theme.palette.primary.main
-          }}
-        />
-        
-        <Box>
-          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-            Elige un color para identificar tu hábito
-          </Typography>
-          
-          <Stack spacing={2}>
-            {colorOptions.map((option) => (
-              <Card
-                key={option.value}
-                elevation={color === option.value ? 3 : 1}
-                onClick={() => setColor(option.value)}
-                sx={{ 
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  transition: 'all 0.3s ease',
-                  transform: color === option.value ? 'scale(1.02)' : 'scale(1)',
-                  border: `2px solid ${color === option.value ? option.hex : 'transparent'}`,
-                  '&:hover': {
-                    transform: 'scale(1.02)',
-                    boxShadow: 3
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Box 
-                      sx={{ 
-                        bgcolor: alpha(option.hex, 0.2),
-                        borderRadius: '50%',
-                        p: 1.5,
-                        color: option.hex
-                      }}
-                    >
-                      <FormatPaintIcon fontSize="large" />
-                    </Box>
-                    <Box flex={1}>
-                      <Typography variant="h6" fontWeight="bold">
-                        {option.label}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Para identificar visualmente tu hábito
-                      </Typography>
-                    </Box>
-                    <Radio 
-                      checked={color === option.value}
-                      sx={{ 
-                        color: option.hex,
-                        '&.Mui-checked': {
-                          color: option.hex
-                        }
-                      }}
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
+  const renderSuccess = () => {
+    if (!savedSnapshot) return null;
+    const n = savedSnapshot;
+    const freqLabel = FREQUENCY_OPTIONS.find((o) => o.value === n.frequency)?.label || '';
+    const diffLabel = ['','Muy fácil','Fácil','Normal','Difícil','Muy difícil'][n.difficulty];
+    const colorMap = { primary: theme.palette.primary.main, secondary: theme.palette.secondary.main, error: theme.palette.error.main, warning: theme.palette.warning.main, info: theme.palette.info.main };
+    const habitColor = colorMap[n.color] || theme.palette.primary.main;
+    return (
+      <AnimatedSuccess color={habitColor} title="¡Hábito creado!">
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>{n.name}</Typography>
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center', mb: 2 }}>
+          <Chip label={freqLabel} size="small" sx={{ fontWeight: 600 }} />
+          <Chip label={diffLabel} size="small" sx={{ fontWeight: 600 }} />
+          {n.reminder && <Chip label={n.reminderTime} size="small" sx={{ fontWeight: 600, bgcolor: alpha(habitColor, 0.1), color: habitColor }} />}
         </Box>
-        
-        <Box sx={{ mt: 4, p: 3, bgcolor: alpha(theme.palette.success.main, 0.1), borderRadius: 2 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
-            Resumen
-          </Typography>
-          <Stack spacing={1}>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Nombre:</Typography>
-              <Typography variant="body2" fontWeight="medium">{name}</Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Frecuencia:</Typography>
-              <Typography variant="body2" fontWeight="medium">
-                {frequency === 'daily' ? 'Diario' : 
-                 frequency === 'weekdays' ? 'Días laborables' : 
-                 frequency === 'weekends' ? 'Fines de semana' : 
-                 frequency === 'monthly' ? 'Mensual' :
-                 frequency === 'yearly' ? 'Anual' : 'Semanal'}
-              </Typography>
-            </Stack>
-
-            {frequency === 'custom' && (
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Typography variant="body2" color="text.secondary">Días:</Typography>
-                <Box textAlign="right">
-                  {customDays.sort().map(day => (
-                    <Typography key={day} variant="body2" fontWeight="medium">
-                      {weekdays.find(d => d.value === day)?.label}
-                    </Typography>
-                  ))}
-                </Box>
-              </Stack>
-            )}
-
-            {frequency === 'monthly' && (
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Typography variant="body2" color="text.secondary">Días del mes:</Typography>
-                <Box textAlign="right">
-                  <Typography variant="body2" fontWeight="medium">
-                    {monthlyDays.sort((a, b) => a - b).join(', ')}
-                  </Typography>
-                </Box>
-              </Stack>
-            )}
-
-            {frequency === 'yearly' && (
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Typography variant="body2" color="text.secondary">Meses:</Typography>
-                <Box textAlign="right">
-                  {yearlyMonths.sort((a, b) => a - b).map(month => (
-                    <Typography key={month} variant="body2" fontWeight="medium">
-                      {yearMonths.find(m => m.value === month)?.label}
-                    </Typography>
-                  ))}
-                </Box>
-              </Stack>
-            )}
-
-            {frequency === 'yearly' && (
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Typography variant="body2" color="text.secondary">Días del mes:</Typography>
-                <Box textAlign="right">
-                  <Typography variant="body2" fontWeight="medium">
-                    {yearlyDays.sort((a, b) => a - b).join(', ')}
-                  </Typography>
-                </Box>
-              </Stack>
-            )}
-
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Dificultad:</Typography>
-              <Box display="flex" alignItems="center">
-                <Box 
-                  sx={{ 
-                    width: 12, 
-                    height: 12, 
-                    borderRadius: '50%', 
-                    bgcolor: getDifficultyInfo(difficulty).color,
-                    mr: 1 
-                  }} 
-                />
-                <Typography variant="body2" fontWeight="medium">
-                  {getDifficultyInfo(difficulty).label} ({getDifficultyInfo(difficulty).multiplier}x)
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Recordatorio:</Typography>
-              <Typography variant="body2" fontWeight="medium">
-                {reminder ? `Activado (${reminderTime})` : 'Desactivado'}
-              </Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Color:</Typography>
-              <Box display="flex" alignItems="center">
-                <Box 
-                  sx={{ 
-                    width: 16, 
-                    height: 16, 
-                    borderRadius: '50%', 
-                    bgcolor: `${getColorObject(color).value}.main`,
-                    mr: 1 
-                  }} 
-                />
-                <Typography variant="body2" fontWeight="medium">
-                  {getColorObject(color).label}
-                </Typography>
-              </Box>
-            </Stack>
-          </Stack>
-        </Box>
-      </Card>
-      
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <Button
-          variant="outlined"
-          onClick={() => handleStepChange('back')}
-          startIcon={<ArrowBackIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            borderWidth: 2,
-            '&:hover': {
-              borderWidth: 2
-            }
-          }}
-        >
-          Volver
+        <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
+          sx={{ maxWidth: 320, bgcolor: habitColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: alpha(habitColor, 0.8) } }}>
+          Crear otro
         </Button>
-        <Button 
-          variant="contained" 
-          color="success"
-          onClick={() => handleStepChange('next')}
-          disabled={!isFormValid()}
-          endIcon={<CheckCircleIcon />}
-          sx={{ 
-            px: 4,
-            py: 1.5,
-            borderRadius: 2,
-            boxShadow: 2
-          }}
-        >
-          Crear Hábito
-        </Button>
-      </Box>
-    </Box>
-  );
-  
+        <Button onClick={() => navigate('/Habitos')} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver a Hábitos</Button>
+      </AnimatedSuccess>
+    );
+  };
+
+  const handleStepChange = (direction) => {
+    if (direction === 'back') {
+      if (step === 1) navigate('/Habitos');
+      else setStep(step - 1);
+    } else if (direction === 'next') {
+      if (step < 4) setStep(step + 1);
+      else saveHabit();
+    }
+  };
+
+  const freqLabel = FREQUENCY_OPTIONS.find((o) => o.value === frequency)?.label || '';
+
   return (
     <Layout title="Crear Nuevo Hábito">
-      <Box 
-        sx={{ 
-          minHeight: '100vh',
-          pt: 8,
-          pb: 4,
+      <Box
+        sx={{
+          maxWidth: 600,
+          mx: 'auto',
           px: 2,
-          width: '100%',
+          py: 2,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          gap: 2.5,
+          pb: 8,
         }}
       >
-        <Container maxWidth={false} sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Panel de progreso */}
-          <Card 
-            elevation={4} 
-            sx={{ 
-              width: '100%',
-              bgcolor: 'background.paper',
-              borderRadius: 3
-            }}
-          >
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h5" fontWeight="bold" gutterBottom>
-                Nuevo Hábito
+        {savedSnapshot ? (
+          renderSuccess()
+        ) : (
+          <>
+        {/* Dots indicator */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.75, py: 1 }}>
+          {STEPS.map((label, i) => {
+            const idx = i + 1;
+            const isActive = step === idx;
+            const isDone = step > idx;
+            return (
+              <Box
+                key={idx}
+                sx={{
+                  width: isActive ? 24 : 8,
+                  height: 8,
+                  borderRadius: 999,
+                  bgcolor: isActive || isDone ? theme.palette.primary.main : alpha(theme.palette.text.disabled, 0.4),
+                  transition: 'all 0.2s ease',
+                }}
+              />
+            );
+          })}
+        </Box>
+
+        {/* Step 1: Información */}
+        <Fade in={step === 1} key="step1">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700} gutterBottom>
+                ¿Qué hábito deseas crear?
               </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Completa los siguientes pasos para crear tu nuevo hábito
+              <Typography variant="body2" color="text.secondary">
+                Los buenos hábitos son la clave para alcanzar tus metas.
               </Typography>
-              
-              <Stack direction="row" spacing={2} mt={4} sx={{ overflowX: 'auto', pb: 1 }}>
-                {[
-                  { label: 'Información', icon: <DescriptionIcon /> },
-                  { label: 'Frecuencia', icon: <RepeatIcon /> },
-                  { label: 'Personalización', icon: <TrendingUpIcon /> },
-                  { label: 'Finalizar', icon: <FormatPaintIcon /> }
-                ].map((item, index) => (
-                  <Box 
-                    key={index}
+            </Box>
+
+            <Box
+              sx={{
+                borderRadius: 3,
+                border: `1px solid ${theme.palette.divider}`,
+                p: 2.5,
+              }}
+            >
+              <Stack spacing={3}>
+                <Box>
+                  <Typography variant="body2" fontWeight={600} gutterBottom>
+                    Nombre del hábito
+                  </Typography>
+                  <TextField
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    fullWidth
+                    placeholder="Ej: Beber agua, Meditar, Leer..."
+                    size="small"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <DescriptionIcon sx={{ color: 'text.secondary' }} fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography variant="body2" fontWeight={600} gutterBottom>
+                    Descripción (opcional)
+                  </Typography>
+                  <TextField
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    fullWidth
+                    multiline
+                    rows={3}
+                    placeholder="Describe este hábito"
+                    size="small"
+                  />
+                </Box>
+              </Stack>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Button
+                variant="outlined"
+                onClick={() => handleStepChange('back')}
+                startIcon={<ArrowBackIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Volver
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleStepChange('next')}
+                disabled={!name.trim()}
+                endIcon={<ArrowForwardIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Continuar
+              </Button>
+            </Box>
+          </Box>
+        </Fade>
+
+        {/* Step 2: Frecuencia */}
+        <Fade in={step === 2} key="step2">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700} gutterBottom>
+                ¿Con qué frecuencia?
+              </Typography>
+              <Stack direction="row" spacing={0.75} alignItems="center">
+                <Chip
+                  icon={<DescriptionIcon sx={{ fontSize: 14 }} />}
+                  label={name}
+                  size="small"
+                  sx={{
+                    bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    color: theme.palette.primary.main,
+                    fontWeight: 600,
+                    height: 28,
+                  }}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  Define la frecuencia
+                </Typography>
+              </Stack>
+            </Box>
+
+            <Stack spacing={1}>
+              {FREQUENCY_OPTIONS.map((opt) => (
+                <SelectableCard
+                  key={opt.value}
+                  icon={<RepeatIcon sx={{ color: frequency === opt.value ? theme.palette.primary.main : 'text.secondary' }} />}
+                  label={opt.label}
+                  desc={opt.desc}
+                  active={frequency === opt.value}
+                  onClick={() => setFrequency(opt.value)}
+                  activeColor={theme.palette.primary.main}
+                />
+              ))}
+            </Stack>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Button
+                variant="outlined"
+                onClick={() => handleStepChange('back')}
+                startIcon={<ArrowBackIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Volver
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleStepChange('next')}
+                endIcon={<ArrowForwardIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Continuar
+              </Button>
+            </Box>
+          </Box>
+        </Fade>
+
+        {/* Step 3: Personalización */}
+        <Fade in={step === 3} key="step3">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700} gutterBottom>
+                Personalizá tu hábito
+              </Typography>
+              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+                <Chip
+                  icon={<DescriptionIcon sx={{ fontSize: 14 }} />}
+                  label={name}
+                  size="small"
+                  sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, fontWeight: 600, height: 28 }}
+                />
+                <Chip
+                  icon={<RepeatIcon sx={{ fontSize: 14 }} />}
+                  label={freqLabel}
+                  size="small"
+                  sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, fontWeight: 600, height: 28 }}
+                />
+              </Stack>
+            </Box>
+
+            <Box sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, p: 2.5 }}>
+              <Stack spacing={3}>
+                {/* Días semanales */}
+                {frequency === 'custom' && (
+                  <Box>
+                    <Typography variant="body2" fontWeight={600} gutterBottom>
+                      Días de la semana
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                      {weekdays.map((day) => (
+                        <Chip
+                          key={day.value}
+                          label={day.label}
+                          onClick={() => handleDayToggle(day.value)}
+                          color={customDays.includes(day.value) ? 'primary' : 'default'}
+                          variant={customDays.includes(day.value) ? 'filled' : 'outlined'}
+                          size="small"
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* Días mensuales */}
+                {frequency === 'monthly' && (
+                  <Box>
+                    <Typography variant="body2" fontWeight={600} gutterBottom>
+                      Días del mes
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                      {monthDays.map((day) => (
+                        <Chip
+                          key={day}
+                          label={day}
+                          onClick={() => handleMonthlyDayToggle(day)}
+                          color={monthlyDays.includes(day) ? 'primary' : 'default'}
+                          variant={monthlyDays.includes(day) ? 'filled' : 'outlined'}
+                          size="small"
+                          sx={{ minWidth: 40 }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* Anual */}
+                {frequency === 'yearly' && (
+                  <>
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} gutterBottom>
+                        Meses
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        {yearMonthsArr.map((month, idx) => (
+                          <Chip
+                            key={idx + 1}
+                            label={month.substring(0, 3)}
+                            onClick={() => handleYearlyMonthToggle(idx + 1)}
+                            color={yearlyMonths.includes(idx + 1) ? 'primary' : 'default'}
+                            variant={yearlyMonths.includes(idx + 1) ? 'filled' : 'outlined'}
+                            size="small"
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} gutterBottom>
+                        Días del mes
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                        {monthDays.map((day) => (
+                          <Chip
+                            key={day}
+                            label={day}
+                            onClick={() => handleYearlyDayToggle(day)}
+                            color={yearlyDays.includes(day) ? 'primary' : 'default'}
+                            variant={yearlyDays.includes(day) ? 'filled' : 'outlined'}
+                            size="small"
+                            sx={{ minWidth: 40 }}
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  </>
+                )}
+
+                {/* Dificultad */}
+                <Box>
+                  <Typography variant="body2" fontWeight={600} gutterBottom>
+                    Nivel de Dificultad
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                    Los hábitos más difíciles valen más puntos.
+                  </Typography>
+                  <Stack spacing={1}>
+                    {difficultyOptions.map((opt) => (
+                      <Box
+                        key={opt.value}
+                        onClick={() => setDifficulty(opt.value)}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          border: `1.5px solid ${difficulty === opt.value ? opt.color : theme.palette.divider}`,
+                          cursor: 'pointer',
+                          bgcolor: difficulty === opt.value ? alpha(opt.color, 0.05) : 'transparent',
+                          transition: '0.15s',
+                          '&:hover': { borderColor: opt.color },
+                        }}
+                      >
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Rating
+                            value={opt.value}
+                            max={5}
+                            readOnly
+                            size="small"
+                            icon={<FitnessCenterIcon fontSize="inherit" />}
+                            emptyIcon={<FitnessCenterIcon fontSize="inherit" sx={{ opacity: 0.3 }} />}
+                            sx={{
+                              '& .MuiRating-iconFilled': { color: opt.color },
+                              '& .MuiRating-iconEmpty': { color: alpha(opt.color, 0.3) },
+                            }}
+                          />
+                          <Box sx={{ flex: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={0.75}>
+                              <Typography variant="body2" fontWeight={600}>
+                                {opt.label}
+                              </Typography>
+                              <Chip label={`${opt.multiplier}x`} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {opt.desc} — {opt.example}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+
+                {/* Recordatorio */}
+                <Box>
+                  <Typography variant="body2" fontWeight={600} gutterBottom>
+                    Recordatorio
+                  </Typography>
+                  <Box
+                    onClick={() => setReminder(!reminder)}
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 2,
+                      p: 1.5,
                       borderRadius: 2,
-                      bgcolor: step === index + 1 ? 'primary.main' : 'transparent',
-                      color: step === index + 1 ? 'white' : 'text.primary',
-                      border: `1px solid ${step === index + 1 ? 'transparent' : theme.palette.divider}`,
-                      opacity: step >= index + 1 ? 1 : 0.5,
-                      minWidth: 'fit-content'
+                      border: `1.5px solid ${reminder ? theme.palette.primary.main : theme.palette.divider}`,
+                      cursor: 'pointer',
+                      bgcolor: reminder ? alpha(theme.palette.primary.main, 0.05) : 'transparent',
+                      transition: '0.15s',
+                      '&:hover': { borderColor: theme.palette.primary.main },
                     }}
                   >
-                    {React.cloneElement(item.icon, { 
-                      style: { 
-                        color: step === index + 1 ? 'white' : theme.palette.text.secondary 
-                      }
-                    })}
-                    <Typography variant="body1" fontWeight={step === index + 1 ? 'bold' : 'regular'}>
-                      {item.label}
-                    </Typography>
-                    {step > index + 1 && (
-                      <CheckCircleIcon sx={{ ml: 'auto', color: theme.palette.success.main }} />
-                    )}
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Box sx={{ color: reminder ? theme.palette.primary.main : 'text.secondary' }}>
+                        <NotificationsActiveIcon fontSize="small" />
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                          Activar recordatorio
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Recibe notificaciones para no olvidar este hábito
+                        </Typography>
+                      </Box>
+                    </Stack>
                   </Box>
+                  {reminder && (
+                    <TextField
+                      type="time"
+                      value={reminderTime}
+                      onChange={(e) => setReminderTime(e.target.value)}
+                      fullWidth
+                      size="small"
+                      sx={{ mt: 1 }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                </Box>
+              </Stack>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Button
+                variant="outlined"
+                onClick={() => handleStepChange('back')}
+                startIcon={<ArrowBackIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Volver
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleStepChange('next')}
+                disabled={!isStep3Valid()}
+                endIcon={<ArrowForwardIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Continuar
+              </Button>
+            </Box>
+          </Box>
+        </Fade>
+
+        {/* Step 4: Finalizar */}
+        <Fade in={step === 4} key="step4">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={700} gutterBottom>
+                Finalizá la creación
+              </Typography>
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                <Chip
+                  icon={<DescriptionIcon sx={{ fontSize: 14 }} />}
+                  label={name}
+                  size="small"
+                  sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, fontWeight: 600, height: 28 }}
+                />
+                <Chip
+                  icon={<RepeatIcon sx={{ fontSize: 14 }} />}
+                  label={freqLabel}
+                  size="small"
+                  sx={{ bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main, fontWeight: 600, height: 28 }}
+                />
+                <Chip
+                  icon={<TrendingUpIcon sx={{ fontSize: 14 }} />}
+                  label={getDifficultyInfo(difficulty).label}
+                  size="small"
+                  sx={{ bgcolor: alpha(getDifficultyInfo(difficulty).color, 0.08), color: getDifficultyInfo(difficulty).color, fontWeight: 600, height: 28 }}
+                />
+              </Stack>
+            </Box>
+
+            {/* Color selector */}
+            <Box>
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                Elegí un color
+              </Typography>
+              <Stack spacing={1}>
+                {colorOptions.map((opt) => (
+                  <SelectableCard
+                    key={opt.value}
+                    icon={<PaletteOutlinedIcon sx={{ color: opt.hex }} />}
+                    label={opt.label}
+                    desc="Para identificar visualmente tu hábito"
+                    active={color === opt.value}
+                    onClick={() => setColor(opt.value)}
+                    activeColor={opt.hex}
+                  />
                 ))}
               </Stack>
             </Box>
-          </Card>
-          
-          {/* Panel principal */}
-          <Card 
-            elevation={4} 
-            sx={{ 
-              flex: 1,
-              bgcolor: 'background.paper',
-              borderRadius: 3,
-              display: 'flex',
-              flexDirection: 'column',
-              width: '100%',
-              minHeight: 0
-            }}
-          >
-            <Box sx={{ 
-              p: 3,
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'auto',
-              '&::-webkit-scrollbar': {
-                width: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: 'transparent',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                borderRadius: '4px',
-              },
-            }}>
-              {step === 1 && renderStep1()}
-              {step === 2 && renderStep2()}
-              {step === 3 && renderStep3()}
-              {step === 4 && renderStep4()}
+
+            {/* Resumen */}
+            <Box
+              sx={{
+                borderRadius: 3,
+                border: `1px solid ${theme.palette.divider}`,
+                p: 2.5,
+                bgcolor: alpha(theme.palette.success.main, 0.04),
+              }}
+            >
+              <Typography variant="body2" fontWeight={700} gutterBottom>
+                Resumen
+              </Typography>
+              <Stack spacing={0.75}>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">Nombre</Typography>
+                  <Typography variant="caption" fontWeight={600}>{name}</Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">Frecuencia</Typography>
+                  <Typography variant="caption" fontWeight={600}>{freqLabel}</Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">Dificultad</Typography>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: getDifficultyInfo(difficulty).color }} />
+                    <Typography variant="caption" fontWeight={600}>
+                      {getDifficultyInfo(difficulty).label} ({getDifficultyInfo(difficulty).multiplier}x)
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">Recordatorio</Typography>
+                  <Typography variant="caption" fontWeight={600}>
+                    {reminder ? `Activado (${reminderTime})` : 'Desactivado'}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">Color</Typography>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: `${color}.main` }} />
+                    <Typography variant="caption" fontWeight={600}>
+                      {colorOptions.find((o) => o.value === color)?.label}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Stack>
             </Box>
-          </Card>
-        </Container>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Button
+                variant="outlined"
+                onClick={() => handleStepChange('back')}
+                startIcon={<ArrowBackIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Volver
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={() => handleStepChange('next')}
+                disabled={!isFormValid() || saving}
+                endIcon={<CheckCircleIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                {saving ? 'Creando...' : 'Crear Hábito'}
+              </Button>
+            </Box>
+          </Box>
+        </Fade>
+          </>
+        )}
       </Box>
     </Layout>
   );
 };
 
-export default NewHabit; 
+export default NewHabit;

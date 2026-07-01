@@ -3,22 +3,29 @@ import './App.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import Login from './pages/basics/Login.jsx';
 import Home from './pages/basics/Home.jsx';
-import Finances from './pages/finances/Finances.jsx';
+import Gastos from './pages/finances/Gastos.jsx';
+import Ingresos from './pages/finances/Ingresos.jsx';
+import ProcesarDevolucion from './pages/finances/ProcesarDevolucion.jsx';
 import Savings from './pages/savings/Savings.jsx';
 import FundHistory from './pages/savings/FundHistory.jsx';
 import Loading from './pages/basics/Loading.jsx';
 import Habits from './pages/habits/Habits';
 import HabitsList from './pages/habits/HabitsList';
-import PlantDashboard from './pages/plants/PlantDashboard.jsx';
 import Plant from './pages/plants/Plant.jsx';
 import Jardin from './pages/plants/Jardin.jsx';
 import NewPlant from './pages/plants/NewPlant.jsx';
-import NewIrrigation from './pages/plants/NewIrrigation.jsx';
-import NuevaAccion from './pages/plants/NuevaAccion.jsx';
-import Aditives from './pages/plants/Aditives.jsx';
-import NewAditive from './pages/plants/NewAditive.jsx';
+import NuevaPoda from './pages/plants/NuevaPoda.jsx';
+import NuevoInsecticida from './pages/plants/NuevoInsecticida.jsx';
+import NuevoTransplante from './pages/plants/NuevoTransplante.jsx';
+import NuevoSuplemento from './pages/plants/NuevoSuplemento.jsx';
+import CambiarEtapa from './pages/plants/CambiarEtapa.jsx';
+import Nutrientes from './pages/plants/Nutrientes.jsx';
+import CrearNutriente from './pages/plants/CrearNutriente.jsx';
+import CrearInsecticida from './pages/plants/CrearInsecticida.jsx';
+import CrearSuplemento from './pages/plants/CrearSuplemento.jsx';
 import NewTransaction from './pages/finances/NewTransaction.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
+import Exchanges from './pages/finances/Exchanges.jsx';
 import { subscribeToAuthChanges } from './services/auth';
 import { subscribeToUserData } from './services/database';
 import { useStore } from './store'; 
@@ -30,13 +37,23 @@ import EditHabit from './pages/habits/EditHabit';
 import HabitDetailPage from './pages/habits/HabitDetail';
 import CreditCards from './pages/finances/CreditCards.jsx';
 import CreditCardDetail from './pages/finances/CreditCardDetail.jsx';
+import PagarTarjeta from './pages/finances/PagarTarjeta.jsx';
+import NuevaTarjeta from './pages/finances/NuevaTarjeta.jsx';
+import EditarTarjeta from './pages/finances/EditarTarjeta.jsx';
+import SubirResumenTC from './pages/finances/SubirResumenTC.jsx';
+import FechasTC from './pages/finances/FechasTC.jsx';
+import CrearFondo from './pages/savings/CrearFondo.jsx';
+import AgregarAFondo from './pages/savings/AgregarAFondo.jsx';
+import RetirarDeFondo from './pages/savings/RetirarDeFondo.jsx';
+import EditarFondo from './pages/savings/EditarFondo.jsx';
 import Configuracion from './pages/basics/Configuracion';
+import NuevaNotificacion from './pages/basics/NuevaNotificacion';
+import TestAnimation from './pages/basics/TestAnimation';
 import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
 import NewPhoto from './pages/plants/NewPhoto.jsx';
 import RegistrarMedicion from './pages/plants/RegistrarMedicion.jsx';
 import LogPlantaWizard from './pages/plants/LogPlantaWizard.jsx';
-import RegularPh from './pages/plants/RegularPh.jsx';
 
 function App() {
   const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
@@ -77,13 +94,16 @@ function App() {
             };
           }
 
+          transaction._key = transactionId;
           groupdedFinances.incomes[year].months[month].data.push(transaction);
           
           // Considerar devoluciones en los cálculos de ingresos también
           const originalAmount = transaction.amount || 0;
           const refundAmount = transaction.refundAmount || 0;
           const effectiveAmount = originalAmount - refundAmount;
-          const effectiveAmountUSD = transaction.amountUSD ? (transaction.amountUSD * (1 - (refundAmount / originalAmount))) : (effectiveAmount / (transaction.valorUSD || 1));
+          const effectiveAmountUSD = (transaction.amountUSD != null)
+            ? (originalAmount > 0 ? transaction.amountUSD * (1 - (refundAmount / originalAmount)) : transaction.amountUSD)
+            : (effectiveAmount / (transaction.valorUSD || 1));
           
           groupdedFinances.incomes[year].months[month].total += effectiveAmount;
           groupdedFinances.incomes[year].months[month].totalUSD += effectiveAmountUSD;
@@ -122,6 +142,7 @@ function App() {
             };
           }
           
+          transaction._key = transactionId;
           groupdedFinances.expenses[year].months[month].data.push(transaction);
           
           // Solo sumar al total si no es una transacción con tarjeta que debe excluirse
@@ -130,7 +151,9 @@ function App() {
             const originalAmount = transaction.amount || 0;
             const refundAmount = transaction.refundAmount || 0;
             const effectiveAmount = originalAmount - refundAmount;
-            const effectiveAmountUSD = transaction.amountUSD ? (transaction.amountUSD * (1 - (refundAmount / originalAmount))) : (effectiveAmount / (transaction.valorUSD || 1));
+            const effectiveAmountUSD = (transaction.amountUSD != null)
+              ? (originalAmount > 0 ? transaction.amountUSD * (1 - (refundAmount / originalAmount)) : transaction.amountUSD)
+              : (effectiveAmount / (transaction.valorUSD || 1));
             
             groupdedFinances.expenses[year].months[month].total += effectiveAmount;
             groupdedFinances.expenses[year].months[month].totalUSD += effectiveAmountUSD;
@@ -139,6 +162,29 @@ function App() {
           }
         } else {
           console.warn(`Transacción de gasto ${transactionId} sin fecha válida:`, transaction);
+        }
+      });
+    }
+    
+    // Procesar exchanges (compra/venta de divisas)
+    let groupedExchanges = {};
+    if (data.exchanges) {
+      Object.keys(data.exchanges).forEach((exchangeId) => {
+        const tx = data.exchanges[exchangeId];
+        if (tx && tx.date) {
+          const [, month, year] = tx.date.split('/').map(Number);
+          if (!groupedExchanges[year]) {
+            groupedExchanges[year] = { months: {} };
+          }
+          if (!groupedExchanges[year].months[month]) {
+            groupedExchanges[year].months[month] = { data: [], totalCompras: 0, totalVentas: 0 };
+          }
+          groupedExchanges[year].months[month].data.push(tx);
+          if (tx.operationType === 'Compra') {
+            groupedExchanges[year].months[month].totalCompras += (tx.amountARS || 0);
+          } else {
+            groupedExchanges[year].months[month].totalVentas += (tx.amountARS || 0);
+          }
         }
       });
     }
@@ -206,7 +252,9 @@ function App() {
       plants: groupedPlants,
       habits: groupedHabits,
       creditCards: groupedCreditCards,
+      exchanges: groupedExchanges,
       savingsFunds: data.savingsFunds || {},
+      creditCardPayments: data.creditCardPayments || {},
       config: data.config || {}  // Asegurarse de incluir la configuración
     };
   };
@@ -231,7 +279,9 @@ function App() {
           .catch((error) => console.error('Error fetching dollar rate:', error));
 
         unsubscribeData = subscribeToUserData((data) => {
+          console.log('[LifeTrack] RTDB snapshot - config.notifications:', JSON.stringify(data?.config?.notifications, null, 2));
           const filteredData = filterData(data);
+          console.log('[LifeTrack] filterData result - userData.config.notifications:', JSON.stringify(filteredData?.config?.notifications, null, 2));
           setUserData(filteredData);
           setUserLoggedIn(true);
           setIsLoading(false);
@@ -267,12 +317,18 @@ function App() {
       {userLoggedIn?
       <Router>
         <Routes>
-          <Route path="/finanzas" element={<Finances />} />
+          <Route path="/gastos" element={<Gastos />} />
+          <Route path="/ingresos" element={<Ingresos />} />
+          <Route path="/ProcesarDevolucion" element={<ProcesarDevolucion />} />
           <Route path="/ahorros" element={<Savings />} />
-          <Route path="/ahorros/fondo/:fundId" element={<FundHistory />} />
-          <Route path="/nuevoGasto" element={<NewTransaction type="expense" />} />
-          <Route path="/nuevoIngreso" element={<NewTransaction type="income" />} />
+          <Route path="/HistorialFondo/:fundId" element={<FundHistory />} />
+          <Route path="/nuevoFondo" element={<CrearFondo />} />
+          <Route path="/agregarFondos/:fundId" element={<AgregarAFondo />} />
+          <Route path="/retirarFondos/:fundId" element={<RetirarDeFondo />} />
+          <Route path="/editarFondo/:fundId" element={<EditarFondo />} />
+          <Route path="/nuevoMovimiento" element={<NewTransaction />} />
           <Route path="/exchange" element={<Exchange />} />
+          <Route path="/exchanges" element={<Exchanges />} />
           <Route path="/NuevoHabito" element={<NewHabit />} />
           <Route path="/EditarHabito/:habitId" element={<EditHabit />} />
           <Route path="/DetalleHabito/:habitId" element={<HabitDetailPage />} />
@@ -280,25 +336,38 @@ function App() {
           <Route path="/HabitosList" element={<HabitsList />} />
           <Route path="/tarjetas" element={<CreditCards />} />
           <Route path="/tarjeta" element={<CreditCardDetail />} />
+          <Route path="/PagarTarjeta" element={<PagarTarjeta />} />
+          <Route path="/nuevaTarjeta" element={<NuevaTarjeta />} />
+          <Route path="/editarTarjeta/:cardId" element={<EditarTarjeta />} />
+          <Route path="/tarjetaFechas/:cardId" element={<FechasTC />} />
+          <Route path="/subirResumen/:cardId" element={<SubirResumenTC />} />
           <Route path="/Configuracion" element={<Configuracion />} />
+          <Route path="/nuevaNotificacion" element={<NuevaNotificacion />} />
+          <Route path="/test-animacion" element={<TestAnimation />} />
           <Route path="/Perfil" element={<Perfil />} />
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/ayuda" element={<Ayuda />} />
           <Route path="/register" element={<Login />} />
-          <Route path="/Plantas" element={<PlantDashboard />} />
+          <Route path="/plantas" element={<Jardin />} />
           <Route path="/Planta" element={<Plant />} />
-          <Route path="/Jardin" element={<Jardin />} />
-          <Route path="/Ambientes" element={<Navigate to="/Jardin" />} />
+          <Route path="/Jardin" element={<Navigate to="/plantas" />} />
+          <Route path="/Ambientes" element={<Navigate to="/plantas" />} />
           <Route path="/NuevaPlanta" element={<NewPlant />} />
-          <Route path="/NuevoRiego" element={<NewIrrigation />} />
-          <Route path="/NuevaAccion" element={<NuevaAccion />} />
-          <Route path="/Aditivos" element={<Aditives />} />
-          <Route path="/NuevoAditivo" element={<NewAditive />} />
+          <Route path="/NuevoRiego" element={<RegistrarMedicion />} />
+          <Route path="/NuevoSuplemento" element={<NuevoSuplemento />} />
+          <Route path="/NuevaPoda" element={<NuevaPoda />} />
+          <Route path="/NuevoInsecticida" element={<NuevoInsecticida />} />
+          <Route path="/NuevoTransplante" element={<NuevoTransplante />} />
+          <Route path="/CambiarEtapa" element={<CambiarEtapa />} />
+          <Route path="/nutrientes" element={<Nutrientes />} />
+          <Route path="/Aditivos" element={<Navigate to="/nutrientes" />} />
+          <Route path="/NuevoAditivo" element={<Navigate to="/CrearNutriente" />} />
+          <Route path="/CrearNutriente" element={<CrearNutriente />} />
+          <Route path="/CrearInsecticida" element={<CrearInsecticida />} />
+          <Route path="/CrearSuplemento" element={<CrearSuplemento />} />
           <Route path="/NuevaFoto" element={<NewPhoto />} />
-          <Route path="/Registrar" element={<RegistrarMedicion />} />
           <Route path="/LogPlanta" element={<LogPlantaWizard />} />
-          <Route path="/RegularPh" element={<RegularPh />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

@@ -12,6 +12,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import Chart from 'react-apexcharts';
 import { formatAmount, getMonthName } from '../../utils';
 import { getCategoryColor } from './financesHelpers';
+import { AnimatedItem } from '../../design-system';
 
 // Helper: últimos N meses incluyendo el seleccionado, retorna labels cortos + valores
 const buildLastNMonths = (year, month, monthlyTrendsData, dataType, n = 6) => {
@@ -109,7 +110,7 @@ const FinancesCharts = ({
     },
     tooltip: {
       theme: theme.palette.mode,
-      y: { formatter: (v) => `$${formatAmount(v)}` },
+      y: { formatter: (v) => `${formatAmount(v)}` },
     },
     colors: [accent],
   };
@@ -138,7 +139,7 @@ const FinancesCharts = ({
     },
     dataLabels: {
       enabled: true,
-      formatter: (v) => `$${formatAmount(v)}`,
+      formatter: (v) => `${formatAmount(v)}`,
       offsetX: 50,
       style: {
         fontSize: '11px',
@@ -161,7 +162,7 @@ const FinancesCharts = ({
     legend: { show: false },
     tooltip: {
       theme: theme.palette.mode,
-      y: { formatter: (v) => `$${formatAmount(v)}` },
+      y: { formatter: (v) => `${formatAmount(v)}` },
     },
     colors: categoriesData.map((c) => c.color),
   };
@@ -187,6 +188,7 @@ const FinancesCharts = ({
   const hasCategories = categoriesData.length > 0;
 
   return (
+    <AnimatedItem>
     <Card
       elevation={0}
       sx={{
@@ -270,6 +272,7 @@ const FinancesCharts = ({
         ))}
       </Box>
     </Card>
+    </AnimatedItem>
   );
 };
 

@@ -8,9 +8,10 @@ import { getStageIcon } from './plantsHelpers';
 
 // Etiqueta del botón de avance de etapa según la etapa actual.
 function getStageButtonLabel(etapa) {
-  if (etapa === 'Floracion') return 'Cosechar';
+  if (etapa === 'Floracion') return 'Lavar raíces';
+  if (etapa === 'Lavado de Raices') return 'Cosechar';
   if (etapa === 'Germinacion') return 'Cambiar a Vegetativo';
-  if (etapa === 'Vegetativo') return 'Cambiar a Floración';
+  if (etapa === 'Vegetativo') return 'Cambiar a Floracion';
   if (etapa === 'Secado') return 'Enfrascar';
   return 'Cambiar etapa';
 }
@@ -64,7 +65,7 @@ const Separator = () => (
 const PlantHero = ({ plant, onChangeProfilePhoto, onChangeStage }) => {
   const theme = useTheme();
   const isFloracion = plant.etapa === 'Floracion';
-  const canChangeStage = !plant.isArchived && plant.etapa !== 'Enfrascado';
+  const canChangeStage = !plant.isArchived && plant.etapa !== 'Curado' && plant.etapa !== 'Enfrascado';
 
   return (
     <Card

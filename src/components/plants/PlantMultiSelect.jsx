@@ -6,19 +6,23 @@ import GrassIcon from '@mui/icons-material/Grass';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ParkIcon from '@mui/icons-material/Park';
 import ForestIcon from '@mui/icons-material/Forest';
+import WavesIcon from '@mui/icons-material/Waves';
 
 const STAGE_ICONS = {
   Germinacion: SpaIcon, Vegetativo: GrassIcon, Floracion: LocalFloristIcon,
-  Secado: ParkIcon, Enfrascado: ForestIcon,
+  Lavado: WavesIcon, 'Lavado de Raices': WavesIcon,
+  Secado: ParkIcon, Curado: ForestIcon,
 };
 const STAGE_COLORS = {
   Germinacion: '#8e24aa', Vegetativo: '#43a047', Floracion: '#e53935',
-  Secado: '#fb8c00', Enfrascado: '#546e7a',
+  'Lavado de Raices': '#00acc1',
+  Secado: '#fb8c00', Curado: '#546e7a',
 };
 
-const PlantMultiSelect = ({ plants, selectedIds, onToggle, color }) => {
+const PlantMultiSelect = ({ plants, selectedIds, onToggle, color, disabledIds }) => {
   const theme = useTheme();
   const accent = color || theme.palette.primary.main;
+  const disabledSet = disabledIds || new Set();
 
   if (plants.length === 0) {
     return (
@@ -34,11 +38,12 @@ const PlantMultiSelect = ({ plants, selectedIds, onToggle, color }) => {
         const StageIcon = STAGE_ICONS[p.etapa] || SpaIcon;
         const stageColor = STAGE_COLORS[p.etapa] || theme.palette.primary.main;
         const isSelected = selectedIds.has(p.id);
+        const isDisabled = disabledSet.has(p.id);
         return (
           <Card
             key={p.id}
             variant="outlined"
-            onClick={() => onToggle(p.id)}
+            onClick={() => !isDisabled && onToggle(p.id)}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -46,15 +51,17 @@ const PlantMultiSelect = ({ plants, selectedIds, onToggle, color }) => {
               px: 2,
               py: 1.5,
               borderRadius: 2,
-              cursor: 'pointer',
-              borderColor: isSelected ? accent : theme.palette.divider,
-              borderWidth: isSelected ? 2 : 1,
-              bgcolor: isSelected ? alpha(accent, 0.04) : 'transparent',
+              cursor: isDisabled ? 'default' : 'pointer',
+              opacity: isDisabled ? 0.35 : 1,
+              pointerEvents: isDisabled ? 'none' : 'auto',
+              borderColor: isDisabled ? theme.palette.divider : (isSelected ? accent : theme.palette.divider),
+              borderWidth: isSelected && !isDisabled ? 2 : 1,
+              bgcolor: isSelected && !isDisabled ? alpha(accent, 0.04) : 'transparent',
               transition: '0.12s',
-              '&:hover': { borderColor: theme.palette.primary.light },
+              '&:hover': isDisabled ? {} : { borderColor: theme.palette.primary.light },
             }}
           >
-            <Avatar sx={{ width: 44, height: 44, bgcolor: alpha(stageColor, 0.12), color: stageColor }}>
+            <Avatar sx={{ width: 44, height: 44, bgcolor: alpha(stageColor, isDisabled ? 0.05 : 0.12), color: stageColor, opacity: isDisabled ? 0.4 : 1 }}>
               {p.profilePhotoUrl ? (
                 <Box component="img" src={p.profilePhotoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
@@ -63,7 +70,7 @@ const PlantMultiSelect = ({ plants, selectedIds, onToggle, color }) => {
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{p.name}</Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color={isDisabled ? 'text.disabled' : 'text.secondary'}>
                 {p.etapa || '?'}{p.potVolume ? ` · ${p.potVolume}L` : ''}{p.quantity > 1 ? ` · x${p.quantity}` : ''}
               </Typography>
             </Box>

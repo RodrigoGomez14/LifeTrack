@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -21,7 +21,6 @@ import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import LocalGroceryStoreIcon from '@mui/icons-material/LocalGroceryStore';
@@ -39,16 +38,18 @@ import WorkIcon from '@mui/icons-material/Work';
 import LaptopIcon from '@mui/icons-material/Laptop';
 import PeopleIcon from '@mui/icons-material/People';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 import { useStore } from '../../store';
 import { addExpense, addIncome, addCardTransaction } from '../../services/finances';
 import { updateSavingsWithHistory } from '../../services/savings';
-import { getDate } from '../../utils';
+import { formatAmount, getDate } from '../../utils';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
 
 // ── Helpers a nivel módulo ──────────────────────────────────────────────────
 
 const extractCategories = (financesNode, kind) => {
-  const map = new Map();
+  const set = new Set();
   const yearsNode = financesNode?.[kind] || {};
   Object.values(yearsNode).forEach((year) => {
     const months = year?.months || {};
@@ -56,16 +57,11 @@ const extractCategories = (financesNode, kind) => {
       const txs = month?.data;
       if (!Array.isArray(txs)) return;
       txs.forEach((tx) => {
-        const cat = tx?.category;
-        if (!cat) return;
-        if (!map.has(cat)) map.set(cat, new Set());
-        if (tx?.subcategory) map.get(cat).add(tx.subcategory);
+        if (tx?.category) set.add(tx.category);
       });
     });
   });
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b, 'es'))
-    .map(([name, subs]) => ({ name, subcategories: Array.from(subs).sort((a, b) => a.localeCompare(b, 'es')) }));
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es')).map((name) => ({ name }));
 };
 
 const CATEGORY_ICONS = {
@@ -89,7 +85,7 @@ const formatAmountDisplay = (raw, currency, type) => {
   const withThousands = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   const formatted = decimalPart !== undefined ? `${withThousands},${decimalPart}` : withThousands;
   const sign = type === 'expense' ? '−' : '+';
-  const symbol = currency === 'ARS' ? '$' : 'US$';
+  const symbol = currency === 'ARS' ? '$' : 'USD';
   return `${sign}${symbol} ${formatted}`;
 };
 
@@ -101,14 +97,38 @@ const parseAmount = (raw) => {
 };
 
 const formatARS = (n) => `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const formatUSD = (n) => `US$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatUSD = (n) => `USD ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// DD/MM/YYYY → YYYY-MM-DD para input nativo type="date"
+const toDateInput = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return '';
+  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+};
+
+// YYYY-MM-DD → DD/MM/YYYY
+const fromDateInput = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return '';
+  return `${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}/${parts[0]}`;
+};
+
+// DD/MM/YYYY → Date object
+const parseDateStr = (dateStr) => {
+  const parts = dateStr.split('/').map(Number);
+  return new Date(parts[2], parts[1] - 1, parts[0]);
+};
 
 // ── Componente ──────────────────────────────────────────────────────────────
 
-const INSTALLMENT_OPTIONS = [1, 3, 4, 6, 9, 12, 18, 24];
-const TOTAL_STEPS = 3;
+const INSTALLMENT_OPTIONS = [2, 3, 6, 9, 12];
+const TOTAL_STEPS = 4;
 
-const NewTransaction = ({ type: initialType = 'expense' }) => {
+const NewTransaction = ({ type: propType }) => {
+  const location = useLocation();
+  const initialType = location.state?.type || propType || 'expense';
   const theme = useTheme();
   const navigate = useNavigate();
   const { userData, dollarRate } = useStore();
@@ -119,7 +139,6 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('ARS');
   const [category, setCategory] = useState('');
-  const [subcategory, setSubcategory] = useState('');
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [selectedCard, setSelectedCard] = useState('');
@@ -127,6 +146,11 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [error, setError] = useState('');
+  const [customDate, setCustomDate] = useState(null);
+  const [dateEditing, setDateEditing] = useState(false);
+
+  // Ref para evitar re-autoavance al volver atrás con misma categoría sin subcategorías
+  const lastAutoAdvanceCat = useRef('');
 
   const typeColor = type === 'expense' ? theme.palette.error.main : theme.palette.success.main;
   const typeColorBg = type === 'expense' ? theme.palette.error.dark : theme.palette.success.dark;
@@ -144,31 +168,37 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   }, [userData]);
 
   const currentCategories = categoriesByType[type] || [];
-  const currentSubs = useMemo(() => {
-    const cat = currentCategories.find((c) => c.name === category);
-    return cat?.subcategories || [];
-  }, [currentCategories, category]);
 
   const parsedAmount = parseAmount(amount);
   const rate = dollarRate?.venta || 1;
-  const amountInARS = currency === 'ARS' ? parsedAmount : parsedAmount * rate;
+  const amountInARS = currency === 'ARS' ? parsedAmount : 0;
   const amountInUSD = currency === 'USD' ? parsedAmount : parsedAmount / rate;
   const equivalentText = currency === 'ARS'
     ? `= ${formatUSD(amountInUSD)} · TC ${formatARS(rate).replace('$ ', '')}`
-    : `= ${formatARS(amountInARS)} · TC ${formatARS(rate).replace('$ ', '')}`;
+    : (parsedAmount > 0 ? formatUSD(amountInUSD) : '\u00A0');
 
   const currentSavingsARS = userData?.savings?.amountARS || 0;
   const currentSavingsUSD = userData?.savings?.amountUSD || 0;
+  const isImmediateDeduction = type === 'income' || paymentMethod === 'cash';
   const sign = type === 'expense' ? -1 : 1;
-  const savingsAfterARS = currency === 'ARS' ? currentSavingsARS + sign * parsedAmount : currentSavingsARS;
-  const savingsAfterUSD = currency === 'USD' ? currentSavingsUSD + sign * parsedAmount : currentSavingsUSD;
+  const savingsAfterARS = isImmediateDeduction && currency === 'ARS' ? currentSavingsARS + sign * parsedAmount : currentSavingsARS;
+  const savingsAfterUSD = isImmediateDeduction && currency === 'USD' ? currentSavingsUSD + sign * parsedAmount : currentSavingsUSD;
 
-  // Fix: resetear categoría y subcategoría cuando cambia el tipo
+  // ── Auto-avance en step 2: elegir categoría ya envía a step 3 ─────────────
+  useEffect(() => {
+    if (step === 2 && category && category !== lastAutoAdvanceCat.current) {
+      lastAutoAdvanceCat.current = category;
+      const timer = setTimeout(() => setStep(3), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [step, category]);
+
+  // Resetear categoría cuando cambia el tipo
   const handleTypeChange = (e, v) => {
     if (!v) return;
     setType(v);
     setCategory('');
-    setSubcategory('');
+    lastAutoAdvanceCat.current = '';
     if (v === 'income') setPaymentMethod('cash');
   };
 
@@ -185,7 +215,6 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
     setAmount(amount + key);
   }, [amount]);
 
-  // Paste: convierte cualquier input numérico pegado a formato interno "XX,YY"
   const handleAmountPaste = (raw) => {
     const cleaned = raw.replace(/[^\d,.]/g, '');
     const normalized = cleaned.replace(/\./g, '').replace(',', '.');
@@ -198,39 +227,43 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
 
   // ── Navegación ────────────────────────────────────────────────────────────
   const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS));
-  const goBack = () => setStep((s) => Math.max(s - 1, 1));
-  const handleClose = () => navigate('/Finanzas');
+  const goBack = () => {
+    setDateEditing(false);
+    setStep((s) => Math.max(s - 1, 1));
+  };
+  const handleClose = () => navigate(-1);
 
   // Validaciones
   const canStep1 = parsedAmount > 0;
-  const canStep2 = !!category && description.trim().length > 0 && (paymentMethod === 'cash' || (paymentMethod === 'creditCard' && !!selectedCard));
+  // Step 3 → 4: para gastos requiere método de pago válido; para ingresos siempre true
+  const canStep3 = type === 'income' || (paymentMethod === 'cash' || (paymentMethod === 'creditCard' && !!selectedCard));
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
     setError('');
+    const transactionDate = customDate || getDate();
     try {
       if (type === 'expense') {
         if (paymentMethod === 'cash') {
-          addExpense({ amount: amountInARS, amountUSD: amountInUSD, category, subcategory, date: getDate(), description, valorUSD: rate, paymentMethod: 'cash' });
+          addExpense({ amount: amountInARS, amountUSD: amountInUSD, category, date: transactionDate, description, currency, valorUSD: rate, paymentMethod: 'cash' });
           await updateSavingsWithHistory({ currency, amount: -parsedAmount, currentBalance: currency === 'ARS' ? currentSavingsARS : currentSavingsUSD });
         } else {
-          // Fix: redondeo de cuotas
           const rawInstallmentARS = amountInARS / installments;
           const rawInstallmentUSD = amountInUSD / installments;
           const installmentAmountARS = Math.round(rawInstallmentARS * 100) / 100;
           const installmentAmountUSD = Math.round(rawInstallmentUSD * 100) / 100;
-          const now = new Date();
+          const baseDate = parseDateStr(transactionDate);
 
           for (let i = 0; i < installments; i++) {
-            const d = new Date(now);
-            d.setMonth(now.getMonth() + i);
+            const d = new Date(baseDate);
+            d.setMonth(baseDate.getMonth() + i);
             const formattedDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
             const txData = {
               amount: installmentAmountARS, amountUSD: installmentAmountUSD,
-              category, subcategory, date: formattedDate,
-              description: `${description} - Cuota ${String(i + 1).padStart(2, '0')}/${String(installments).padStart(2, '0')}`,
+              category, date: formattedDate, currency,
+              description,
               valorUSD: rate, paymentMethod: 'creditCard', cardId: selectedCard,
               installments, currentInstallment: i + 1,
             };
@@ -239,12 +272,12 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
           }
         }
       } else {
-        addIncome({ amount: amountInARS, amountUSD: amountInUSD, category, subcategory, date: getDate(), description, valorUSD: rate });
+        addIncome({ amount: amountInARS, amountUSD: amountInUSD, category, date: transactionDate, description, currency, valorUSD: rate });
         await updateSavingsWithHistory({ currency, amount: parsedAmount, currentBalance: currency === 'ARS' ? currentSavingsARS : currentSavingsUSD });
       }
 
-      setSavedSnapshot({ savingsAfterARS, savingsAfterUSD, amountText: formatAmountDisplay(amount, currency, type), category, subcategory, type });
-      setStep(4); // éxito
+      setSavedSnapshot({ savingsAfterARS, savingsAfterUSD, amountText: formatAmountDisplay(amount, currency, type), category, type, isImmediateDeduction });
+      setStep(TOTAL_STEPS + 1); // éxito
     } catch (err) {
       console.error('Error al guardar la transacción:', err);
       setError(err?.message || 'Error al guardar. Reintentá.');
@@ -257,53 +290,60 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
   const handleLoadAnother = () => {
     setStep(1);
     setAmount('');
+    setCategory('');
     setCurrency('ARS');
     setDescription('');
     setPaymentMethod('cash');
     setInstallments(1);
+    setCustomDate(null);
+    setDateEditing(false);
+    lastAutoAdvanceCat.current = '';
     setSavedSnapshot(null);
-    // Mantiene type y category para cargas rápidas del mismo tipo
   };
 
   // ── UI: barra superior + dots ─────────────────────────────────────────────
   const renderHeader = (showBack, title) => (
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-      <IconButton onClick={showBack ? goBack : handleClose} size="small">
-        {showBack ? <ArrowBackIcon fontSize="small" /> : <CloseIcon />}
-      </IconButton>
+      {showBack ? (
+        <IconButton onClick={goBack} size="small"><ArrowBackIcon fontSize="small" /></IconButton>
+      ) : (
+        <Box sx={{ width: 36 }} />
+      )}
       <Typography variant="body2" sx={{ fontWeight: 600, letterSpacing: 0.3 }}>
         {title}
       </Typography>
-      <Box sx={{ width: 36 }} />
+      <IconButton onClick={handleClose} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
     </Box>
   );
 
-  const renderSummaryBanner = () => (
-    <Box sx={{ px: 2, py: 1.5 }}>
-      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
-        {type === 'expense' ? 'GASTO' : 'INGRESO'}
-      </Typography>
-      <Typography variant="h5" sx={{ fontWeight: 700, color: typeColor, lineHeight: 1.2 }}>
-        {formatAmountDisplay(amount, currency, type)}
-      </Typography>
+  const renderProgressDots = (activeStep) => (
+    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, pt: 1.5, pb: 2 }}>
+      {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((n) => (
+        <Box key={n} sx={{ width: n === activeStep ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
+      ))}
     </Box>
+  );
+
+  // Botón de acción con color del tipo
+  const renderActionButton = (label, onClick, disabled = false, loading = false) => (
+    <Button fullWidth variant="contained" size="large" disabled={disabled || loading} onClick={onClick}
+      sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem',
+        '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
+      {loading ? 'Guardando...' : label}
+    </Button>
   );
 
   // ── STEP 1: Monto ─────────────────────────────────────────────────────────
   const renderStep1 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {renderHeader(false, 'Nuevo')}
+      {renderProgressDots(1)}
 
-      {/* Progress dots */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, py: 2 }}>
-        {[1, 2, 3].map((n) => (
-          <Box key={n} sx={{ width: n === 1 ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
-        ))}
-      </Box>
-
-      {/* Type toggle */}
-      <Box sx={{ px: 3 }}>
-        <ToggleButtonGroup value={type} exclusive onChange={handleTypeChange} fullWidth
+      <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        {/* Type toggle */}
+        <AnimatedItem>
+          <Box sx={{ px: 3 }}>
+            <ToggleButtonGroup value={type} exclusive onChange={handleTypeChange} fullWidth
           sx={{
             '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, color: 'text.secondary', fontWeight: 600, textTransform: 'none', py: 1.2 },
             '& .MuiToggleButton-root.Mui-selected[value="expense"]': { bgcolor: theme.palette.error.main, color: 'white', '&:hover': { bgcolor: theme.palette.error.dark } },
@@ -311,31 +351,35 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
           }}>
           <ToggleButton value="expense">Gasto</ToggleButton>
           <ToggleButton value="income">Ingreso</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
+          </ToggleButtonGroup>
+        </Box>
+        </AnimatedItem>
 
-      {/* Amount display */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>MONTO</Typography>
+        {/* Amount display */}
+        <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>MONTO</Typography>
         <Typography variant="h2" sx={{ fontWeight: 700, color: typeColor, mt: 1, fontSize: { xs: '2.5rem', sm: '3.5rem' }, textAlign: 'center', wordBreak: 'break-all' }}>
           {formatAmountDisplay(amount, currency, type)}
         </Typography>
 
-        <ToggleButtonGroup value={currency} exclusive onChange={(_e, v) => v && setCurrency(v)} size="small"
+        <ToggleButtonGroup value={currency} exclusive onChange={(_e, v) => v && setCurrency(v)}
           sx={{
-            mt: 2, '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, borderRadius: 999, px: 2.5, py: 0.4, textTransform: 'none', fontWeight: 600 },
+            mt: 2, gap: 1, '& .MuiToggleButton-root': { border: `1px solid ${theme.palette.divider}`, borderRadius: 999, px: 3, py: 0.75, textTransform: 'none', fontWeight: 600 },
             '& .MuiToggleButton-root.Mui-selected': { bgcolor: alpha(typeColor, 0.1), color: typeColor, borderColor: typeColor },
           }}>
           <ToggleButton value="ARS">ARS</ToggleButton>
           <ToggleButton value="USD">USD</ToggleButton>
         </ToggleButtonGroup>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>{parsedAmount > 0 ? equivalentText : ' '}</Typography>
-      </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>{parsedAmount > 0 ? equivalentText : '\u00A0'}</Typography>
+        </Box>
+        </AnimatedItem>
 
-      {/* Numpad + paste */}
-      <Box sx={{ px: 3, pb: 2 }}>
-        <Grid container spacing={1}>
+        {/* Numpad + paste */}
+        <AnimatedItem>
+          <Box sx={{ px: 3, pb: 2 }}>
+            <Grid container spacing={1}>
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'backspace'].map((key) => (
             <Grid item xs={4} key={key}>
               <Button fullWidth onClick={() => handleKeyPress(key)}
@@ -345,7 +389,6 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
             </Grid>
           ))}
         </Grid>
-        {/* Paste helper */}
         <TextField
           value={amount}
           onChange={(e) => handleAmountPaste(e.target.value)}
@@ -354,43 +397,36 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
           fullWidth
           sx={{ mt: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
           inputProps={{ inputMode: 'decimal', autoComplete: 'off' }}
-        />
-      </Box>
+            />
+        </Box>
+        </AnimatedItem>
 
-      <Box sx={{ px: 3, pb: 3 }}>
-        <Button fullWidth variant="contained" size="large" disabled={!canStep1} onClick={goNext}
-          sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem',
-            '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
-          Siguiente →
-        </Button>
-      </Box>
+        <AnimatedItem>
+          <Box sx={{ px: 3, pb: 3 }}>
+            {renderActionButton('Siguiente →', goNext, !canStep1)}
+          </Box>
+        </AnimatedItem>
+      </AnimatedGroup>
     </Box>
   );
 
-  // ── STEP 2: Categoría + Detalle ───────────────────────────────────────────
+  // ── STEP 2: Categoría ─────────────────────────────────────────────────────
   const renderStep2 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {renderHeader(true, 'Detalles')}
-      {renderSummaryBanner()}
+      {renderHeader(true, 'Categoría')}
 
       <Box sx={{ flex: 1, px: 3, overflowY: 'auto', pb: 2 }}>
-        {/* Progress dots */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, pb: 2 }}>
-          {[1, 2, 3].map((n) => (
-            <Box key={n} sx={{ width: n === 2 ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
-          ))}
-        </Box>
+        {renderProgressDots(2)}
 
-        {/* Category grid */}
         <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>CATEGORÍA</Typography>
         {currentCategories.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>Aún no tenés categorías en tu historial.</Typography>
         ) : (
-          <Grid container spacing={1} sx={{ mb: 2.5 }}>
+          <Grid container spacing={1} component={AnimatedGroup}>
             {currentCategories.map((cat) => {
               const isSelected = category === cat.name;
               return (
-                <Grid item xs={4} key={cat.name}>
+                <Grid item xs={4} key={cat.name} component={AnimatedItem}>
                   <Card elevation={0} onClick={() => setCategory(cat.name)}
                     sx={{ cursor: 'pointer', border: `1.5px solid ${isSelected ? typeColor : theme.palette.divider}`, bgcolor: isSelected ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, transition: 'all 0.15s', '&:hover': { borderColor: typeColor } }}>
                     <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
@@ -403,29 +439,22 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
             })}
           </Grid>
         )}
+      </Box>
+    </Box>
+  );
 
-        {/* Subcategory (optional) */}
-        {currentSubs.length > 0 && (
-          <Box sx={{ mb: 2.5 }}>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>SUBCATEGORÍA</Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip label="Sin subcategoría" onClick={() => setSubcategory('')}
-                sx={{ bgcolor: !subcategory ? typeColor : 'transparent', color: !subcategory ? 'white' : 'text.primary', border: `1px solid ${!subcategory ? typeColor : theme.palette.divider}`, fontWeight: !subcategory ? 600 : 500, '&:hover': { bgcolor: !subcategory ? typeColorBg : alpha(typeColor, 0.06) } }} />
-              {currentSubs.map((sub) => {
-                const isSel = subcategory === sub;
-                return (
-                  <Chip key={sub} label={sub} onClick={() => setSubcategory(sub)}
-                    sx={{ bgcolor: isSel ? typeColor : 'transparent', color: isSel ? 'white' : 'text.primary', border: `1px solid ${isSel ? typeColor : theme.palette.divider}`, fontWeight: isSel ? 600 : 500, '&:hover': { bgcolor: isSel ? typeColorBg : alpha(typeColor, 0.06) } }} />
-                );
-              })}
-            </Box>
-          </Box>
-        )}
+  // ── STEP 3: Descripción + Método de pago ──────────────────────────────────
+  const renderStep3 = () => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {renderHeader(true, type === 'expense' ? 'Descripción y pago' : 'Descripción')}
 
-        {/* Description */}
-        <Box sx={{ mb: 2.5 }}>
+      <Box sx={{ flex: 1, px: 3, overflowY: 'auto', pb: 2 }}>
+        {renderProgressDots(3)}
+
+        {/* Descripción (opcional) */}
+        <Box sx={{ mb: type === 'expense' ? 2.5 : 0 }}>
           <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>DESCRIPCIÓN</Typography>
-          <TextField fullWidth multiline rows={2} value={description}
+          <TextField fullWidth multiline rows={2} value={description} autoFocus
             onChange={(e) => {
               if (e.target.value.length <= 120) setDescription(e.target.value);
             }}
@@ -436,136 +465,200 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
           </Typography>
         </Box>
 
-        {/* Payment method (only expenses) */}
+        {/* Método de pago (solo gastos) */}
         {type === 'expense' && (
-          <Box>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>MÉTODO DE PAGO</Typography>
+          <AnimatedGroup>
+            <AnimatedItem>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>MÉTODO DE PAGO</Typography>
+            </AnimatedItem>
 
-            <Card elevation={0} onClick={() => setPaymentMethod('cash')}
+            <AnimatedItem><Card elevation={0} onClick={() => setPaymentMethod('cash')}
               sx={{ cursor: 'pointer', border: `1.5px solid ${paymentMethod === 'cash' ? typeColor : theme.palette.divider}`, bgcolor: paymentMethod === 'cash' ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, mb: 1, '&:hover': { borderColor: typeColor } }}>
               <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <AccountBalanceWalletIcon sx={{ color: paymentMethod === 'cash' ? typeColor : 'text.secondary', fontSize: 20 }} />
                 <Box><Typography variant="body2" sx={{ fontWeight: 600 }}>Efectivo</Typography><Typography variant="caption" color="text.secondary">Pesos en mano</Typography></Box>
               </CardContent>
-            </Card>
+            </Card></AnimatedItem>
 
             {availableCards.map((card) => {
               const isSel = paymentMethod === 'creditCard' && selectedCard === card.id;
               return (
-                <Card key={card.id} elevation={0} onClick={() => { setPaymentMethod('creditCard'); setSelectedCard(card.id); }}
+                <AnimatedItem key={card.id}><Card key={card.id} elevation={0} onClick={() => { setPaymentMethod('creditCard'); setSelectedCard(card.id); }}
                   sx={{ cursor: 'pointer', border: `1.5px solid ${isSel ? typeColor : theme.palette.divider}`, bgcolor: isSel ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, mb: 1, '&:hover': { borderColor: typeColor } }}>
                   <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
                     <CreditCardIcon sx={{ color: isSel ? typeColor : 'text.secondary', fontSize: 20 }} />
                     <Box><Typography variant="body2" sx={{ fontWeight: 600 }}>{card.name}</Typography><Typography variant="caption" color="text.secondary">**** {card.lastFourDigits}</Typography></Box>
                   </CardContent>
-                </Card>
+                </Card></AnimatedItem>
               );
             })}
 
             {paymentMethod === 'creditCard' && (
               <Box sx={{ mt: 1.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>CUOTAS</Typography>
-                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                <Grid container spacing={1} component={AnimatedGroup}>
                   {INSTALLMENT_OPTIONS.map((n) => {
                     const isSel = installments === n;
                     return (
-                      <Chip key={n} label={`${n}x`} onClick={() => setInstallments(n)}
-                        sx={{ bgcolor: isSel ? typeColor : 'transparent', color: isSel ? 'white' : 'text.primary', border: `1px solid ${isSel ? typeColor : theme.palette.divider}`, fontWeight: isSel ? 600 : 500, '&:hover': { bgcolor: isSel ? typeColorBg : alpha(typeColor, 0.06) } }} />
+                      <Grid item xs={4} key={n} component={AnimatedItem}>
+                        <Card elevation={0} onClick={() => setInstallments(n)}
+                          sx={{ cursor: 'pointer', border: `1.5px solid ${isSel ? typeColor : theme.palette.divider}`, bgcolor: isSel ? alpha(typeColor, 0.06) : 'transparent', borderRadius: 2, '&:hover': { borderColor: typeColor } }}>
+                          <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="body1" sx={{ fontWeight: 700, color: isSel ? typeColor : 'text.primary', fontSize: '1.1rem' }}>
+                              {n}x
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
                     );
                   })}
-                </Box>
+                </Grid>
+                {installments > 1 && (
+                  <AnimatedItem><Card elevation={0} sx={{ mt: 1.5, bgcolor: alpha(typeColor, 0.05), border: `1.5px solid ${alpha(typeColor, 0.15)}`, borderRadius: 2 }}>
+                    <CardContent sx={{ p: 2, textAlign: 'center', '&:last-child': { pb: 2 } }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                        VALOR POR CUOTA
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: typeColor }}>
+                        {currency === 'ARS' ? formatARS(amountInARS / installments) : formatUSD(amountInUSD / installments)}
+                      </Typography>
+                    </CardContent>
+                  </Card></AnimatedItem>
+                )}
               </Box>
             )}
-          </Box>
+          </AnimatedGroup>
         )}
       </Box>
 
-      <Box sx={{ px: 3, pb: 3, pt: 1 }}>
-        <Button fullWidth variant="contained" size="large" disabled={!canStep2} onClick={goNext}
-          sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none',
-            '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
-          Revisar
-        </Button>
-      </Box>
+      <AnimatedItem>
+        <Box sx={{ px: 3, pb: 3, pt: 1 }}>
+          {renderActionButton('Revisar', goNext, !canStep3)}
+        </Box>
+      </AnimatedItem>
     </Box>
   );
 
-  // ── STEP 3: Revisar + Guardar ─────────────────────────────────────────────
-  const renderStep3 = () => {
+  // ── STEP 4: Confirmar ─────────────────────────────────────────────────────
+  const renderStep4 = () => {
     const now = new Date();
     const timeStr = `Hoy, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const dateDisplay = customDate || timeStr;
     const methodLabel = type === 'expense'
       ? paymentMethod === 'cash' ? `Efectivo (${currency})`
         : (() => { const c = availableCards.find((x) => x.id === selectedCard); return c ? `${c.name} **** ${c.lastFourDigits}${installments > 1 ? ` · ${installments}x` : ''}` : 'Tarjeta'; })()
       : `Ingreso (${currency})`;
     const deltaText = type === 'expense'
-      ? (currency === 'ARS' ? `−${formatARS(parsedAmount)}` : `−${formatUSD(parsedAmount)}`)
-      : (currency === 'ARS' ? `+${formatARS(parsedAmount)}` : `+${formatUSD(parsedAmount)}`);
+      ? (currency === 'ARS' ? `−${formatAmount(parsedAmount)}` : `−${formatAmount(parsedAmount, true)}`)
+      : (currency === 'ARS' ? `+${formatAmount(parsedAmount)}` : `+${formatAmount(parsedAmount, true)}`);
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {renderHeader(true, 'Confirmar')}
-        {renderSummaryBanner()}
 
         <Box sx={{ flex: 1, px: 3, overflowY: 'auto' }}>
-          {/* Progress dots */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, pb: 2 }}>
-            {[1, 2, 3].map((n) => (
-              <Box key={n} sx={{ width: n === 3 ? 20 : 8, height: 4, borderRadius: 2, bgcolor: n <= step ? typeColor : alpha(theme.palette.text.primary, 0.15), transition: 'all 0.2s' }} />
-            ))}
-          </Box>
+          {renderProgressDots(4)}
 
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Revisar</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>Confirmá los datos antes de guardar.</Typography>
-
-          <Card elevation={0} sx={{ bgcolor: alpha(typeColor, 0.05), border: `1px solid ${alpha(typeColor, 0.2)}`, borderRadius: 3, mb: 2.5, textAlign: 'center' }}>
+          <AnimatedGroup>
+            <AnimatedItem><Card elevation={0} sx={{ bgcolor: alpha(typeColor, 0.05), border: `1px solid ${alpha(typeColor, 0.2)}`, borderRadius: 3, mb: 2.5, textAlign: 'center' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>TOTAL A REGISTRAR</Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: typeColor, mt: 0.5 }}>{formatAmountDisplay(amount, currency, type)}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{currency === 'ARS' ? `≈ ${formatUSD(amountInUSD)}` : `≈ ${formatARS(amountInARS)}`}</Typography>
+              {currency === 'ARS' && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>≈ {formatUSD(amountInUSD)}</Typography>}
             </CardContent>
-          </Card>
+          </Card></AnimatedItem>
 
-          <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden', mb: 2.5 }}>
+          <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden', mb: 2.5 }}>
             <Box sx={{ p: 2.5 }}>
-              {[
-                ['Categoría', subcategory ? `${category} · ${subcategory}` : category],
-                ['Descripción', description],
-                ['Método', methodLabel],
-                ['Fecha', timeStr],
-              ].map(([label, value]) => (
-                <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${theme.palette.divider}`, '&:last-child': { borderBottom: 'none' }, alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">{label}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{value}</Typography>
-                </Box>
-              ))}
-            </Box>
-          </Card>
-
-          <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3 }}>
-            <CardContent sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', '&:last-child': { pb: 2.5 } }}>
-              <Box>
-                <Typography variant="caption" color="text.secondary">Ahorros después</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>{currency === 'ARS' ? formatARS(savingsAfterARS) : formatUSD(savingsAfterUSD)}</Typography>
+              {/* Categoría */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${theme.palette.divider}`, alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">Categoría</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{category}</Typography>
               </Box>
-              <Chip label={deltaText} size="small" sx={{ bgcolor: alpha(typeColor, 0.12), color: typeColor, fontWeight: 600 }} />
-            </CardContent>
-          </Card>
+
+              {/* Descripción */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${theme.palette.divider}`, alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">Descripción</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{description || '—'}</Typography>
+              </Box>
+
+              {/* Método (solo gastos) */}
+              {type === 'expense' && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${theme.palette.divider}`, alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Método</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{methodLabel}</Typography>
+                </Box>
+              )}
+
+              {/* Fecha (clickeable para editar) */}
+              <Box onClick={() => setDateEditing(true)}
+                sx={{ display: 'flex', justifyContent: 'space-between', py: 1, alignItems: 'center', gap: 1, cursor: 'pointer', borderRadius: 1, '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.04) } }}>
+                <Typography variant="body2" color="text.secondary">Fecha</Typography>
+                {dateEditing ? (
+                  <TextField type="date" size="small"
+                    value={toDateInput(customDate || getDate())}
+                    onChange={(e) => {
+                      if (e.target.value) setCustomDate(fromDateInput(e.target.value));
+                    }}
+                    onBlur={() => setDateEditing(false)}
+                    autoFocus
+                    sx={{ width: 160, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    inputProps={{ style: { textAlign: 'right', paddingRight: 4 } }}
+                  />
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right', borderBottom: `1px dashed transparent`, transition: 'border-color 0.15s', '.MuiBox-root:hover &': { borderBottomColor: typeColor } }}>
+                      {dateDisplay}
+                    </Typography>
+                    <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.5 }} />
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </Card></AnimatedItem>
+
+          {isImmediateDeduction ? (
+            <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${alpha(typeColor, 0.2)}`, borderRadius: 3, overflow: 'hidden', bgcolor: alpha(typeColor, 0.04) }}>
+              <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">Ahorros actuales</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.25 }}>
+                  {currency === 'ARS' ? formatAmount(currentSavingsARS) : formatAmount(currentSavingsUSD, true)}
+                </Typography>
+                <Box sx={{ display: 'inline-block', bgcolor: alpha(typeColor, 0.1), borderRadius: 2, px: 1.5, py: 0.25, mt: 0.75 }}>
+                  <Typography variant="caption" sx={{ color: typeColor, fontWeight: 600 }}>{deltaText}</Typography>
+                </Box>
+              </Box>
+              <Box sx={{ borderTop: `1px solid ${alpha(typeColor, 0.1)}`, mx: 2.5 }} />
+              <Box sx={{ px: 2.5, py: 2.5, textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">Nuevos ahorros</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: typeColor, mt: 0.25 }}>
+                  {currency === 'ARS' ? formatAmount(savingsAfterARS) : formatAmount(savingsAfterUSD, true)}
+                </Typography>
+              </Box>
+            </Card></AnimatedItem>
+          ) : (
+            <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3 }}>
+              <CardContent sx={{ p: 2.5, textAlign: 'center', '&:last-child': { pb: 2.5 } }}>
+                <Typography variant="caption" color="text.secondary">El pago con tarjeta no afecta tus ahorros hoy</Typography>
+              </CardContent>
+            </Card></AnimatedItem>
+          )}
+          </AnimatedGroup>
         </Box>
 
         <Box sx={{ px: 3, pb: 3, pt: 2 }}>
-          <Button fullWidth variant="contained" size="large" disabled={submitting} onClick={handleSubmit}
-            sx={{ bgcolor: typeColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem',
-              '&:hover': { bgcolor: typeColorBg }, '&.Mui-disabled': { bgcolor: alpha(typeColor, 0.3), color: 'white' } }}>
-            {submitting ? 'Guardando...' : type === 'expense' ? 'Confirmar gasto' : 'Confirmar ingreso'}
-          </Button>
-          <Button fullWidth onClick={() => setStep(1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Editar datos</Button>
+          {renderActionButton(
+            type === 'expense' ? 'Confirmar gasto' : 'Confirmar ingreso',
+            handleSubmit,
+            false,
+            submitting
+          )}
         </Box>
       </Box>
     );
   };
 
-  // ── Éxito ────────────────────────────────────────────────────────────────
+  // ── Éxito ──────────────────────────────────────────────────────────────────
   const renderSuccess = () => {
     if (!savedSnapshot) return null;
     const snap = savedSnapshot;
@@ -573,31 +666,28 @@ const NewTransaction = ({ type: initialType = 'expense' }) => {
     const snapColorBg = snap.type === 'expense' ? theme.palette.error.dark : theme.palette.success.dark;
 
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', px: 4, textAlign: 'center' }}>
-        <Box sx={{ width: 96, height: 96, borderRadius: '50%', bgcolor: alpha(snapColor, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
-          <CheckCircleIcon sx={{ fontSize: 64, color: snapColor }} />
-        </Box>
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>{snap.type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!'}</Typography>
+      <AnimatedSuccess color={snapColor} title={snap.type === 'expense' ? '¡Gasto registrado!' : '¡Ingreso registrado!'}>
         <Typography variant="h4" sx={{ fontWeight: 700, color: snapColor, mb: 0.5 }}>{snap.amountText}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{snap.subcategory ? `${snap.category} · ${snap.subcategory}` : snap.category}</Typography>
-        <Chip label={`Ahorros  ${formatARS(snap.savingsAfterARS)}`} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.06), color: 'text.primary', fontWeight: 600, px: 1, mb: 4 }} />
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{snap.category}</Typography>
+        {snap.isImmediateDeduction && <Chip label={`Ahorros  ${formatARS(snap.savingsAfterARS)}`} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.06), color: 'text.primary', fontWeight: 600, px: 1, mb: 4 }} />}
         <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
           sx={{ maxWidth: 320, bgcolor: snapColor, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: snapColorBg } }}>
           Cargar otro
         </Button>
-        <Button onClick={() => navigate('/Finanzas')} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver a Finanzas</Button>
-      </Box>
+        <Button onClick={() => navigate(-1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver</Button>
+      </AnimatedSuccess>
     );
   };
 
   return (
-    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       <Fade in key={step} timeout={250}>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
-          {step === 4 && renderSuccess()}
+          {step === 4 && renderStep4()}
+          {step === 5 && renderSuccess()}
         </Box>
       </Fade>
 

@@ -42,6 +42,8 @@ export const updateSavingsWithHistory = ({ currency, amount, currentBalance, ...
 
 export const addSavingsFund = (data) => db.push('savingsFunds', data);
 
+export const updateFund = (fundId, data) => db.update(`savingsFunds/${fundId}`, data);
+
 export const removeFund = (fundId) => db.remove(`savingsFunds/${fundId}`);
 
 // Mover dinero entre savings y un fondo. `amount` positivo = depósito al fondo

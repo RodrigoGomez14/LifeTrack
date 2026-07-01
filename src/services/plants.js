@@ -44,6 +44,8 @@ export const archivePlant = async (plantId, plantData) => {
   return newKey;
 };
 
-// === Aditivos (fertilizantes / insecticidas) ===
+// === Aditivos (fertilizantes / insecticidas / suplementos) ===
 
-export const addAditive = (data) => db.push('plants/aditives', data);
+export const addNutriente = (data) => db.push('plants/aditives/fertilizantes', data);
+export const addInsecticidaAditivo = (data) => db.push('plants/aditives/insecticidas', data);
+export const addSuplemento = (data) => db.push('plants/aditives/suplementos', data);

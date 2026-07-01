@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import {
   Box,
   Typography,
-  IconButton,
   TextField,
   alpha,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { addCreditCard, updateCreditCard } from '../../services/finances';
 import { getCardGradient, getCardLabel } from './creditCardsHelpers';
 
@@ -71,19 +69,8 @@ const TarjetasAddEditSheet = ({
 
   return (
     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 1.5, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <IconButton size="small" onClick={onBack} sx={{ color: 'text.secondary', mr: 1 }}>
-          <ArrowBackIcon fontSize="small" />
-        </IconButton>
-        <Typography variant="body2" sx={{ fontWeight: 700, flex: 1 }}>
-          {isEdit ? 'Editar tarjeta' : 'Nueva tarjeta'}
-        </Typography>
-      </Box>
-
-      <Box sx={{ flex: 1, overflow: 'auto', px: 1.5, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {/* Live preview card */}
-        <Box
+      {/* Card preview */}
+      <Box
           sx={{
             width: '100%',
             maxWidth: 340,
@@ -185,7 +172,6 @@ const TarjetasAddEditSheet = ({
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
           />
         </Box>
-      </Box>
 
       {/* Submit */}
       <Box sx={{ px: 1.5, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, IconButton, TextField, Card, CardContent,
-  Snackbar, Alert, alpha, Paper,
+  Snackbar, Alert, alpha, Paper, Button,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -14,6 +14,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
 import { addPlant } from '../../services/plants';
+import { AnimatedSuccess } from '../../design-system';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -80,6 +81,7 @@ const NewPlant = () => {
   const [inicioVegetativo, setInicioVegetativo] = useState(null);
   const [inicioFloracion, setInicioFloracion] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
 
   const goNext = () => setStep((s) => Math.min(s + 1, STEPS_TOTAL - 1));
@@ -104,8 +106,7 @@ const NewPlant = () => {
         ...(inicioFloracion ? { inicioFloracion: formatDate(inicioFloracion) } : {}),
       };
       addPlant(plantData);
-      setSnack('Planta creada');
-      setTimeout(() => navigate('/Plantas'), 400);
+      setSavedSnapshot({ name: name.trim(), genetic: genetic.trim(), quantity, potVolume, etapa });
     } catch (err) {
       console.error(err);
       setSnack('Error al crear');
@@ -113,19 +114,54 @@ const NewPlant = () => {
     setSubmitting(false);
   };
 
+  const handleLoadAnother = () => {
+    setStep(0);
+    setName('');
+    setGenetic('');
+    setQuantity('');
+    setPotVolume('');
+    setEtapa('Germinacion');
+    setBirthDate(null);
+    setInicioVegetativo(null);
+    setInicioFloracion(null);
+    setSavedSnapshot(null);
+  };
+
+  const renderSuccess = () => {
+    if (!savedSnapshot) return null;
+    const n = savedSnapshot;
+    const stageLabel = STAGE_OPTIONS.find((s) => s.key === n.etapa)?.label || n.etapa;
+    return (
+      <AnimatedSuccess color="#43a047" title="¡Planta creada!">
+        <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>{n.name}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{n.genetic}{n.quantity ? ` · ${n.quantity} unidad${n.quantity !== '1' ? 'es' : ''}` : ''}</Typography>
+        <Typography variant="caption" color="text.disabled" sx={{ mb: 3 }}>{stageLabel}{n.potVolume ? ` · ${n.potVolume}L` : ''}</Typography>
+        <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
+          sx={{ maxWidth: 320, bgcolor: '#43a047', color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: '#2e7d32' } }}>
+          Crear otra
+        </Button>
+        <Button onClick={() => navigate('/plantas')} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver a Plantas</Button>
+      </AnimatedSuccess>
+    );
+  };
+
   const StageIcon = STAGE_OPTIONS.find((s) => s.key === etapa)?.icon || SpaIcon;
 
   return (
-    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+      {savedSnapshot ? (
+        renderSuccess()
+      ) : (
+        <>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
         {step > 0 ? (
           <IconButton onClick={goBack} size="small"><ArrowBackIcon /></IconButton>
-        ) : (
-          <IconButton onClick={() => navigate(-1)} size="small"><CloseIcon /></IconButton>
-        )}
+) : (
+            <Box sx={{ width: 36 }} />
+          )}
         <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>Nueva planta</Typography>
-        <Box sx={{ width: 36 }} />
+        <IconButton onClick={() => navigate(-1)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
       </Box>
 
       <WizardProgressDots total={STEPS_TOTAL} current={step} color="#43a047" />
@@ -270,10 +306,12 @@ const NewPlant = () => {
       )}
 
       <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity={snack === 'Planta creada' ? 'success' : 'error'} variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>
+        <Alert severity="error" variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>
           {snack}
         </Alert>
       </Snackbar>
+        </>
+      )}
     </Box>
   );
 };

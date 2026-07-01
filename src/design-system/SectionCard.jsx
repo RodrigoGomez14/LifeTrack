@@ -1,4 +1,5 @@
-import { Paper, Typography, Box } from '@mui/material';
+import { Paper, Typography, Box, Button } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 
 export const SectionCard = ({ title, icon, action, children, sx }) => (
   <Paper
@@ -34,33 +35,22 @@ export const SectionCard = ({ title, icon, action, children, sx }) => (
   </Paper>
 );
 
-export const DashedAddCard = ({ label, desc, onClick }) => (
-  <Paper
+export const DashedAddCard = ({ label, onClick }) => (
+  <Button
+    fullWidth
     variant="outlined"
+    startIcon={<AddIcon />}
     onClick={onClick}
     sx={{
-      py: 2.5,
-      px: 1,
+      py: 3,
       borderRadius: 2,
-      textAlign: 'center',
-      cursor: 'pointer',
-      mb: 2,
       borderStyle: 'dashed',
-      transition: '0.15s',
-      '&:hover': {
-        borderColor: 'primary.light',
-        bgcolor: 'action.hover',
-      },
+      textTransform: 'none',
+      fontWeight: 600,
+      mb: 2,
+      justifyContent: 'center',
     }}
   >
-    <Typography variant="h4" sx={{ mb: 0.3 }}>
-      +
-    </Typography>
-    <Typography variant="body2" fontWeight={600}>
-      {label}
-    </Typography>
-    <Typography variant="caption" color="text.secondary" display="block">
-      {desc}
-    </Typography>
-  </Paper>
+    {label}
+  </Button>
 );

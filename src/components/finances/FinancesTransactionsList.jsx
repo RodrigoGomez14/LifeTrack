@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -18,9 +19,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import UndoIcon from '@mui/icons-material/Undo';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import { formatAmount } from '../../utils';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import { formatNumber } from '../../utils';
+import { update } from '../../services/database';
+import { updateSavingsWithHistory } from '../../services/savings';
 import { getCategoryIcon, getCategoryColor } from './financesHelpers';
+import { DashedAddCard, AnimatedGroup, AnimatedItem } from '../../design-system';
 
 // ───── Helpers de fecha ─────
 
@@ -78,13 +82,37 @@ const FinancesTransactionsList = ({
   selectedYear,
   selectedMonth,
   dollarRate,
-  onOpenRefund,
 }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isExpense = dataType === 'expenses';
   const accent = isExpense ? theme.palette.error.main : theme.palette.success.main;
+  const usdColor = theme.palette.warning.main;
   const [searchText, setSearchText] = useState('');
   const [expandedTx, setExpandedTx] = useState(null);
+  const [impacting, setImpacting] = useState(null);
+
+  const handleImpact = async (tx, e) => {
+    e.stopPropagation();
+    if (!tx._key || impacting) return;
+    setImpacting(tx._key);
+    try {
+      const currency = tx.currency === 'USD' ? 'USD' : 'ARS';
+      await updateSavingsWithHistory({
+        currency,
+        amount: -Math.abs(tx.amount || 0),
+        currentBalance: 0,
+      });
+      await update(`expenses/${tx._key}`, {
+        pendingImpact: null,
+        hiddenFromList: false,
+        excludeFromTotal: false,
+      });
+    } catch (err) {
+      console.error('Error al impactar en ahorros:', err);
+    }
+    setImpacting(null);
+  };
 
   // Construye transacciones del mes (preserva flags de futuras/ocultas como en el código viejo)
   const allTransactions = useMemo(() => {
@@ -115,7 +143,7 @@ const FinancesTransactionsList = ({
       const isCreditCard =
         t.paymentMethod === 'creditCard' || t.creditCardTransaction === true || t.excludeFromTotal === true;
       if (t.isFutureTransaction) return false;
-      if (t.hiddenFromList && !isCreditCard) return false;
+      if (t.hiddenFromList && !isCreditCard && !t.pendingImpact) return false;
 
       if (!term) return true;
       const fields = [
@@ -135,53 +163,42 @@ const FinancesTransactionsList = ({
     filtered.forEach((tx) => {
       const d = parseFechaFlexible(tx.date);
       const key = isNaN(d.getTime()) ? 'invalid' : `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-      if (!groups.has(key)) groups.set(key, { date: d, items: [], total: 0 });
+      if (!groups.has(key)) groups.set(key, { date: d, items: [], total: 0, totalUSD: 0 });
       const eff = (tx.amount || 0) - (tx.refundAmount || 0);
       groups.get(key).items.push(tx);
       groups.get(key).total += eff;
+      if (tx.currency === 'USD') {
+        groups.get(key).totalUSD += (tx.amountUSD || 0);
+      }
     });
     return Array.from(groups.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [filtered]);
 
   // ───── Render ─────
 
-  if (allTransactions.length === 0) {
-    return (
-      <Box sx={{ px: 2, mb: 4 }}>
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: 4,
-            p: 4,
-            textAlign: 'center',
-            border: `1px dashed ${theme.palette.divider}`,
-          }}
-        >
-          <Avatar sx={{ bgcolor: alpha(accent, 0.12), color: accent, width: 56, height: 56, mx: 'auto', mb: 1.5 }}>
-            <ReceiptLongIcon />
-          </Avatar>
-          <Typography variant="body2" color="text.secondary">
-            No hay {isExpense ? 'gastos' : 'ingresos'} registrados este mes.
-          </Typography>
-        </Card>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ px: 2, mb: 4 }}>
+      {/* Card fantasma — primer ítem para incitar a crear */}
+      <AnimatedItem>
+        <Box sx={{ mb: 2 }}>
+          <DashedAddCard
+            label={isExpense ? 'Agregar gasto' : 'Agregar ingreso'}
+            desc={allTransactions.length === 0 ? (isExpense ? 'Registrá tu primer gasto' : 'Registrá tu primer ingreso') : 'Registrá un nuevo movimiento'}
+            onClick={() => navigate('/nuevoMovimiento', { state: { type: isExpense ? 'expense' : 'income' } })}
+          />
+        </Box>
+      </AnimatedItem>
+
       {/* Header de la sección */}
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5, px: 0.5 }}>
         <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary' }}>
           MOVIMIENTOS
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {filtered.length} de {allTransactions.length}
-        </Typography>
       </Box>
 
       {/* Buscador */}
-      <TextField
+      {allTransactions.length > 0 && (
+        <TextField
         fullWidth
         size="small"
         value={searchText}
@@ -205,23 +222,35 @@ const FinancesTransactionsList = ({
           ),
         }}
       />
+      )}
 
       {/* Grupos por fecha */}
-      {groupsByDate.length === 0 ? (
+      {allTransactions.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+          No hay {isExpense ? 'gastos' : 'ingresos'} registrados este mes.
+        </Typography>
+      ) : groupsByDate.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
           Sin resultados para "{searchText}"
         </Typography>
       ) : (
-        <Stack spacing={2}>
+        <AnimatedGroup>
+          <Stack spacing={2}>
           {groupsByDate.map((group, gi) => (
-            <Box key={gi}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1, px: 0.5 }}>
+            <AnimatedItem key={gi}>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1, px: 0.5 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.secondary' }}>
                   {labelFromDate(group.date)}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: accent }}>
-                  {isExpense ? '−' : '+'}${formatAmount(group.total)}
+                  {isExpense ? '−' : '+'}$ {formatNumber(group.total)}
                 </Typography>
+                {group.totalUSD > 0 && (
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: usdColor }}>
+                    −USD {formatNumber(group.totalUSD, { abbreviate: false })}
+                  </Typography>
+                )}
               </Box>
 
               <Card
@@ -242,7 +271,8 @@ const FinancesTransactionsList = ({
                     const refundAmount = tx.refundAmount || 0;
                     const effectiveAmount = originalAmount - refundAmount;
                     const hasRefund = refundAmount > 0;
-                    const amountUSD = effectiveAmount / (dollarRate?.venta || 1);
+                    const isNativeUSD = tx.currency === 'USD';
+                    const amountUSD = isNativeUSD ? (tx.amountUSD || 0) : effectiveAmount / (dollarRate?.venta || 1);
 
                     return (
                       <Box
@@ -251,7 +281,7 @@ const FinancesTransactionsList = ({
                         sx={{
                           cursor: 'pointer',
                           p: 1.5,
-                          '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.4) },
+                          '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.06) },
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -288,12 +318,14 @@ const FinancesTransactionsList = ({
                             </Box>
                           </Box>
                           <Box sx={{ textAlign: 'right' }}>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: accent, whiteSpace: 'nowrap' }}>
-                              {isExpense ? '−' : '+'}${formatAmount(effectiveAmount)}
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: isNativeUSD ? usdColor : accent, whiteSpace: 'nowrap' }}>
+                              {isNativeUSD
+                                ? `${isExpense ? '−' : '+'}USD ${formatNumber(tx.amountUSD || 0, { abbreviate: false })}`
+                                : `${isExpense ? '−' : '+'}$ ${formatNumber(effectiveAmount)}`}
                             </Typography>
                             {hasRefund && (
                               <Typography variant="caption" sx={{ color: theme.palette.success.main, fontWeight: 500 }}>
-                                Devolución ${formatAmount(refundAmount)}
+                                Devolución $ {formatNumber(refundAmount)}
                               </Typography>
                             )}
                           </Box>
@@ -315,37 +347,60 @@ const FinancesTransactionsList = ({
                                 {tx.description}
                               </Typography>
                             )}
-                            <Typography variant="caption" color="text.secondary">
-                              {fullDateLabel(parseFechaFlexible(tx.date))}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              ≈ US$ {formatAmount(amountUSD)}
-                              {tx.valorUSD ? ` · TC ${formatAmount(tx.valorUSD)}` : ''}
-                            </Typography>
+                            {isNativeUSD ? (
+                              <Typography variant="caption" color="text.secondary">
+                                Pago en USD
+                              </Typography>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                ≈ USD {formatNumber(amountUSD, { abbreviate: false })}
+                                {tx.valorUSD ? ` · TC $${formatNumber(tx.valorUSD)}` : ''}
+                              </Typography>
+                            )}
                             <Typography variant="caption" color="text.secondary">
                               {isCreditCard ? 'Pago con tarjeta' : 'Efectivo / pesos'}
                             </Typography>
 
-                            {isExpense && onOpenRefund && !hasRefund && !isCreditCard && (
+                            {tx.pendingImpact && (
                               <Box sx={{ mt: 1 }}>
                                 <Button
                                   size="small"
+                                  variant="contained"
+                                  startIcon={<TrendingDownIcon fontSize="small" />}
+                                  onClick={(e) => handleImpact(tx, e)}
+                                  disabled={impacting === tx._key}
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    borderRadius: 2,
+                                    bgcolor: theme.palette.error.main,
+                                    '&:hover': { bgcolor: theme.palette.error.dark },
+                                  }}
+                                >
+                                  {impacting === tx._key ? 'Impactando...' : 'Impactar en ahorros'}
+                                </Button>
+                              </Box>
+                            )}
+
+                            {isExpense && !hasRefund && !isCreditCard && (
+                              <Box sx={{ mt: 1 }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
                                   startIcon={<UndoIcon fontSize="small" />}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onOpenRefund(tx);
+                                    navigate('/ProcesarDevolucion', { state: { tx } });
                                   }}
                                   sx={{
                                     textTransform: 'none',
                                     fontWeight: 600,
-                                    color: theme.palette.success.main,
-                                    bgcolor: alpha(theme.palette.success.main, 0.08),
-                                    borderRadius: 999,
-                                    px: 1.5,
-                                    '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.15) },
+                                    borderRadius: 2,
+                                    bgcolor: theme.palette.success.main,
+                                    '&:hover': { bgcolor: theme.palette.success.dark },
                                   }}
                                 >
-                                  Registrar devolución
+                                  Devolución
                                 </Button>
                               </Box>
                             )}
@@ -357,8 +412,10 @@ const FinancesTransactionsList = ({
                 </Stack>
               </Card>
             </Box>
+            </AnimatedItem>
           ))}
         </Stack>
+        </AnimatedGroup>
       )}
     </Box>
   );

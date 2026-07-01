@@ -13,7 +13,7 @@ const TransactionsTabsList = ({ data,category }) => {
                             {getCategoryIcon(transaction.category)}
                         </ListItemIcon>
                         <ListItemText
-                            primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(transaction.amount)} - USD {formatAmount(transaction.amountUSD)}</Typography>}
+                            primary={<Typography variant="subtitle1" style={{ fontWeight: 'bold' }}>{formatAmount(transaction.amount)} - {formatAmount(transaction.amountUSD, true)}</Typography>}
                             secondary={
                                 <div>
                                     <Typography variant="body1">{transaction.subcategory}</Typography>

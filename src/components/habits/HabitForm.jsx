@@ -1,25 +1,30 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Button, 
-  Card, 
-  CardContent, 
-  Divider, 
-  FormControl, 
-  FormControlLabel, 
-  FormLabel, 
-  Grid, 
-  InputLabel, 
-  MenuItem, 
-  Radio, 
-  RadioGroup, 
-  Select, 
-  TextField, 
+import {
+  Box,
+  Button,
+  Card,
+  Divider,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Grid,
+  MenuItem,
+  Radio,
+  RadioGroup,
+  Select,
+  TextField,
   Typography,
   Checkbox,
   Chip,
-  Stack
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  alpha,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { addHabit, updateHabit, removeHabit } from '../../services/habits';
 import { useStore } from '../../store';
@@ -27,187 +32,206 @@ import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
+const weekdays = [
+  { value: 1, label: 'Lun' },
+  { value: 2, label: 'Mar' },
+  { value: 3, label: 'Mié' },
+  { value: 4, label: 'Jue' },
+  { value: 5, label: 'Vie' },
+  { value: 6, label: 'Sáb' },
+  { value: 0, label: 'Dom' },
+];
+
+const monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
+const yearMonths = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const DIFFICULTY_OPTIONS = [
+  { value: 1, label: 'Muy Fácil', color: '#4caf50', multiplier: 1.0 },
+  { value: 2, label: 'Fácil', color: '#8bc34a', multiplier: 1.5 },
+  { value: 3, label: 'Moderado', color: '#ff9800', multiplier: 2.5 },
+  { value: 4, label: 'Difícil', color: '#f44336', multiplier: 4.0 },
+  { value: 5, label: 'Muy Difícil', color: '#9c27b0', multiplier: 6.0 },
+];
+
+const colorOptions = [
+  { value: 'primary', label: 'Azul' },
+  { value: 'secondary', label: 'Verde' },
+  { value: 'error', label: 'Rojo' },
+  { value: 'warning', label: 'Naranja' },
+  { value: 'info', label: 'Celeste' },
+];
+
 const HabitForm = ({ habit = null, isEditing = false }) => {
   const navigate = useNavigate();
   const { userData } = useStore();
-  
-  // Estado para los campos del formulario
+  const theme = useTheme();
+
   const [name, setName] = useState(habit ? habit.name : '');
   const [description, setDescription] = useState(habit ? habit.description : '');
   const [frequency, setFrequency] = useState(habit ? habit.frequency : 'daily');
   const [customDays, setCustomDays] = useState(habit ? habit.customDays || [] : []);
+  const [monthlyDays, setMonthlyDays] = useState(habit ? habit.monthlyDays || [] : []);
+  const [yearlyMonths, setYearlyMonths] = useState(habit ? habit.yearlyMonths || [] : []);
+  const [yearlyDays, setYearlyDays] = useState(habit ? habit.yearlyDays || [] : []);
   const [reminder, setReminder] = useState(habit ? habit.reminder : false);
   const [reminderTime, setReminderTime] = useState(habit ? habit.reminderTime : '08:00');
   const [color, setColor] = useState(habit ? habit.color : 'primary');
-  
-  // Opciones para los días de la semana
-  const weekdays = [
-    { value: 1, label: 'Lunes' },
-    { value: 2, label: 'Martes' },
-    { value: 3, label: 'Miércoles' },
-    { value: 4, label: 'Jueves' },
-    { value: 5, label: 'Viernes' },
-    { value: 6, label: 'Sábado' },
-    { value: 0, label: 'Domingo' }
-  ];
-  
-  // Opciones para colores
-  const colorOptions = [
-    { value: 'primary', label: 'Azul' },
-    { value: 'secondary', label: 'Verde' },
-    { value: 'error', label: 'Rojo' },
-    { value: 'warning', label: 'Naranja' },
-    { value: 'info', label: 'Celeste' }
-  ];
-  
-  // Manejar cambio en los días personalizados
+  const [difficulty, setDifficulty] = useState(habit ? habit.difficulty || 1 : 1);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const handleDayToggle = (day) => {
-    if (customDays.includes(day)) {
-      setCustomDays(customDays.filter(d => d !== day));
-    } else {
-      setCustomDays([...customDays, day]);
-    }
+    setCustomDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
   };
-  
-  // Determinar si el formulario es válido
+
+  const handleMonthlyDayToggle = (day) => {
+    setMonthlyDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  };
+
+  const handleYearlyMonthToggle = (m) => {
+    setYearlyMonths((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+  };
+
+  const handleYearlyDayToggle = (d) => {
+    setYearlyDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  };
+
   const isFormValid = () => {
     if (!name.trim()) return false;
     if (frequency === 'custom' && customDays.length === 0) return false;
+    if (frequency === 'monthly' && monthlyDays.length === 0) return false;
+    if (frequency === 'yearly' && (yearlyMonths.length === 0 || yearlyDays.length === 0)) return false;
     return true;
   };
-  
-  // Guardar el hábito
-  const saveHabit = () => {
+
+  const saveHabit = async () => {
     if (!isFormValid()) return;
-    
+    setSaving(true);
+
     const habitData = {
       name,
       description,
       frequency,
       customDays: frequency === 'custom' ? customDays : [],
+      monthlyDays: frequency === 'monthly' ? monthlyDays : [],
+      yearlyMonths: frequency === 'yearly' ? yearlyMonths : [],
+      yearlyDays: frequency === 'yearly' ? yearlyDays : [],
       reminder,
       reminderTime: reminder ? reminderTime : null,
       color,
+      difficulty,
+      difficultyMultiplier: DIFFICULTY_OPTIONS.find((o) => o.value === difficulty)?.multiplier || 1.0,
       createdAt: habit ? habit.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      streak: habit ? habit.streak || 0 : 0
+      streak: habit ? habit.streak || 0 : 0,
     };
-    
+
     try {
       if (isEditing && habit) {
-        // Actualizar hábito existente
-        updateHabit(habit.id, habitData)
-          .then(() => {
-            console.log('Hábito actualizado correctamente');
-            navigate('/Habitos');
-          })
-          .catch(error => {
-            console.error('Error al actualizar hábito:', error);
-            alert('Error al actualizar hábito: ' + error.message);
-          });
+        await updateHabit(habit.id, habitData);
       } else {
-        // Crear nuevo hábito
-        addHabit(habitData)
-          .then(() => {
-            console.log('Hábito creado correctamente');
-            navigate('/Habitos');
-          })
-          .catch(error => {
-            console.error('Error al crear hábito:', error);
-            alert('Error al crear hábito: ' + error.message);
-          });
+        await addHabit(habitData);
       }
+      navigate('/Habitos');
     } catch (error) {
-      console.error('Error inesperado:', error);
-      alert('Error inesperado: ' + error.message);
+      console.error('Error al guardar hábito:', error);
+    } finally {
+      setSaving(false);
     }
   };
-  
-  // Eliminar el hábito
-  const deleteHabit = () => {
-    if (isEditing && habit) {
-      if (window.confirm('¿Estás seguro de eliminar este hábito? Esta acción no se puede deshacer.')) {
-        removeHabit(habit.id)
-          .then(() => {
-            navigate('/Habitos');
-          })
-          .catch(error => {
-            console.error('Error al eliminar hábito:', error);
-          });
-      }
+
+  const deleteHabit = async () => {
+    if (!isEditing || !habit) return;
+    setDeleting(true);
+    try {
+      await removeHabit(habit.id);
+      navigate('/Habitos');
+    } catch (error) {
+      console.error('Error al eliminar hábito:', error);
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
     }
   };
-  
-  // Cancelar y volver atrás
-  const handleCancel = () => {
-    navigate('/Habitos');
-  };
-  
+
   return (
-    <Card elevation={3}>
-      <CardContent>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-          <Typography variant="h6">{isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}</Typography>
-          <Button 
-            startIcon={<ArrowBackIcon />} 
-            onClick={handleCancel}
+    <Card
+      elevation={0}
+      sx={{
+        borderRadius: 3,
+        border: `1px solid ${theme.palette.divider}`,
+        maxWidth: 700,
+        mx: 'auto',
+      }}
+    >
+      <Box sx={{ px: 2.5, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography variant="body1" fontWeight={700}>
+          {isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}
+        </Typography>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/Habitos')}
+          size="small"
+          sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+        >
+          Volver
+        </Button>
+      </Box>
+      <Divider />
+      <Box sx={{ p: 2.5 }}>
+        <Stack spacing={3}>
+          {/* Nombre */}
+          <TextField
+            label="Nombre del hábito"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            fullWidth
+            required
+            placeholder="Ej: Beber agua, Meditar, Ejercicio..."
             size="small"
-          >
-            Volver
-          </Button>
-        </Box>
-        
-        <Divider sx={{ mb: 3 }} />
-        
-        <Grid container spacing={3}>
-          {/* Nombre del hábito */}
-          <Grid item xs={12}>
-            <TextField
-              label="Nombre del hábito"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              fullWidth
-              required
-              placeholder="Ej: Beber agua, Meditar, Ejercicio..."
-            />
-          </Grid>
-          
+          />
+
           {/* Descripción */}
-          <Grid item xs={12}>
-            <TextField
-              label="Descripción (opcional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              fullWidth
-              multiline
-              rows={2}
-              placeholder="Describe este hábito y por qué es importante para ti"
-            />
-          </Grid>
-          
+          <TextField
+            label="Descripción (opcional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            fullWidth
+            multiline
+            rows={2}
+            size="small"
+            placeholder="Describe este hábito"
+          />
+
           {/* Frecuencia */}
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <FormLabel id="frequency-label">Frecuencia</FormLabel>
-              <RadioGroup
-                aria-labelledby="frequency-label"
-                name="frequency"
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-              >
-                <FormControlLabel value="daily" control={<Radio />} label="Diario" />
-                <FormControlLabel value="weekdays" control={<Radio />} label="Días laborables (Lun-Vie)" />
-                <FormControlLabel value="weekends" control={<Radio />} label="Fines de semana (Sáb-Dom)" />
-                <FormControlLabel value="custom" control={<Radio />} label="Personalizado" />
-              </RadioGroup>
-            </FormControl>
-          </Grid>
-          
+          <FormControl fullWidth>
+            <FormLabel sx={{ fontWeight: 600, mb: 1, fontSize: '0.85rem', color: 'text.primary' }}>
+              Frecuencia
+            </FormLabel>
+            <RadioGroup
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value)}
+            >
+              <FormControlLabel value="daily" control={<Radio size="small" />} label="Diario" />
+              <FormControlLabel value="weekdays" control={<Radio size="small" />} label="Días laborables (Lun-Vie)" />
+              <FormControlLabel value="weekends" control={<Radio size="small" />} label="Fines de semana (Sáb-Dom)" />
+              <FormControlLabel value="custom" control={<Radio size="small" />} label="Personalizado (días de la semana)" />
+              <FormControlLabel value="monthly" control={<Radio size="small" />} label="Mensual" />
+              <FormControlLabel value="yearly" control={<Radio size="small" />} label="Anual" />
+            </RadioGroup>
+          </FormControl>
+
           {/* Días personalizados */}
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: frequency === 'custom' ? 'block' : 'none' }}>
-              <FormLabel>Selecciona los días</FormLabel>
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+          {frequency === 'custom' && (
+            <Box>
+              <FormLabel sx={{ fontWeight: 600, mb: 1, display: 'block', fontSize: '0.85rem', color: 'text.primary' }}>
+                Días de la semana
+              </FormLabel>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                 {weekdays.map((day) => (
                   <Chip
                     key={day.value}
@@ -215,110 +239,230 @@ const HabitForm = ({ habit = null, isEditing = false }) => {
                     onClick={() => handleDayToggle(day.value)}
                     color={customDays.includes(day.value) ? 'primary' : 'default'}
                     variant={customDays.includes(day.value) ? 'filled' : 'outlined'}
-                    sx={{ mb: 1 }}
+                    size="small"
                   />
                 ))}
               </Stack>
             </Box>
-          </Grid>
-          
+          )}
+
+          {/* Días mensuales */}
+          {frequency === 'monthly' && (
+            <Box>
+              <FormLabel sx={{ fontWeight: 600, mb: 1, display: 'block', fontSize: '0.85rem', color: 'text.primary' }}>
+                Días del mes
+              </FormLabel>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                {monthDays.map((day) => (
+                  <Chip
+                    key={day}
+                    label={day}
+                    onClick={() => handleMonthlyDayToggle(day)}
+                    color={monthlyDays.includes(day) ? 'primary' : 'default'}
+                    variant={monthlyDays.includes(day) ? 'filled' : 'outlined'}
+                    size="small"
+                    sx={{ minWidth: 40 }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Anual */}
+          {frequency === 'yearly' && (
+            <>
+              <Box>
+                <FormLabel sx={{ fontWeight: 600, mb: 1, display: 'block', fontSize: '0.85rem', color: 'text.primary' }}>
+                  Meses
+                </FormLabel>
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                  {yearMonths.map((month, idx) => (
+                    <Chip
+                      key={idx + 1}
+                      label={month.substring(0, 3)}
+                      onClick={() => handleYearlyMonthToggle(idx + 1)}
+                      color={yearlyMonths.includes(idx + 1) ? 'primary' : 'default'}
+                      variant={yearlyMonths.includes(idx + 1) ? 'filled' : 'outlined'}
+                      size="small"
+                    />
+                  ))}
+                </Stack>
+              </Box>
+              <Box>
+                <FormLabel sx={{ fontWeight: 600, mb: 1, display: 'block', fontSize: '0.85rem', color: 'text.primary' }}>
+                  Días del mes
+                </FormLabel>
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                  {monthDays.map((day) => (
+                    <Chip
+                      key={day}
+                      label={day}
+                      onClick={() => handleYearlyDayToggle(day)}
+                      color={yearlyDays.includes(day) ? 'primary' : 'default'}
+                      variant={yearlyDays.includes(day) ? 'filled' : 'outlined'}
+                      size="small"
+                      sx={{ minWidth: 40 }}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            </>
+          )}
+
+          {/* Dificultad */}
+          <Box>
+            <FormLabel sx={{ fontWeight: 600, mb: 1, display: 'block', fontSize: '0.85rem', color: 'text.primary' }}>
+              Dificultad
+            </FormLabel>
+            <Stack spacing={1}>
+              {DIFFICULTY_OPTIONS.map((opt) => (
+                <Box
+                  key={opt.value}
+                  onClick={() => setDifficulty(opt.value)}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    border: `1.5px solid ${difficulty === opt.value ? opt.color : theme.palette.divider}`,
+                    cursor: 'pointer',
+                    bgcolor: difficulty === opt.value ? alpha(opt.color, 0.05) : 'transparent',
+                    transition: '0.15s',
+                    '&:hover': { borderColor: opt.color },
+                  }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: opt.color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                      {opt.label}
+                    </Typography>
+                    <Chip label={`${opt.multiplier}x`} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700 }} />
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+
           {/* Recordatorio */}
-          <Grid item xs={12} md={6}>
+          <Box>
             <FormControlLabel
-              control={
-                <Checkbox 
-                  checked={reminder} 
-                  onChange={(e) => setReminder(e.target.checked)} 
-                />
-              }
+              control={<Checkbox checked={reminder} onChange={(e) => setReminder(e.target.checked)} size="small" />}
               label="Activar recordatorio"
             />
-            
             {reminder && (
               <TextField
-                label="Hora del recordatorio"
+                label="Hora"
                 type="time"
                 value={reminderTime}
                 onChange={(e) => setReminderTime(e.target.value)}
                 fullWidth
-                margin="normal"
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                size="small"
+                sx={{ mt: 1 }}
+                InputLabelProps={{ shrink: true }}
               />
             )}
-          </Grid>
-          
+          </Box>
+
           {/* Color */}
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <InputLabel id="color-label">Color</InputLabel>
-              <Select
-                labelId="color-label"
-                value={color}
-                label="Color"
-                onChange={(e) => setColor(e.target.value)}
-              >
-                {colorOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    <Box display="flex" alignItems="center">
-                      <Box 
-                        sx={{ 
-                          width: 16, 
-                          height: 16, 
-                          borderRadius: '50%', 
-                          bgcolor: `${option.value}.main`,
-                          mr: 1 
-                        }} 
-                      />
-                      {option.label}
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          {/* Botones de acción */}
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-            <Box display="flex" justifyContent="space-between">
-              <Box>
-                {isEditing && (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={deleteHabit}
-                  >
-                    Eliminar Hábito
-                  </Button>
-                )}
-              </Box>
-              <Box>
+          <FormControl fullWidth>
+            <FormLabel sx={{ fontWeight: 600, mb: 1, fontSize: '0.85rem', color: 'text.primary' }}>
+              Color
+            </FormLabel>
+            <Select
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              size="small"
+            >
+              {colorOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        bgcolor: `${opt.value}.main`,
+                      }}
+                    />
+                    {opt.label}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Botones */}
+          <Divider />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Box>
+              {isEditing && (
                 <Button
                   variant="outlined"
-                  onClick={handleCancel}
-                  sx={{ mr: 2 }}
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => setDeleteOpen(true)}
+                  size="small"
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
                 >
-                  Cancelar
+                  Eliminar
                 </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<SaveIcon />}
-                  onClick={saveHabit}
-                  disabled={!isFormValid()}
-                >
-                  {isEditing ? 'Actualizar' : 'Guardar'}
-                </Button>
-              </Box>
+              )}
             </Box>
-          </Grid>
-        </Grid>
-      </CardContent>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/Habitos')}
+                size="small"
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={saveHabit}
+                disabled={!isFormValid() || saving}
+                size="small"
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 999 }}
+              >
+                {saving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Guardar'}
+              </Button>
+            </Stack>
+          </Box>
+        </Stack>
+      </Box>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Eliminar hábito</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de eliminar <strong>{name}</strong>? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteOpen(false)} sx={{ textTransform: 'none', borderRadius: 999 }}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={deleteHabit}
+            color="error"
+            variant="contained"
+            disabled={deleting}
+            sx={{ textTransform: 'none', borderRadius: 999 }}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };
 
-export default HabitForm; 
+export default HabitForm;

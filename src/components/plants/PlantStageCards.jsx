@@ -4,7 +4,7 @@ import { Card, Box, Typography, Grid, Avatar, Chip } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { getStageInfo, getStageIcon } from './plantsHelpers';
 
-const STAGES = ['Germinacion', 'Vegetativo', 'Floracion', 'Secado'];
+const STAGES = ['Germinacion', 'Vegetativo', 'Floracion', 'Lavado de Raices', 'Secado', 'Curado'];
 
 // Parsea una fecha DD/MM/YYYY a Date para formateo. Lo hace la JSX en dos lugares
 // (dd/MM y yyyy), así que lo dejamos como helper inline.

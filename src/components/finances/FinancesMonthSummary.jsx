@@ -6,7 +6,6 @@ import {
   Stack,
   Divider,
   Avatar,
-  Button,
   LinearProgress,
   alpha,
 } from '@mui/material';
@@ -17,6 +16,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { formatAmount, getMonthName } from '../../utils';
 import { getCategoryIcon, getCategoryColor } from './financesHelpers';
+import { AnimatedItem } from '../../design-system';
 
 const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
 const todayIfCurrent = (year, month) => {
@@ -32,7 +32,6 @@ const FinancesMonthSummary = ({
   selectedYear,
   selectedMonth,
   dollarRate,
-  onSeeAllCategories,
 }) => {
   const theme = useTheme();
   const isExpense = dataType === 'expenses';
@@ -67,47 +66,55 @@ const FinancesMonthSummary = ({
   // Top 3 categorías
   const top3 = (monthlyData?.sortedCategories || []).slice(0, 3);
 
+  // Datos todavía no calculados (useEffect no corrió aún)
+  if (!monthlyData) return null;
+
   // Estado vacío
-  if (!monthlyData || total === 0) {
+  if (total === 0) {
     return (
-      <Card
-        elevation={0}
-        sx={{
-          mx: 2,
-          mb: 3,
-          borderRadius: 4,
-          p: 4,
-          textAlign: 'center',
-          border: `1px dashed ${theme.palette.divider}`,
-        }}
-      >
-        <Avatar
+      <AnimatedItem>
+        <Card
+          elevation={0}
           sx={{
-            bgcolor: alpha(accent, 0.12),
-            color: accent,
-            width: 64,
-            height: 64,
-            mx: 'auto',
-            mb: 2,
+            mx: 2,
+            mt: 1.5,
+            mb: 3,
+            borderRadius: 4,
+            p: 4,
+            textAlign: 'center',
+            border: `1px dashed ${theme.palette.divider}`,
           }}
         >
-          {isExpense ? <TrendingDownIcon /> : <TrendingUpIcon />}
-        </Avatar>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Sin {isExpense ? 'gastos' : 'ingresos'} este mes
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {getMonthName(selectedMonth)} {selectedYear} aún no tiene registros.
-        </Typography>
-      </Card>
+          <Avatar
+            sx={{
+              bgcolor: alpha(accent, 0.12),
+              color: accent,
+              width: 64,
+              height: 64,
+              mx: 'auto',
+              mb: 2,
+            }}
+          >
+            {isExpense ? <TrendingDownIcon /> : <TrendingUpIcon />}
+          </Avatar>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Sin {isExpense ? 'gastos' : 'ingresos'} este mes
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {getMonthName(selectedMonth)} {selectedYear} aún no tiene registros.
+          </Typography>
+        </Card>
+      </AnimatedItem>
     );
   }
 
   return (
+    <AnimatedItem>
     <Card
       elevation={0}
       sx={{
         mx: 2,
+        mt: 1.5,
         mb: 3,
         borderRadius: 4,
         overflow: 'hidden',
@@ -126,10 +133,10 @@ const FinancesMonthSummary = ({
             fontSize: { xs: '2.5rem', sm: '3rem' },
           }}
         >
-          {isExpense ? '−' : '+'}${formatAmount(total)}
+          {isExpense ? '−' : '+'}{formatAmount(total)}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          = US$ {formatAmount(totalUSD)}
+          = {formatAmount(totalUSD, true)}
         </Typography>
       </Box>
 
@@ -157,7 +164,7 @@ const FinancesMonthSummary = ({
             PROMEDIO/DÍA
           </Typography>
           <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.25 }}>
-            ${formatAmount(avgPerDay)}
+            {formatAmount(avgPerDay)}
           </Typography>
         </Box>
         <Box sx={{ textAlign: 'center' }}>
@@ -219,7 +226,7 @@ const FinancesMonthSummary = ({
                     {catName}
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: accentDark, whiteSpace: 'nowrap' }}>
-                    ${formatAmount(catData.total)}
+                    {formatAmount(catData.total)}
                   </Typography>
                 </Box>
                 <LinearProgress
@@ -237,17 +244,10 @@ const FinancesMonthSummary = ({
           })}
         </Stack>
 
-        {(monthlyData?.sortedCategories || []).length > 3 && (
-          <Button
-            fullWidth
-            onClick={onSeeAllCategories}
-            sx={{ mt: 2, textTransform: 'none', color: accent, fontWeight: 600 }}
-          >
-            Ver todas las categorías ({monthlyData.sortedCategories.length})
-          </Button>
-        )}
+
       </Box>
     </Card>
+    </AnimatedItem>
   );
 };
 

@@ -1,59 +1,97 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../../components/layout/Layout';
-import { 
-  Grid, 
-  Card, 
-  CardContent, 
-  Typography, 
+import {
   Box,
+  Card,
+  Typography,
   Button,
   useTheme,
-  useMediaQuery,
   Chip,
   Stack,
-  LinearProgress,
   Avatar,
-  Container,
-  Fab,
   CircularProgress,
   alpha,
-  Skeleton,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
 import { useStore } from '../../store';
+import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
-import FlashOnIcon from '@mui/icons-material/FlashOn';
 import EditIcon from '@mui/icons-material/Edit';
-import { useNavigate } from 'react-router-dom';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
+import { DashedAddCard } from '../../design-system/SectionCard';
+import { AnimatedGroup, AnimatedItem } from '../../design-system';
+import {
+  shouldShowHabitForDate,
+  formatDate,
+} from '../../components/habits/habitsHelpers';
+
+const DIFFICULTY_COLORS = {
+  1: '#4caf50',
+  2: '#8bc34a',
+  3: '#ff9800',
+  4: '#f44336',
+  5: '#9c27b0',
+};
+
+const DIFFICULTY_LABELS = {
+  1: 'Muy Fácil',
+  2: 'Fácil',
+  3: 'Moderado',
+  4: 'Difícil',
+  5: 'Muy Difícil',
+};
+
+const getFrequencyText = (habit) => {
+  switch (habit.frequency) {
+    case 'daily':
+      return 'Diario';
+    case 'weekdays':
+      return 'Lunes a Viernes';
+    case 'weekends':
+      return 'Fines de semana';
+    case 'custom': {
+      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const sorted = [...(habit.customDays || [])].sort((a, b) => a - b);
+      return sorted.map((d) => dayNames[d]).join(', ');
+    }
+    case 'monthly': {
+      const sorted = [...(habit.monthlyDays || [])].sort((a, b) => a - b);
+      return `Día${sorted.length > 1 ? 's' : ''} ${sorted.join(', ')}`;
+    }
+    case 'yearly': {
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const sortedMonths = [...(habit.yearlyMonths || [])].sort((a, b) => a - b);
+      return sortedMonths.map((m) => months[m - 1]).join(', ');
+    }
+    default:
+      return 'No definida';
+  }
+};
 
 const HabitsList = () => {
   const { userData } = useStore();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
-  
+
   const [habits, setHabits] = useState([]);
   const [completedHabits, setCompletedHabits] = useState({});
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
-  // Cargar hábitos del usuario
   useEffect(() => {
     setLoading(true);
     if (userData && userData.habits) {
       const habitsArray = Object.keys(userData.habits)
-        .filter(key => key !== 'completed')
-        .map(id => ({
-          id,
-          ...userData.habits[id]
-        }));
-      
+        .filter((key) => key !== 'completed')
+        .map((id) => ({ id, ...userData.habits[id] }));
       setHabits(habitsArray);
-      
-      // Cargar hábitos completados para calcular estadísticas
       if (userData.habits.completed) {
         setCompletedHabits(userData.habits.completed);
       }
-      
       setLoading(false);
     } else {
       setHabits([]);
@@ -62,225 +100,47 @@ const HabitsList = () => {
     }
   }, [userData]);
 
-  // Función para obtener el color de dificultad
-  const getDifficultyColor = (difficulty) => {
-    const colors = {
-      1: '#4caf50', // Muy Fácil - Verde
-      2: '#8bc34a', // Fácil - Verde claro
-      3: '#ff9800', // Moderado - Naranja
-      4: '#f44336', // Difícil - Rojo
-      5: '#9c27b0'  // Muy Difícil - Púrpura
-    };
-    return colors[difficulty] || colors[1];
-  };
-
-  // Función para obtener el nombre de dificultad
-  const getDifficultyLabel = (difficulty) => {
-    const labels = {
-      1: 'Muy Fácil',
-      2: 'Fácil',
-      3: 'Moderado',
-      4: 'Difícil',
-      5: 'Muy Difícil'
-    };
-    return labels[difficulty] || 'Fácil';
-  };
-
-  // Función para calcular puntos por completar el hábito
-  const calculateHabitPoints = (habit) => {
-    const multiplier = habit.difficultyMultiplier || 1.0;
-    return Math.round(10 * multiplier);
-  };
-
-  // Obtener texto para frecuencia
-  const getFrequencyText = (habit) => {
-    switch (habit.frequency) {
-      case 'daily': return 'Todos los días';
-      case 'weekdays': return 'Lunes a Viernes';
-      case 'weekends': return 'Sábados y Domingos';
-      case 'custom':
-        if (Array.isArray(habit.customDays) && habit.customDays.length > 0) {
-          const dayNames = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
-          const sortedDays = [...habit.customDays].sort((a, b) => a - b);
-          const daysList = sortedDays.map(dayIndex => dayNames[dayIndex]);
-          
-          if (daysList.length === 1) {
-            return `Cada ${daysList[0]}`;
-          } else if (daysList.length === 2) {
-            return `${daysList[0]} y ${daysList[1]}`;
-          } else {
-            const lastDay = daysList.pop();
-            return `${daysList.join(', ')} y ${lastDay}`;
-          }
-        }
-        return 'Días personalizados';
-      case 'monthly':
-        if (Array.isArray(habit.monthlyDays) && habit.monthlyDays.length > 0) {
-          const sortedDays = [...habit.monthlyDays].sort((a, b) => a - b);
-          
-          if (sortedDays.length === 1) {
-            return `El día ${sortedDays[0]} de cada mes`;
-          } else if (sortedDays.length === 2) {
-            return `Los días ${sortedDays[0]} y ${sortedDays[1]} de cada mes`;
-          } else {
-            const lastDay = sortedDays.pop();
-            return `Los días ${sortedDays.join(', ')} y ${lastDay} de cada mes`;
-          }
-        }
-        return 'Mensualmente';
-      case 'yearly':
-        if (Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.length > 0 && 
-            Array.isArray(habit.yearlyDays) && habit.yearlyDays.length > 0) {
-          const monthNames = [
-            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-          ];
-          
-          const sortedMonths = [...habit.yearlyMonths].sort((a, b) => a - b);
-          const sortedDays = [...habit.yearlyDays].sort((a, b) => a - b);
-          
-          const monthsList = sortedMonths.map(month => monthNames[month - 1]);
-          
-          let monthsText;
-          if (monthsList.length === 1) {
-            monthsText = monthsList[0];
-          } else if (monthsList.length === 2) {
-            monthsText = `${monthsList[0]} y ${monthsList[1]}`;
-          } else {
-            const lastMonth = monthsList.pop();
-            monthsText = `${monthsList.join(', ')} y ${lastMonth}`;
-          }
-          
-          let daysText;
-          if (sortedDays.length === 1) {
-            daysText = `el día ${sortedDays[0]}`;
-          } else if (sortedDays.length === 2) {
-            daysText = `los días ${sortedDays[0]} y ${sortedDays[1]}`;
-          } else {
-            const lastDay = sortedDays.pop();
-            daysText = `los días ${sortedDays.join(', ')} y ${lastDay}`;
-          }
-          
-          return `${daysText} de ${monthsText}`;
-        }
-        return 'Anualmente';
-      default: return 'Frecuencia no definida';
-    }
-  };
-
-  // Calcular estadísticas de un hábito (últimos 30 días)
-  const calculateHabitStats = (habit) => {
+  const calculateStats = (habit) => {
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
-    
+
     let totalPossible = 0;
     let totalCompleted = 0;
-    
-    // Verificar cada día de los últimos 30 días
+
     for (let d = new Date(thirtyDaysAgo); d <= today; d.setDate(d.getDate() + 1)) {
       if (shouldShowHabitForDate(habit, d)) {
         totalPossible++;
-        
         const dateStr = formatDate(d);
         if (completedHabits[dateStr] && completedHabits[dateStr][habit.id]) {
           totalCompleted++;
         }
       }
     }
-    
-    const percentage = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
-    const points = calculateHabitPoints(habit);
-    
+
     return {
-      percentage,
+      percentage: totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0,
       completed: totalCompleted,
       possible: totalPossible,
-      points
+      points: Math.round(10 * (habit.difficultyMultiplier || 1.0)),
     };
   };
 
-  // Determinar si un hábito debe mostrarse para una fecha específica
-  const shouldShowHabitForDate = (habit, date) => {
-    if (habit.createdAt) {
-      const createdDate = new Date(habit.createdAt);
-      createdDate.setHours(0, 0, 0, 0);
-      const checkDate = new Date(date);
-      checkDate.setHours(0, 0, 0, 0);
-      
-      if (checkDate < createdDate) {
-        return false;
-      }
-    }
-    
-    const dayOfWeek = date.getDay();
-    const dayOfMonth = date.getDate();
-    const month = date.getMonth() + 1;
-    
-    switch (habit.frequency) {
-      case 'daily':
-        return true;
-      case 'weekdays':
-        return dayOfWeek >= 1 && dayOfWeek <= 5;
-      case 'weekends':
-        return dayOfWeek === 0 || dayOfWeek === 6;
-      case 'custom':
-        return Array.isArray(habit.customDays) && habit.customDays.includes(dayOfWeek);
-      case 'monthly':
-        return Array.isArray(habit.monthlyDays) && habit.monthlyDays.includes(dayOfMonth);
-      case 'yearly':
-        const isCorrectMonth = Array.isArray(habit.yearlyMonths) && habit.yearlyMonths.includes(month);
-        const isCorrectDay = Array.isArray(habit.yearlyDays) && habit.yearlyDays.includes(dayOfMonth);
-        return isCorrectMonth && isCorrectDay;
-      default:
-        return true;
-    }
-  };
-
-  // Formatear fecha como YYYY-MM-DD
-  const formatDate = (date) => {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  // Crear un nuevo hábito
-  const createNewHabit = () => {
-    navigate('/NuevoHabito');
-  };
-
-  // Editar hábito
-  const editHabit = (habitId) => {
-    navigate(`/EditarHabito/${habitId}`);
-  };
-
-  // Obtener colores de gradiente basados en el color del hábito
-  const getGradientColors = (habitColor) => {
-    const colorMap = {
-      primary: [theme.palette.primary.dark, theme.palette.primary.main],
-      secondary: [theme.palette.secondary.dark, theme.palette.secondary.main],
-      success: [theme.palette.success.dark, theme.palette.success.main],
-      info: [theme.palette.info.dark, theme.palette.info.main],
-      warning: [theme.palette.warning.dark, theme.palette.warning.main],
-      error: [theme.palette.error.dark, theme.palette.error.main],
-    };
-    return colorMap[habitColor] || colorMap.primary;
-  };
+  const filtered = habits.filter((h) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      h.name.toLowerCase().includes(q) ||
+      (h.description && h.description.toLowerCase().includes(q))
+    );
+  });
 
   if (loading) {
     return (
       <Layout title="Mis Hábitos">
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Grid container spacing={3}>
-            {[1, 2, 3, 4, 5, 6].map((item) => (
-              <Grid item xs={12} sm={6} md={4} key={item}>
-                <Skeleton variant="rectangular" height={320} sx={{ borderRadius: 3 }} />
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <CircularProgress />
+        </Box>
       </Layout>
     );
   }
@@ -288,202 +148,174 @@ const HabitsList = () => {
   if (habits.length === 0) {
     return (
       <Layout title="Mis Hábitos">
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ maxWidth: 600, mx: 'auto', px: 2, py: 4 }}>
           <Box sx={{ textAlign: 'center', py: 8 }}>
-            <PlaylistAddCheckIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 3 }} />
-            <Typography variant="h4" color="text.secondary" gutterBottom>
-              No tienes hábitos configurados
+            <PlaylistAddCheckIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom sx={{ fontWeight: 600 }}>
+              No tenés hábitos
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 400, mx: 'auto' }}>
-              Crea tu primer hábito para comenzar tu seguimiento y establecer rutinas positivas en tu vida.
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Creá tu primer hábito para comenzar el seguimiento.
             </Typography>
-            <Button 
-              variant="contained" 
-              size="large"
-              startIcon={<AddIcon />} 
-              onClick={createNewHabit}
-              sx={{ borderRadius: 3, py: 1.5, px: 4 }}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/NuevoHabito')}
+              sx={{ borderRadius: 999, textTransform: 'none', fontWeight: 600, px: 3 }}
             >
-              Crear Mi Primer Hábito
+              Crear hábito
             </Button>
           </Box>
-        </Container>
+        </Box>
       </Layout>
     );
   }
 
   return (
     <Layout title="Mis Hábitos">
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Grid container spacing={3}>
-          {habits.map((habit) => {
-            const stats = calculateHabitStats(habit);
-            const difficultyColor = getDifficultyColor(habit.difficulty || 1);
-            const difficultyLabel = getDifficultyLabel(habit.difficulty || 1);
-            const frequencyText = getFrequencyText(habit);
-            const [gradientStart, gradientEnd] = getGradientColors(habit.color || 'primary');
-            
+      <Box sx={{ maxWidth: 700, mx: 'auto', px: 2, py: 2 }}>
+        {/* Buscador pill */}
+        <Box sx={{ mb: 2.5 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Buscar hábitos..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                </InputAdornment>
+              ),
+              endAdornment: search ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearch('')} sx={{ p: 0.25 }}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : undefined,
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 999,
+                bgcolor: alpha(theme.palette.action.hover, 0.35),
+                '& fieldset': { borderColor: 'transparent' },
+                '&:hover fieldset': { borderColor: alpha(theme.palette.primary.main, 0.3) },
+                '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main, borderWidth: 1.5 },
+              },
+            }}
+          />
+        </Box>
+
+        {/* Lista */}
+        <AnimatedGroup component={Stack} spacing={1.5}>
+          {filtered.map((habit) => {
+            const stats = calculateStats(habit);
+            const diffColor = DIFFICULTY_COLORS[habit.difficulty || 1];
+            const diffLabel = DIFFICULTY_LABELS[habit.difficulty || 1];
+            const freqText = getFrequencyText(habit);
+            const habitColor = theme.palette[habit.color]?.main || theme.palette.primary.main;
+
             return (
-              <Grid item xs={12} sm={6} md={4} key={habit.id}>
-                <Card
-                  elevation={6}
-                  sx={{
-                    borderRadius: 3,
-                    overflow: 'hidden',
-                    transition: 'all 0.3s ease',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: theme.shadows[12],
-                    }
-                  }}
-                >
-                  {/* Header con gradiente */}
-                  <Box
+              <AnimatedItem key={habit.id}>
+              <Card
+                key={habit.id}
+                elevation={0}
+                onClick={() => navigate(`/DetalleHabito/${habit.id}`)}
+                sx={{
+                  borderRadius: 3,
+                  border: `1px solid ${theme.palette.divider}`,
+                  cursor: 'pointer',
+                  transition: '0.15s',
+                  '&:hover': {
+                    borderColor: alpha(habitColor, 0.4),
+                    bgcolor: alpha(habitColor, 0.02),
+                  },
+                }}
+              >
+                <Box sx={{ px: 2.5, py: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar
                     sx={{
-                      p: 3,
-                      background: `linear-gradient(135deg, ${gradientStart}, ${gradientEnd})`,
-                      color: 'white',
-                      position: 'relative'
+                      bgcolor: alpha(habitColor, 0.15),
+                      color: habitColor,
+                      width: 44,
+                      height: 44,
+                      fontWeight: 700,
+                      fontSize: '1.1rem',
                     }}
                   >
-                    <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar
-                          sx={{
-                            bgcolor: 'rgba(255, 255, 255, 0.2)',
-                            color: 'white',
-                            width: 48,
-                            height: 48,
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            border: '2px solid rgba(255, 255, 255, 0.3)'
-                          }}
-                        >
-                          {habit.name.substring(0, 1).toUpperCase()}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="h6" fontWeight="bold" sx={{ mb: 0.5 }}>
-                            {habit.name}
-                          </Typography>
-                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                            {frequencyText}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      
-                      <Button
-                        size="small"
-                        onClick={() => editHabit(habit.id)}
+                    {habit.name.charAt(0).toUpperCase()}
+                  </Avatar>
+
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
+                      {habit.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.25, flexWrap: 'wrap' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {freqText}
+                      </Typography>
+                      <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: 'text.disabled' }} />
+                      <Box
                         sx={{
-                          minWidth: 40,
-                          width: 40,
-                          height: 40,
+                          width: 8,
+                          height: 8,
                           borderRadius: '50%',
-                          bgcolor: 'rgba(255, 255, 255, 0.2)',
-                          color: 'white',
-                          '&:hover': {
-                            bgcolor: 'rgba(255, 255, 255, 0.3)',
-                          }
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </Button>
-                    </Stack>
-                  </Box>
-
-                  {/* Contenido principal con fondo oscuro */}
-                  <Box
-                    sx={{
-                      bgcolor: '#1a1a1a',
-                      color: 'white',
-                      p: 3,
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}
-                  >
-                    {/* Información de puntos y dificultad */}
-                    <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
-                      <Chip
-                        icon={<FlashOnIcon sx={{ fontSize: '0.9rem !important' }} />}
-                        label={`${stats.points} puntos`}
-                        size="medium"
-                        sx={{
-                          bgcolor: alpha(theme.palette.warning.main, 0.2),
-                          color: theme.palette.warning.light,
-                          fontWeight: 'bold',
-                          border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
-                          '& .MuiChip-icon': {
-                            color: theme.palette.warning.light
-                          }
+                          bgcolor: diffColor,
                         }}
                       />
-                      
-                      <Chip
-                        label={difficultyLabel}
-                        size="medium"
-                        sx={{
-                          bgcolor: alpha(difficultyColor, 0.2),
-                          color: difficultyColor,
-                          fontWeight: 'bold',
-                          border: `1px solid ${alpha(difficultyColor, 0.4)}`,
-                        }}
-                      />
-                    </Stack>
-
-                    {/* Información adicional del hábito */}
-                    <Box sx={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      {habit.description ? (
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            color: 'rgba(255, 255, 255, 0.8)', 
-                            fontStyle: 'italic',
-                            px: 2,
-                            lineHeight: 1.4
-                          }}
-                        >
-                          "{habit.description}"
-                        </Typography>
-                      ) : (
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            color: 'rgba(255, 255, 255, 0.4)', 
-                            fontStyle: 'italic'
-                          }}
-                        >
-                          Sin descripción
-                        </Typography>
-                      )}
+                      <Typography variant="caption" color="text.secondary">
+                        {diffLabel}
+                      </Typography>
                     </Box>
                   </Box>
-                </Card>
-              </Grid>
+
+                  <Box sx={{ textAlign: 'right', minWidth: 50 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 700,
+                        color: stats.percentage >= 80 ? 'success.main' : stats.percentage >= 50 ? 'info.main' : 'text.secondary',
+                      }}
+                    >
+                      {stats.percentage}%
+                    </Typography>
+                  </Box>
+
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/EditarHabito/${habit.id}`);
+                    }}
+                    sx={{
+                      color: 'text.secondary',
+                      '&:hover': { color: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                    }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Card>
+              </AnimatedItem>
             );
           })}
-        </Grid>
-      </Container>
+        </AnimatedGroup>
 
-      {/* Botón Flotante para añadir */}
-      <Fab 
-        color="primary" 
-        aria-label="añadir hábito" 
-        onClick={createNewHabit}
-        sx={{
-          position: 'fixed',
-          bottom: { xs: 70, sm: 30 },
-          right: { xs: 16, sm: 30 },
-          boxShadow: 6
-        }}
-      >
-        <AddIcon />
-      </Fab>
+        {/* Card fantasma para agregar */}
+        <AnimatedItem>
+        <Box sx={{ mt: 2 }}>
+          <DashedAddCard
+            label="Agregar hábito"
+            desc="Crear un nuevo seguimiento"
+            onClick={() => navigate('/NuevoHabito')}
+          />
+        </Box>
+        </AnimatedItem>
+      </Box>
     </Layout>
   );
 };
 
-export default HabitsList; 
+export default HabitsList;

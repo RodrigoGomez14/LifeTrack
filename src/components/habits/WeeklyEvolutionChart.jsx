@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  Box,
-  Stack,
-  Avatar,
-  Typography,
-  useMediaQuery,
-} from '@mui/material';
+import { Card, Box, Typography, alpha } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import ReactApexChart from 'react-apexcharts';
 import { formatDate, shouldShowHabitForDate } from './habitsHelpers';
+import { AnimatedItem } from '../../design-system';
 
 const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [chartData, setChartData] = useState({ series: [], options: {} });
 
   useEffect(() => {
@@ -23,16 +16,14 @@ const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => 
     const currentDate = new Date();
     const weekDates = [];
 
-    // Últimas 5 semanas completadas (excluye la actual: nunca está terminada hasta el domingo)
     const startWeekOffset = 5;
     const endWeekOffset = 1;
     for (let i = startWeekOffset; i >= endWeekOffset; i--) {
       const weekStart = new Date(currentDate);
-      weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + (i * 7)));
+      weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + i * 7));
       weekDates.push(weekStart);
     }
 
-    // Para cada semana, calcular % ponderado de completitud por día (lun→dom)
     const series = weekDates.map((weekStartDate) => {
       const weekEndDate = new Date(weekStartDate);
       weekEndDate.setDate(weekStartDate.getDate() + 6);
@@ -57,9 +48,7 @@ const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => 
           }
         });
 
-        data[dayOffset] = weightedPossible > 0
-          ? Math.round((weightedCompleted / weightedPossible) * 100)
-          : 0;
+        data[dayOffset] = weightedPossible > 0 ? Math.round((weightedCompleted / weightedPossible) * 100) : 0;
       }
 
       return { name: `${startFormatted} - ${endFormatted}`, data };
@@ -69,21 +58,9 @@ const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => 
       chart: {
         height: 350,
         type: 'line',
-        toolbar: {
-          show: true,
-          tools: {
-            download: true,
-            selection: true,
-            zoom: true,
-            zoomin: true,
-            zoomout: true,
-            pan: true,
-            reset: true,
-          },
-        },
+        toolbar: { show: true, tools: { download: true, selection: true, zoom: true, zoomin: true, zoomout: true, pan: true, reset: true } },
         fontFamily: theme.typography.fontFamily,
         background: 'transparent',
-        dropShadow: { enabled: true, top: 2, left: 2, blur: 4, opacity: 0.15 },
       },
       dataLabels: { enabled: false },
       stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
@@ -97,10 +74,7 @@ const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => 
       yaxis: {
         min: 0,
         max: 100,
-        labels: {
-          formatter: (val) => `${val}%`,
-          style: { colors: theme.palette.text.secondary },
-        },
+        labels: { formatter: (val) => `${val}%`, style: { colors: theme.palette.text.secondary } },
       },
       tooltip: {
         x: { show: true },
@@ -119,27 +93,11 @@ const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => 
         position: 'left',
         horizontalAlign: 'left',
         labels: { colors: theme.palette.text.secondary },
-        fontSize: '13px',
+        fontSize: '12px',
         itemMargin: { horizontal: 10, vertical: 5 },
         offsetX: 10,
         offsetY: 5,
       },
-      responsive: [
-        {
-          breakpoint: 600,
-          options: {
-            chart: { height: 240 },
-            legend: {
-              show: true,
-              position: 'bottom',
-              horizontalAlign: 'center',
-              offsetY: 5,
-              fontSize: '11px',
-              itemMargin: { horizontal: 6, vertical: 3 },
-            },
-          },
-        },
-      ],
       colors: [
         theme.palette.primary.main,
         theme.palette.info.main,
@@ -155,58 +113,59 @@ const WeeklyEvolutionChart = ({ userData, habits, allWeeksCompletedHabits }) => 
   if (chartData.series.length === 0) return null;
 
   return (
+    <AnimatedItem>
     <Card
-      elevation={3}
+      elevation={0}
       sx={{
-        width: '100%',
-        borderRadius: { xs: 2, sm: 3 },
+        borderRadius: 3,
+        border: `1px solid ${theme.palette.divider}`,
         overflow: 'hidden',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          boxShadow: { xs: theme.shadows[3], sm: theme.shadows[8] },
-        }
       }}
     >
       <Box
         sx={{
-          p: { xs: 2, sm: 3 },
-          background: `linear-gradient(to right, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-          borderBottom: `1px solid ${theme.palette.divider}`
+          px: 2.5,
+          py: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          borderBottom: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="space-between">
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Avatar
-              sx={{
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                width: { xs: 36, sm: 40 },
-                height: { xs: 36, sm: 40 }
-              }}
-            >
-              <ShowChartIcon />
-            </Avatar>
-            <Box>
-              <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold" color="white">
-                Evolución Ponderada
-              </Typography>
-              <Typography variant="body2" color="white" sx={{ opacity: 0.9 }}>
-                Últimas 5 semanas (por dificultad)
-              </Typography>
-            </Box>
-          </Box>
-        </Stack>
+        <Box
+          sx={{
+            bgcolor: alpha(theme.palette.primary.main, 0.12),
+            color: theme.palette.primary.main,
+            borderRadius: '50%',
+            width: 36,
+            height: 36,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ShowChartIcon fontSize="small" />
+        </Box>
+        <Box>
+          <Typography variant="body2" fontWeight={700} color="text.primary">
+            Evolución Ponderada
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Últimas 5 semanas
+          </Typography>
+        </Box>
       </Box>
 
-      <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'background.paper', height: isMobile ? 300 : 400 }}>
+      <Box sx={{ p: { xs: 2, sm: 2.5 }, bgcolor: 'background.paper' }}>
         <ReactApexChart
           options={chartData.options}
           series={chartData.series}
           type="line"
-          height={isMobile ? 240 : 350}
+          height={350}
         />
       </Box>
     </Card>
+    </AnimatedItem>
   );
 };
 

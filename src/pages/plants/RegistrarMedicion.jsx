@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, TextField, Card,
-  Chip, InputAdornment, Snackbar, Alert, alpha,
+  Chip, InputAdornment, Snackbar, Alert, alpha, Button,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -10,6 +10,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import { useStore } from '../../store';
 import { addPlantActivity } from '../../services/plants';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
@@ -40,6 +41,7 @@ const RegistrarMedicion = () => {
   const [selectedAditives, setSelectedAditives] = useState([]);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
 
   const activePlants = userData?.plants?.active
@@ -92,9 +94,7 @@ const RegistrarMedicion = () => {
       for (const id of selectedPlantIds) {
         await addPlantActivity(id, 'irrigations', data);
       }
-      const count = selectedPlantIds.size > 1 ? ` (${selectedPlantIds.size} plantas)` : '';
-      setSnack(`Riego registrado${count}`);
-      setTimeout(() => navigate(-1), 400);
+      setSavedSnapshot({ ph, ec, ppm, quantity, aditives: selectedAditives, notes, plantCount: selectedPlantIds.size });
     } catch (err) {
       console.error(err);
       setSnack('Error al guardar');
@@ -102,19 +102,63 @@ const RegistrarMedicion = () => {
     setSubmitting(false);
   };
 
+  const handleLoadAnother = () => {
+    setStep(0);
+    setPh('');
+    setEc('');
+    setPpm('');
+    setQuantity('');
+    setSelectedAditives([]);
+    setNotes('');
+    setSavedSnapshot(null);
+  };
+
+  const renderSuccess = () => {
+    if (!savedSnapshot) return null;
+    const n = savedSnapshot;
+    return (
+      <AnimatedSuccess color="#00BCD4" title="¡Riego registrado!">
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {n.plantCount > 1 ? `${n.plantCount} plantas` : '1 planta'}
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center', mb: 1 }}>
+          {n.ph && <Chip label={`pH ${n.ph}`} size="small" sx={{ fontWeight: 600 }} />}
+          {n.ec && <Chip label={`EC ${n.ec} mS/cm`} size="small" sx={{ fontWeight: 600 }} />}
+          {n.ppm && <Chip label={`PPM ${n.ppm}`} size="small" sx={{ fontWeight: 600 }} />}
+          {n.quantity && <Chip label={`${n.quantity} ml`} size="small" sx={{ fontWeight: 600 }} />}
+        </Box>
+        {n.aditives?.length > 0 && (
+          <Typography variant="caption" color="text.disabled" sx={{ mb: 1 }}>
+            + {n.aditives.length} aditivo{n.aditives.length !== 1 ? 's' : ''}
+          </Typography>
+        )}
+        {n.notes && <Typography variant="caption" color="text.disabled" sx={{ mb: 3, maxWidth: 280 }}>"{n.notes}"</Typography>}
+        <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
+          sx={{ maxWidth: 320, bgcolor: '#00BCD4', color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: '#0097a7' }, mt: n.notes ? 0 : 3 }}>
+          Cargar otro
+        </Button>
+        <Button onClick={() => navigate(-1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver</Button>
+      </AnimatedSuccess>
+    );
+  };
+
   const selectedPlants = activePlants.filter((p) => selectedPlantIds.has(p.id));
 
   return (
-    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+    <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
+      {savedSnapshot ? (
+        renderSuccess()
+      ) : (
+        <>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
         {step > 0 ? (
           <IconButton onClick={goBack} size="small"><ArrowBackIcon /></IconButton>
-        ) : (
-          <IconButton onClick={() => navigate(-1)} size="small"><CloseIcon /></IconButton>
-        )}
+) : (
+            <Box sx={{ width: 36 }} />
+          )}
         <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>Riego</Typography>
-        <Box sx={{ width: 36 }} />
+        <IconButton onClick={() => navigate(-1)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
       </Box>
 
       <WizardProgressDots total={STEPS_TOTAL} current={step} color="#00BCD4" />
@@ -123,17 +167,18 @@ const RegistrarMedicion = () => {
 
         {/* Step 0: Plant multi-select */}
         {step === 0 && (
-          <Box>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
+          <AnimatedGroup>
+            <AnimatedItem><Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
               SELECCIONÁ LAS PLANTAS
-            </Typography>
-            <PlantMultiSelect plants={activePlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#00BCD4" />
-          </Box>
+            </Typography></AnimatedItem>
+            <AnimatedItem><PlantMultiSelect plants={activePlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#00BCD4" /></AnimatedItem>
+          </AnimatedGroup>
         )}
 
         {/* Step 1: Measurements */}
         {step === 1 && (
-          <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <AnimatedGroup>
+            <AnimatedItem><Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1.5, display: 'block' }}>MEDICIONES</Typography>
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
               <TextField label="pH" type="number" value={ph} onChange={(e) => setPh(e.target.value)} size="small"
@@ -147,12 +192,14 @@ const RegistrarMedicion = () => {
                 inputProps={{ step: 10, inputMode: 'numeric' }}
                 sx={{ flex: 1, minWidth: 80, '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
             </Box>
-          </Card>
+          </Card></AnimatedItem>
+          </AnimatedGroup>
         )}
 
         {/* Step 2: Watering */}
         {step === 2 && (
-          <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <AnimatedGroup>
+            <AnimatedItem><Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1.5, display: 'block' }}>RIEGO</Typography>
             <TextField label="Agua" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} size="small" fullWidth
               InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" color="text.disabled">ml</Typography></InputAdornment> }}
@@ -174,35 +221,38 @@ const RegistrarMedicion = () => {
               </Box>
             )}
             {fertilizantes.length === 0 && (
-              <Typography variant="caption" color="text.secondary">No hay aditivos en la biblioteca. Agregalos desde Aditivos.</Typography>
+               <Typography variant="caption" color="text.secondary">No hay aditivos en la biblioteca. Agregalos desde Aditivos.</Typography>
             )}
-          </Card>
+          </Card></AnimatedItem>
+          </AnimatedGroup>
         )}
 
         {/* Step 3: Note */}
         {step === 3 && (
-          <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <AnimatedGroup>
+            <AnimatedItem><Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
             <TextField label="Nota (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth multiline rows={3}
               placeholder="Ej: Cambié la solución, ajusté pH..."
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-          </Card>
+          </Card></AnimatedItem>
+          </AnimatedGroup>
         )}
 
         {/* Step 4: Review */}
         {step === 4 && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Revisar</Typography>
+          <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Revisar</Typography></AnimatedItem>
 
             {selectedPlants.length > 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <AnimatedItem><Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 {selectedPlants.map((p) => (
                   <Chip key={p.id} label={p.name} size="small"
                     sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', fontWeight: 600 }} />
                 ))}
-              </Box>
+              </Box></AnimatedItem>
             )}
 
-            <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
+            <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
               {ph && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
                   <Typography variant="body2" color="text.secondary">pH</Typography>
@@ -237,8 +287,8 @@ const RegistrarMedicion = () => {
                 <Typography variant="body2" color="text.secondary">Plantas</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
               </Box>
-            </Box>
-          </Box>
+            </Box></AnimatedItem>
+          </AnimatedGroup>
         )}
       </Box>
 
@@ -261,10 +311,12 @@ const RegistrarMedicion = () => {
       )}
 
       <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert severity={snack.startsWith('Riego') ? 'success' : 'error'} variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>
+        <Alert severity="error" variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>
           {snack}
         </Alert>
       </Snackbar>
+        </>
+      )}
     </Box>
   );
 };
