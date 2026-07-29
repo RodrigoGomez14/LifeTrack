@@ -14,7 +14,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
-import { auth, storage, messaging } from '../../firebase';
+import { uploadProfilePhoto, uploadBackup } from '../../services/storage';
 import Layout from '../../components/layout/Layout';
 import { SectionCard, LoadingOverlay, AnimatedGroup, AnimatedItem } from '../../design-system';
 import { useStore } from '../../store';
@@ -24,8 +24,13 @@ import {
   getUserBackup,
   setConfig,
 } from '../../services/config';
-import { requestPermission, saveFcmToken as saveDeviceToken, removeFcmToken } from '../../services/notifications';
-import * as db from '../../services/database';
+import {
+  requestPermission,
+  saveFcmToken as saveDeviceToken,
+  removeFcmToken,
+  getReminders,
+  removeReminder,
+} from '../../services/notifications';
 
 const DAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -55,6 +60,7 @@ const Configuracion = () => {
   const [savingName, setSavingName] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  const [birthday, setBirthday] = useState('');
   const [dataBackupEnabled, setDataBackupEnabled] = useState(false);
   const [backupFrequency, setBackupFrequency] = useState('daily');
   const [lastBackupDate, setLastBackupDate] = useState(null);
@@ -67,35 +73,29 @@ const Configuracion = () => {
   const [deviceLinked, setDeviceLinked] = useState(false);
   const [linkingDevice, setLinkingDevice] = useState(false);
   const [unlinkingDevice, setUnlinkingDevice] = useState(false);
-  const [localDeviceToken, setLocalDeviceToken] = useState(null);
+  const [notifList, setNotifList] = useState({});
+
+  // Cargar reminders desde el nodo notifications/ (fuera del arbol del user)
+  useEffect(() => {
+    if (!user?.uid) return;
+    getReminders(user.uid).then(setNotifList);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (userData?.config) {
       const c = userData.config;
+      setBirthday(c.birthday || '');
       setDataBackupEnabled(c.dataBackupEnabled || false);
       setBackupFrequency(c.backupFrequency || 'daily');
       setLastBackupDate(c.lastBackupDate || null);
-      setDeviceLinked(!!c.notifications?.fcmToken);
     }
   }, [userData]);
-
-  useEffect(() => {
-    if (messaging) {
-      messaging.getToken({ vapidKey: 'BKjMSzLbssVRr1aCjbcgxsRZWNvH8y-gYErFAtZlkq3Li0tC6I2RQmuqidCZtdunPyyS6_FBqKpIPjll98e4Wbk' })
-        .then((token) => { if (token) setLocalDeviceToken(token); })
-        .catch(() => {});
-    }
-  }, []);
-
-  const storedToken = userData?.config?.notifications?.fcmToken;
-  const showNotifications = !storedToken || localDeviceToken === storedToken;
 
   const handleLinkDevice = async () => {
     setLinkingDevice(true);
     const result = await requestPermission();
     if (result?.token && user?.uid) {
       await saveDeviceToken(user.uid, result.token);
-      setLocalDeviceToken(result.token);
       setDeviceLinked(true);
       showSnack('Dispositivo vinculado');
     } else {
@@ -108,9 +108,7 @@ const Configuracion = () => {
     setUnlinkingDevice(true);
     try {
       await removeFcmToken(user?.uid);
-      if (messaging) await messaging.deleteToken();
       setDeviceLinked(false);
-      setLocalDeviceToken(null);
       showSnack('Dispositivo desvinculado');
     } catch {
       showSnack('Error al desvincular', 'error');
@@ -161,11 +159,10 @@ const Configuracion = () => {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) { showSnack('Solo se aceptan imágenes', 'error'); return; }
     setUploadingPhoto(true);
     try {
-      const filePath = `profileImages/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
-      const uploadTask = await storage.ref(filePath).put(file);
-      const downloadURL = await uploadTask.ref.getDownloadURL();
+      const downloadURL = await uploadProfilePhoto(file);
       await updatePhotoURL(downloadURL);
       setUserData({ ...(userData || {}), photoURL: downloadURL });
       showSnack('Foto actualizada');
@@ -174,11 +171,12 @@ const Configuracion = () => {
   };
 
   const handleDeleteNotif = async () => {
-    if (!deleteNotifDialog) return;
+    if (!deleteNotifDialog || !user?.uid) return;
     setDeletingNotif(true);
     try {
-      await db.remove(`config/notifications/list/${deleteNotifDialog}`);
-      showSnack('Notificación eliminada');
+      await removeReminder(user.uid, deleteNotifDialog);
+      setNotifList((prev) => { const next = { ...prev }; delete next[deleteNotifDialog]; return next; });
+      showSnack('Notificacion eliminada');
       setDeleteNotifDialog(null);
     } catch { showSnack('Error al eliminar', 'error'); }
     setDeletingNotif(false);
@@ -196,8 +194,7 @@ const Configuracion = () => {
       const dateString = now.toISOString().split('T')[0];
       const timeString = now.toTimeString().split(' ')[0].replace(/:/g, '-');
       const fileName = `backup_${dateString}_${timeString}.json`;
-      const storageRef = storage.ref(`backups/${auth.currentUser.uid}/${fileName}`);
-      await storageRef.put(blob);
+      const url = await uploadBackup(blob, fileName);
       const newLastBackup = now.toISOString();
       if (isAutomatic) {
         const configToSave = { ...userData?.config, lastBackupDate: newLastBackup };
@@ -205,7 +202,6 @@ const Configuracion = () => {
         setLastBackupDate(newLastBackup);
         showSnack('Backup automático creado');
       } else {
-        const url = await storageRef.getDownloadURL();
         const link = document.createElement('a');
         link.href = url; link.download = fileName;
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
@@ -232,7 +228,6 @@ const Configuracion = () => {
 
   const showSnack = (msg, severity = 'success') => setSnack(`${severity}:${msg}`);
 
-  const notifList = userData?.config?.notifications?.list || {};
   const notifEntries = Object.entries(notifList);
 
   return (
@@ -268,11 +263,30 @@ const Configuracion = () => {
             </Button>
           </Box>
           )}
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', display: 'block', mb: 0.5 }}>
+              CUMPLEAÑOS
+            </Typography>
+            <TextField
+              type="date"
+              size="small"
+              value={birthday ? `2000-${birthday.split('/')[1]}-${birthday.split('/')[0]}` : ''}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                const [, m, d] = e.target.value.split('-');
+                const val = `${d}/${m}`;
+                setBirthday(val);
+                setConfig({ ...userData?.config, birthday: val });
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, maxWidth: 180 }}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
         </SectionCard>
         </AnimatedItem>
 
         {/* ── NOTIFICACIONES ── */}
-        {showNotifications && (
         <AnimatedItem>
         <SectionCard title="Notificaciones" icon={<NotificationsActiveIcon sx={{ color: '#fff' }} />}>
           {deviceLinked ? (
@@ -297,10 +311,12 @@ const Configuracion = () => {
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>{n.name}</Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
-                    {n.days.sort().map((d) => (
+                    {(n.days || []).sort().map((d) => (
                       <Chip key={d} label={DAYS_SHORT[d]} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600 }} />
                     ))}
-                    <Chip label={n.time} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }} />
+                    <Chip label={
+                      n.slot === 'morning' ? '09:00' : n.slot === 'midday' ? '12:00' : n.slot === 'evening' ? '18:00' : n.slot === 'night' ? '22:00' : n.slot
+                    } size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }} />
                   </Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25 }}>
                     "{n.title}"
@@ -318,11 +334,10 @@ const Configuracion = () => {
           <Card variant="outlined" onClick={() => navigate('/nuevaNotificacion')}
             sx={{ borderRadius: 2, borderStyle: 'dashed', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, py: 2, mt: notifEntries.length > 0 ? 0 : 0, color: 'text.secondary', '&:hover': { borderColor: 'primary.light', color: 'primary.light' } }}>
             <AddIcon sx={{ fontSize: 20 }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>Nueva notificación</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Nueva notificacion</Typography>
           </Card>
         </SectionCard>
         </AnimatedItem>
-        )}
 
         {/* ── DATOS ── */}
         <AnimatedItem>

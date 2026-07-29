@@ -54,7 +54,7 @@ const TarjetasDatesWizard = ({
       await onSave({ closingDate, dueDate });
       onClose();
     } catch (e) {
-      console.error(e);
+
       setError('Error al guardar. Intentá de nuevo.');
     } finally {
       setSaving(false);

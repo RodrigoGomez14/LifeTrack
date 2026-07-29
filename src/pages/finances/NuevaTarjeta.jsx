@@ -47,9 +47,7 @@ const NuevaTarjeta = () => {
     try {
       await addCreditCard({ name: name.trim(), cardType });
       setStep(TOTAL_STEPS);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch {}
     setSubmitting(false);
   };
 

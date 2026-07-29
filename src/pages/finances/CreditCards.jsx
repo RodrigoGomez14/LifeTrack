@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Container, Box } from '@mui/material';
+import { Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, animate } from 'framer-motion';
 import Layout from '../../components/layout/Layout';
@@ -11,7 +11,6 @@ import {
   parseFlexibleDate,
   isBeyondFutureLimit,
 } from '../../components/finances/creditCardsHelpers';
-import { AnimatedItem } from '../../design-system';
 import MonthNav from '../../components/shared/MonthNav';
 import TarjetasListView from '../../components/finances/TarjetasListView';
 
@@ -146,7 +145,10 @@ const CreditCards = () => {
 
   const onTouchStart = (e) => {
     if (e.touches.length !== 1) return;
-    touchStartX.current = e.touches[0].clientX;
+    const x = e.touches[0].clientX;
+    const margin = panelW * 0.05;
+    if (x < margin || x > panelW - margin) return;
+    touchStartX.current = x;
     touchStartY.current = e.touches[0].clientY;
     isDragging.current = false;
   };
@@ -186,22 +188,20 @@ const CreditCards = () => {
   const renderList = (data, year, month) => {
     if (!data) return null;
     return (
-      <AnimatedItem>
-        <TarjetasListView
-          cards={data.cards}
-          selectedYear={year}
-          selectedMonth={month}
-          cardDates={data.cardSummaryDates}
-          getCardTotal={data.getCardTotal}
-          getCardTotalNativeUSD={data.getCardTotalNativeUSD}
-          isCardPaid={data.isCardPaid}
-          displayTotal={data.displayTotal}
-          areCardsActuallyPaid={data.areCardsActuallyPaid}
-          onCardClick={openDetail}
-          onAddCard={openAdd}
-          onOpenPayment={() => openMultiPayment(month, year)}
-        />
-      </AnimatedItem>
+      <TarjetasListView
+        cards={data.cards}
+        selectedYear={year}
+        selectedMonth={month}
+        cardDates={data.cardSummaryDates}
+        getCardTotal={data.getCardTotal}
+        getCardTotalNativeUSD={data.getCardTotalNativeUSD}
+        isCardPaid={data.isCardPaid}
+        displayTotal={data.displayTotal}
+        areCardsActuallyPaid={data.areCardsActuallyPaid}
+        onCardClick={openDetail}
+        onAddCard={openAdd}
+        onOpenPayment={() => openMultiPayment(month, year)}
+      />
     );
   };
 
@@ -212,20 +212,14 @@ const CreditCards = () => {
       <Box onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <Box sx={{ overflow: 'hidden' }}>
           <motion.div style={{ display: 'flex', x: panX, width: panelW * 3 }}>
-            <Box sx={{ minWidth: panelW }}>
-              <Container maxWidth="sm" sx={{ py: 2 }}>
-                {renderList(prevData, pY, pM)}
-              </Container>
+            <Box sx={{ minWidth: panelW, py: 2 }}>
+              <Box sx={{ maxWidth: 600, mx: 'auto' }}>{renderList(prevData, pY, pM)}</Box>
             </Box>
-            <Box sx={{ minWidth: panelW }}>
-              <Container maxWidth="sm" sx={{ py: 2 }}>
-                {renderList(curData, selectedYear, selectedMonth)}
-              </Container>
+            <Box sx={{ minWidth: panelW, py: 2 }}>
+              <Box sx={{ maxWidth: 600, mx: 'auto' }}>{renderList(curData, selectedYear, selectedMonth)}</Box>
             </Box>
-            <Box sx={{ minWidth: panelW }}>
-              <Container maxWidth="sm" sx={{ py: 2 }}>
-                {renderList(nextData, nY, nM)}
-              </Container>
+            <Box sx={{ minWidth: panelW, py: 2 }}>
+              <Box sx={{ maxWidth: 600, mx: 'auto' }}>{renderList(nextData, nY, nM)}</Box>
             </Box>
           </motion.div>
         </Box>

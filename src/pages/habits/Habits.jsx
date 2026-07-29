@@ -362,7 +362,6 @@ const Habits = () => {
     try {
       await toggleHabitCompletionService(habitId, dateStr, newCompletedStatus);
     } catch (error) {
-      console.error('Error updating habit completion:', error);
       setCompletedHabits((prev) => {
         const reverted = { ...prev };
         if (!reverted[dateStr]) reverted[dateStr] = {};

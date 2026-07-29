@@ -138,7 +138,7 @@ const HabitForm = ({ habit = null, isEditing = false }) => {
       }
       navigate('/Habitos');
     } catch (error) {
-      console.error('Error al guardar hábito:', error);
+
     } finally {
       setSaving(false);
     }
@@ -151,7 +151,7 @@ const HabitForm = ({ habit = null, isEditing = false }) => {
       await removeHabit(habit.id);
       navigate('/Habitos');
     } catch (error) {
-      console.error('Error al eliminar hábito:', error);
+
     } finally {
       setDeleting(false);
       setDeleteOpen(false);

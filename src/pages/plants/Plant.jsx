@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Swal from 'sweetalert2';
 import { Box, Typography, Card, alpha, Popover, Grid, CardContent, Avatar } from "@mui/material";
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
-import ScienceIcon from '@mui/icons-material/Science';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -13,15 +13,17 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import { SectionCard, AnimatedGroup, AnimatedItem } from "../../design-system";
+import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
+import { AnimatedGroup, AnimatedItem } from "../../design-system";
 import Layout from "../../components/layout/Layout";
 import { useStore } from "../../store";
-import { updatePlant, archivePlant } from "../../services/plants";
+import { updatePlant } from "../../services/plants";
 import { checkSearch } from "../../utils";
-import { calculateDaysBetween, calculateDaysInStage } from "../../components/plants/plantsHelpers";
+import { calculateDaysBetween, getPlantTimeline, getStageRanges, normalizeDate } from "../../components/plants/plantsHelpers";
 import PlantProfilePhotoDialog from "../../components/plants/PlantProfilePhotoDialog";
-import PlantMeasurementsChart from "../../components/plants/PlantMeasurementsChart";
+import PlantEvolutionChart from "../../components/plants/PlantEvolutionChart";
 import PlantPhotoCompare from "../../components/plants/PlantPhotoCompare";
+import PlantDayActivityCard from "../../components/plants/PlantDayActivityCard";
 import WeekStrip, { getDayKey } from "../../components/plants/WeekStrip";
 import { STAGES } from "../../components/plants/PlantShared";
 
@@ -30,42 +32,32 @@ const Plant = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
 
-  const [plant, setPlant] = useState(null);
-  const [selectedDay, setSelectedDay] = useState(new Date());
-  const [showProfilePhotoSelector, setShowProfilePhotoSelector] = useState(false);
-  const [showPhotoCompare, setShowPhotoCompare] = useState(false);
-  const [actionAnchorEl, setActionAnchorEl] = useState(null);
-
-  const [pesoHumedoInput, setPesoHumedoInput] = useState('');
-  const [pesoSecoInput, setPesoSecoInput] = useState('');
-  const [savingPesoHumedo, setSavingPesoHumedo] = useState(false);
-  const [savingPesoSeco, setSavingPesoSeco] = useState(false);
-  const [isArchiving, setIsArchiving] = useState(false);
-
-  useEffect(() => {
+  const plant = useMemo(() => {
     const id = checkSearch(location.search);
-    if (userData?.plants?.active && userData.plants.active[id]) {
-      setPlant({ ...userData.plants.active[id], id, isArchived: false });
-    } else if (userData?.plants?.history && userData.plants.history[id]) {
-      setPlant({ ...userData.plants.history[id], id, isArchived: true });
-    } else if (userData?.plants) {
-      let found = false;
-      if (userData.plants.archived && userData.plants.archived[id]) {
-        setPlant({ ...userData.plants.archived[id], id, isArchived: true }); found = true;
-      }
-      if (!found) {
-        for (const key in userData.plants) {
-          if (key !== 'active' && typeof userData.plants[key] === 'object') {
-            for (const plantId in userData.plants[key]) {
-              if (plantId === id) { setPlant({ ...userData.plants[key][plantId], id, isArchived: true }); found = true; break; }
-            }
-            if (found) break;
+    if (!id || !userData?.plants) return null;
+    if (userData.plants.active && userData.plants.active[id]) {
+      return { ...userData.plants.active[id], id, isArchived: false };
+    }
+    if (userData.plants.history && userData.plants.history[id]) {
+      return { ...userData.plants.history[id], id, isArchived: true };
+    }
+    for (const key in userData.plants) {
+      if (key !== 'active' && typeof userData.plants[key] === 'object') {
+        for (const plantId in userData.plants[key]) {
+          if (plantId === id) {
+            return { ...userData.plants[key][plantId], id, isArchived: true };
           }
         }
       }
     }
+    return null;
   }, [location.search, userData?.plants]);
+  const [selectedDay, setSelectedDay] = useState(new Date());
+  const [showProfilePhotoSelector, setShowProfilePhotoSelector] = useState(false);
+  const [showPhotoCompare, setShowPhotoCompare] = useState(false);
+  const [actionAnchorEl, setActionAnchorEl] = useState(null);
 
   const etapaNormalizada = plant?.etapa === 'Enfrascado' ? 'Curado' : plant?.etapa;
   const stage = STAGES.find((s) => s.key === etapaNormalizada) || STAGES[0];
@@ -73,34 +65,74 @@ const Plant = () => {
     if (!plant?.birthDate) return 0;
     const [d, m, y] = plant.birthDate.split('/');
     const plantDate = new Date(+y, +m - 1, +d);
-    return Math.floor((selectedDay - plantDate) / (1000 * 60 * 60 * 24));
+    return Math.floor((selectedDay - plantDate) / (1000 * 60 * 60 * 24)) + 1;
   }, [plant, selectedDay]);
-  const weeksActive = Math.floor(daysActive / 7);
+  const weeksActive = Math.max(1, Math.floor((daysActive - 1) / 7) + 1);
 
-  const vegDays = useMemo(() => {
-    if (!plant?.inicioVegetativo) return null;
-    return calculateDaysBetween(plant.inicioVegetativo, plant.inicioFloracion || null);
-  }, [plant]);
+  const stageTimeline = useMemo(() => {
+    if (!plant) return [];
+    const stages = [
+      { key: 'Germinacion', startField: 'birthDate', endField: 'inicioVegetativo', color: '#8e24aa' },
+      { key: 'Vegetativo', startField: 'inicioVegetativo', endField: 'inicioFloracion', color: '#43a047' },
+      { key: 'Floracion', startField: 'inicioFloracion', endField: 'inicioLavado', color: '#e53935' },
+      { key: 'Lavado de Raices', startField: 'inicioLavado', endField: 'inicioSecado', color: '#00acc1' },
+      { key: 'Secado', startField: 'inicioSecado', endField: 'inicioCurado', color: '#fb8c00' },
+      { key: 'Curado', startField: 'inicioCurado', endField: null, color: '#546e7a' },
+    ];
+    const parseDate = (str) => { if (!str) return null; const [d, m, y] = str.split('/').map(Number); return new Date(y, m - 1, d); };
+    return stages.map((s) => {
+      const startDateStr = s.key === 'Curado'
+        ? (plant.inicioCurado || plant.inicioEnfrascado)
+        : plant[s.startField];
+      const endDateStr = s.endField ? plant[s.endField] : null;
+      const startDate = parseDate(startDateStr);
+      const endDate = parseDate(endDateStr);
 
-  const flowerDays = useMemo(() => {
-    if (!plant?.inicioFloracion) return null;
-    return calculateDaysBetween(plant.inicioFloracion);
-  }, [plant]);
+      if (!startDate || startDate > selectedDay) {
+        return { key: s.key, days: null, weeks: null, color: s.color, started: false };
+      }
 
-  const lavadoDays = useMemo(() => {
-    if (!plant?.inicioLavado) return null;
-    return calculateDaysInStage(plant, 'Lavado de Raices');
-  }, [plant]);
+      let limit;
+      if (endDate && endDate <= selectedDay) {
+        limit = new Date(endDate);
+        limit.setDate(limit.getDate() - 1);
+      } else {
+        limit = selectedDay;
+      }
+      const limitStr = `${String(limit.getDate()).padStart(2, '0')}/${String(limit.getMonth() + 1).padStart(2, '0')}/${limit.getFullYear()}`;
+      const days = calculateDaysBetween(startDateStr, limitStr);
+      const weeks = Math.max(1, Math.floor(((days || 0) - 1) / 7) + 1);
+      return { key: s.key, days, weeks, color: s.color, started: true };
+    });
+  }, [plant, selectedDay]);
 
-  const dryDays = useMemo(() => {
-    if (!plant?.inicioSecado) return null;
-    return calculateDaysInStage(plant, 'Secado');
-  }, [plant]);
-
-  const curedDays = useMemo(() => {
-    const inicio = plant?.inicioCurado || plant?.inicioEnfrascado;
-    if (!inicio) return null;
-    return calculateDaysInStage(plant, 'Curado');
+  const getDayStageColor = useCallback((date) => {
+    if (!plant) return null;
+    const stages = [
+      { startField: 'birthDate', endField: 'inicioVegetativo', color: '#8e24aa' },
+      { startField: 'inicioVegetativo', endField: 'inicioFloracion', color: '#43a047' },
+      { startField: 'inicioFloracion', endField: 'inicioLavado', color: '#e53935' },
+      { startField: 'inicioLavado', endField: 'inicioSecado', color: '#00acc1' },
+      { startField: 'inicioSecado', endField: 'inicioCurado', color: '#fb8c00' },
+      { startField: 'inicioCurado', endField: null, color: '#546e7a' },
+    ];
+    const selTs = date.getTime();
+    for (const s of stages) {
+      const startStr = s.startField === 'inicioCurado'
+        ? (plant.inicioCurado || plant.inicioEnfrascado)
+        : (s.startField === 'birthDate' ? plant.birthDate : plant[s.startField]);
+      if (!startStr) continue;
+      const [sd, sm, sy] = startStr.split('/').map(Number);
+      const startTs = new Date(sy, sm - 1, sd).getTime();
+      if (selTs < startTs) continue;
+      let endTs = Infinity;
+      if (s.endField && plant[s.endField]) {
+        const [ed, em, ey] = plant[s.endField].split('/').map(Number);
+        endTs = new Date(ey, em - 1, ed).getTime();
+      }
+      if (selTs < endTs) return s.color;
+    }
+    return null;
   }, [plant]);
 
   const isCurado = plant?.etapa === 'Curado' || plant?.etapa === 'Enfrascado';
@@ -131,7 +163,7 @@ const Plant = () => {
     types.forEach(({ prop, getVals }) => {
       if (plant[prop]) {
         Object.values(plant[prop]).forEach((entry) => {
-          if (entry.date === selectedKey) {
+          if (normalizeDate(entry.date) === selectedKey) {
             const vals = getVals(entry).filter(Boolean);
             vals.forEach((v) => entries.push(v));
           }
@@ -141,234 +173,124 @@ const Plant = () => {
     return entries;
   }, [plant, selectedKey]);
 
-  const dayTime = useMemo(() => {
-    if (!plant) return '';
-    const sources = [plant.logs, plant.irrigations];
-    for (const source of sources) {
-      if (!source) continue;
-      for (const entry of Object.values(source)) {
-        if (entry.date === selectedKey && entry.time) return entry.time;
-      }
-    }
-    return '';
-  }, [plant, selectedKey]);
-
   const isFuture = useMemo(() => {
     const today = new Date(); today.setHours(23, 59, 59, 999);
     return selectedDay > today;
   }, [selectedDay]);
 
   const dayLogData = useMemo(() => {
-    if (!plant?.logs) return { completeData: null };
-    let completeData = null;
+    if (!plant?.logs) return { completeEntries: [] };
+    const completeEntries = [];
     Object.values(plant.logs).forEach((entry) => {
-      if (entry.date !== selectedKey) return;
+      if (normalizeDate(entry.date) !== selectedKey) return;
       if (entry.ph !== undefined && entry.ec !== undefined && entry.ppm !== undefined) {
-        completeData = entry;
+        completeEntries.push(entry);
       }
     });
-    return { completeData };
+    return { completeEntries };
   }, [plant, selectedKey]);
+
+  const timeline = useMemo(() => getPlantTimeline(plant), [plant]);
+  const stageRanges = useMemo(() => getStageRanges(plant), [plant]);
+
+  const dayActions = useMemo(() => {
+    return timeline.filter((e) => e.date === selectedKey && e.type !== 'log');
+  }, [timeline, selectedKey]);
 
   const handleSetProfilePhoto = (imageUrl, imageKey) => {
     setShowProfilePhotoSelector(false);
     const plantId = checkSearch(location.search);
     updatePlant(plantId, { profilePhotoUrl: imageUrl, profilePhotoKey: imageKey }, { isArchived: plant.isArchived })
-      .then(() => { setPlant((p) => ({ ...p, profilePhotoUrl: imageUrl, profilePhotoKey: imageKey })); Swal.fire({ icon: 'success', title: 'Foto actualizada', timer: 1500 }); })
+      .then(() => { Swal.fire({ icon: 'success', title: 'Foto actualizada', timer: 1500 }); })
       .catch(() => Swal.fire({ icon: 'error', title: 'Error' }));
-  };
-
-  const handleSavePesoHumedo = async () => {
-    if (!pesoHumedoInput || parseFloat(pesoHumedoInput) <= 0) return;
-    setSavingPesoHumedo(true);
-    try {
-      const plantId = checkSearch(location.search);
-      await updatePlant(plantId, { pesoHumedo: parseFloat(pesoHumedoInput) }, { isArchived: plant.isArchived });
-      setPlant((p) => ({ ...p, pesoHumedo: parseFloat(pesoHumedoInput) })); setPesoHumedoInput('');
-      Swal.fire({ icon: 'success', title: 'Peso guardado', timer: 1500 });
-    } catch { Swal.fire({ icon: 'error', title: 'Error' }); }
-    setSavingPesoHumedo(false);
-  };
-
-  const handleSavePesoSeco = async () => {
-    if (!pesoSecoInput || parseFloat(pesoSecoInput) <= 0) return;
-    setSavingPesoSeco(true);
-    try {
-      const plantId = checkSearch(location.search);
-      await updatePlant(plantId, { pesoSeco: parseFloat(pesoSecoInput) }, { isArchived: plant.isArchived });
-      setPlant((p) => ({ ...p, pesoSeco: parseFloat(pesoSecoInput) })); setPesoSecoInput('');
-      Swal.fire({ icon: 'success', title: 'Peso guardado', timer: 1500 });
-    } catch { Swal.fire({ icon: 'error', title: 'Error' }); }
-    setSavingPesoSeco(false);
-  };
-
-  const handleArchivePlant = async () => {
-    const result = await Swal.fire({
-      title: '¿Archivar planta?',
-      text: 'La planta pasará a tu archivo histórico. No se borrará ningún dato.',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Archivar',
-      cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#c62828',
-    });
-    if (!result.isConfirmed) return;
-    setIsArchiving(true);
-    try {
-      await archivePlant(plant.id, plant);
-      navigate('/plantas');
-    } catch {
-      Swal.fire({ icon: 'error', title: 'Error al archivar' });
-      setIsArchiving(false);
-    }
   };
 
   if (!plant) {
     return <Layout title="Cargando..."><Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}><Typography variant="h6" color="text.secondary">Cargando...</Typography></Box></Layout>;
   }
 
+  const weekStripNode = (
+    <Box sx={{ bgcolor: alpha(theme.palette.primary.main, 0.12), borderRadius: isDesktop ? 2 : 0, overflow: 'hidden' }}>
+      <WeekStrip
+        allPlants={[plant]}
+        selectedDay={selectedDay}
+        onDaySelect={setSelectedDay}
+        showLabels={false}
+        getStageColor={getDayStageColor}
+      />
+    </Box>
+  );
+
   return (
     <Layout title={plant.name || 'Planta'} showBack onBack={() => navigate('/plantas')}>
-      <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2, pb: 8 }}>
-        <Box sx={{ bgcolor: alpha(theme.palette.divider, 0.25), borderRadius: 2, py: 1, px: 0.5 }}>
-          <WeekStrip
-            allPlants={[plant]}
-            selectedDay={selectedDay}
-            onDaySelect={setSelectedDay}
-            showLabels={false}
-          />
-        </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mr: 1, alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          {vegDays !== null && (
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#43a047', fontSize: '0.7rem', bgcolor: alpha('#43a047', 0.08), px: 0.75, py: 0.25, borderRadius: 1 }}>
-              Vegetativo {vegDays}d
-            </Typography>
-          )}
-          {flowerDays !== null && (
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#e53935', fontSize: '0.7rem', bgcolor: alpha('#e53935', 0.08), px: 0.75, py: 0.25, borderRadius: 1 }}>
-              Floracion {flowerDays}d
-            </Typography>
-          )}
-          {lavadoDays !== null && (
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#00acc1', fontSize: '0.7rem', bgcolor: alpha('#00acc1', 0.08), px: 0.75, py: 0.25, borderRadius: 1 }}>
-              Lavado {lavadoDays}d
-            </Typography>
-          )}
-          {dryDays !== null && (
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#fb8c00', fontSize: '0.7rem', bgcolor: alpha('#fb8c00', 0.08), px: 0.75, py: 0.25, borderRadius: 1 }}>
-              Secado {dryDays}d
-            </Typography>
-          )}
-          {curedDays !== null && (
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#546e7a', fontSize: '0.7rem', bgcolor: alpha('#546e7a', 0.08), px: 0.75, py: 0.25, borderRadius: 1 }}>
-              Curado {curedDays}d
-            </Typography>
-          )}
-          <Typography variant="caption" sx={{ fontWeight: 700, color: stage.color, ml: 0.5 }}>
-            DÍA {daysActive} (SEMANA {weeksActive})
-          </Typography>
+      {!isDesktop && weekStripNode}
+      <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, pt: isDesktop ? 2 : 1, display: 'flex', flexDirection: 'column', gap: 2, pb: 8 }}>
+        {isDesktop && weekStripNode}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mr: 1, alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+          {stageTimeline.filter(s => s.started).map((s, i) => (
+            <React.Fragment key={s.key}>
+              {i > 0 && <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>·</Typography>}
+              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.7rem', color: s.color }}>
+                {`${s.days} DÍAS${(s.key === 'Vegetativo' || s.key === 'Floracion') ? ` (S${s.weeks})` : ''}`}
+              </Typography>
+            </React.Fragment>
+          ))}
         </Box>
 
-        {plant.etapa === 'Vegetativo' || plant.etapa === 'Floracion' || plant.etapa === 'Lavado de Raices' || plant.etapa === 'Secado' || plant.etapa === 'Curado' || plant.etapa === 'Enfrascado' || plant.inicioVegetativo || plant.inicioFloracion ? (
+        {!isFuture && !plant.isArchived && (plant.etapa === 'Secado' || plant.etapa === 'Curado' || plant.etapa === 'Enfrascado') && (!plant.pesoHumedo || !plant.pesoSeco || isCurado) && (
           <AnimatedItem>
-            <Card variant="outlined" sx={{ p: 1.5, borderRadius: 2, display: 'flex', gap: 1.5, alignItems: 'center' }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" sx={{ color: '#43a047', fontWeight: 600, fontSize: '0.65rem', display: 'block', mb: 0.25 }}>
-                TRANSPLANTE
-              </Typography>
-              <Box component="input" type="date" value={plant.inicioVegetativo ? (() => { const [d, m, y] = plant.inicioVegetativo.split('/'); return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`; })() : ''}
-                onChange={(e) => {
-                  if (!e.target.value) return;
-                  const [y, m, d] = e.target.value.split('-');
-                  const dateStr = `${parseInt(d)}/${parseInt(m)}/${y}`;
-                  const plantId = checkSearch(location.search);
-                  updatePlant(plantId, { inicioVegetativo: dateStr }, { isArchived: plant.isArchived })
-                    .then(() => setPlant((p) => ({ ...p, inicioVegetativo: dateStr })));
-                }}
-                style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${alpha('#43a047', 0.3)}`, background: 'transparent', color: theme.palette.text.primary, fontSize: '0.75rem' }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" sx={{ color: '#e91e63', fontWeight: 600, fontSize: '0.65rem', display: 'block', mb: 0.25 }}>
-                INICIO FLORA
-              </Typography>
-              <Box component="input" type="date" value={plant.inicioFloracion ? (() => { const [d, m, y] = plant.inicioFloracion.split('/'); return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`; })() : ''}
-                onChange={(e) => {
-                  if (!e.target.value) return;
-                  const [y, m, d] = e.target.value.split('-');
-                  const dateStr = `${parseInt(d)}/${parseInt(m)}/${y}`;
-                  const plantId = checkSearch(location.search);
-                  updatePlant(plantId, { inicioFloracion: dateStr }, { isArchived: plant.isArchived })
-                    .then(() => setPlant((p) => ({ ...p, inicioFloracion: dateStr })));
-                }}
-                style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: `1px solid ${alpha('#e91e63', 0.3)}`, background: 'transparent', color: theme.palette.text.primary, fontSize: '0.75rem' }} />
-            </Box>
-          </Card>
-          </AnimatedItem>
-        ) : null}
-
-        {/* MEDICIÓN */}
-        {dayEntries.length > 0 && (
-          <>
-            <AnimatedItem>
-              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
-                MEDICIÓN
-              </Typography>
-            </AnimatedItem>
-            <AnimatedItem>
-              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                  {selectedKey === getDayKey(new Date()) ? 'Hoy' : selectedKey}
-                </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.light', mt: 0.25 }}>
-                  {dayTime || '--:--'}
-                </Typography>
-              </Box>
-            </Card>
-            </AnimatedItem>
-            <AnimatedGroup sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-              {(() => {
-              const completeData = dayLogData.completeData;
-              const phReg = completeData?.phReg;
-              const phMain = phReg ?? completeData?.ph ?? null;
-              const phStrikethrough = phReg && completeData?.ph ? completeData.ph : null;
-
-              const cards = [
-                { type: 'ph', label: 'pH', value: phMain, subValue: phStrikethrough, color: '#4CAF50', unit: '' },
-                ...(completeData ? [
-                  { type: 'ec', label: 'EC', value: completeData.ec, color: '#2196F3', unit: ' mS/cm' },
-                  { type: 'ppm', label: 'PPM', value: completeData.ppm, color: '#FF9800', unit: '' },
-                  { type: 'temp', label: 'Temp', value: completeData.waterTemp, color: '#E91E63', unit: '°C' },
-                ] : []),
-              ].filter((c) => c.value !== undefined && c.value !== null);
-
-              return cards.map((c, i) => (
-                <AnimatedItem key={i}>
-                  <Box sx={{
-                    p: 2, textAlign: 'center', borderRadius: 2,
-                    border: `1px solid ${alpha(c.color, 0.2)}`,
-                    bgcolor: alpha(c.color, 0.08),
-                  }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5, color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                      {c.label}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: c.color }}>
-                      {c.value}{c.unit}
-                    </Typography>
-                    {c.subValue != null && (
-                      <Typography variant="caption" sx={{ color: alpha(c.color, 0.5), textDecoration: 'line-through', display: 'block' }}>
-                        {c.subValue}{c.unit}
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
+              ACCIONES IMPORTANTES
+            </Typography>
+            <Grid container spacing={1} sx={{ mt: 0.5 }}>
+              {!plant.pesoHumedo ? (
+                <Grid item xs={12}>
+                  <Card elevation={0} onClick={() => navigate(`/IndicarPeso?tipo=humedo&id=${plant.id}`)}
+                    sx={{ cursor: 'pointer', borderRadius: 2, bgcolor: '#E65100', transition: 'all 0.15s', '&:hover': { filter: 'brightness(0.9)' } }}>
+                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
+                      <Avatar sx={{ bgcolor: alpha('#fff', 0.25), color: '#fff', width: 40, height: 40, mx: 'auto', mb: 0.75 }}>
+                        <MonitorWeightIcon sx={{ fontSize: 20 }} />
+                      </Avatar>
+                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: '#fff' }} noWrap>
+                        Peso húmedo
                       </Typography>
-                    )}
-                  </Box>
-                </AnimatedItem>
-              ));
-            })()}
-            </AnimatedGroup>
-          </>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ) : !plant.pesoSeco ? (
+                <Grid item xs={12}>
+                  <Card elevation={0} onClick={() => navigate(`/IndicarPeso?tipo=seco&id=${plant.id}`)}
+                    sx={{ cursor: 'pointer', borderRadius: 2, bgcolor: '#E65100', transition: 'all 0.15s', '&:hover': { filter: 'brightness(0.9)' } }}>
+                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
+                      <Avatar sx={{ bgcolor: alpha('#fff', 0.25), color: '#fff', width: 40, height: 40, mx: 'auto', mb: 0.75 }}>
+                        <MonitorWeightIcon sx={{ fontSize: 20 }} />
+                      </Avatar>
+                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: '#fff' }} noWrap>
+                        Peso seco
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ) : isCurado ? (
+                <Grid item xs={12}>
+                  <Card elevation={0} onClick={() => navigate(`/ArchivarPlanta?id=${plant.id}`)}
+                    sx={{ cursor: 'pointer', borderRadius: 2, bgcolor: '#c62828', transition: 'all 0.15s', '&:hover': { filter: 'brightness(0.9)' } }}>
+                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
+                      <Avatar sx={{ bgcolor: alpha('#fff', 0.25), color: '#fff', width: 40, height: 40, mx: 'auto', mb: 0.75 }}>
+                        <ArchiveOutlinedIcon sx={{ fontSize: 20 }} />
+                      </Avatar>
+                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: '#fff' }} noWrap>
+                        Archivar planta
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ) : null}
+            </Grid>
+          </AnimatedItem>
         )}
 
-        {!isFuture && (
+        {!isFuture && !isCurado && (
           <>
             <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
               ACCIONES RÁPIDAS
@@ -377,10 +299,8 @@ const Plant = () => {
           const quickActions = [
             { label: 'Foto', icon: PhotoCameraOutlinedIcon, color: '#FF9800', onClick: () => navigate(`/NuevaFoto?id=${plant.id}`) },
             { label: 'Acción', icon: FlashOnIcon, color: '#00BCD4', onClick: (e) => setActionAnchorEl(e.currentTarget) },
-            { label: 'Log', icon: DescriptionOutlinedIcon, color: '#43a047', onClick: () => navigate(`/LogPlanta?id=${plant.id}&date=${encodeURIComponent(selectedKey)}`) },
-            isCurado
-              ? { label: 'Archivar', icon: ArchiveOutlinedIcon, color: '#c62828', onClick: handleArchivePlant }
-              : { label: 'Sig. Etapa', icon: ArrowForwardIcon, color: stage.color, onClick: () => navigate(`/CambiarEtapa?id=${plant.id}`) },
+            { label: 'Log', icon: DescriptionOutlinedIcon, color: '#7c4dff', onClick: () => navigate(`/LogPlanta?id=${plant.id}&date=${encodeURIComponent(selectedKey)}`) },
+            { label: 'Sig. Etapa', icon: ArrowForwardIcon, color: '#43a047', onClick: () => navigate(`/CambiarEtapa?id=${plant.id}`) },
           ];
           return (
             <Grid container spacing={1} component={AnimatedGroup}>
@@ -413,6 +333,92 @@ const Plant = () => {
         })()}
           </>
         )}
+
+        {/* MEDICIÓN */}
+        {dayLogData.completeEntries.length > 0 && (
+          <>
+            <AnimatedItem>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
+                MEDICIÓN
+              </Typography>
+            </AnimatedItem>
+            <AnimatedItem>
+              <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                  {selectedKey === getDayKey(new Date()) ? 'Hoy' : selectedKey}
+                </Typography>
+                {dayLogData.completeEntries.map((entry, ei) => (
+                  <Typography key={ei} variant="h6" sx={{ fontWeight: 600, color: 'primary.light', mt: 0.25 }}>
+                    {entry.time || '--:--'}
+                  </Typography>
+                ))}
+              </Box>
+            </Card>
+            </AnimatedItem>
+            {dayLogData.completeEntries.map((entry, ei) => {
+              const phReg = entry.phReg;
+              const phMain = phReg ?? entry.ph ?? null;
+              const phStrikethrough = phReg && entry.ph ? entry.ph : null;
+              const cards = [
+                { type: 'ph', label: 'pH', value: phMain, subValue: phStrikethrough, color: '#4CAF50', unit: '' },
+                { type: 'ec', label: 'EC', value: entry.ec, color: '#2196F3', unit: ' mS/cm' },
+                { type: 'ppm', label: 'PPM', value: entry.ppm, color: '#FF9800', unit: '' },
+                { type: 'temp', label: 'Temp', value: entry.waterTemp, color: '#E91E63', unit: '°C' },
+              ].filter((c) => c.value !== undefined && c.value !== null);
+              return (
+                <React.Fragment key={ei}>
+                  <AnimatedGroup sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '1fr', gap: 1 }}>
+                    {cards.map((c, i) => (
+                      <AnimatedItem key={i} sx={{ height: '100%' }}>
+                        <Box sx={{
+                          height: '100%', p: 2, textAlign: 'center', borderRadius: 2, display: 'flex', flexDirection: 'column',
+                          border: `1px solid ${alpha(c.color, 0.2)}`,
+                          bgcolor: alpha(c.color, 0.08),
+                        }}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5, color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                            {c.label}
+                          </Typography>
+                          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: c.color }}>
+                              {c.value}{c.unit}
+                            </Typography>
+                          </Box>
+                          {c.subValue != null && (
+                            <Box sx={{ mt: 0.5 }}>
+                              <Typography variant="caption" sx={{ color: alpha(c.color, 0.5), textDecoration: 'line-through', display: 'block' }}>
+                                {c.subValue}{c.unit}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </AnimatedItem>
+                    ))}
+                  </AnimatedGroup>
+                </React.Fragment>
+              );
+            })}
+          </>
+        )}
+
+        {plant.pesoHumedo && (
+          <AnimatedItem>
+            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
+              PESAJES
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 0.5 }}>
+              <Box sx={{ p: 1.5, textAlign: 'center', borderRadius: 2, border: `1px solid ${alpha('#E65100', 0.2)}`, bgcolor: alpha('#E65100', 0.06) }}>
+                <Typography variant="caption" color="text.secondary">Peso húmedo</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#E65100' }}>{plant.pesoHumedo}g</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, textAlign: 'center', borderRadius: 2, border: `1px solid ${alpha('#E65100', 0.2)}`, bgcolor: alpha('#E65100', 0.06) }}>
+                <Typography variant="caption" color="text.secondary">Peso seco</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: plant.pesoSeco ? '#E65100' : 'text.disabled' }}>{plant.pesoSeco ? `${plant.pesoSeco}g` : '—'}</Typography>
+              </Box>
+            </Box>
+          </AnimatedItem>
+        )}
+
         <Popover
           open={Boolean(actionAnchorEl)}
           anchorEl={actionAnchorEl}
@@ -423,8 +429,7 @@ const Plant = () => {
         >
           <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', minWidth: 180 }}>
             {[
-              { label: 'Riego', icon: <WaterDropIcon sx={{ fontSize: 18 }} />, color: '#00BCD4', tipo: 'riego' },
-              { label: 'Suplementos', icon: <ScienceIcon sx={{ fontSize: 18 }} />, color: '#9C27B0', tipo: 'suplementos' },
+              { label: 'Nueva Solución', icon: <WaterDropIcon sx={{ fontSize: 18 }} />, color: '#00BCD4', tipo: 'solucion' },
               { label: 'Insecticida', icon: <BugReportIcon sx={{ fontSize: 18 }} />, color: '#FF5722', tipo: 'insecticida' },
               { label: 'Poda', icon: <ContentCutIcon sx={{ fontSize: 18 }} />, color: '#4CAF50', tipo: 'poda' },
               { label: 'Transplante', icon: <SwapHorizIcon sx={{ fontSize: 18 }} />, color: '#2196F3', tipo: 'transplante' },
@@ -433,14 +438,13 @@ const Plant = () => {
                 onClick={() => {
                   setActionAnchorEl(null);
                   const routeMap = {
-                    riego: '/NuevoRiego',
-                    suplementos: '/NuevoSuplemento',
+                    solucion: '/NuevaSolucion',
                     insecticida: '/NuevoInsecticida',
                     poda: '/NuevaPoda',
                     transplante: '/NuevoTransplante',
                   };
-                  const route = routeMap[act.tipo] || '/NuevoRiego';
-                  const dateParam = act.tipo === 'riego' || act.tipo === 'suplementos'
+                  const route = routeMap[act.tipo] || '/NuevaSolucion';
+                  const dateParam = act.tipo === 'solucion'
                     ? `id=${plant.id}&date=${encodeURIComponent(selectedKey)}`
                     : `id=${plant.id}`;
                   navigate(`${route}?${dateParam}`);
@@ -453,11 +457,21 @@ const Plant = () => {
           </Box>
         </Popover>
 
+        {dayActions.length > 0 && (
+          <>
+            <AnimatedItem>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
+                ACTIVIDAD DEL DÍA
+              </Typography>
+            </AnimatedItem>
+            <AnimatedItem>
+              <PlantDayActivityCard activities={dayActions} />
+            </AnimatedItem>
+          </>
+        )}
+
         <AnimatedItem>
-          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
-            EVOLUCIÓN
-          </Typography>
-          <PlantMeasurementsChart plant={plant} />
+          <PlantEvolutionChart plant={plant} stageRanges={stageRanges} timeline={timeline} />
         </AnimatedItem>
 
         {plant.images && (
@@ -482,35 +496,6 @@ const Plant = () => {
               ))}
             </Box>
           </>
-          </AnimatedItem>
-        )}
-
-        {(plant.etapa === 'Secado' || plant.etapa === 'Curado' || plant.etapa === 'Enfrascado' || plant.pesoHumedo || plant.pesoSeco) && (
-          <AnimatedItem>
-            <SectionCard title="Pesos" icon={<Box component="span" sx={{ color: '#fff', fontSize: 16 }}>⚖️</Box>}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                  <Box component="input" type="number" placeholder="Peso húmedo (g)" value={pesoHumedoInput} onChange={(e) => setPesoHumedoInput(e.target.value)} disabled={savingPesoHumedo}
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${theme.palette.divider}`, background: 'transparent', color: theme.palette.text.primary, fontSize: '0.85rem' }} />
-                  <Box component="button" onClick={handleSavePesoHumedo} sx={{ px: 2, py: 1, borderRadius: 2, border: 'none', bgcolor: 'primary.main', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>
-                    {savingPesoHumedo ? '...' : 'Guardar'}
-                  </Box>
-                </Box>
-                {plant.pesoHumedo ? <Typography variant="caption" color="text.secondary">Actual: {plant.pesoHumedo}g</Typography> : null}
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                  <Box component="input" type="number" placeholder="Peso seco (g)" value={pesoSecoInput} onChange={(e) => setPesoSecoInput(e.target.value)} disabled={savingPesoSeco}
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${theme.palette.divider}`, background: 'transparent', color: theme.palette.text.primary, fontSize: '0.85rem' }} />
-                  <Box component="button" onClick={handleSavePesoSeco} sx={{ px: 2, py: 1, borderRadius: 2, border: 'none', bgcolor: 'primary.main', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>
-                    {savingPesoSeco ? '...' : 'Guardar'}
-                  </Box>
-                </Box>
-                {plant.pesoSeco ? <Typography variant="caption" color="text.secondary">Actual: {plant.pesoSeco}g</Typography> : null}
-              </Box>
-            </Box>
-          </SectionCard>
           </AnimatedItem>
         )}
       </Box>

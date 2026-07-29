@@ -8,7 +8,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckIcon from '@mui/icons-material/Check';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { auth, storage } from '../../firebase';
+import { uploadStatementPdf } from '../../services/storage';
 import { setCardStatement } from '../../services/finances';
 import WizardProgressDots from '../plants/WizardProgressDots';
 import WizardFooter from '../plants/WizardFooter';
@@ -66,20 +66,8 @@ const TarjetasUploadWizard = ({
     setUploading(true);
     setError('');
     try {
-      const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error('Usuario no autenticado');
+      const { downloadURL, storagePath } = await uploadStatementPdf(file, cardId, yearMonth);
 
-      const safeName = file.name.replace(/\s+/g, '_');
-      const fileName = `${cardId}_${yearMonth}_${safeName}`;
-      const storagePath = `users/${uid}/summaries/${fileName}`;
-      const storageRef = storage.ref(storagePath);
-
-      await storageRef.put(file, {
-        contentType: 'application/pdf',
-        customMetadata: { userId: uid, cardId, yearMonth },
-      });
-
-      const downloadURL = await storageRef.getDownloadURL();
       await setCardStatement(cardId, yearMonth, {
         fileName: file.name,
         uploadDate: new Date().toISOString(),
@@ -92,7 +80,7 @@ const TarjetasUploadWizard = ({
       onSuccess('Resumen subido');
       onClose();
     } catch (err) {
-      console.error(err);
+
       setError(getUploadErrorMessage(err));
     } finally {
       setUploading(false);

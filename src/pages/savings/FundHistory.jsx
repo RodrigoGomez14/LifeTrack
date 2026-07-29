@@ -247,7 +247,7 @@ const FundHistory = () => {
                                   </Typography>
                                 </Box>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: txColor, whiteSpace: 'nowrap' }}>
-                                  {isDeposit ? '+' : '\u2212'}{fmt(tx.amount || 0)}
+                                  {fmt(tx.amount || 0)}
                                 </Typography>
                               </Box>
                             );

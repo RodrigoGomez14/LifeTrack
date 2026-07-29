@@ -15,7 +15,7 @@ import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { formatNumber, getMonthName, checkSearch } from '../../utils';
 import { remove } from '../../services/database';
-import { storage } from '../../firebase';
+import { getFileUrl } from '../../services/storage';
 import {
   getCardClosingDates, filterAndSortBillingPeriodTransactions,
   defaultClosingDateString, defaultDueDateString,
@@ -158,7 +158,7 @@ const CreditCardDetail = () => {
     }
     // Refrescar URL en segundo plano para la próxima
     if (statement.storagePath) {
-      try { await storage.ref(statement.storagePath).getDownloadURL(); } catch {}
+      try { await getFileUrl(statement.storagePath); } catch {}
     }
   };
 
@@ -402,11 +402,11 @@ const CreditCardDetail = () => {
                         {labelFromDate(group.date)}
                       </Typography>
                       <Typography variant="caption" sx={{ fontWeight: 600, color: theme.palette.error.main }}>
-                        −$ {formatNumber(group.total)}
+                        $ {formatNumber(group.total)}
                       </Typography>
                       {group.totalUSD > 0 && (
                         <Typography variant="caption" sx={{ fontWeight: 600, color: theme.palette.warning.main }}>
-                          −USD {formatNumber(group.totalUSD, { abbreviate: false })}
+                          USD {formatNumber(group.totalUSD, { abbreviate: false })}
                         </Typography>
                       )}
                     </Box>
@@ -461,7 +461,7 @@ const CreditCardDetail = () => {
                                   </Typography>
                                 </Box>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: tx.currency === 'USD' ? theme.palette.warning.main : theme.palette.error.main, whiteSpace: 'nowrap' }}>
-                                  {tx.currency === 'USD' ? `−USD ${formatNumber(tx.amountUSD || 0, { abbreviate: false })}` : `−$ ${formatNumber(tx.amount || 0)}`}
+                                  {tx.currency === 'USD' ? `USD ${formatNumber(tx.amountUSD || 0, { abbreviate: false })}` : `$ ${formatNumber(tx.amount || 0)}`}
                                 </Typography>
                               </Box>
 

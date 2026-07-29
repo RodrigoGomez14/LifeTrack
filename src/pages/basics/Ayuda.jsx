@@ -55,13 +55,13 @@ const SECTIONS = [
     color: '#2e7d32',
     items: [
       { label: 'Jardín', desc: 'Lista de plantas activas agrupadas por etapa (Germinacion, Vegetativo, Floracion, Lavado de Raices, Secado, Curado). Buscador y pestaña Archivo para plantas finalizadas. Botón "+" para nueva planta.' },
-      { label: 'Perfil de planta', desc: 'Vista detallada con selector de semana, indicadores de días por etapa (Vegetativo, Floracion, Secado, Curado), fechas de transplante e inicio de flora. Cuatro botones de acción: Foto, Acción (menú con riego/suplemento/insecticida/poda/transplante), Log y Siguiente Etapa.' },
+      { label: 'Perfil de planta', desc: 'Vista detallada con selector de semana, indicadores de dias por etapa (Vegetativo, Floracion, Secado, Curado), fechas de transplante e inicio de flora. Cuatro botones de accion: Foto, Accion (menu con riego/insecticida/poda/transplante), Log y Siguiente Etapa.' },
       { label: 'Registro de log', desc: 'Wizard de 5 pasos para registrar mediciones diarias: pH → EC → PPM → Temperatura → Revisar. Las mediciones del día se muestran como cuatro tarjetas (pH, EC, PPM, Temp) con colores por tipo y valor tachado si hay pH regulado.' },
-      { label: 'Acciones', desc: 'Cada tipo de acción tiene su propio wizard independiente: Riego (plantas → mediciones → agua+aditivos → notas → revisar), Suplemento (plantas → producto+dosis → notas → revisar), Insecticida (plantas → tipo+método → producto+dosis → notas → revisar), Poda (plantas → tipo → notas → revisar), Transplante (plantas → maceta+volumen → notas → revisar).' },
+      { label: 'Acciones', desc: 'Cada tipo de accion tiene su propio wizard independiente: Riego (plantas / mediciones / agua+aditivos / notas / revisar), Insecticida (plantas / tipo+metodo / producto+dosis / notas / revisar), Poda (plantas / tipo / notas / revisar), Transplante (plantas / maceta+volumen / notas / revisar).' },
       { label: 'Cambio de etapa', desc: 'Wizard de 3 pasos: información de la etapa actual y siguiente con cronología visual → nota opcional → confirmar. La planta avanza por su ciclo de vida: Germinacion → Vegetativo → Floracion → Lavado de Raices → Secado → Curado. Al llegar a Curado se puede archivar.' },
       { label: 'Fotos', desc: 'Subida de fotos desde el perfil. Galería con vista en grilla y comparación lado a lado entre fotos de distintas fechas. Las fotos del día se muestran en miniatura debajo del log.' },
       { label: 'Gráfico de evolución', desc: 'Chart de líneas con series de pH, EC y PPM a lo largo del tiempo para detectar tendencias.' },
-      { label: 'Nutrientes & Suplementos', desc: 'Biblioteca de productos con tres pestañas: Nutrientes, Insecticidas y Suplementos. Cada producto muestra nombre, marca, tipo y lista de dosis recomendadas. Wizards dedicados para crear nuevos: /CrearNutriente, /CrearInsecticida, /CrearSuplemento.' },
+      { label: 'Nutrientes & Insecticidas', desc: 'Biblioteca de productos con dos pestanas: Nutrientes e Insecticidas. Los nutrientes muestran dosis organizadas por etapa (Vegetativo/Floracion) y semana. Wizards dedicados para crear nuevos: /CrearNutriente, /crearInsecticida.' },
     ],
   },
   {
@@ -86,7 +86,7 @@ const SECTIONS = [
       { label: 'Subí fotos seguido', desc: 'Sacar una foto por semana te permite comparar visualmente el progreso de tus plantas. La galería tiene vista de comparación lado a lado entre fechas.' },
       { label: 'Medí pH y EC siempre que riegues', desc: 'El gráfico de evolución de mediciones se construye solo con los datos que registres. Cuantos más puntos, mejor vas a entender las tendencias de tu solución.' },
       { label: 'Activá el backup automático', desc: 'Un backup diario de tus datos en formato JSON te protege contra cualquier imprevisto. En Configuración → Datos poné el toggle en ON y frecuencia diaria.' },
-      { label: 'Creá tus nutrientes en la biblioteca', desc: 'Antes de registrar un riego con suplementos, asegurate de tener los productos cargados en Nutrientes & Suplementos con sus dosis. Después aparecen como chips para seleccionar rápido en el wizard de Riego.' },
+      { label: 'Crea tus nutrientes en la biblioteca', desc: 'Antes de registrar un riego, asegurate de tener los productos cargados en Nutrientes & Insecticidas con sus dosis. Despues aparecen como chips para seleccionar rapido en el wizard de Riego.' },
     ],
   },
 ];

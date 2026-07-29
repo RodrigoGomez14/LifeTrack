@@ -1,14 +1,14 @@
 import React from 'react';
 import { Grid, Card, CardContent, Typography, Avatar, alpha } from '@mui/material';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import { AnimatedGroup, AnimatedItem } from '../../design-system';
 
 const ACTIONS = [
-  { label: 'Movimiento', route: '/nuevoMovimiento', icon: SwapHorizIcon, color: '#7c4dff' },
-  { label: 'Exchange', route: '/exchange', icon: CurrencyExchangeIcon, color: '#29b6f6' },
-  { label: 'Log de planta', route: '/LogPlanta', icon: LocalFloristIcon, color: '#43a047' },
+  { label: 'Gasto', route: '/nuevoMovimiento', icon: TrendingDownIcon, color: '#e53935', state: { type: 'expense' } },
+  { label: 'Ingreso', route: '/nuevoMovimiento', icon: TrendingUpIcon, color: '#43a047', state: { type: 'income' } },
+  { label: 'Log', route: '/LogPlanta', icon: LocalFloristIcon, color: '#7c4dff' },
 ];
 
 const QuickActions = ({ onNavigate }) => (
@@ -17,7 +17,7 @@ const QuickActions = ({ onNavigate }) => (
       <Grid item xs={4} sm={4} key={action.label} component={AnimatedItem}>
         <Card
           elevation={0}
-          onClick={() => onNavigate(action.route)}
+          onClick={() => onNavigate(action.route, action.state)}
           sx={{
             cursor: 'pointer',
             borderRadius: 2,

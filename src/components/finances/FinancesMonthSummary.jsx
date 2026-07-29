@@ -15,7 +15,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { formatAmount, getMonthName } from '../../utils';
-import { getCategoryIcon, getCategoryColor } from './financesHelpers';
+import { getCategoryIcon } from './financesHelpers';
 import { AnimatedItem } from '../../design-system';
 
 const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
@@ -32,6 +32,7 @@ const FinancesMonthSummary = ({
   selectedYear,
   selectedMonth,
   dollarRate,
+  userData,
 }) => {
   const theme = useTheme();
   const isExpense = dataType === 'expenses';
@@ -53,13 +54,30 @@ const FinancesMonthSummary = ({
   const days = Math.max(1, todayIfCurrent(selectedYear, selectedMonth));
   const avgPerDay = total / days;
 
-  // Vs mes anterior — usa monthlyTrendsData de este año, o re-leemos del año anterior si selectedMonth=1
-  // Para simplicidad: leemos del array trends (índice del mes anterior)
-  const prevIndex = selectedMonth - 2; // 0-indexed
+  // Vs mes anterior — proporcional al mismo día del mes
+  const prevIndex = selectedMonth - 2;
   let prevAmount = 0;
   if (prevIndex >= 0) {
     const arr = isExpense ? monthlyTrendsData?.expenses : monthlyTrendsData?.incomes;
     prevAmount = arr?.[prevIndex] || 0;
+  }
+  // Si es el mes actual, ajustar el mes anterior al mismo día para una comparación justa
+  const now = new Date();
+  const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
+  if (isCurrentMonth && prevAmount > 0) {
+    const dayOfMonth = now.getDate();
+    const pM = selectedMonth === 1 ? 12 : selectedMonth - 1;
+    const pY = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+    const pMonthData = userData?.finances?.[dataType]?.[pY]?.months?.[pM];
+    if (pMonthData?.data && Array.isArray(pMonthData.data)) {
+      prevAmount = pMonthData.data
+        .filter((tx) => {
+          if (!tx.date || tx.excludeFromTotal) return false;
+          const parts = tx.date.split('/').map(Number);
+          return parts.length === 3 && parts[0] <= dayOfMonth;
+        })
+        .reduce((s, tx) => s + (tx.amount || 0) - (tx.refundAmount || 0), 0);
+    }
   }
   const percentChange = prevAmount > 0 ? ((total - prevAmount) / prevAmount) * 100 : null;
 
@@ -133,7 +151,7 @@ const FinancesMonthSummary = ({
             fontSize: { xs: '2.5rem', sm: '3rem' },
           }}
         >
-          {isExpense ? '−' : '+'}{formatAmount(total)}
+          {formatAmount(total)}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           = {formatAmount(totalUSD, true)}
@@ -207,15 +225,13 @@ const FinancesMonthSummary = ({
           TOP CATEGORÍAS
         </Typography>
         <Stack spacing={1.75}>
-          {top3.map(([catName, catData]) => {
-            const color = getCategoryColor(catName, theme, dataType);
-            return (
-              <Box key={catName}>
+          {top3.map(([catName, catData]) => (
+            <Box key={catName}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                   <Avatar
                     sx={{
-                      bgcolor: alpha(color, 0.15),
-                      color,
+                      bgcolor: alpha(accent, 0.15),
+                      color: accent,
                       width: 28,
                       height: 28,
                     }}
@@ -235,13 +251,12 @@ const FinancesMonthSummary = ({
                   sx={{
                     height: 6,
                     borderRadius: 999,
-                    bgcolor: alpha(color, 0.1),
-                    '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 999 },
+                    bgcolor: alpha(accent, 0.1),
+                    '& .MuiLinearProgress-bar': { bgcolor: accent, borderRadius: 999 },
                   }}
                 />
               </Box>
-            );
-          })}
+            ))}
         </Stack>
 
 

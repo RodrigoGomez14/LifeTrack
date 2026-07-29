@@ -109,7 +109,6 @@ const FinancesTransactionsList = ({
         excludeFromTotal: false,
       });
     } catch (err) {
-      console.error('Error al impactar en ahorros:', err);
     }
     setImpacting(null);
   };
@@ -176,18 +175,23 @@ const FinancesTransactionsList = ({
 
   // ───── Render ─────
 
+  const now = new Date();
+  const isCurrentMonth = selectedYear === now.getFullYear() && selectedMonth === now.getMonth() + 1;
+
   return (
     <Box sx={{ px: 2, mb: 4 }}>
-      {/* Card fantasma — primer ítem para incitar a crear */}
-      <AnimatedItem>
-        <Box sx={{ mb: 2 }}>
-          <DashedAddCard
+      {/* Card fantasma — solo mes actual */}
+      {isCurrentMonth && (
+        <AnimatedItem>
+          <Box sx={{ mb: 2 }}>
+            <DashedAddCard
             label={isExpense ? 'Agregar gasto' : 'Agregar ingreso'}
             desc={allTransactions.length === 0 ? (isExpense ? 'Registrá tu primer gasto' : 'Registrá tu primer ingreso') : 'Registrá un nuevo movimiento'}
             onClick={() => navigate('/nuevoMovimiento', { state: { type: isExpense ? 'expense' : 'income' } })}
           />
         </Box>
       </AnimatedItem>
+      )}
 
       {/* Header de la sección */}
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5, px: 0.5 }}>
@@ -244,11 +248,11 @@ const FinancesTransactionsList = ({
                   {labelFromDate(group.date)}
                 </Typography>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: accent }}>
-                  {isExpense ? '−' : '+'}$ {formatNumber(group.total)}
+                  $ {formatNumber(group.total)}
                 </Typography>
                 {group.totalUSD > 0 && (
                   <Typography variant="caption" sx={{ fontWeight: 600, color: usdColor }}>
-                    −USD {formatNumber(group.totalUSD, { abbreviate: false })}
+                    USD {formatNumber(group.totalUSD, { abbreviate: false })}
                   </Typography>
                 )}
               </Box>
@@ -320,8 +324,8 @@ const FinancesTransactionsList = ({
                           <Box sx={{ textAlign: 'right' }}>
                             <Typography variant="body2" sx={{ fontWeight: 700, color: isNativeUSD ? usdColor : accent, whiteSpace: 'nowrap' }}>
                               {isNativeUSD
-                                ? `${isExpense ? '−' : '+'}USD ${formatNumber(tx.amountUSD || 0, { abbreviate: false })}`
-                                : `${isExpense ? '−' : '+'}$ ${formatNumber(effectiveAmount)}`}
+                                ? `USD ${formatNumber(tx.amountUSD || 0, { abbreviate: false })}`
+                                : `$ ${formatNumber(effectiveAmount)}`}
                             </Typography>
                             {hasRefund && (
                               <Typography variant="caption" sx={{ color: theme.palette.success.main, fontWeight: 500 }}>

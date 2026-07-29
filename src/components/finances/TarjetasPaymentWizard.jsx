@@ -1,13 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, IconButton, Button, Card, Checkbox, TextField, alpha,
+  Box, Typography, IconButton, Button, Card, Checkbox, alpha,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { formatAmount, getMonthName } from '../../utils';
 import { bulkUpdate, generateKey } from '../../services/database';
@@ -21,19 +24,16 @@ import WizardProgressDots from '../plants/WizardProgressDots';
 import WizardFooter from '../plants/WizardFooter';
 import { AnimatedGroup, AnimatedItem } from '../../design-system';
 
-const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-const toDateInput = (dateStr) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('/');
-  if (parts.length !== 3) return '';
-  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+const toDate = (str) => {
+  if (!str) return new Date();
+  const [d, m, y] = str.split('/');
+  return new Date(+y, +m - 1, +d);
 };
-const fromDateInput = (dateStr) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return '';
-  return `${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}/${parts[0]}`;
+const fromDate = (date) => {
+  if (!date) return null;
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 const TarjetasPaymentWizard = ({
@@ -51,7 +51,6 @@ const TarjetasPaymentWizard = ({
   const [selectedCardIds, setSelectedCardIds] = useState(new Set(cardId ? [cardId] : []));
   const [customAmount, setCustomAmount] = useState('');
   const [customDate, setCustomDate] = useState(null);
-  const [dateEditing, setDateEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [snack, setSnack] = useState('');
 
@@ -62,7 +61,6 @@ const TarjetasPaymentWizard = ({
   const totalSteps = numberOfPayments > 1 ? 4 + numberOfPayments : 4;
 
   const today = new Date();
-  const dateLabel = `${today.getDate()} ${MONTHS[today.getMonth()]}`;
   const monthName = getMonthName(selectedMonth);
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
@@ -79,9 +77,15 @@ const TarjetasPaymentWizard = ({
     return all;
   }, [userData, inputCards, selectedYear, selectedMonth]);
 
+  const rate = dollarRate?.venta || 1;
+
   const getCardTotal = (id) => {
     if (!allCardTransactions[id]) return 0;
-    return allCardTransactions[id].reduce((sum, t) => sum + t.amount, 0);
+    return allCardTransactions[id].reduce((sum, t) => {
+      const ars = t.amount || 0;
+      const usd = t.currency === 'USD' ? (t.amountUSD || 0) : 0;
+      return sum + ars + usd * rate;
+    }, 0);
   };
 
   const selectedCards = inputCards.filter((c) => selectedCardIds.has(c.id));
@@ -94,7 +98,6 @@ const TarjetasPaymentWizard = ({
 
   const savingsARS = userData?.savings?.amountARS || 0;
   const currentSavings = savingsARS;
-  const rate = dollarRate?.venta || 1;
   const firstPaymentAmount = numberOfPayments > 1
     ? (parseFloat((paymentAmounts[0] || '').replace(',', '.')) || 0)
     : selectedAmount;
@@ -227,7 +230,7 @@ const TarjetasPaymentWizard = ({
       setSnack('Pago registrado');
       setTimeout(() => { onClose(); navigate('/tarjetas'); }, 600);
     } catch (err) {
-      console.error(err);
+
       setSnack(`Error: ${err.message || 'al procesar el pago'}`);
     }
     setSubmitting(false);
@@ -239,6 +242,7 @@ const TarjetasPaymentWizard = ({
   const cardsWithBalance = inputCards.filter((c) => getCardTotal(c.id) > 0);
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
     <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
@@ -487,29 +491,15 @@ const TarjetasPaymentWizard = ({
           <AnimatedGroup sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Datos */}
             <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-              <Box onClick={() => setDateEditing(!dateEditing)}
-                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5, borderBottom: selectedCards.filter((c) => getCardTotal(c.id) > 0).length > 0 ? `1px solid ${theme.palette.divider}` : 'none', cursor: 'pointer', '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.04) } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5, borderBottom: selectedCards.filter((c) => getCardTotal(c.id) > 0).length > 0 ? `1px solid ${theme.palette.divider}` : 'none' }}>
                 <Typography variant="body2" color="text.secondary">Fecha</Typography>
-                {dateEditing ? (
-                  <TextField type="date" size="small"
-                    value={toDateInput(customDate || `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`)}
-                    onChange={(e) => {
-                      if (e.target.value) setCustomDate(fromDateInput(e.target.value));
-                      setDateEditing(false);
-                    }}
-                    onBlur={() => setDateEditing(false)}
-                    autoFocus
-                    sx={{ width: 160, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                    inputProps={{ style: { textAlign: 'right' } }}
+                <Box sx={{ maxWidth: 160 }}>
+                  <DatePicker
+                    value={customDate ? toDate(customDate) : new Date()}
+                    onChange={(date) => setCustomDate(date ? fromDate(date) : null)}
+                    slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
                   />
-                ) : (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {customDate || `Hoy, ${dateLabel}`}
-                    </Typography>
-                    <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                  </Box>
-                )}
+                </Box>
               </Box>
               {selectedCards.filter((c) => getCardTotal(c.id) > 0).map((c) => (
                 <Box key={c.id} sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
@@ -589,6 +579,7 @@ const TarjetasPaymentWizard = ({
         </Box>
       )}
     </Box>
+    </LocalizationProvider>
   );
 };
 

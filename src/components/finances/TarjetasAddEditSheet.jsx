@@ -61,7 +61,7 @@ const TarjetasAddEditSheet = ({
       onSuccess(isEdit ? 'Tarjeta actualizada' : 'Tarjeta agregada');
       onBack();
     } catch (err) {
-      console.error(err);
+
       onError('Error al guardar la tarjeta');
     }
     setSubmitting(false);
@@ -106,6 +106,7 @@ const TarjetasAddEditSheet = ({
           value={name}
           onChange={(e) => setName(e.target.value)}
           fullWidth
+          autoFocus
           size="small"
           placeholder="Ej: Galicia"
           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}

@@ -10,8 +10,8 @@ const FinancesSnapshot = ({ incomeTotal, expenseTotal, savingsARS, savingsUSD })
   const navigate = useNavigate();
 
   const cards = [
-    { label: 'Ingresos', value: `+${formatAmount(incomeTotal)}`, route: '/Ingresos', color: theme.palette.success.main },
-    { label: 'Gastos', value: `\u2212${formatAmount(expenseTotal)}`, route: '/Gastos', color: theme.palette.error.main },
+    { label: 'Ingresos', value: formatAmount(incomeTotal), route: '/Ingresos', color: theme.palette.success.main },
+    { label: 'Gastos', value: formatAmount(expenseTotal), route: '/Gastos', color: theme.palette.error.main },
     { label: 'Ahorros ARS', value: formatAmount(savingsARS), route: '/ahorros', color: theme.palette.info.main },
     { label: 'Ahorros USD', value: formatAmount(savingsUSD, true), route: '/ahorros', color: theme.palette.primary.main },
   ];

@@ -1,21 +1,34 @@
 import React, { useState } from 'react';
 import {
-  Box, Typography, IconButton, TextField, Card, alpha,
+  Box, Typography, IconButton, TextField, Card, Button, Chip, alpha,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { formatAmount, formatAmountStr, getDate } from '../../utils';
 import { transferToFund } from '../../services/savings';
 import WizardProgressDots from '../plants/WizardProgressDots';
 import WizardFooter from '../plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
 
 const TOTAL_STEPS = 3;
 const keypadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'backspace'];
+
+const toDate = (str) => {
+  if (!str) return new Date();
+  const [d, m, y] = str.split('/');
+  return new Date(+y, +m - 1, +d);
+};
+const fromDate = (date) => {
+  if (!date) return null;
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+};
 
 const DepositFundWizard = ({ fund, onClose, onSuccess }) => {
   const theme = useTheme();
@@ -24,8 +37,8 @@ const DepositFundWizard = ({ fund, onClose, onSuccess }) => {
   const [amountStr, setAmountStr] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [customDate, setCustomDate] = useState(null);
-  const [dateEditing, setDateEditing] = useState(false);
 
   const savingsARS = userData?.savings?.amountARS || 0;
   const parsedAmount = amountStr ? parseFloat(amountStr.replace(',', '.')) || 0 : 0;
@@ -60,17 +73,36 @@ const DepositFundWizard = ({ fund, onClose, onSuccess }) => {
           newTotal: (fund.balance || 0) + parsedAmount,
         },
       });
-      onSuccess?.();
-    } catch (err) {
-      console.error(err);
-    }
+      setSavedSnapshot({
+        amount: parsedAmount,
+        fundName: fund.name,
+        newFundBalance: (fund.balance || 0) + parsedAmount,
+        newSavings: savingsARS - parsedAmount,
+      });
+    } catch {}
     setSubmitting(false);
   };
 
   const goNext = () => setStep((s) => s + 1);
   const goBack = () => setStep((s) => s - 1);
 
+  if (savedSnapshot) {
+    const s = savedSnapshot;
+    return (
+      <AnimatedSuccess color={theme.palette.success.main} title="¡Depósito realizado!">
+        <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main', mb: 0.5 }}>{formatAmount(s.amount)}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{s.fundName}</Typography>
+        <Chip label={`${s.fundName}  ${formatAmount(s.newFundBalance)}`} sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: 'success.main', fontWeight: 600, mb: 4 }} />
+        <Button fullWidth variant="contained" size="large" onClick={onClose}
+          sx={{ maxWidth: 320, bgcolor: 'success.main', color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: theme.palette.success.dark } }}>
+          Volver a Ahorros
+        </Button>
+      </AnimatedSuccess>
+    );
+  }
+
   return (
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
     <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
         {step > 0 ? <IconButton onClick={goBack} size="small"><ArrowBackIcon /></IconButton> : <Box sx={{ width: 36 }} />}
@@ -161,33 +193,13 @@ const DepositFundWizard = ({ fund, onClose, onSuccess }) => {
               <Box sx={{ p: 2.5 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.75, borderBottom: description.trim() ? `1px solid ${theme.palette.divider}` : 'none' }}>
                   <Typography variant="body2" color="text.secondary">Fecha</Typography>
-                  {dateEditing ? (
-                    <TextField type="date" size="small"
-                      value={(() => {
-                        const d = customDate || getDate();
-                        const parts = d.split('/');
-                        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                      })()}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          const parts = e.target.value.split('-');
-                          setCustomDate(`${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}/${parts[0]}`);
-                        }
-                        setDateEditing(false);
-                      }}
-                      onBlur={() => setDateEditing(false)}
-                      autoFocus
-                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                      inputProps={{ style: { textAlign: 'right' } }}
+                  <Box sx={{ maxWidth: 160 }}>
+                    <DatePicker
+                      value={customDate ? toDate(customDate) : new Date()}
+                      onChange={(date) => setCustomDate(date ? fromDate(date) : null)}
+                      slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
                     />
-                  ) : (
-                    <Box onClick={() => setDateEditing(true)} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {customDate || (() => { const n = new Date(); return `Hoy, ${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`; })()}
-                      </Typography>
-                      <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                    </Box>
-                  )}
+                  </Box>
                 </Box>
                 {description.trim() && (
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
@@ -243,6 +255,7 @@ const DepositFundWizard = ({ fund, onClose, onSuccess }) => {
         </Box>
       )}
     </Box>
+    </LocalizationProvider>
   );
 };
 

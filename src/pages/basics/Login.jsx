@@ -28,7 +28,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useAuth } from '../../hooks/useAuth';
-import { auth, storage } from '../../firebase';
+import { uploadProfilePhoto } from '../../services/storage';
 
 // ── Helpers a nivel módulo ──────────────────────────────────────────────────
 
@@ -70,14 +70,6 @@ const mapFirebaseError = (code) => {
     default:
       return 'Algo salió mal. Inténtalo de nuevo';
   }
-};
-
-const uploadProfilePhoto = async (file) => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Usuario no autenticado');
-  const fileRef = storage.ref().child(`profileImages/${uid}/${file.name}`);
-  await fileRef.put(file);
-  return fileRef.getDownloadURL();
 };
 
 // ── Componente ──────────────────────────────────────────────────────────────
@@ -135,7 +127,6 @@ const Login = () => {
       await signInWithGoogle();
       navigate('/Home');
     } catch (e) {
-      console.error('Google sign-in error:', e);
       setError(mapFirebaseError(e.code));
     } finally {
       setLoading(false);
@@ -160,7 +151,6 @@ const Login = () => {
       await signIn(loginEmail, loginPassword);
       navigate('/Home');
     } catch (e) {
-      console.error('Login error:', e);
       setError(mapFirebaseError(e.code));
     } finally {
       setLoading(false);
@@ -207,15 +197,11 @@ const Login = () => {
         try {
           const url = await uploadProfilePhoto(photoFile);
           await updatePhotoURL(url);
-        } catch (uploadError) {
-          // El usuario ya fue creado; subida de foto falló — no bloqueo el flujo
-          console.warn('Foto no subida:', uploadError);
-        }
+        } catch {}
       }
 
       goToStep(4);
     } catch (e) {
-      console.error('Signup error:', e);
       setError(mapFirebaseError(e.code));
     } finally {
       setLoading(false);

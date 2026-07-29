@@ -186,7 +186,7 @@ const ProcesarDevolucion = () => {
         {step === 1 && (
           <AnimatedGroup sx={{ px: 3, pt: 2 }}>
             <AnimatedItem><Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <TextField label="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline rows={3}
+              <TextField label="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline rows={3} autoFocus
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
             </Card></AnimatedItem>
           </AnimatedGroup>

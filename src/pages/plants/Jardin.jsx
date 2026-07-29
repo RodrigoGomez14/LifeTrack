@@ -9,7 +9,6 @@ import {
   Collapse,
   Tabs,
   Tab,
-  Chip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
@@ -43,7 +42,7 @@ const Jardin = () => {
       if (source && typeof source === 'object') {
         for (const id in source) {
           if (source[id] && typeof source[id] === 'object' && source[id].name) {
-            list.push({ id, ...source[id], isArchived: true });
+            list.push({ ...source[id], id, isArchived: true });
           }
         }
       }
@@ -168,15 +167,7 @@ const Jardin = () => {
             ) : (
               archivedPlants.map((plant) => (
                 <Box key={plant.id} sx={{ mb: 0.5 }}>
-                  <PlantRow plant={plant} onClick={() => navigate(`/Planta/?${plant.id}`)} />
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', pr: 1, mt: -0.5, mb: 0.5 }}>
-                    <Chip
-                      icon={<ArchiveOutlinedIcon sx={{ fontSize: 14 }} />}
-                      label="Archivada"
-                      size="small"
-                      sx={{ height: 20, fontSize: '0.65rem', bgcolor: alpha(theme.palette.text.disabled, 0.08), color: 'text.secondary' }}
-                    />
-                  </Box>
+                  <PlantRow plant={plant} onClick={() => navigate(`/Planta/?id=${plant.id}`)} />
                 </Box>
               ))
             )}

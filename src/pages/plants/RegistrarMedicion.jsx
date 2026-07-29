@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, TextField, Card,
@@ -13,6 +13,7 @@ import { addPlantActivity } from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
+import { getBaseName } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -47,6 +48,14 @@ const RegistrarMedicion = () => {
   const activePlants = userData?.plants?.active
     ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
     : [];
+
+  const filteredPlants = useMemo(() => {
+    if (selectedPlantIds.size === 0) return activePlants;
+    const firstId = [...selectedPlantIds][0];
+    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
+    if (!base) return activePlants;
+    return activePlants.filter((p) => getBaseName(p.name) === base);
+  }, [selectedPlantIds, activePlants]);
 
   const fertilizantes = getFertilizantes(userData?.plants?.aditives);
 
@@ -96,7 +105,7 @@ const RegistrarMedicion = () => {
       }
       setSavedSnapshot({ ph, ec, ppm, quantity, aditives: selectedAditives, notes, plantCount: selectedPlantIds.size });
     } catch (err) {
-      console.error(err);
+
       setSnack('Error al guardar');
     }
     setSubmitting(false);
@@ -171,7 +180,7 @@ const RegistrarMedicion = () => {
             <AnimatedItem><Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
               SELECCIONÁ LAS PLANTAS
             </Typography></AnimatedItem>
-            <AnimatedItem><PlantMultiSelect plants={activePlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#00BCD4" /></AnimatedItem>
+            <AnimatedItem><PlantMultiSelect plants={filteredPlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#00BCD4" /></AnimatedItem>
           </AnimatedGroup>
         )}
 

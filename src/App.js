@@ -19,10 +19,12 @@ import NuevoInsecticida from './pages/plants/NuevoInsecticida.jsx';
 import NuevoTransplante from './pages/plants/NuevoTransplante.jsx';
 import NuevoSuplemento from './pages/plants/NuevoSuplemento.jsx';
 import CambiarEtapa from './pages/plants/CambiarEtapa.jsx';
+import IndicarPeso from './pages/plants/IndicarPeso.jsx';
+import ArchivarPlanta from './pages/plants/ArchivarPlanta.jsx';
 import Nutrientes from './pages/plants/Nutrientes.jsx';
 import CrearNutriente from './pages/plants/CrearNutriente.jsx';
 import CrearInsecticida from './pages/plants/CrearInsecticida.jsx';
-import CrearSuplemento from './pages/plants/CrearSuplemento.jsx';
+import CrearDosis from './pages/plants/CrearDosis.jsx';
 import NewTransaction from './pages/finances/NewTransaction.jsx';
 import Exchange from './pages/finances/Exchange.jsx';
 import Exchanges from './pages/finances/Exchanges.jsx';
@@ -53,6 +55,7 @@ import Ayuda from './pages/basics/Ayuda';
 import Perfil from './pages/basics/Perfil';
 import NewPhoto from './pages/plants/NewPhoto.jsx';
 import RegistrarMedicion from './pages/plants/RegistrarMedicion.jsx';
+import NuevaSolucion from './pages/plants/NuevaSolucion.jsx';
 import LogPlantaWizard from './pages/plants/LogPlantaWizard.jsx';
 
 function App() {
@@ -110,7 +113,6 @@ function App() {
           groupdedFinances.incomes[year].total += effectiveAmount;
           groupdedFinances.incomes[year].totalUSD += effectiveAmountUSD;
         } else {
-          console.warn(`Transacción de ingreso ${transactionId} sin fecha válida:`, transaction);
         }
       });
     }
@@ -161,7 +163,6 @@ function App() {
             groupdedFinances.expenses[year].totalUSD += effectiveAmountUSD;
           }
         } else {
-          console.warn(`Transacción de gasto ${transactionId} sin fecha válida:`, transaction);
         }
       });
     }
@@ -198,18 +199,9 @@ function App() {
     if(data.plants){
       groupedPlants['active'] = data.plants.active || {};
       groupedPlants['history'] = data.plants.history || {};
-      let aditives = {fertilizantes:{},insecticidas:{}};
       if (data.plants.aditives) {
-        Object.keys(data.plants.aditives).forEach((aditiveId) => {
-          const aditive = data.plants.aditives[aditiveId];
-          if (aditive?.type === 'Fertilizante') {
-            aditives.fertilizantes[aditiveId] = aditive;
-          } else {
-            aditives.insecticidas[aditiveId] = aditive;
-          }
-        });
+        groupedPlants['aditives'] = data.plants.aditives;
       }
-      groupedPlants['aditives']=aditives;
     }
 
     // Procesar hábitos
@@ -235,10 +227,8 @@ function App() {
             // Asegurarse de que el objeto de pago tenga las propiedades esperadas
             const payment = groupedCreditCards[cardId].payments[paymentMonth];
             if (payment && typeof payment === 'object') {
-              // Si no tiene fecha, agregar una por defecto
               if (!payment.date) {
-                console.warn(`Pago de tarjeta ${cardId} para ${paymentMonth} sin fecha, agregando una fecha por defecto`);
-                payment.date = '1/1/2023'; // Fecha por defecto
+                payment.date = '1/1/2023';
               }
             }
           });
@@ -261,33 +251,39 @@ function App() {
 
   useEffect(() => {
     let unsubscribeData = null;
+    let prevUid = null;
+
     const unsubscribe = subscribeToAuthChanges((user) => {
-      // Limpiar listener previo si había una sesión anterior
-      if (unsubscribeData) {
-        unsubscribeData();
-        unsubscribeData = null;
-      }
       if (user) {
-        // Reactivar loading mientras esperamos el primer snapshot del data del user.
-        // Esto evita el flash de /login entre signIn() exitoso y la llegada del data.
-        setIsLoading(true);
+        const isNewLogin = user.uid !== prevUid;
+        prevUid = user.uid;
 
-        // Obtener el valor del dólar blue
-        fetch('https://dolarapi.com/v1/dolares/blue')
-          .then((response) => response.json())
-          .then((data) => setDollarRate(data))
-          .catch((error) => console.error('Error fetching dollar rate:', error));
+        if (isNewLogin) {
+          // Primer login o cambio de cuenta: mostrar loading y crear listener RTDB.
+          setIsLoading(true);
 
-        unsubscribeData = subscribeToUserData((data) => {
-          console.log('[LifeTrack] RTDB snapshot - config.notifications:', JSON.stringify(data?.config?.notifications, null, 2));
-          const filteredData = filterData(data);
-          console.log('[LifeTrack] filterData result - userData.config.notifications:', JSON.stringify(filteredData?.config?.notifications, null, 2));
-          setUserData(filteredData);
-          setUserLoggedIn(true);
-          setIsLoading(false);
-        });
+          fetch('https://dolarapi.com/v1/dolares/blue')
+            .then((response) => response.json())
+            .then((data) => setDollarRate(data))
+            .catch(() => {});
+
+          if (unsubscribeData) unsubscribeData();
+          unsubscribeData = subscribeToUserData((data) => {
+            const filteredData = filterData(data);
+            setUserData(filteredData);
+            setUserLoggedIn(true);
+            setIsLoading(false);
+          });
+        }
+        // Token refresh (mismo uid): no hacer nada. El listener RTDB existente
+        // maneja la re-autenticación automáticamente vía el SDK de Firebase.
       } else {
-        // Logout o estado inicial sin sesión: limpiar todo y terminar loading.
+        // Logout o estado inicial sin sesión.
+        prevUid = null;
+        if (unsubscribeData) {
+          unsubscribeData();
+          unsubscribeData = null;
+        }
         setUserData(null);
         setUserLoggedIn(false);
         setIsLoading(false);
@@ -354,18 +350,21 @@ function App() {
           <Route path="/Jardin" element={<Navigate to="/plantas" />} />
           <Route path="/Ambientes" element={<Navigate to="/plantas" />} />
           <Route path="/NuevaPlanta" element={<NewPlant />} />
-          <Route path="/NuevoRiego" element={<RegistrarMedicion />} />
+          <Route path="/NuevaSolucion" element={<NuevaSolucion />} />
           <Route path="/NuevoSuplemento" element={<NuevoSuplemento />} />
           <Route path="/NuevaPoda" element={<NuevaPoda />} />
           <Route path="/NuevoInsecticida" element={<NuevoInsecticida />} />
           <Route path="/NuevoTransplante" element={<NuevoTransplante />} />
           <Route path="/CambiarEtapa" element={<CambiarEtapa />} />
+          <Route path="/IndicarPeso" element={<IndicarPeso />} />
+          <Route path="/ArchivarPlanta" element={<ArchivarPlanta />} />
           <Route path="/nutrientes" element={<Nutrientes />} />
           <Route path="/Aditivos" element={<Navigate to="/nutrientes" />} />
-          <Route path="/NuevoAditivo" element={<Navigate to="/CrearNutriente" />} />
+          <Route path="/NuevoAditivo" element={<Navigate to="/crearInsecticida" />} />
           <Route path="/CrearNutriente" element={<CrearNutriente />} />
-          <Route path="/CrearInsecticida" element={<CrearInsecticida />} />
-          <Route path="/CrearSuplemento" element={<CrearSuplemento />} />
+          <Route path="/crearInsecticida" element={<CrearInsecticida />} />
+          <Route path="/CrearAditivo" element={<Navigate to="/crearInsecticida" />} />
+          <Route path="/CrearDosis" element={<CrearDosis />} />
           <Route path="/NuevaFoto" element={<NewPhoto />} />
           <Route path="/LogPlanta" element={<LogPlantaWizard />} />
           <Route path="*" element={<Navigate to="/" />} />

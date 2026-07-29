@@ -29,6 +29,7 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import HomeIcon from '@mui/icons-material/Home';
 import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
+import CannabisIcon from '../../components/icons/CannabisIcon';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import FlightIcon from '@mui/icons-material/Flight';
@@ -37,8 +38,11 @@ import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import WorkIcon from '@mui/icons-material/Work';
 import LaptopIcon from '@mui/icons-material/Laptop';
 import PeopleIcon from '@mui/icons-material/People';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
 
 import { useStore } from '../../store';
 import { addExpense, addIncome, addCardTransaction } from '../../services/finances';
@@ -48,21 +52,15 @@ import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-syste
 
 // ── Helpers a nivel módulo ──────────────────────────────────────────────────
 
-const extractCategories = (financesNode, kind) => {
-  const set = new Set();
-  const yearsNode = financesNode?.[kind] || {};
-  Object.values(yearsNode).forEach((year) => {
-    const months = year?.months || {};
-    Object.values(months).forEach((month) => {
-      const txs = month?.data;
-      if (!Array.isArray(txs)) return;
-      txs.forEach((tx) => {
-        if (tx?.category) set.add(tx.category);
-      });
-    });
-  });
-  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es')).map((name) => ({ name }));
-};
+const EXPENSE_CATEGORIES = [
+  'Supermercado', 'Auto', 'Entretenimiento, salidas y comida',
+  'Hogar y servicios', 'Indoor y porro', 'Lilo',
+  'Salud', 'Transporte', 'Extras',
+].map((name) => ({ name }));
+
+const INCOME_CATEGORIES = [
+  'Sueldo', 'Camila', 'Extras',
+].map((name) => ({ name }));
 
 const CATEGORY_ICONS = {
   Supermercado: LocalGroceryStoreIcon, Transporte: CommuteIcon, Auto: DirectionsCarIcon,
@@ -70,6 +68,10 @@ const CATEGORY_ICONS = {
   Hogar: HomeIcon, Entretenimiento: SportsEsportsIcon, Viajes: FlightIcon,
   Educacion: SchoolIcon, Salud: LocalHospitalIcon, Extras: MoreHorizIcon,
   Sueldo: WorkIcon, Freelance: LaptopIcon, Camila: PeopleIcon,
+  'Entretenimiento, salidas y comida': RestaurantIcon,
+  'Hogar y servicios': HomeIcon,
+  'Indoor y porro': CannabisIcon,
+  Lilo: FavoriteIcon,
 };
 
 const renderCategoryIcon = (name, props = {}) => {
@@ -99,20 +101,16 @@ const parseAmount = (raw) => {
 const formatARS = (n) => `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatUSD = (n) => `USD ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// DD/MM/YYYY → YYYY-MM-DD para input nativo type="date"
-const toDateInput = (dateStr) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('/');
-  if (parts.length !== 3) return '';
-  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+// ── Helpers para DatePicker ──────────────────────────────────────────────────
+const toDate = (str) => {
+  if (!str) return new Date();
+  const [d, m, y] = str.split('/');
+  return new Date(+y, +m - 1, +d);
 };
-
-// YYYY-MM-DD → DD/MM/YYYY
-const fromDateInput = (dateStr) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return '';
-  return `${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}/${parts[0]}`;
+const fromDate = (date) => {
+  if (!date) return null;
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 // DD/MM/YYYY → Date object
@@ -147,7 +145,6 @@ const NewTransaction = ({ type: propType }) => {
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [error, setError] = useState('');
   const [customDate, setCustomDate] = useState(null);
-  const [dateEditing, setDateEditing] = useState(false);
 
   // Ref para evitar re-autoavance al volver atrás con misma categoría sin subcategorías
   const lastAutoAdvanceCat = useRef('');
@@ -161,11 +158,10 @@ const NewTransaction = ({ type: propType }) => {
     return Object.keys(cards).filter((k) => k !== 'transactions').map((id) => ({ id, ...cards[id] }));
   }, [userData]);
 
-  const categoriesByType = useMemo(() => {
-    const expenseCats = extractCategories(userData?.finances, 'expenses');
-    const incomeCats = extractCategories(userData?.finances, 'incomes');
-    return { expense: expenseCats, income: incomeCats };
-  }, [userData]);
+  const categoriesByType = useMemo(() => ({
+    expense: EXPENSE_CATEGORIES,
+    income: INCOME_CATEGORIES,
+  }), []);
 
   const currentCategories = categoriesByType[type] || [];
 
@@ -228,7 +224,6 @@ const NewTransaction = ({ type: propType }) => {
   // ── Navegación ────────────────────────────────────────────────────────────
   const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS));
   const goBack = () => {
-    setDateEditing(false);
     setStep((s) => Math.max(s - 1, 1));
   };
   const handleClose = () => navigate(-1);
@@ -279,7 +274,6 @@ const NewTransaction = ({ type: propType }) => {
       setSavedSnapshot({ savingsAfterARS, savingsAfterUSD, amountText: formatAmountDisplay(amount, currency, type), category, type, isImmediateDeduction });
       setStep(TOTAL_STEPS + 1); // éxito
     } catch (err) {
-      console.error('Error al guardar la transacción:', err);
       setError(err?.message || 'Error al guardar. Reintentá.');
     } finally {
       setSubmitting(false);
@@ -296,7 +290,6 @@ const NewTransaction = ({ type: propType }) => {
     setPaymentMethod('cash');
     setInstallments(1);
     setCustomDate(null);
-    setDateEditing(false);
     lastAutoAdvanceCat.current = '';
     setSavedSnapshot(null);
   };
@@ -541,9 +534,6 @@ const NewTransaction = ({ type: propType }) => {
 
   // ── STEP 4: Confirmar ─────────────────────────────────────────────────────
   const renderStep4 = () => {
-    const now = new Date();
-    const timeStr = `Hoy, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const dateDisplay = customDate || timeStr;
     const methodLabel = type === 'expense'
       ? paymentMethod === 'cash' ? `Efectivo (${currency})`
         : (() => { const c = availableCards.find((x) => x.id === selectedCard); return c ? `${c.name} **** ${c.lastFourDigits}${installments > 1 ? ` · ${installments}x` : ''}` : 'Tarjeta'; })()
@@ -590,29 +580,16 @@ const NewTransaction = ({ type: propType }) => {
                 </Box>
               )}
 
-              {/* Fecha (clickeable para editar) */}
-              <Box onClick={() => setDateEditing(true)}
-                sx={{ display: 'flex', justifyContent: 'space-between', py: 1, alignItems: 'center', gap: 1, cursor: 'pointer', borderRadius: 1, '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.04) } }}>
+              {/* Fecha (editable) */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, gap: 1 }}>
                 <Typography variant="body2" color="text.secondary">Fecha</Typography>
-                {dateEditing ? (
-                  <TextField type="date" size="small"
-                    value={toDateInput(customDate || getDate())}
-                    onChange={(e) => {
-                      if (e.target.value) setCustomDate(fromDateInput(e.target.value));
-                    }}
-                    onBlur={() => setDateEditing(false)}
-                    autoFocus
-                    sx={{ width: 160, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                    inputProps={{ style: { textAlign: 'right', paddingRight: 4 } }}
+                <Box sx={{ maxWidth: 160 }}>
+                  <DatePicker
+                    value={customDate ? toDate(customDate) : new Date()}
+                    onChange={(date) => setCustomDate(date ? fromDate(date) : null)}
+                    slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
                   />
-                ) : (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right', borderBottom: `1px dashed transparent`, transition: 'border-color 0.15s', '.MuiBox-root:hover &': { borderBottomColor: typeColor } }}>
-                      {dateDisplay}
-                    </Typography>
-                    <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled', opacity: 0.5 }} />
-                  </Box>
-                )}
+                </Box>
               </Box>
             </Box>
           </Card></AnimatedItem>
@@ -680,6 +657,7 @@ const NewTransaction = ({ type: propType }) => {
   };
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
     <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       <Fade in key={step} timeout={250}>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -695,6 +673,7 @@ const NewTransaction = ({ type: propType }) => {
         <Alert severity="error" variant="filled" onClose={() => setError('')} sx={{ width: '100%', borderRadius: 2 }}>{error}</Alert>
       </Snackbar>
     </Box>
+    </LocalizationProvider>
   );
 };
 

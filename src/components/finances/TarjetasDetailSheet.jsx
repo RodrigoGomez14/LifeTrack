@@ -27,14 +27,20 @@ import MonthNav from '../shared/MonthNav';
 const CATEGORY_META = {
   Supermercado: { icon: '🛒', color: '#4CAF50' },
   Hogar: { icon: '🏠', color: '#FF9800' },
+  'Hogar y servicios': { icon: '🏠', color: '#FF9800' },
   Transporte: { icon: '🚌', color: '#2196F3' },
   Auto: { icon: '🚗', color: '#607D8B' },
   Salud: { icon: '🏥', color: '#E91E63' },
   Restaurante: { icon: '🍽️', color: '#FF5722' },
   Entretenimiento: { icon: '🎬', color: '#9C27B0' },
+  'Entretenimiento, salidas y comida': { icon: '🍽️', color: '#9C27B0' },
+  Indoor: { icon: '🌿', color: '#4CAF50' },
+  'Indoor y porro': { icon: '🌿', color: '#4CAF50' },
+  Lilo: { icon: '❤️', color: '#E91E63' },
   Educación: { icon: '📚', color: '#3F51B5' },
   Servicios: { icon: '🔧', color: '#795548' },
   Ropa: { icon: '👕', color: '#00BCD4' },
+  Extras: { icon: '📦', color: '#9E9E9E' },
 };
 const getCategoryMeta = (cat) => CATEGORY_META[cat] || { icon: '💰', color: '#9E9E9E' };
 
@@ -169,7 +175,7 @@ const TarjetasDetailSheet = ({
                       <Typography variant="caption" color="text.disabled">{formatTxDate(tx.date)}</Typography>
                     </Box>
                   </Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.light' }}>−{formatAmount(tx.amount || 0)}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.light' }}>{formatAmount(tx.amount || 0)}</Typography>
                 </Box>
               );
             })}

@@ -7,8 +7,7 @@ import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ParkIcon from '@mui/icons-material/Park';
 import ForestIcon from '@mui/icons-material/Forest';
 import WavesIcon from '@mui/icons-material/Waves';
-import CircleIcon from '@mui/icons-material/Circle';
-import { calculateDaysBetween } from './plantsHelpers';
+import { calculateDaysInStage } from './plantsHelpers';
 
 const CannabisIcon = (props) => (
   <SvgIcon {...props} viewBox="0 0 512 512" sx={{ fill: 'none', stroke: 'currentColor', strokeWidth: 36, ...props.sx }}>
@@ -41,16 +40,8 @@ export const ToolCircle = ({ icon, label, onClick, color }) => {
 
 export const PlantRow = ({ plant, onClick }) => {
   const stage = STAGES.find((s) => s.key === plant.etapa) || STAGES[0];
-  const birthDate = plant.birthDate;
-  const daysActive = birthDate ? Math.floor((new Date() - (() => { const [d, m, y] = birthDate.split('/'); return new Date(+y, +m - 1, +d); })()) / (1000 * 60 * 60 * 24)) : null;
-  const weeksActive = daysActive !== null ? Math.floor(daysActive / 7) : null;
-
-  const vegDays = plant.inicioVegetativo
-    ? calculateDaysBetween(plant.inicioVegetativo, plant.inicioFloracion || null)
-    : null;
-  const flowerDays = plant.inicioFloracion
-    ? calculateDaysBetween(plant.inicioFloracion)
-    : null;
+  const daysInStage = calculateDaysInStage(plant, plant.etapa);
+  const weeksInStage = daysInStage !== null ? Math.max(1, Math.floor((daysInStage - 1) / 7) + 1) : null;
 
   return (
     <Box onClick={onClick} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, cursor: 'pointer', borderRadius: 2, '&:hover': { bgcolor: 'action.hover' }, transition: '0.1s' }}>
@@ -65,27 +56,9 @@ export const PlantRow = ({ plant, onClick }) => {
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>{plant.name}</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25, flexWrap: 'wrap' }}>
-          {vegDays !== null && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-              <CircleIcon sx={{ fontSize: 8, color: '#43a047' }} />
-              <Typography variant="caption" sx={{ color: '#43a047', fontWeight: 500, fontSize: '0.7rem', lineHeight: 1 }}>
-                {vegDays} días
-              </Typography>
-            </Box>
-          )}
-          {flowerDays !== null && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
-              <CircleIcon sx={{ fontSize: 8, color: '#e91e63' }} />
-              <Typography variant="caption" sx={{ color: '#e91e63', fontWeight: 500, fontSize: '0.7rem', lineHeight: 1 }}>
-                {flowerDays} días
-              </Typography>
-            </Box>
-          )}
-        </Box>
       </Box>
       <Typography variant="caption" sx={{ fontWeight: 600, color: stage.color, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
-        D{String(daysActive || 0).padStart(2, '0')}{weeksActive !== null ? ` (S${weeksActive})` : ''}
+        D{String(daysInStage || 0).padStart(2, '0')}{weeksInStage !== null ? ` (S${weeksInStage})` : ''}
       </Typography>
     </Box>
   );

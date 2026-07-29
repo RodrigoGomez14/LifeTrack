@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, Button, TextField,
@@ -14,6 +14,9 @@ import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ParkIcon from '@mui/icons-material/Park';
 import ForestIcon from '@mui/icons-material/Forest';
 import WavesIcon from '@mui/icons-material/Waves';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { addPlantActivity } from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
@@ -40,6 +43,8 @@ const STEPS = [
   { key: 'waterTemp', label: 'Temp. agua', unit: '°C', hint: 'Medí la temperatura del agua' },
 ];
 
+const getBaseName = (name) => name?.replace(/\s+\d+$/, '').trim().toLowerCase() || '';
+
 const now = () => new Date();
 const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -60,8 +65,9 @@ const LogPlantaWizard = () => {
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
+  const [customDate, setCustomDate] = useState(null);
 
-  const timestamp = useMemo(() => now(), []);
+  const submittingRef = useRef(false);
 
   const activePlants = userData?.plants?.active
     ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
@@ -138,12 +144,15 @@ const LogPlantaWizard = () => {
   const hasPlants = selectedPlantIds.size > 0;
 
   const handleSubmitFull = async () => {
-    if (!hasPlants || !allFieldsFilled) return;
+    if (!hasPlants || !allFieldsFilled || submittingRef.current) return;
     setSubmitting(true);
+    submittingRef.current = true;
+    const snapshot = { values: { ...values }, notes, plantCount: selectedPlantIds.size, mode: 'full' };
+    setSavedSnapshot(snapshot);
     try {
       const data = {
-        date: logDate,
-        time: formatTime(timestamp),
+        date: customDate || logDate,
+        time: formatTime(now()),
         ...(values.ph ? { ph: parseFloat(values.ph.replace(',', '.')) } : {}),
         ...(values.ec ? { ec: parseFloat(values.ec.replace(',', '.')) } : {}),
         ...(values.ppm ? { ppm: parseInt(values.ppm.replace(',', '.')) } : {}),
@@ -153,17 +162,20 @@ const LogPlantaWizard = () => {
       for (const id of selectedPlantIds) {
         await addPlantActivity(id, 'logs', data);
       }
-      setSavedSnapshot({ values: { ...values }, notes, plantCount: selectedPlantIds.size, mode: 'full' });
     } catch (err) {
-      console.error(err);
+      setSavedSnapshot(null);
       setSnack('Error al guardar');
     }
+    submittingRef.current = false;
     setSubmitting(false);
   };
 
   const handleSubmitRegulate = async () => {
-    if (selectedPlantIds.size === 0 || !values.ph) return;
+    if (selectedPlantIds.size === 0 || !values.ph || submittingRef.current) return;
+    const snapshot = { values: { ...values }, plantCount: selectedPlantIds.size, mode: 'regulate' };
+    setSavedSnapshot(snapshot);
     setSubmitting(true);
+    submittingRef.current = true;
     try {
       const t = formatTime(now());
       const phReg = parseFloat(values.ph.replace(',', '.'));
@@ -177,11 +189,11 @@ const LogPlantaWizard = () => {
           await db.update(`plants/active/${pid}/logs/${logKey}`, { phReg, time: t });
         }
       }
-      setSavedSnapshot({ values: { ...values }, plantCount: selectedPlantIds.size, mode: 'regulate' });
     } catch (err) {
-      console.error(err);
+      setSavedSnapshot(null);
       setSnack('Error al guardar');
     }
+    submittingRef.current = false;
     setSubmitting(false);
   };
 
@@ -204,6 +216,30 @@ const LogPlantaWizard = () => {
   const showGroupB = activeGroup === null || activeGroup === 'b';
   const disabledIds = useMemo(() => new Set(groupC.map((p) => p.id)), [groupC]);
 
+  const filteredGroupA = useMemo(() => {
+    if (selectedPlantIds.size === 0) return groupA;
+    const firstId = [...selectedPlantIds][0];
+    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
+    if (!base) return groupA;
+    return groupA.filter((p) => getBaseName(p.name) === base);
+  }, [selectedPlantIds, groupA, activePlants]);
+
+  const filteredGroupB = useMemo(() => {
+    if (selectedPlantIds.size === 0) return groupB;
+    const firstId = [...selectedPlantIds][0];
+    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
+    if (!base) return groupB;
+    return groupB.filter((p) => getBaseName(p.name) === base);
+  }, [selectedPlantIds, groupB, activePlants]);
+
+  const filteredGroupC = useMemo(() => {
+    if (selectedPlantIds.size === 0) return groupC;
+    const firstId = [...selectedPlantIds][0];
+    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
+    if (!base) return groupC;
+    return groupC.filter((p) => getBaseName(p.name) === base);
+  }, [selectedPlantIds, groupC, activePlants]);
+
   const currentPhFromLog = useMemo(() => {
     if (mode !== 'regulate') return null;
     const firstPlant = groupA.find((p) => selectedPlantIds.has(p.id));
@@ -215,22 +251,21 @@ const LogPlantaWizard = () => {
   }, [mode, groupA, selectedPlantIds, logDate]);
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
     <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       {savedSnapshot ? (
         savedSnapshot.mode === 'regulate' ? (
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3, gap: 3 }}>
-            <AnimatedSuccess color="#4CAF50" title="¡pH regulado!">
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {savedSnapshot.plantCount > 1 ? `${savedSnapshot.plantCount} plantas` : '1 planta'}
-              </Typography>
-              <Chip label={`pH regulado ${savedSnapshot.values.ph}`} size="small" sx={{ fontWeight: 600 }} />
-            </AnimatedSuccess>
+          <AnimatedSuccess color="#4CAF50" title="¡pH regulado!">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {savedSnapshot.plantCount > 1 ? `${savedSnapshot.plantCount} plantas` : '1 planta'}
+            </Typography>
+            <Chip label={`pH regulado ${savedSnapshot.values.ph}`} size="small" sx={{ fontWeight: 600 }} />
             <Button variant="contained" size="large" onClick={handleLoadAnother}
-              sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', bgcolor: '#4CAF50', '&:hover': { bgcolor: '#388E3C' } }}>
+              sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', bgcolor: '#4CAF50', '&:hover': { bgcolor: '#388E3C' }, mt: 3 }}>
               Cargar otro
             </Button>
-            <Button onClick={() => navigate(-1)} sx={{ textTransform: 'none', color: 'text.secondary' }}>Volver</Button>
-          </Box>
+            <Button onClick={() => navigate(-1)} sx={{ mt: 1, textTransform: 'none', color: 'text.secondary' }}>Volver</Button>
+          </AnimatedSuccess>
         ) : (
           <AnimatedSuccess color={theme.palette.primary.main} title="¡Log guardado!">
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -267,64 +302,68 @@ const LogPlantaWizard = () => {
 
       <WizardProgressDots total={TOTAL_STEPS} current={step} color={mode === 'regulate' ? '#4CAF50' : undefined} />
 
-      <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
       {/* Step 0: Plant multi-select */}
       {isPlantStep && (
-        <AnimatedGroup sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, px: 3, pb: 3 }}>
-          <AnimatedItem>
-            <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block' }}>
-              SELECCIONÁ LAS PLANTAS
-            </Typography>
-          </AnimatedItem>
-
-          {showGroupA && groupA.length > 0 && (
+        <>
+        <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0, px: 3, pb: 1 }}>
+          <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <AnimatedItem>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#4CAF50', mb: 0.5, display: 'block' }}>
-                {activeGroup === 'a' ? 'CON LOG DEL DÍA' : 'CON LOG — regular pH'}
-              </Typography>
-              <PlantMultiSelect plants={groupA} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#4CAF50" />
-            </AnimatedItem>
-          )}
-
-          {showGroupB && groupB.length > 0 && (
-            <AnimatedItem>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: activeGroup === 'b' ? theme.palette.primary.main : 'text.secondary', mb: 0.5, mt: showGroupA ? 2 : 0, display: 'block' }}>
-                {activeGroup === 'b' ? 'SIN LOG' : 'SIN LOG — cargar nuevo'}
-              </Typography>
-              <PlantMultiSelect plants={groupB} selectedIds={selectedPlantIds} onToggle={togglePlant} />
-            </AnimatedItem>
-          )}
-
-          {groupC.length > 0 && (
-            <AnimatedItem>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', mb: 0.5, mt: 2, display: 'block' }}>
-                COMPLETAS · YA REGULADAS
-              </Typography>
-              <PlantMultiSelect plants={groupC} selectedIds={new Set()} onToggle={() => {}} disabledIds={disabledIds} />
-            </AnimatedItem>
-          )}
-
-          {(groupA.length === 0 && groupB.length === 0 && groupC.length === 0 && activePlants.length > 0) && (
-            <AnimatedItem>
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                No hay plantas activas
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block' }}>
+                SELECCIONÁ LAS PLANTAS
               </Typography>
             </AnimatedItem>
-          )}
 
-          <AnimatedItem sx={{ pt: 1 }}>
-            <Button fullWidth variant="contained" disabled={!hasPlants} onClick={goNext}
-              sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
-              Siguiente →
-            </Button>
-          </AnimatedItem>
-        </AnimatedGroup>
+            {showGroupA && filteredGroupA.length > 0 && (
+              <AnimatedItem>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#4CAF50', mb: 0.5, display: 'block' }}>
+                  {activeGroup === 'a' ? 'CON LOG DEL DÍA' : 'CON LOG — regular pH'}
+                </Typography>
+                <PlantMultiSelect plants={filteredGroupA} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#4CAF50" />
+              </AnimatedItem>
+            )}
+
+            {showGroupB && filteredGroupB.length > 0 && (
+              <AnimatedItem>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: activeGroup === 'b' ? theme.palette.primary.main : 'text.secondary', mb: 0.5, mt: showGroupA ? 2 : 0, display: 'block' }}>
+                  {activeGroup === 'b' ? 'SIN LOG' : 'SIN LOG — cargar nuevo'}
+                </Typography>
+                <PlantMultiSelect plants={filteredGroupB} selectedIds={selectedPlantIds} onToggle={togglePlant} />
+              </AnimatedItem>
+            )}
+
+            {filteredGroupC.length > 0 && (
+              <AnimatedItem>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', mb: 0.5, mt: 2, display: 'block' }}>
+                  COMPLETAS · YA REGULADAS
+                </Typography>
+                <PlantMultiSelect plants={filteredGroupC} selectedIds={new Set()} onToggle={() => {}} disabledIds={disabledIds} />
+              </AnimatedItem>
+            )}
+
+            {(groupA.length === 0 && groupB.length === 0 && groupC.length === 0 && activePlants.length > 0) && (
+              <AnimatedItem>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                  No hay plantas activas
+                </Typography>
+              </AnimatedItem>
+            )}
+          </AnimatedGroup>
+        </Box>
+
+        <Box sx={{ px: 3, pb: 3, pt: 1 }}>
+          <Button fullWidth variant="contained" disabled={!hasPlants} onClick={goNext}
+            sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
+            Siguiente →
+          </Button>
+        </Box>
+        </>
       )}
 
       {/* Mode 'regulate': single pH regulation step */}
       {!isPlantStep && mode === 'regulate' && (
-        <AnimatedGroup sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <AnimatedGroup sx={{ flex: 1, overflow: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
               {currentPhFromLog !== null && (
@@ -378,7 +417,7 @@ const LogPlantaWizard = () => {
 
       {/* Mode 'full': Steps 1-4 (measurements) */}
       {!isPlantStep && !isLastStep && mode !== 'regulate' && currentStep && (
-        <AnimatedGroup sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <AnimatedGroup sx={{ flex: 1, overflow: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary' }}>
@@ -427,7 +466,7 @@ const LogPlantaWizard = () => {
 
       {/* Mode 'full': Step 5 (Review) */}
       {isLastStep && mode !== 'regulate' && (
-        <Box sx={{ flex: 1, overflow: 'auto', px: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0, px: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Revisar</Typography>
 
           {selectedPlants.length > 0 && (
@@ -449,8 +488,24 @@ const LogPlantaWizard = () => {
             </Box>
           )}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
-            <Typography variant="caption">{logDate} · {formatTime(timestamp)}</Typography>
+          <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
+              <Typography variant="body2" color="text.secondary">Fecha</Typography>
+              <Box sx={{ maxWidth: 160 }}>
+                <DatePicker
+                  value={customDate ? (() => { const [d, m, y] = customDate.split('/'); return new Date(+y, +m - 1, +d); })() : (() => { const [d, m, y] = logDate.split('/'); return new Date(+y, +m - 1, +d); })()}
+                  onChange={(date) => {
+                    if (date) {
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const yy = date.getFullYear();
+                      setCustomDate(`${dd}/${mm}/${yy}`);
+                    }
+                  }}
+                  slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
+                />
+              </Box>
+            </Box>
           </Box>
 
           <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
@@ -500,6 +555,7 @@ const LogPlantaWizard = () => {
         </>
       )}
     </Box>
+    </LocalizationProvider>
   );
 };
 

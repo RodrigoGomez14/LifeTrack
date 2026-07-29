@@ -7,7 +7,6 @@ import {
   signOut,
   updateDisplayName,
   updatePhotoURL,
-  deleteCurrentUser,
   subscribeToAuthChanges,
 } from '../services/auth';
 
@@ -33,6 +32,5 @@ export const useAuth = () => {
     signOut,
     updateDisplayName,
     updatePhotoURL,
-    deleteAccount: deleteCurrentUser,
   };
 };

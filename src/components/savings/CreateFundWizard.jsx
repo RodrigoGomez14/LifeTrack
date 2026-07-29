@@ -50,9 +50,7 @@ const CreateFundWizard = ({ onClose, onSuccess }) => {
         history: {},
       });
       onSuccess?.();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch {}
     setSubmitting(false);
   };
 

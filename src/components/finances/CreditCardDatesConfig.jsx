@@ -72,7 +72,6 @@ const CreditCardDatesConfig = ({
     try {
       await onSave({ closingDate, dueDate });
     } catch (e) {
-      console.error('Error al guardar fechas:', e);
       setError('Error al guardar. Intentá de nuevo.');
     } finally {
       setSaving(false);

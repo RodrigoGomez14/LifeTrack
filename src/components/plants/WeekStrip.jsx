@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Box, Typography, IconButton } from '@mui/material';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme, alpha } from '@mui/material/styles';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -25,9 +26,16 @@ const getWeekDates = (weekOffset = 0) => {
 const sameDay = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 const getDayKey = (date) => {
-  const d = date.getDate();
-  const m = date.getMonth() + 1;
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
   return `${d}/${m}/${date.getFullYear()}`;
+};
+
+const normalizeDate = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
 };
 
 const getActivityIndicators = (date, allPlants) => {
@@ -37,26 +45,26 @@ const getActivityIndicators = (date, allPlants) => {
   allPlants.forEach((plant) => {
     ['irrigations', 'prunings', 'insecticides', 'transplants', 'images', 'logs'].forEach((prop) => {
       if (plant[prop]) {
-        const has = Object.values(plant[prop]).some((e) => e.date === key);
+        const has = Object.values(plant[prop]).some((e) => normalizeDate(e.date) === key);
         if (has) indicators.push(prop === 'irrigations' ? '#2196F3' : prop === 'prunings' ? '#4CAF50' : prop === 'insecticides' ? '#FF5722' : prop === 'transplants' ? '#9C27B0' : prop === 'images' ? '#FF9800' : '#607D8B');
       }
     });
   });
-  return indicators.slice(0, 3);
+  return indicators.slice(0, 4);
 };
 
-const DayCell = ({ date, isToday, isSelected, indicators, label, onClick }) => (
-  <Box onClick={onClick} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25, cursor: 'pointer', flex: 1 }}>
+const DayCell = ({ date, isToday, isSelected, indicators, label, onClick, stageColor }) => (
+  <Box onClick={onClick} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flex: 1, py: 2, bgcolor: stageColor ? alpha(stageColor, 0.2) : 'transparent', transition: 'background-color 0.15s' }}>
     <Box sx={{
       width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: 12, fontWeight: 700,
       bgcolor: isSelected ? '#D4A017' : isToday ? alpha('#3f51b5', 0.2) : 'transparent',
-      color: isSelected ? '#fff' : isToday ? '#7986cb' : 'text.secondary',
+      color: isSelected ? '#fff' : isToday ? '#7986cb' : stageColor ? '#fff' : 'text.secondary',
       transition: 'background-color 0.1s, color 0.1s',
     }}>
       {date.getDate()}
     </Box>
-    <Box sx={{ display: 'flex', gap: 0.15, justifyContent: 'center', height: 3 }}>
+    <Box sx={{ display: 'flex', gap: 0.15, justifyContent: 'center', alignItems: 'center', height: 6, mt: 0.25, mb: 1 }}>
       {indicators.map((c, j) => (
         <Box key={j} sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: c }} />
       ))}
@@ -67,13 +75,17 @@ const DayCell = ({ date, isToday, isSelected, indicators, label, onClick }) => (
   </Box>
 );
 
-const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, selectedDay, onDaySelect, showLabels = true }) => {
+const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, selectedDay, onDaySelect, showLabels = true, getStageColor }) => {
   const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
+  const arrowSx = { color: 'text.secondary', p: 0.25, borderRadius: '6px', '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.8) } };
   const touchRef = useRef({ startX: 0, currentX: 0 });
   const [internalOffset, setInternalOffset] = useState(0);
   const [isGrabbing, setIsGrabbing] = useState(false);
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const daySelectedRef = useRef(false);
+  const originalDayRef = useRef(null);
 
   const offset = externalOffset !== undefined ? externalOffset : internalOffset;
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
@@ -113,6 +125,8 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
 
   const handleTouchStart = (e) => {
     touchRef.current = { startX: e.touches[0].clientX, currentX: e.touches[0].clientX };
+    daySelectedRef.current = false;
+    originalDayRef.current = selectedDay;
     setIsGrabbing(true);
   };
 
@@ -121,6 +135,12 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
     const delta = e.touches[0].clientX - touchRef.current.startX;
     touchRef.current.currentX = e.touches[0].clientX;
     translateX.set(delta);
+    if (!daySelectedRef.current && containerWidthRef.current && Math.abs(delta) > containerWidthRef.current * 0.2) {
+      daySelectedRef.current = true;
+      const dir = delta > 0 ? -1 : 1;
+      const newWeekDates = getWeekDates(offset + dir);
+      onDaySelect?.(dir === 1 ? newWeekDates[0] : newWeekDates[6]);
+    }
   };
 
   const handleTouchEnd = () => {
@@ -131,17 +151,20 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
     if (Math.abs(delta) > threshold) {
       const dir = delta > 0 ? -1 : 1;
       const newOffset = offset + dir;
+      translateX.jump(delta + dir * containerWidthRef.current);
       if (externalOffset !== undefined) {
         onWeekChange?.(newOffset);
       } else {
         setInternalOffset(newOffset);
         onWeekChange?.(newOffset);
       }
-      translateX.set(delta);
       requestAnimationFrame(() => {
         animate(translateX, 0, { type: 'spring', stiffness: 250, damping: 30, mass: 0.8 });
       });
     } else {
+      if (daySelectedRef.current) {
+        onDaySelect?.(originalDayRef.current);
+      }
       animate(translateX, 0, { type: 'spring', stiffness: 350, damping: 35, mass: 0.6 });
     }
     touchRef.current = null;
@@ -150,7 +173,7 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
   const renderWeekRow = (dates) => {
     if (!containerWidth) return null;
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'space-around', width: containerWidth, flexShrink: 0, px: 0.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-around', width: containerWidth, flexShrink: 0, px: isDesktop ? 0.5 : 0 }}>
         {dates.map((date, i) => {
           const isToday = sameDay(date, today);
           const isSelected = sameDay(date, selectedDay);
@@ -164,6 +187,7 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
               indicators={indicators}
               label={DAYS_FULL[date.getDay()]}
               onClick={() => onDaySelect?.(date)}
+              stageColor={getStageColor ? getStageColor(date) : null}
             />
           );
         })}
@@ -171,20 +195,15 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
     );
   };
 
-  const weekLabel = useMemo(() => {
-    const start = currDates[0]; const end = currDates[6];
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    if (start.getMonth() === end.getMonth()) return `${start.getDate()} - ${end.getDate()} ${months[start.getMonth()]}`;
-    return `${start.getDate()} ${months[start.getMonth()]} - ${end.getDate()} ${months[end.getMonth()]}`;
-  }, [currDates]);
-
   return (
-    <Box sx={{ userSelect: 'none' }}>
+    <Box sx={{ userSelect: 'none', px: isDesktop ? 1 : 0 }}>
       {showLabels && (
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-          <IconButton size="small" onClick={() => navigateWeek(-1)} sx={{ color: 'text.secondary', p: 0.25 }}>
-            <ChevronLeftIcon fontSize="small" />
-          </IconButton>
+          {isDesktop && (
+            <IconButton size="small" onClick={() => navigateWeek(-1)} sx={arrowSx}>
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+          )}
           <Box sx={{ display: 'flex', justifyContent: 'space-around', flex: 1 }}>
             {DAYS_SHORT.map((d, i) => (
               <Typography key={i} variant="caption" sx={{ fontWeight: 600, fontSize: 10, color: i === 0 || i === 6 ? alpha(theme.palette.text.secondary, 0.6) : 'text.secondary', textAlign: 'center', flex: 1 }}>
@@ -192,15 +211,17 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
               </Typography>
             ))}
           </Box>
-          <IconButton size="small" onClick={() => navigateWeek(1)} sx={{ color: 'text.secondary', p: 0.25 }}>
-            <ChevronRightIcon fontSize="small" />
-          </IconButton>
+          {isDesktop && (
+            <IconButton size="small" onClick={() => navigateWeek(1)} sx={arrowSx}>
+              <ChevronRightIcon fontSize="small" />
+            </IconButton>
+          )}
         </Box>
       )}
 
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        {!showLabels && (
-          <IconButton size="small" onClick={() => navigateWeek(-1)} sx={{ color: 'text.secondary', p: 0.25 }}>
+        {isDesktop && !showLabels && (
+          <IconButton size="small" onClick={() => navigateWeek(-1)} sx={arrowSx}>
             <ChevronLeftIcon fontSize="small" />
           </IconButton>
         )}
@@ -221,18 +242,12 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
           )}
         </Box>
 
-        {!showLabels && (
-          <IconButton size="small" onClick={() => navigateWeek(1)} sx={{ color: 'text.secondary', p: 0.25 }}>
+        {isDesktop && !showLabels && (
+          <IconButton size="small" onClick={() => navigateWeek(1)} sx={arrowSx}>
             <ChevronRightIcon fontSize="small" />
           </IconButton>
         )}
       </Box>
-
-      {!showLabels && (
-        <Typography variant="caption" sx={{ textAlign: 'center', display: 'block', mt: 0.5, color: 'text.secondary', fontSize: 10 }}>
-          {weekLabel}
-        </Typography>
-      )}
     </Box>
   );
 };

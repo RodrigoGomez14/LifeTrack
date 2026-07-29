@@ -6,9 +6,10 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { useAuth } from '../../hooks/useAuth';
-import { getMonthName, formatAmount } from '../../utils';
+import { getMonthName } from '../../utils';
 import { getCardClosingDates, filterAndSortBillingPeriodTransactions } from '../../components/finances/creditCardsHelpers';
 import { AnimatedGroup, AnimatedItem } from '../../design-system';
+import BirthdayOverlay from '../../components/home/BirthdayOverlay';
 import QuickActions from '../../components/home/QuickActions';
 import FinancesSnapshot from '../../components/home/FinancesSnapshot';
 import CreditCardsGlance from '../../components/home/CreditCardsGlance';
@@ -77,6 +78,64 @@ const computeTopCategories = (monthData, today, excludeHidden) => {
     .map(([category, amount]) => ({ category, amount }));
 };
 
+// ── Helper: datos de tarjetas para un mes específico ──────────────────────
+const computeCardsData = (cardsObj, year, month, monthKey, dollarRate) => {
+  const cardIds = Object.keys(cardsObj).filter((k) => k !== 'transactions');
+  if (cardIds.length === 0) return { cards: [], totalPendiente: 0, showPayButton: false };
+
+  const cards = cardIds.map((cardId) => {
+    const card = cardsObj[cardId];
+    const { prevClosingDate, currentClosingDate } = getCardClosingDates(card, year, month);
+    const transactions = filterAndSortBillingPeriodTransactions(
+      cardsObj.transactions?.[cardId] || {},
+      prevClosingDate,
+      currentClosingDate
+    );
+    const totalARS = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalNativeUSD = transactions.reduce((sum, t) =>
+      t.currency === 'USD' ? sum + (t.amountUSD || 0) : sum, 0
+    );
+    const rate = dollarRate?.venta || 1;
+    const total = totalARS + totalNativeUSD * rate;
+    const paid = !!card.payments?.[monthKey];
+
+    const configured = card.dates?.[monthKey];
+    const closingDay = configured?.closingDate
+      ? Number(configured.closingDate.split('-')[2])
+      : (card.defaultClosingDay || 10);
+    const dueDay = configured?.dueDate
+      ? Number(configured.dueDate.split('-')[2])
+      : (card.defaultDueDay || 25);
+
+    let dueMonth = month;
+    let dueYear = year;
+    if (dueDay <= closingDay) {
+      dueMonth = month === 12 ? 1 : month + 1;
+      if (month === 12) dueYear = year + 1;
+    }
+
+    const closingDate = new Date(year, month - 1, closingDay);
+    const dueDate = new Date(dueYear, dueMonth - 1, dueDay);
+
+    return {
+      id: cardId, name: card.name || 'Sin nombre', cardType: card.cardType,
+      lastFourDigits: card.lastFourDigits, total, totalNativeUSD, paid,
+      closingDay, closingMonth: month, dueDay, dueMonth,
+      dates: {
+        closingLabel: `${DAYS_SHORT[closingDate.getDay()]} ${closingDay} ${getMonthName(month).substring(0, 3)}`,
+        dueLabel: `${DAYS_SHORT[dueDate.getDay()]} ${dueDay} ${getMonthName(dueMonth).substring(0, 3)}`,
+      },
+    };
+  });
+
+  const totalPendiente = cards.reduce((sum, c) => sum + (c.paid ? 0 : c.total), 0);
+  const todayDay = new Date().getDate();
+  const isPastClosing = cards.some((c) => c.total > 0 && todayDay >= c.closingDay);
+  const showPayButton = totalPendiente > 0 && isPastClosing;
+
+  return { cards, totalPendiente, showPayButton };
+};
+
 const Home = () => {
   const { userData, dollarRate } = useStore();
   const { user } = useAuth();
@@ -84,6 +143,14 @@ const Home = () => {
   const theme = useTheme();
 
   const displayName = user?.displayName || '';
+  const birthday = userData?.config?.birthday;
+
+  const todayDDMM = useMemo(() => {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const isBirthday = birthday === todayDDMM;
+  const alreadySeen = sessionStorage.getItem('bdaySeen') === todayDDMM;
 
   const currentDate = useMemo(() => new Date(), []);
   const currentYear = currentDate.getFullYear();
@@ -115,70 +182,19 @@ const Home = () => {
     const totalFunds = fundsList.reduce((s, f) => s + (f.balance || 0), 0);
     const fundCount = fundsList.length;
 
-    // Credit cards snapshot
+    // Credit cards — mostrar mes anterior si no está pago
     const cardsObj = userData.creditCards || {};
-    const cardIds = Object.keys(cardsObj).filter((k) => k !== 'transactions');
-    const monthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
-    const cards = cardIds.map((cardId) => {
-      const card = cardsObj[cardId];
-      const { prevClosingDate, currentClosingDate } = getCardClosingDates(card, currentYear, currentMonth);
-      const transactions = filterAndSortBillingPeriodTransactions(
-        cardsObj.transactions?.[cardId] || {},
-        prevClosingDate,
-        currentClosingDate
-      );
-      const totalARS = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-      const totalNativeUSD = transactions.reduce((sum, t) =>
-        t.currency === 'USD' ? sum + (t.amountUSD || 0) : sum, 0
-      );
-      const rate = dollarRate?.venta || 1;
-      const total = totalARS + totalNativeUSD * rate;
-      const paid = !!card.payments?.[monthKey];
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    const prevMonthKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
-      // Fechas configuradas o defaults
-      const configured = card.dates?.[monthKey];
-      const closingDay = configured?.closingDate
-        ? (() => { const [y, m, d] = configured.closingDate.split('-').map(Number); return d; })()
-        : (card.defaultClosingDay || 10);
-      const dueDay = configured?.dueDate
-        ? (() => { const [y, m, d] = configured.dueDate.split('-').map(Number); return d; })()
-        : (card.defaultDueDay || 25);
+    const currentCardsData = computeCardsData(cardsObj, currentYear, currentMonth, currentMonthKey, dollarRate);
+    const prevCardsData = computeCardsData(cardsObj, prevYear, prevMonth, prevMonthKey, dollarRate);
 
-      let dueMonth = currentMonth;
-      let dueYear = currentYear;
-      if (dueDay <= closingDay) {
-        dueMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-        if (currentMonth === 12) dueYear = currentYear + 1;
-      }
-
-      const closingDate = new Date(currentYear, currentMonth - 1, closingDay);
-      const dueDate = new Date(dueYear, dueMonth - 1, dueDay);
-
-      return {
-        id: cardId,
-        name: card.name || 'Sin nombre',
-        cardType: card.cardType,
-        lastFourDigits: card.lastFourDigits,
-        total,
-        totalNativeUSD,
-        paid,
-        closingDay,
-        closingMonth: currentMonth,
-        dueDay,
-        dueMonth,
-        dates: {
-          closingLabel: `${DAYS_SHORT[closingDate.getDay()]} ${closingDay} ${getMonthName(currentMonth).substring(0, 3)}`,
-          dueLabel: `${DAYS_SHORT[dueDate.getDay()]} ${dueDay} ${getMonthName(dueMonth).substring(0, 3)}`,
-        },
-      };
-    });
-
-    const totalPendiente = cards.reduce((sum, c) => sum + (c.paid ? 0 : c.total), 0);
-
-    const todayDay = new Date().getDate();
-    const isPastClosing = cards.some((c) => c.total > 0 && todayDay >= c.closingDay);
-    const showPayButton = totalPendiente > 0 && isPastClosing;
+    const hasUnpaidPrevious = prevCardsData.cards.some(c => c.total > 0 && !c.paid);
+    const cardsData = hasUnpaidPrevious ? prevCardsData : currentCardsData;
 
     return {
       incomeTotal,
@@ -189,11 +205,10 @@ const Home = () => {
       savingsUSD,
       totalFunds,
       fundCount,
-      cards,
-      totalPendiente,
-      showPayButton,
+      cards: cardsData.cards,
+      totalPendiente: cardsData.totalPendiente,
     };
-  }, [userData, currentYear, currentMonth, today]);
+  }, [userData, currentYear, currentMonth, today, dollarRate]);
 
   const now = new Date();
   const todayLabel = `${DAYS[now.getDay()]} ${now.getDate()} de ${MONTHS[now.getMonth()]} de ${now.getFullYear()}`;
@@ -233,7 +248,7 @@ const Home = () => {
               ACCIONES RÁPIDAS
             </Typography>
           </AnimatedItem>
-          <AnimatedItem><QuickActions onNavigate={(route) => navigate(route)} /></AnimatedItem>
+          <AnimatedItem><QuickActions onNavigate={(route, state) => navigate(route, { state: state || undefined })} /></AnimatedItem>
 
           {/* Finanzas */}
           <AnimatedItem>
@@ -262,8 +277,6 @@ const Home = () => {
             <CreditCardsGlance
               cards={snapshot.cards}
               totalPendiente={snapshot.totalPendiente}
-              showPayButton={snapshot.showPayButton}
-              onPayCards={() => navigate(`/PagarTarjeta?mes=${currentMonth}&anio=${currentYear}`)}
             />
           </AnimatedItem>
 
@@ -281,6 +294,9 @@ const Home = () => {
           </AnimatedItem>
         </AnimatedGroup>
       </Box>
+      {isBirthday && !alreadySeen && (
+        <BirthdayOverlay onDismiss={() => sessionStorage.setItem('bdaySeen', todayDDMM)} />
+      )}
     </Layout>
   );
 };

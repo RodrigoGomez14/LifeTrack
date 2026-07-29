@@ -231,6 +231,17 @@ Usada por todos los wizards de Plants para recibir el ID de la planta.
 
 ---
 
+## Workflow Build/Deploy
+
+- **Build + Deploy:** Solo cuando se dé la orden explícita "empezá a hacer build y deploy". A partir de ahí, cada iteración termina con `npm run build` + `firebase deploy` para testear en vivo en el celular.
+- **Stop:** Con "dejá de hacer build y deploy" se cierra la ventana hasta nuevo aviso.
+- **Commit a GitHub:** Solo ante orden directa de "commiteá a la siguiente versión mayor/menor".
+- **Versioning (convención propia):**
+  - *Menor* (bug fixes/parches): `x.x.1` → `x.x.2` (ej: `1.0.3` → `1.0.4`)
+  - *Mayor* (features/nuevas funcionalidades): `x.1.x` → `x.2.x` (ej: `1.0.4` → `1.1.0`)
+
+---
+
 ## Testing
 
 - Existe `setupTests.js` de Create React App (Jest + React Testing Library)
@@ -2082,6 +2093,91 @@ const slideVariants = {
 ```
 Las Cards de revisión NO necesitan `flex: 1` — solo `gap` para espaciado entre ellas. El scroll lo maneja el Box padre.
 
+---
+
+### Patrón 7: Campo de fecha en step de revisión (DatePicker inline en card ghost)
+
+**Archivos de referencia:** `src/pages/plants/NuevaPoda.jsx` (step revisión), `src/pages/plants/NuevoTransplante.jsx`, `src/pages/plants/NuevoInsecticida.jsx`
+
+**Cuándo usarlo:** En el step final de revisión de un wizard, dentro de la card ghost con las filas de datos, para permitir editar la fecha antes de guardar.
+
+**Estructura:**
+
+1. **Imports necesarios:**
+```jsx
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { es } from 'date-fns/locale';
+```
+
+2. **Helper `formatDate` a nivel módulo** (convierte `Date` → `DD/MM/YYYY` para persistir):
+```jsx
+const formatDate = (date) => {
+  if (!date) return null;
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yy = date.getFullYear();
+  return `${dd}/${mm}/${yy}`;
+};
+```
+
+3. **State como `Date` object** (no string). Si viene `?date=DD/MM/YYYY` por URL, parsear:
+```jsx
+const [fecha, setFecha] = useState(() => {
+  if (dateParam) {
+    const [d, m, y] = dateParam.split('/');
+    return new Date(+y, +m - 1, +d);
+  }
+  return new Date();
+});
+```
+
+4. **Envolver el `return` del componente en `<LocalizationProvider>`:**
+```jsx
+return (
+  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+    <Box sx={{ position: 'fixed', inset: 0, ... }}>
+      {/* wizard content */}
+    </Box>
+  </LocalizationProvider>
+);
+```
+
+5. **Fila dentro de la card ghost de revisión** — label a la izquierda, `DatePicker` a la derecha con `maxWidth: 160`:
+```jsx
+<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5 }}>
+  <Typography variant="body2" color="text.secondary">Fecha</Typography>
+  <Box sx={{ maxWidth: 160 }}>
+    <DatePicker
+      value={fecha}
+      onChange={(date) => date && setFecha(date)}
+      slotProps={{
+        textField: {
+          size: 'small',
+          sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } },
+        },
+      }}
+    />
+  </Box>
+</Box>
+```
+
+6. **Al persistir**, usar `formatDate(fecha)` (no el `Date` directo ni `getDate()`):
+```jsx
+await addPlantActivity(id, 'prunings', { date: formatDate(fecha), ... });
+```
+
+7. **En `handleLoadAnother`**, resetear a `new Date()`:
+```jsx
+setFecha(new Date());
+```
+
+**Notas importantes:**
+- **No usar `TextField` plano** para la fecha. Todos los wizards de plants usan `DatePicker` de `@mui/x-date-pickers` con `AdapterDateFns` y locale `es` — mantener consistencia.
+- **`getDate()` de `utils.js`** devuelve un string `DD/MM/YYYY` — solo útil para defaults iniciales o snapshots. Para edición inline, siempre `DatePicker` + `formatDate`.
+- **`maxWidth: 160`** en el wrapper del DatePicker para que no ocupe todo el ancho de la card.
+- **`size="small"`** para que visualmente coincida con la altura de las otras filas de la card.
+
 | Caso | Patrón | Archivo ejemplo |
 |---|---|---|
 | Lista de cards con entrada stagger | **Patrón 1** (`AnimatedGroup` + `AnimatedItem`) | `Home.jsx`, `HabitsStatCards.jsx`, `Savings.jsx` |
@@ -2090,7 +2186,8 @@ Las Cards de revisión NO necesitan `flex: 1` — solo `gap` para espaciado entr
 | Navegador horizontal compacto con swipe (semanas, tabs) | **Patrón 3** (WeekStrip, `useMotionValue` + `useTransform`) | `WeekStrip.jsx` |
 | Transición simple entre estados con slide horizontal | **Patrón 4** (`AnimatePresence` + `custom` variants) | Cualquier toggle/routing interno |
 | Desactivar animaciones en una subsección | `skipEnter={true}` en `AnimatedGroup` | Cuando necesitás que solo el slide padre sea visible |
-| Paso de wizard con numpad y display centrado | **Patrón 6** (AnimatedGroup flex:1 + AnimatedItem display:flex en el display) | `NewTransaction.jsx` Step 1, `Exchange.jsx` Steps 1-2 |
+| Paso de wizard con numpad y display centrado | **Patrón 6** (AnimatedGroup flex:1 + AnimatedItem display:flex en el display) | `NewTransaction.jsx` Step 1, `Exchange.jsx` Steps 1-2, `NuevoInsecticida.jsx` Step 3 |
+| Campo de fecha editable en step de revisión | **Patrón 7** (DatePicker + LocalizationProvider + formatDate helper) | `NuevaPoda.jsx`, `NuevoTransplante.jsx`, `NuevoInsecticida.jsx` |
 
 **Decisiones importantes tomadas:**
 - Los componentes de animación usan `<Box component={motion.div}>` de MUI, no `<motion.div>` nativo. Esto garantiza que `sx` funcione correctamente.
@@ -2120,3 +2217,86 @@ Las Cards de revisión NO necesitan `flex: 1` — solo `gap` para espaciado entr
 - Aplicar Patrón 2 o 3 al navegador de meses de Tarjetas
 - Aplicar Patrón 2 o 3 a la navegación de semanas en Habits
 - Evaluar swipe en otras listas (HabitsList, Exchanges, FundHistory)
+
+---
+
+### 2026-07-04 — Auditoría de seguridad + Capa Storage + Rediseño de notificaciones
+
+**Qué se hizo:**
+- **Creado `services/storage.js`** con `uploadProfilePhoto`, `uploadPlantImage`, `uploadStatementPdf`, `uploadBackup`, `getFileUrl`. Sanitiza nombres de archivo y resuelve `uid` internamente vía `getCurrentUser()`.
+- **Migrados 6 componentes** que importaban `auth, storage` directo de `firebase.js`:
+  - `Login.jsx` — `uploadProfilePhoto` desde el servicio
+  - `Configuracion.jsx` — `uploadProfilePhoto` + `uploadBackup` desde el servicio
+  - `NewPhoto.jsx` — `uploadPlantImage` desde el servicio (devuelve `{downloadURL, storagePath}`)
+  - `CreditCardStatementUpload.jsx` — `uploadStatementPdf` + `getFileUrl`
+  - `TarjetasUploadWizard.jsx` — `uploadStatementPdf`
+  - `CreditCardDetail.jsx` — `getFileUrl`
+- **Eliminadas** `deleteAllUserData()` de `services/config.js` y `deleteCurrentUser()` de `services/auth.js` + `useAuth.js`. No existe más la función de eliminar cuenta.
+- **Consola 100% limpia**: eliminadas 34 líneas de `console.warn/error/log` en todo `src/`. La más importante: App.js ya no loguea objetos de transacciones completos con datos financieros.
+- **Creado agente `security-auditor`** en `.opencode/agents/` para auditorías futuras.
+- **Rediseño completo del sistema de notificaciones** para eliminar el consumo excesivo de datos en Firebase (~150 MB/hora):
+  - **Causa raíz identificada**: la cloud function `dailyExpenseReminder` corría cada minuto (`* * * * *`), leía la DB entera (`db.ref('/').once('value')`) y escribía `lastSent` en el árbol del usuario. Cada escritura disparaba el listener raíz del cliente (`subscribeToUserData`) que re-descargaba TODO el árbol (1.28 MB). Resultado: ~150 MB/hora.
+  - **Nueva cloud function `checkReminders`**: 4 slots diarios (9, 12, 18, 22). Lee **solo** el nodo `notifications/` (fuera de `users/`). Escribe `lastSent` en `notifications/` (no en el árbol del usuario → no dispara el listener raíz). Consumo: ~20 KB/día (reducción 99.999%).
+  - **Nueva estructura de datos**: `notifications/{uid}/fcmToken` y `notifications/{uid}/reminders/{id}` — nodo separado del árbol del usuario.
+  - **`NuevaNotificacion.jsx`**: time picker reemplazado por selector de 4 franjas horarias fijas (Mañana 09:00, Mediodía 12:00, Tarde 18:00, Noche 22:00).
+  - **`Configuracion.jsx`**: sección de notificaciones actualizada para leer/escribir del nuevo nodo `notifications/`. Carga reminders con `getReminders()` (one-time read) en mount.
+  - **`services/notifications.js`**: reescrito para usar paths `notifications/{uid}/` con `database.ref()` directo. Funciones: `requestPermission`, `saveFcmToken`, `removeFcmToken`, `getStoredFcmToken`, `addReminder`, `updateReminder`, `removeReminder`, `getReminders`, `onForegroundMessage`.
+
+**Por qué se hizo así:**
+- **Storage service**: unifica 5 patrones de upload regados en 6 componentes. Sanitiza `file.name` con `replace(/[^a-zA-Z0-9._-]/g, '_')` — prevención de path traversal. Los paths de storage se construyen dentro del servicio (no en los componentes).
+- **Eliminar delete account**: el usuario no quiere la feature. Las funciones existían pero no tenían UI. Borrado completo para no dejar código huérfano.
+- **Notificaciones con slots fijos**: el problema de fondo era el polling cada minuto + lectura de la DB entera. Con 4 slots fijos la función corre 4 veces/día (no 1440). El nodo separado `notifications/` garantiza que la función **nunca** lea el árbol del usuario y que sus escrituras **nunca** disparen el listener raíz del cliente.
+- **`notifications/` como nodo raíz separado**: la decisión clave. `subscribeToUserData` escucha `database.ref(uid)` = `{uid}`. Escribir en `notifications/{uid}` está fuera de ese path → cero re-descargas en el cliente.
+
+**Archivos creados:**
+- `src/services/storage.js`
+- `.opencode/agents/security-auditor.md`
+
+**Archivos modificados:**
+- `src/pages/basics/Login.jsx` (import storage service, removido helper local)
+- `src/pages/basics/Configuracion.jsx` (storage + backup + sección notificaciones refactorizada)
+- `src/pages/plants/NewPhoto.jsx` (uploadPlantImage, removido `auth`)
+- `src/components/finances/CreditCardStatementUpload.jsx` (uploadStatementPdf + getFileUrl)
+- `src/components/finances/TarjetasUploadWizard.jsx` (uploadStatementPdf)
+- `src/pages/finances/CreditCardDetail.jsx` (getFileUrl)
+- `src/services/config.js` (removido deleteAllUserData)
+- `src/services/auth.js` (removido deleteCurrentUser)
+- `src/hooks/useAuth.js` (removido deleteAccount)
+- `src/services/notifications.js` (reescrito completo — nuevo nodo)
+- `src/pages/basics/NuevaNotificacion.jsx` (reescrito — slots en vez de time picker)
+- `src/App.js` (console.* limpios, ruta /nuevaNotificacion mantenida)
+- `functions/index.js` (reescrito — 4 slots, nodo notifications/)
+- 15+ archivos más: console.* eliminados
+
+**Decisiones importantes tomadas:**
+- **NO se migró el listener raíz** (`subscribeToUserData`) a listeners por módulo. Queda documentado como "futura reestructuración" (ver abajo). El consumo actual sin la cloud function es aceptable (~2 descargas del árbol por sesión de uso).
+- **Horarios fijos**: 09:00, 12:00, 18:00, 22:00 (hora Argentina). El usuario pierde la capacidad de elegir horario exacto pero gana cero consumo innecesario.
+- **`notifications/` usa `database.ref()` directo** en vez de pasar por `services/database.js` (que siempre prepende `uid`). Esto es correcto porque el path necesario es `notifications/{uid}/...` y no `{uid}/notifications/...`.
+- **Build**: 997 KB gzipped, sin errores.
+
+**Pendiente — DEPLOY:**
+- **Desplegar la nueva cloud function**: ejecutar `firebase deploy --only functions` desde la raíz del proyecto. Esto **reemplaza** la función vieja (`dailyExpenseReminder`) por la nueva (`checkReminders`). La vieja deja de existir y de consumir datos.
+- **Verificar en Firebase Console** que la función vieja ya no aparece y la nueva tiene schedule `0 9,12,18,22 * * *`.
+
+---
+
+## Futuras reestructuraciones
+
+### Listeners por módulo (en lugar del listener raíz)
+
+**Problema:** `subscribeToUserData` en `database.js:68-73` suscribe al árbol entero del usuario. Cada write en cualquier parte dispara una re-descarga completa.
+
+**Solución propuesta:** Reemplazar por listeners individuales por dominio:
+- `useFinances()` → suscribe a `{uid}/expenses` + `{uid}/incomes` + `{uid}/creditCards`
+- `usePlants()` → suscribe a `{uid}/plants`
+- `useHabits()` → suscribe a `{uid}/habits`
+- `useSavings()` → suscribe a `{uid}/savings` + `{uid}/savingsFunds`
+- `useConfig()` → suscribe a `{uid}/config`
+
+Cada hook se carga solo cuando su página está activa (lazy subscription). App.js deja de tener el árbol completo en un solo state y pasa a ser un orchestrator de hooks.
+
+**Beneficio:** Reducción ~80-90% del tráfico de descarga. Un cambio en una planta no re-descarga los gastos.
+
+**Riesgo:** Cambio arquitectónico grande. Requiere refactor de `store.js` y de todos los componentes que leen `userData.xxx` del store global.
+
+**Estado:** No implementado. El consumo actual sin la cloud function es aceptable para un solo usuario.

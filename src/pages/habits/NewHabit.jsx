@@ -143,8 +143,7 @@ const NewHabit = () => {
     try {
       await addHabit(habitData);
       setSavedSnapshot({ name, frequency, difficulty, color, reminder, reminderTime });
-    } catch (error) {
-      console.error('Error al crear hábito:', error);
+    } catch {
       setSaving(false);
     }
   };
@@ -269,6 +268,7 @@ const NewHabit = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
+                    autoFocus
                     fullWidth
                     placeholder="Ej: Beber agua, Meditar, Leer..."
                     size="small"

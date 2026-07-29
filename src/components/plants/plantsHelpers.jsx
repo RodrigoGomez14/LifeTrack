@@ -8,6 +8,31 @@ import WavesIcon from '@mui/icons-material/Waves';
 
 export const STAGES_ORDER = ['Germinacion', 'Vegetativo', 'Floracion', 'Lavado de Raices', 'Secado', 'Curado'];
 
+export const STAGE_PALETTE = {
+  Germinacion: '#8e24aa',
+  Vegetativo: '#43a047',
+  Floracion: '#e53935',
+  'Lavado de Raices': '#00acc1',
+  Secado: '#fb8c00',
+  Curado: '#546e7a',
+};
+
+// Convierte "DD/MM/YYYY" a timestamp UTC (mediodía para evitar offsets de zona horaria).
+export function parseDateToTimestamp(dateStr) {
+  if (!dateStr) return null;
+  const [d, m, y] = dateStr.split('/').map(Number);
+  if (!d || !m || !y) return null;
+  return Date.UTC(y, m - 1, d, 12, 0, 0);
+}
+
+// Normaliza "D/M/YYYY" → "DD/MM/YYYY" para comparaciones exactas.
+export function normalizeDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+}
+
 // Convierte "DD/MM/YYYY" a "Lunes, 5 de mayo de 2026" (capitalizada).
 export function convertToDetailedDate(dateString) {
   if (!dateString) return '';
@@ -35,8 +60,8 @@ export function formatMonthDisplay(date) {
     .replace(/^\w/, (c) => c.toUpperCase());
 }
 
-// Diferencia en días entre dos fechas DD/MM/YYYY. Si endDateStr no se pasa, usa hoy.
-// Cuando se calcula contra "hoy", resta 1 día para no contar el día actual.
+// Diferencia en dias entre dos fechas DD/MM/YYYY. Si endDateStr no se pasa, usa hoy.
+// Dia 1 = primer dia, semana 1 = dias 1-7, semana 2 = dias 8-14, etc.
 export function calculateDaysBetween(startDateStr, endDateStr = null) {
   if (!startDateStr) return null;
   const startParts = startDateStr.split('/');
@@ -48,7 +73,6 @@ export function calculateDaysBetween(startDateStr, endDateStr = null) {
   );
 
   let endDate;
-  let isCalculatingToToday = false;
   if (endDateStr) {
     const endParts = endDateStr.split('/');
     if (endParts.length === 3) {
@@ -59,18 +83,15 @@ export function calculateDaysBetween(startDateStr, endDateStr = null) {
       );
     } else {
       endDate = new Date();
-      isCalculatingToToday = true;
     }
   } else {
     endDate = new Date();
-    isCalculatingToToday = true;
   }
 
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null;
   const diffTime = Math.abs(endDate - startDate);
-  let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  if (isCalculatingToToday && diffDays > 0) diffDays -= 1;
-  return diffDays;
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays + 1;
 }
 
 // Días que la planta pasó (o lleva) en una etapa específica.
@@ -211,4 +232,123 @@ export function getNextStage(currentStage) {
     default:
       return null;
   }
+}
+
+// Timeline unificado de todos los eventos de la planta.
+// Devuelve array ordenado cronológicamente:
+// [{ date, type, label, color, data, _id }]
+const SUBCOLLECTION_META = [
+  { key: 'irrigations', type: 'irrigation', color: '#2196F3', label: 'Riego' },
+  { key: 'prunings', type: 'pruning', color: '#4CAF50', label: 'Poda' },
+  { key: 'insecticides', type: 'insecticide', color: '#FF5722', label: 'Insecticida' },
+  { key: 'transplants', type: 'transplant', color: '#9C27B0', label: 'Transplante' },
+  { key: 'images', type: 'image', color: '#FF9800', label: 'Foto' },
+  { key: 'logs', type: 'log', color: '#607D8B', label: 'Log' },
+];
+
+const STAGE_CHANGE_META = [
+  { field: 'inicioVegetativo', stage: 'Vegetativo' },
+  { field: 'inicioFloracion', stage: 'Floracion' },
+  { field: 'inicioLavado', stage: 'Lavado de Raices' },
+  { field: 'inicioSecado', stage: 'Secado' },
+  { field: 'inicioCurado', stage: 'Curado' },
+  { field: 'inicioEnfrascado', stage: 'Curado' },
+];
+
+export function getPlantTimeline(plant) {
+  if (!plant) return [];
+  const events = [];
+
+  if (plant.birthDate) {
+    events.push({
+      date: normalizeDate(plant.birthDate),
+      type: 'birth',
+      label: 'Nacimiento',
+      color: '#8e24aa',
+      stage: 'Germinacion',
+      data: {},
+    });
+  }
+
+  STAGE_CHANGE_META.forEach(({ field, stage }) => {
+    if (plant[field]) {
+      events.push({
+        date: normalizeDate(plant[field]),
+        type: 'stageChange',
+        label: `→ ${stage}`,
+        color: STAGE_PALETTE[stage] || '#888',
+        stage,
+        data: { field, stage },
+      });
+    }
+  });
+
+  SUBCOLLECTION_META.forEach(({ key, type, color, label }) => {
+    if (!plant[key]) return;
+    Object.entries(plant[key]).forEach(([subId, entry]) => {
+      if (!entry.date) return;
+      events.push({ date: normalizeDate(entry.date), type, label, color, data: { ...entry, _id: subId } });
+    });
+  });
+
+  events.sort((a, b) => {
+    const ta = parseDateToTimestamp(a.date);
+    const tb = parseDateToTimestamp(b.date);
+    return (ta || 0) - (tb || 0);
+  });
+
+  return events;
+}
+
+// Normaliza el nombre de la planta sacando el número final (ej: "AK-47 1" → "ak-47").
+// Útil para agrupar plantas hermanas (misma genética) en los wizards de selección.
+export function getBaseName(name) {
+  return name?.replace(/\s+\d+$/, '').trim().toLowerCase() || '';
+}
+
+// Devuelve los rangos de etapa como [{ stage, color, start, end }] con timestamps UTC.
+// El end de la etapa actual es hoy; los stages no iniciados no aparecen.
+export function getStageRanges(plant) {
+  if (!plant) return [];
+  const ranges = [];
+  const today = new Date();
+  const todayTs = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+  const stages = [
+    { key: 'Germinacion', startField: 'birthDate', endField: 'inicioVegetativo' },
+    { key: 'Vegetativo', startField: 'inicioVegetativo', endField: 'inicioFloracion' },
+    { key: 'Floracion', startField: 'inicioFloracion', endField: 'inicioLavado' },
+    { key: 'Lavado de Raices', startField: 'inicioLavado', endField: 'inicioSecado' },
+    { key: 'Secado', startField: 'inicioSecado', endField: 'inicioCurado' },
+    { key: 'Curado', startField: null, endField: null },
+  ];
+
+  stages.forEach(({ key, startField, endField }) => {
+    let startDateStr;
+    if (key === 'Curado') {
+      startDateStr = plant.inicioCurado || plant.inicioEnfrascado;
+    } else {
+      startDateStr = plant[startField];
+    }
+    if (!startDateStr) return;
+
+    const startTs = parseDateToTimestamp(startDateStr);
+    if (!startTs) return;
+
+    let endTs = todayTs;
+    if (endField && plant[endField]) {
+      endTs = parseDateToTimestamp(plant[endField]) || todayTs;
+    }
+
+    if (startTs >= endTs) return;
+
+    ranges.push({
+      stage: key,
+      color: STAGE_PALETTE[key] || '#888',
+      start: startTs,
+      end: endTs,
+    });
+  });
+
+  return ranges;
 }

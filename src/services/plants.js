@@ -33,19 +33,24 @@ export const setPlantPotVolume = (plantId, newVolume) =>
   });
 
 // Mueve la planta de `active` a `history`. Agrega `inicioSecado` si no existía.
-// Devuelve la nueva key generada en history.
 export const archivePlant = async (plantId, plantData) => {
   const dataToArchive = { ...plantData };
+  delete dataToArchive.id;
   if (!dataToArchive.inicioSecado) {
     dataToArchive.inicioSecado = getDate();
   }
-  const newKey = await db.push('plants/history', dataToArchive);
+  await db.write(`plants/history/${plantId}`, dataToArchive);
   await db.remove(`plants/active/${plantId}`);
-  return newKey;
+  return plantId;
 };
 
-// === Aditivos (fertilizantes / insecticidas / suplementos) ===
+// === Nutrientes e insecticidas ===
 
 export const addNutriente = (data) => db.push('plants/aditives/fertilizantes', data);
-export const addInsecticidaAditivo = (data) => db.push('plants/aditives/insecticidas', data);
-export const addSuplemento = (data) => db.push('plants/aditives/suplementos', data);
+export const addInsecticida = (data) => db.push('plants/aditives/insecticidas', data);
+
+export const addNutrientDosis = (nutrientId, data) =>
+  db.push(`plants/aditives/fertilizantes/${nutrientId}/dosis`, data);
+
+export const addAditiveDosis = (category, aditiveId, data) =>
+  db.push(`plants/aditives/${category}/${aditiveId}/dosis`, data);

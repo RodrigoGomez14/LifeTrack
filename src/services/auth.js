@@ -34,10 +34,6 @@ export const updateDisplayName = (displayName) =>
 export const updatePhotoURL = (photoURL) =>
   auth.currentUser.updateProfile({ photoURL });
 
-// === Cuenta ===
-
-export const deleteCurrentUser = () => auth.currentUser.delete();
-
 // === Suscripción a cambios de auth ===
 
 export const subscribeToAuthChanges = (callback) =>

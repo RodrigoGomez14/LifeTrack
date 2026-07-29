@@ -56,7 +56,7 @@ const EditarFondo = () => {
         target: form.target ? parseFloat(form.target.replace(',', '.')) || null : null,
       });
       navigate('/ahorros');
-    } catch (err) { console.error(err); }
+    } catch {}
     setSaving(false);
   };
 

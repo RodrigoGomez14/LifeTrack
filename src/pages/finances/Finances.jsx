@@ -49,7 +49,7 @@ const Panel = ({ monthlyData, monthlyTrendsData, userData, dataType, selectedYea
   <Box sx={{ maxWidth: 600, mx: 'auto', width: '100%' }}>
     <AnimatedGroup>
       <AnimatedItem>
-        <FinancesMonthSummary monthlyData={monthlyData} monthlyTrendsData={monthlyTrendsData} dataType={dataType} selectedYear={selectedYear} selectedMonth={selectedMonth} dollarRate={dollarRate} />
+        <FinancesMonthSummary monthlyData={monthlyData} monthlyTrendsData={monthlyTrendsData} dataType={dataType} selectedYear={selectedYear} selectedMonth={selectedMonth} dollarRate={dollarRate} userData={userData} />
       </AnimatedItem>
       <AnimatedItem>
         <Box id="finances-transactions-anchor">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Card, Button, Chip, Divider, alpha } from '@mui/material';
+import { Box, Typography, Button, Chip, Divider, alpha } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { formatNumber, getMonthName } from '../../utils';
 import {
@@ -28,8 +28,6 @@ const TarjetasListView = ({
   const today = new Date();
   const todayDay = today.getDate();
 
-  const isCurrentMonth = selectedYear === today.getFullYear() && selectedMonth === today.getMonth() + 1;
-
   const prevMonth = today.getMonth() === 0 ? 12 : today.getMonth();
   const prevYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
   const isCurrentOrPrevMonth =
@@ -39,54 +37,53 @@ const TarjetasListView = ({
   const isPastClosing = cards.some((card) => {
     const total = getCardTotal(card.id);
     const dates = cardDates[card.id];
-    return total > 0 && dates && todayDay >= dates.closingDay;
+    if (total <= 0 || !dates) return false;
+    const isBeforeCurrent = selectedYear < today.getFullYear() || (selectedYear === today.getFullYear() && selectedMonth - 1 < today.getMonth());
+    if (isBeforeCurrent) return true;
+    return todayDay >= dates.closingDay;
   });
 
   const totalPendiente = displayTotal;
-  const showPaymentButton = isCurrentMonth && isPastClosing && !areCardsActuallyPaid() && totalPendiente > 0;
+  const showPaymentButton = isPastClosing && !areCardsActuallyPaid() && totalPendiente > 0;
 
   return (
     <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      {/* Total global card — siempre visible si hay tarjetas */}
+      {/* Total global card — ghost style */}
       {cards.length > 0 && (
         <AnimatedItem>
-        <Card variant="outlined" sx={{
+        <Box sx={{
+          textAlign: 'center',
+          py: 3,
+          px: 2,
           borderRadius: 2,
-          bgcolor: alpha(theme.palette.primary.main, 0.04),
-          borderColor: alpha(theme.palette.primary.main, 0.15),
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'stretch',
-          overflow: 'hidden',
+          border: `1px solid ${alpha(theme.palette.warning.main, 0.25)}`,
+          bgcolor: alpha(theme.palette.warning.main, 0.06),
+          transition: '0.12s',
+          '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.12) },
         }}>
-          <Box sx={{ px: 2.5, py: 2, flex: 1, minWidth: 0 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5, color: 'text.secondary' }}>
-              Total del período
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: -1, mt: 0.25 }}>
-              $ {formatNumber(totalPendiente)}
-            </Typography>
-          </Box>
+          <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>
+            TOTAL DEL PERÍODO
+          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800, color: theme.palette.warning.main, letterSpacing: -1 }}>
+            $ {formatNumber(totalPendiente)}
+          </Typography>
           {showPaymentButton && (
             <Button
-              variant="contained"
               onClick={onOpenPayment}
               sx={{
-                bgcolor: theme.palette.warning.main,
-                color: '#fff',
-                borderRadius: 0,
-                px: 3,
-                fontWeight: 700,
+                mt: 1.5,
+                borderRadius: 2,
                 textTransform: 'none',
-                fontSize: '0.95rem',
-                minWidth: 'auto',
-                '&:hover': { bgcolor: theme.palette.warning.dark },
+                fontWeight: 700,
+                px: 3,
+                color: theme.palette.warning.main,
+                '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.12) },
               }}
             >
               Pagar
             </Button>
           )}
-        </Card>
+        </Box>
         </AnimatedItem>
       )}
 

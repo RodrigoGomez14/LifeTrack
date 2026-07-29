@@ -15,9 +15,11 @@ import CheckroomIcon from '@mui/icons-material/Checkroom';
 import DevicesIcon from '@mui/icons-material/Devices';
 import WorkIcon from '@mui/icons-material/Work';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import SavingsIcon from '@mui/icons-material/Savings';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CategoryIcon from '@mui/icons-material/Category';
+import CannabisIcon from '../icons/CannabisIcon';
 
 // Devuelve un ícono Material UI según el nombre de la categoría.
 // Si no hay match exacto, busca coincidencias parciales. Default: <CategoryIcon />.
@@ -33,10 +35,15 @@ export const getCategoryIcon = (category) => {
     'Viajes': <FlightIcon fontSize="small" />,
     'Educación': <SchoolIcon fontSize="small" />,
     'Entretenimiento': <SportsEsportsIcon fontSize="small" />,
+    'Entretenimiento, salidas y comida': <RestaurantIcon fontSize="small" />,
     'Hogar': <HomeIcon fontSize="small" />,
+    'Hogar y servicios': <HomeIcon fontSize="small" />,
     'Casa': <HomeIcon fontSize="small" />,
     'Servicios': <ElectricalServicesIcon fontSize="small" />,
+    'Indoor': <CannabisIcon fontSize="small" />,
+    'Indoor y porro': <CannabisIcon fontSize="small" />,
     'Salud': <HealthAndSafetyIcon fontSize="small" />,
+    'Lilo': <FavoriteIcon fontSize="small" />,
     'Ropa': <CheckroomIcon fontSize="small" />,
     'Tecnología': <DevicesIcon fontSize="small" />,
     'Trabajo': <WorkIcon fontSize="small" />,
@@ -70,13 +77,18 @@ export const getCategoryColor = (cat, theme, dataType) => {
     case 'Transporte': return theme.palette.info.main;
     case 'Auto': return theme.palette.warning.main;
     case 'Indoor': return theme.palette.success.main;
+    case 'Indoor y porro': return theme.palette.success.main;
     case 'Porro': return theme.palette.secondary.main;
     case 'Hogar': return theme.palette.primary.main;
+    case 'Hogar y servicios': return theme.palette.primary.main;
     case 'Entretenimiento': return '#FF4081';
+    case 'Entretenimiento, salidas y comida': return '#FF4081';
     case 'Viajes': return '#00BCD4';
     case 'Educacion': return '#9C27B0';
     case 'Salud': return '#4CAF50';
     case 'Salidas': return '#FF9800';
+    case 'Lilo': return '#E91E63';
+    case 'Extras': return theme.palette.grey[600];
     default:
       return dataType === 'expenses' ? theme.palette.error.main : theme.palette.success.main;
   }

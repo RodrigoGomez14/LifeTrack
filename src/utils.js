@@ -154,7 +154,9 @@ const checkWhiteSpace =(text)=>{
 
 export const getDate = () =>{
   var date=new Date()
-  return `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()}`
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth()+1).padStart(2, '0');
+  return `${d}/${m}/${date.getFullYear()}`
 }
 
 export const convertToDetailedDate = (date) =>{

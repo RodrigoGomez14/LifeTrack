@@ -21,7 +21,7 @@ import { AnimatedGroup, AnimatedItem } from '../../design-system';
 
 const SUMMARY = [
   { label: 'ARS', value: (s) => formatAmount(s.savingsARS), icon: AttachMoneyIcon, color: (t) => t.palette.info.main },
-  { label: 'USD', value: (s) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.savingsUSD), icon: MonetizationOnIcon, color: (t) => t.palette.primary.main },
+  { label: 'USD', value: (s) => `USD ${(s.savingsUSD || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, icon: MonetizationOnIcon, color: (t) => t.palette.primary.main },
   { label: 'Fondos', value: (s) => formatAmount(s.totalFunds), icon: AccountBalanceIcon, color: (t) => t.palette.secondary.main },
 ];
 

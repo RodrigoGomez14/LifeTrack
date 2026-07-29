@@ -15,7 +15,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import { auth, storage } from '../../firebase';
+import { uploadStatementPdf, getFileUrl } from '../../services/storage';
 import { setCardStatement } from '../../services/finances';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -64,24 +64,9 @@ const CreditCardStatementUpload = ({
 
     setUploading(true);
     try {
-      const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error('Usuario no autenticado');
+      const yearMonth = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      const { downloadURL, storagePath } = await uploadStatementPdf(file, cardId, yearMonth);
 
-      const safeName = file.name.replace(/\s+/g, '_');
-      const fileName = `${cardId}_${yearMonth}_${safeName}`;
-      const storagePath = `users/${uid}/summaries/${fileName}`;
-      const storageRef = storage.ref(storagePath);
-
-      await storageRef.put(file, {
-        contentType: 'application/pdf',
-        customMetadata: {
-          userId: uid,
-          cardId: cardId,
-          yearMonth,
-        },
-      });
-
-      const downloadURL = await storageRef.getDownloadURL();
       await setCardStatement(cardId, yearMonth, {
         fileName: file.name,
         uploadDate: new Date().toISOString(),
@@ -94,7 +79,7 @@ const CreditCardStatementUpload = ({
       onSnack(statement ? 'Resumen reemplazado' : 'Resumen subido', 'success');
       setInputKey((k) => k + 1);
     } catch (error) {
-      console.error('Error al subir el resumen:', error);
+
       onSnack(getUploadErrorMessage(error), 'error');
     } finally {
       setUploading(false);
@@ -105,13 +90,12 @@ const CreditCardStatementUpload = ({
     if (!statement) return;
     try {
       if (statement.storagePath) {
-        const fresh = await storage.ref(statement.storagePath).getDownloadURL();
+        const fresh = await getFileUrl(statement.storagePath);
         window.open(fresh, '_blank');
       } else if (statement.downloadURL) {
         window.open(statement.downloadURL, '_blank');
       }
     } catch (error) {
-      // Fallback al URL guardado si la fresh URL falla
       if (statement.downloadURL) {
         window.open(statement.downloadURL, '_blank');
       } else {

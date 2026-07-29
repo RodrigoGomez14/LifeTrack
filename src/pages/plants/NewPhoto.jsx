@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, TextField, Card, CardContent,
@@ -13,11 +13,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
-import { auth, storage } from '../../firebase';
+import { uploadPlantImage } from '../../services/storage';
 import { addPlantActivity } from '../../services/plants';
 import { checkSearch, getDate } from '../../utils';
 import { useStore } from '../../store';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
+import { getBaseName } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 import { AnimatedSuccess } from '../../design-system';
@@ -101,6 +102,14 @@ const NewPhoto = () => {
     ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
     : [];
 
+  const filteredPlants = useMemo(() => {
+    if (selectedPlantIds.size === 0) return activePlants;
+    const firstId = [...selectedPlantIds][0];
+    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
+    if (!base) return activePlants;
+    return activePlants.filter((p) => getBaseName(p.name) === base);
+  }, [selectedPlantIds, activePlants]);
+
   const goNext = () => setStep((s) => Math.min(s + 1, STEPS_TOTAL - 1));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
@@ -136,7 +145,7 @@ const NewPhoto = () => {
         });
         newImages.push(processedFile);
         newPreviews.push(previewUrl);
-      } catch (e) { console.error(e); }
+      } catch {}
     }
 
     if (newImages.length > 0) {
@@ -164,7 +173,6 @@ const NewPhoto = () => {
     setUploadProgress({ current: 0, total: selectedImages.length, percent: 0 });
 
     try {
-      const userId = auth.currentUser.uid;
       const dateStr = formatDate(photoDate);
       const formattedDate = dateStr.replace(/\//g, '-');
       let successCount = 0;
@@ -174,26 +182,23 @@ const NewPhoto = () => {
           const compressed = await compressImage(selectedImages[i], imagePreviews[i]);
           for (const currentPlantId of selectedPlantIds) {
             const filename = `${formattedDate}_${Date.now()}_${Math.floor(Math.random() * 10000)}_${i}_${currentPlantId}`.replace(/[^\w.-]/g, '_');
-            const storagePath = `users/${userId}/plants/${currentPlantId}/images/${filename}`;
-            const storageRef = storage.ref(storagePath);
-            const snapshot = await storageRef.put(compressed);
-            const downloadUrl = await snapshot.ref.getDownloadURL();
+            const { downloadURL, storagePath } = await uploadPlantImage(compressed, currentPlantId, filename);
             await addPlantActivity(currentPlantId, 'images', {
               date: dateStr,
-              url: downloadUrl,
+              url: downloadURL,
               description: description || null,
               timestamp: Date.now() + i,
               storagePath,
             });
           }
           successCount++;
-        } catch (e) { console.error(e); }
+        } catch {}
         setUploadProgress({ current: i + 1, total: selectedImages.length, percent: Math.round(((i + 1) / selectedImages.length) * 100) });
       }
 
       setSavedSnapshot({ count: successCount, photoDate, description, plantCount: selectedPlantIds.size, singlePlantId: selectedPlantIds.size === 1 ? Array.from(selectedPlantIds)[0] : null });
     } catch (e) {
-      console.error(e);
+
       setSnack('Error al subir');
     }
     setUploading(false);
@@ -255,7 +260,7 @@ const NewPhoto = () => {
             <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
               SELECCIONÁ LAS PLANTAS
             </Typography>
-            <PlantMultiSelect plants={activePlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#FF9800" />
+            <PlantMultiSelect plants={filteredPlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#FF9800" />
           </Box>
         )}
 
@@ -376,9 +381,15 @@ const NewPhoto = () => {
                 <Typography variant="body2" color="text.secondary">Fotos</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedImages.length}</Typography>
               </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
                 <Typography variant="body2" color="text.secondary">Fecha</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatDate(photoDate)}</Typography>
+                <Box sx={{ maxWidth: 160 }}>
+                  <DatePicker
+                    value={photoDate}
+                    onChange={(date) => setPhotoDate(date)}
+                    slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
+                  />
+                </Box>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5 }}>
                 <Typography variant="body2" color="text.secondary">Plantas</Typography>

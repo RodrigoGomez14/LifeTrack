@@ -14,6 +14,7 @@ import { useTheme } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MenuIcon from '@mui/icons-material/Menu';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -151,6 +152,19 @@ const AppBar = ({ toggleDrawer, title, showBack, onBack }) => {
                 <SettingsOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               </ListItemIcon>
               <Typography variant="body2">Configuración</Typography>
+            </MenuItem>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                setProfileAnchor(null);
+                navigate('/ayuda');
+              }}
+              sx={{ py: 1.25 }}
+            >
+              <ListItemIcon>
+                <HelpOutlineOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              </ListItemIcon>
+              <Typography variant="body2">Ayuda</Typography>
             </MenuItem>
             <Divider />
             <MenuItem
