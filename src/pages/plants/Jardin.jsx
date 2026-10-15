@@ -15,10 +15,13 @@ import SearchIcon from "@mui/icons-material/Search";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
+import MeetingRoomOutlinedIcon from "@mui/icons-material/MeetingRoomOutlined";
 import Layout from "../../components/layout/Layout";
 import { DashedAddCard, AnimatedGroup, AnimatedItem } from "../../design-system";
 import { useStore } from "../../store";
-import { PlantRow, STAGES } from "../../components/plants/PlantShared";
+import { PlantRow } from "../../components/plants/PlantShared";
+
+const NONE_KEY = "__none__";
 
 const Jardin = () => {
   const theme = useTheme();
@@ -33,6 +36,19 @@ const Jardin = () => {
       ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
       : [];
   }, [userData]);
+
+  const ambientesList = useMemo(
+    () =>
+      Object.entries(userData?.plants?.ambientes || {})
+        .map(([id, a]) => ({ id, ...a }))
+        .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric: true })),
+    [userData]
+  );
+
+  const ambientesMap = useMemo(
+    () => Object.fromEntries(ambientesList.map((a) => [a.id, a])),
+    [ambientesList]
+  );
 
   const archivedPlants = useMemo(() => {
     const list = [];
@@ -54,19 +70,46 @@ const Jardin = () => {
     (p) => !search || (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const groupedPlants = useMemo(() => {
-    const groups = {};
+  const groups = useMemo(() => {
+    const buckets = {};
+
+    // Siempre agrupado por ambiente.
     filtered.forEach((p) => {
-      const stageRaw = p.etapa || "Germinacion";
-      const stage = stageRaw === 'Enfrascado' ? 'Curado' : stageRaw;
-      if (!groups[stage]) groups[stage] = [];
-      groups[stage].push(p);
+      const key = p.ambienteId && ambientesMap[p.ambienteId] ? p.ambienteId : NONE_KEY;
+      if (!buckets[key]) buckets[key] = [];
+      buckets[key].push(p);
     });
-    return STAGES.filter((s) => groups[s.key]).map((s) => ({
-      ...s,
-      plants: groups[s.key],
-    }));
-  }, [filtered]);
+
+    const palette = [
+      theme.palette.primary.main,
+      theme.palette.secondary.main,
+      theme.palette.info.main,
+      theme.palette.warning.main,
+      theme.palette.success.main,
+    ];
+
+    const ordered = ambientesList
+      .filter((a) => buckets[a.id])
+      .map((a, i) => ({
+        key: a.id,
+        label: `Ambiente ${a.number}`,
+        color: palette[i % palette.length],
+        icon: MeetingRoomOutlinedIcon,
+        plants: buckets[a.id],
+      }));
+
+    if (buckets[NONE_KEY]) {
+      ordered.unshift({
+        key: NONE_KEY,
+        label: "Sin ambiente",
+        color: theme.palette.text.secondary,
+        icon: MeetingRoomOutlinedIcon,
+        plants: buckets[NONE_KEY],
+      });
+    }
+
+    return ordered;
+  }, [filtered, ambientesList, ambientesMap, theme]);
 
   const toggleGroup = (key) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -97,7 +140,7 @@ const Jardin = () => {
               sx={{ mb: 2 }}
             />
 
-            {groupedPlants.length === 0 ? (
+            {groups.length === 0 ? (
               <AnimatedItem>
                 <Box sx={{ textAlign: 'center', py: 6 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -107,7 +150,7 @@ const Jardin = () => {
               </AnimatedItem>
             ) : (
               <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column' }}>
-                {groupedPlants.map((group) => (
+                {groups.map((group) => (
                   <AnimatedItem key={group.key}>
                     <Box sx={{ mb: 1.5 }}>
                       <Box
@@ -127,7 +170,7 @@ const Jardin = () => {
                       >
                         <group.icon sx={{ fontSize: 18, color: group.color }} />
                         <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: group.color, flex: 1 }}>
-                          {group.key} ({group.plants.length})
+                          {group.label} ({group.plants.length})
                         </Typography>
                         {collapsedGroups[group.key] ? <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
                       </Box>

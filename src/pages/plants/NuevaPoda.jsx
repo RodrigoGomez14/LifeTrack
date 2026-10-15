@@ -17,7 +17,7 @@ import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import { getBaseName } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const COLOR = '#4CAF50';
 const STEPS = 4;
@@ -239,25 +239,16 @@ const NuevaPoda = () => {
                 </AnimatedItem>
 
                 <AnimatedItem>
-                  <Card sx={{ borderRadius: 3, overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary">Tipo</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: accentColor }}>
-                        {PRUNING_TYPES.find((t) => t.value === pruningType)?.label}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary">Plantas</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
-                    </Box>
+                  <ReviewCard color={accentColor}>
+                    <ReviewRow label="Tipo" color={accentColor}>{PRUNING_TYPES.find((t) => t.value === pruningType)?.label}</ReviewRow>
+                    <ReviewRow label="Plantas" value={selectedPlantIds.size} />
                     {notes && (
-                      <Box sx={{ py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                      <Box sx={{ py: 2, px: 2.5 }}>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>Nota</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{notes}</Typography>
                       </Box>
                     )}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5 }}>
-                      <Typography variant="body2" color="text.secondary">Fecha</Typography>
+                    <ReviewRow label="Fecha">
                       <Box sx={{ maxWidth: 160 }}>
                         <DatePicker
                           value={fecha}
@@ -270,8 +261,8 @@ const NuevaPoda = () => {
                           }}
                         />
                       </Box>
-                    </Box>
-                  </Card>
+                    </ReviewRow>
+                  </ReviewCard>
                 </AnimatedItem>
               </AnimatedGroup>
             )}

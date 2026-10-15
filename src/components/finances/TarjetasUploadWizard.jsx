@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import {
-  Box, Typography, IconButton, Button, CircularProgress, alpha, Fade,
+  Box, Typography, IconButton, Button, alpha, Fade, Stack,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckIcon from '@mui/icons-material/Check';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { uploadStatementPdf } from '../../services/storage';
-import { setCardStatement } from '../../services/finances';
+import { setCardStatement, setCardDatesForMonth } from '../../services/finances';
+import { parseFlexibleDate } from './creditCardsHelpers';
 import WizardProgressDots from '../plants/WizardProgressDots';
 import WizardFooter from '../plants/WizardFooter';
 
@@ -23,22 +27,43 @@ function getUploadErrorMessage(error) {
   return error.message || 'Error al subir el archivo.';
 }
 
-const TOTAL_STEPS = 2;
-
+// Wizard de subida del resumen:
+//   0 → elegir y subir el PDF del período actual.
+//   1 → setear las fechas del período SIGUIENTE (vienen en el resumen). Este paso
+//       SOLO existe si esas fechas todavía no están cargadas (si ya lo están, no hay
+//       nada que setear y el wizard se resuelve en un paso).
+// Todo se persiste al final; el paso de fechas se puede omitir.
 const TarjetasUploadWizard = ({
   cardId,
   yearMonth,
   selectedMonth,
   selectedYear,
+  nextMonthKey,
+  nextPeriodLabel,
+  prefillClosingDate,
+  prefillDueDate,
+  nextDatesLocked,
   onClose,
   onSuccess,
 }) => {
   const theme = useTheme();
 
+  const totalSteps = nextDatesLocked ? 1 : 2;
+
   const [step, setStep] = useState(0);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+
+  const [closingDate, setClosingDate] = useState(prefillClosingDate || '');
+  const [dueDate, setDueDate] = useState(prefillDueDate || '');
+
+  // El popover del calendario se porta a <body> y por defecto queda detrás del overlay
+  // de este wizard (zIndex.modal + 1). Lo subimos para que se vea y reciba los clicks.
+  const pickerSlotProps = {
+    popper: { sx: { zIndex: theme.zIndex.modal + 2 } },
+    textField: { fullWidth: true, size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } },
+  };
 
   const handleFileSelect = (e) => {
     const f = e.target.files?.[0];
@@ -61,7 +86,14 @@ const TarjetasUploadWizard = ({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleSubmit = async () => {
+  // El vencimiento no puede ser anterior al cierre.
+  const shouldDisableDueDate = (d) => {
+    if (!closingDate) return false;
+    const closing = parseFlexibleDate(closingDate);
+    return !!(closing && d.toDate() < closing);
+  };
+
+  const handleSubmit = async (skipDates = false) => {
     if (!file) return;
     setUploading(true);
     setError('');
@@ -77,19 +109,18 @@ const TarjetasUploadWizard = ({
         year: selectedYear,
       });
 
+      if (!skipDates && closingDate && dueDate && nextMonthKey) {
+        await setCardDatesForMonth(cardId, nextMonthKey, { closingDate, dueDate });
+      }
+
       onSuccess('Resumen subido');
       onClose();
     } catch (err) {
-
       setError(getUploadErrorMessage(err));
     } finally {
       setUploading(false);
     }
   };
-
-  const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const periodLabel = `${MONTHS[selectedMonth - 1]} ${selectedYear}`;
 
   return (
     <Box sx={{ position: 'fixed', inset: 0, zIndex: theme.zIndex.modal + 1, bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
@@ -103,7 +134,7 @@ const TarjetasUploadWizard = ({
         <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
       </Box>
 
-      <WizardProgressDots total={TOTAL_STEPS} current={step} />
+      <WizardProgressDots total={totalSteps} current={step} />
 
       {step === 0 && (
         <Fade in={step === 0}>
@@ -144,46 +175,84 @@ const TarjetasUploadWizard = ({
               )}
             </Box>
             <Box sx={{ px: 3, pt: 4 }}>
-              <Button fullWidth variant="contained" disabled={!file} onClick={() => setStep(1)}
-                sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
-                Siguiente →
-              </Button>
+              {nextDatesLocked ? (
+                <Button fullWidth variant="contained" disabled={!file || uploading} onClick={() => handleSubmit(true)}
+                  sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
+                  {uploading ? 'Subiendo...' : 'Subir resumen'}
+                </Button>
+              ) : (
+                <Button fullWidth variant="contained" disabled={!file} onClick={() => { setError(''); setStep(1); }}
+                  sx={{ borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', fontSize: '1rem' }}>
+                  Siguiente →
+                </Button>
+              )}
             </Box>
           </Box>
         </Fade>
       )}
 
-      {step === 1 && (
+      {step === 1 && !nextDatesLocked && (
         <Fade in={step === 1}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3, gap: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Confirmar subida</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', maxWidth: 280 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Archivo</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', maxWidth: 180 }} noWrap>{file?.name}</Typography>
-                </Box>
-                <Box sx={{ height: 1, bgcolor: theme.palette.divider }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Tamaño</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatSize(file?.size || 0)}</Typography>
-                </Box>
-                <Box sx={{ height: 1, bgcolor: theme.palette.divider }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Período</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{periodLabel}</Typography>
-                </Box>
-              </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', px: 3, pt: 3, gap: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Fechas del próximo período</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: -1 }}>
+                {nextPeriodLabel
+                  ? `El resumen trae las fechas de ${nextPeriodLabel}.`
+                  : 'Cargá las fechas del próximo período.'}
+              </Typography>
+
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+                <Stack spacing={2} sx={{ width: '100%', maxWidth: 320 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>Fecha de cierre</Typography>
+                    <DatePicker
+                      value={closingDate ? dayjs(closingDate) : null}
+                      onChange={(d) => { if (d) { setClosingDate(d.format('YYYY-MM-DD')); setError(''); } }}
+                      format="DD/MM/YYYY"
+                      slotProps={pickerSlotProps}
+                    />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>Fecha de vencimiento</Typography>
+                    <DatePicker
+                      value={dueDate ? dayjs(dueDate) : null}
+                      onChange={(d) => { if (d) { setDueDate(d.format('YYYY-MM-DD')); setError(''); } }}
+                      format="DD/MM/YYYY"
+                      shouldDisableDate={shouldDisableDueDate}
+                      slotProps={pickerSlotProps}
+                    />
+                  </Box>
+                </Stack>
+              </LocalizationProvider>
+
+              {(!closingDate || !dueDate) && (
+                <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                  Podés completar ambas fechas o subir el resumen sin fechas.
+                </Typography>
+              )}
+
               {error && (
                 <Typography variant="caption" color="error">{error}</Typography>
               )}
             </Box>
+
+            <Box sx={{ px: 3, pb: 0.5 }}>
+              <Button
+                fullWidth
+                disabled={uploading}
+                onClick={() => handleSubmit(true)}
+                sx={{ borderRadius: 999, textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}
+              >
+                Omitir fechas y subir
+              </Button>
+            </Box>
+
             <WizardFooter
-              label="Subir resumen"
-              icon={uploading ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <CheckIcon />}
+              label="Guardar resumen"
               loading={uploading}
               disabled={uploading}
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(false)}
             />
           </Box>
         </Fade>

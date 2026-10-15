@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Box } from '@mui/material';
+import { Box, Tabs, Tab, alpha } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { toggleHabitCompletion as toggleHabitCompletionService } from '../../services/habits';
@@ -8,19 +10,26 @@ import {
   getWeekRange,
   shouldShowHabitForDate,
 } from '../../components/habits/habitsHelpers';
-import { AnimatedGroup, AnimatedItem } from '../../design-system';
-import HabitsWeekNav from '../../components/habits/HabitsWeekNav';
-import HabitsDayList from '../../components/habits/HabitsDayList';
-import WeeklyEvolutionChart from '../../components/habits/WeeklyEvolutionChart';
-import HabitsStatCards from '../../components/habits/HabitsStatCards';
+import { AnimatedItem, DashedAddCard } from '../../design-system';
+import WeekStrip from '../../components/plants/WeekStrip';
+import HabitsSummaryCards from '../../components/habits/HabitsSummaryCards';
+import HabitsDayCard from '../../components/habits/HabitsDayCard';
+import HabitsListView from '../../components/habits/HabitsListView';
 
 const Habits = () => {
   const { userData } = useStore();
+  const theme = useTheme();
+  const navigate = useNavigate();
 
+  const [tab, setTab] = useState(0);
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
   const [habits, setHabits] = useState([]);
   const [completedHabits, setCompletedHabits] = useState({});
-  const [allWeeksCompletedHabits, setAllWeeksCompletedHabits] = useState({});
   const [habitEvents, setHabitEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -41,12 +50,10 @@ const Habits = () => {
 
       setHabits(habitsArray);
       loadCompletedHabitsForWeek(currentWeek);
-      loadAllWeeksCompletedHabits();
       setLoading(false);
     } else {
       setHabits([]);
       setCompletedHabits({});
-      setAllWeeksCompletedHabits({});
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,33 +78,6 @@ const Habits = () => {
     }
 
     setCompletedHabits(weeklyCompleted);
-  };
-
-  const loadAllWeeksCompletedHabits = () => {
-    if (!userData?.habits?.completed) {
-      setAllWeeksCompletedHabits({});
-      return;
-    }
-
-    const allCompleted = {};
-    const currentDate = new Date();
-
-    for (let i = 4; i >= 0; i--) {
-      const weekStart = new Date(currentDate);
-      weekStart.setDate(currentDate.getDate() - (currentDate.getDay() - 1 + i * 7));
-
-      const { start, end } = getWeekRange(weekStart);
-      const weekDate = new Date(start);
-      while (weekDate <= end) {
-        const dateStr = formatDate(weekDate);
-        if (userData.habits.completed[dateStr]) {
-          allCompleted[dateStr] = userData.habits.completed[dateStr];
-        }
-        weekDate.setDate(weekDate.getDate() + 1);
-      }
-    }
-
-    setAllWeeksCompletedHabits(allCompleted);
   };
 
   useEffect(() => {
@@ -344,21 +324,6 @@ const Habits = () => {
       return updated;
     });
 
-    setAllWeeksCompletedHabits((prev) => {
-      const updated = { ...prev };
-      if (!updated[dateStr]) updated[dateStr] = {};
-
-      if (newCompletedStatus) {
-        updated[dateStr][habitId] = { completedAt: new Date().toISOString(), habitId };
-      } else {
-        if (updated[dateStr]) {
-          delete updated[dateStr][habitId];
-          if (Object.keys(updated[dateStr]).length === 0) delete updated[dateStr];
-        }
-      }
-      return updated;
-    });
-
     try {
       await toggleHabitCompletionService(habitId, dateStr, newCompletedStatus);
     } catch (error) {
@@ -378,91 +343,123 @@ const Habits = () => {
         }
         return reverted;
       });
-
-      setAllWeeksCompletedHabits((prev) => {
-        const reverted = { ...prev };
-        if (!reverted[dateStr]) reverted[dateStr] = {};
-
-        if (!newCompletedStatus) {
-          if (isCurrentlyCompleted) {
-            reverted[dateStr][habitId] = { completedAt: 'reverted', habitId };
-          }
-        } else {
-          if (reverted[dateStr] && reverted[dateStr][habitId]) {
-            delete reverted[dateStr][habitId];
-            if (Object.keys(reverted[dateStr]).length === 0) delete reverted[dateStr];
-          }
-        }
-        return reverted;
-      });
     }
   };
 
-  const handleNavigate = (action) => {
-    let newDate = new Date(currentWeek);
+  // Al cambiar de semana desde el WeekStrip, alineamos currentWeek y
+  // mantenemos selectedDay dentro de la semana visible.
+  const handleWeekChange = (offset) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const target = new Date(now);
+    target.setDate(now.getDate() + offset * 7);
 
-    if (action === 'PREV') {
-      newDate.setDate(newDate.getDate() - 7);
-    } else if (action === 'NEXT') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { start: currentWeekStart } = getWeekRange(currentWeek);
-      const nowWeekStart = getWeekRange(today).start;
-      if (currentWeekStart >= nowWeekStart) return;
-      newDate.setDate(newDate.getDate() + 7);
-    } else if (action === 'TODAY') {
-      newDate = new Date();
-    }
+    setCurrentWeek(target);
+    loadCompletedHabitsForWeek(target);
 
-    setCurrentWeek(newDate);
-    loadCompletedHabitsForWeek(newDate);
+    setSelectedDay((prev) => {
+      const { start, end } = getWeekRange(target);
+      const startDay = new Date(start);
+      startDay.setHours(0, 0, 0, 0);
+      const endDay = new Date(end);
+      endDay.setHours(23, 59, 59, 999);
+      if (prev >= startDay && prev <= endDay) return prev;
+      const dayOffset = (prev.getDay() + 6) % 7; // lunes = 0
+      const next = new Date(startDay);
+      next.setDate(startDay.getDate() + dayOffset);
+      return next;
+    });
   };
+
+  // Indicadores del WeekStrip: una barra de color por hábito completado.
+  const getDayIndicators = (date) => {
+    const dateStr = formatDate(date);
+    const dayCompletions = userData?.habits?.completed?.[dateStr];
+    if (!dayCompletions) return [];
+    return habits
+      .filter((habit) => dayCompletions[habit.id])
+      .map((habit) => theme.palette[habit.color]?.main || theme.palette.primary.main)
+      .slice(0, 4);
+  };
+
+  const selectedDateStr = formatDate(selectedDay);
+  const selectedDayEvents = habitEvents.filter((event) => event.resource.date === selectedDateStr);
+  const selectedDayStats = stats.dayStats?.[selectedDateStr] || { total: 0, completed: 0, percentage: 0 };
 
   return (
-    <Layout title="Seguimiento de Hábitos">
+    <Layout title="Hábitos">
       <Box
         sx={{
-          maxWidth: { xs: 1200, md: 1400, lg: 1600 },
+          maxWidth: 600,
           mx: 'auto',
-          width: '100%',
-          px: { xs: 1, sm: 2, md: 3 },
-          py: { xs: 2, md: 3 },
+          p: 2,
+          pb: 8,
           display: 'flex',
           flexDirection: 'column',
-          gap: 2.5,
-          pb: { xs: 10, sm: 8 },
+          gap: 2,
+          width: '100%',
         }}
       >
-        <HabitsWeekNav currentWeek={currentWeek} onNavigate={handleNavigate} />
+        <Tabs
+          value={tab}
+          onChange={(e, v) => setTab(v)}
+          variant="fullWidth"
+          sx={{
+            minHeight: 40,
+            '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600, fontSize: '0.85rem' },
+          }}
+        >
+          <Tab label="Semana" />
+          <Tab label="Lista" />
+        </Tabs>
 
-        <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <AnimatedItem>
-            <HabitsStatCards
-              loading={loading}
-              stats={stats}
-              habits={habits}
-              allWeeksCompletedHabits={allWeeksCompletedHabits}
-            />
-          </AnimatedItem>
+        {tab === 0 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <HabitsSummaryCards loading={loading} stats={stats} />
 
-          <AnimatedItem>
-            <HabitsDayList
-              habitEvents={habitEvents}
-              currentWeek={currentWeek}
+            <Box
+              sx={{
+                bgcolor: alpha(theme.palette.primary.main, 0.12),
+                borderRadius: 2,
+                overflow: 'hidden',
+              }}
+            >
+              <WeekStrip
+                selectedDay={selectedDay}
+                onDaySelect={setSelectedDay}
+                onWeekChange={handleWeekChange}
+                getIndicators={getDayIndicators}
+              />
+            </Box>
+
+            <HabitsDayCard
+              date={selectedDay}
+              events={selectedDayEvents}
+              stats={selectedDayStats}
               loading={loading}
-              dayStats={stats.dayStats}
               onToggle={toggleHabitCompletion}
+              onOpenHabit={(habitId) => navigate(`/DetalleHabito/${habitId}`)}
             />
-          </AnimatedItem>
 
-          <AnimatedItem>
-            <WeeklyEvolutionChart
-              userData={userData}
-              habits={habits}
-              allWeeksCompletedHabits={allWeeksCompletedHabits}
-            />
-          </AnimatedItem>
-        </AnimatedGroup>
+            <AnimatedItem>
+              <DashedAddCard
+                label="Nuevo hábito"
+                desc="Creá un nuevo seguimiento"
+                onClick={() => navigate('/NuevoHabito')}
+              />
+            </AnimatedItem>
+          </Box>
+        )}
+
+        {tab === 1 && (
+          <HabitsListView
+            habits={habits}
+            completedHabits={userData?.habits?.completed || {}}
+            onOpen={(habitId) => navigate(`/DetalleHabito/${habitId}`)}
+            onEdit={(habitId) => navigate(`/DetalleHabito/${habitId}`, { state: { openEdit: true } })}
+            onCreate={() => navigate('/NuevoHabito')}
+          />
+        )}
       </Box>
     </Layout>
   );

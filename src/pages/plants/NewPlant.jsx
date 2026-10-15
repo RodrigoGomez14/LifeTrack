@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, IconButton, TextField, Snackbar, Alert, Button,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -10,7 +11,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
 import { addPlant } from '../../services/plants';
-import { AnimatedSuccess } from '../../design-system';
+import { AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
+import { useStore } from '../../store';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -28,10 +30,16 @@ const formatDate = (date) => {
 const NewPlant = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { userData } = useStore();
+
+  const ambientes = Object.entries(userData?.plants?.ambientes || {})
+    .map(([id, a]) => ({ id, ...a }))
+    .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric: true }));
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [ambienteId, setAmbienteId] = useState('');
   const [birthDate, setBirthDate] = useState(new Date());
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
@@ -56,9 +64,11 @@ const NewPlant = () => {
           etapa: 'Germinacion',
           birthDate: dateStr,
           potVolume: 10,
+          ambienteId: ambienteId || null,
         });
       }
-      setSavedSnapshot({ name: baseName, quantity: qty, birthDate: dateStr });
+      const ambienteLabel = ambientes.find((a) => a.id === ambienteId)?.number;
+      setSavedSnapshot({ name: baseName, quantity: qty, birthDate: dateStr, ambienteLabel });
     } catch (err) {
 
       setSnack('Error al crear');
@@ -70,13 +80,14 @@ const NewPlant = () => {
     setStep(0);
     setName('');
     setQuantity('');
+    setAmbienteId('');
     setBirthDate(new Date());
     setSavedSnapshot(null);
   };
 
   const renderSuccess = () => {
     if (!savedSnapshot) return null;
-    const { name: snapName, quantity: snapQty, birthDate: snapDate } = savedSnapshot;
+    const { name: snapName, quantity: snapQty, birthDate: snapDate, ambienteLabel } = savedSnapshot;
     return (
       <AnimatedSuccess color="#43a047" title={`¡${snapQty} planta${snapQty !== 1 ? 's' : ''} creada${snapQty !== 1 ? 's' : ''}!`}>
         <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -86,7 +97,7 @@ const NewPlant = () => {
           Germinación · Inicio {snapDate}
         </Typography>
         <Typography variant="caption" color="text.disabled" sx={{ mb: 3, display: 'block' }}>
-          Dia 1
+          {ambienteLabel ? `Ambiente ${ambienteLabel}` : 'Sin ambiente'}
         </Typography>
         <Button fullWidth variant="contained" size="large" onClick={handleLoadAnother}
           sx={{ maxWidth: 320, bgcolor: '#43a047', color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: '#2e7d32' } }}>
@@ -128,6 +139,33 @@ const NewPlant = () => {
                   <TextField label="Cantidad" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} fullWidth required
                     inputProps={{ min: 1 }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="plant-ambiente-label">Ambiente</InputLabel>
+                    <Select
+                      labelId="plant-ambiente-label"
+                      label="Ambiente"
+                      value={ambienteId}
+                      onChange={(e) => setAmbienteId(e.target.value)}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <MenuItem value="">Sin ambiente</MenuItem>
+                      {ambientes.map((a) => (
+                        <MenuItem key={a.id} value={a.id}>{`Ambiente ${a.number}`}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {ambientes.length === 0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      No tenés ambientes.{' '}
+                      <Box
+                        component="span"
+                        onClick={() => navigate('/ambientes')}
+                        sx={{ color: 'primary.main', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Crear uno
+                      </Box>
+                    </Typography>
+                  )}
                 </Box>
               )}
 
@@ -136,19 +174,12 @@ const NewPlant = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography>
 
-                  <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 80, pt: 0.5 }}>
-                        Plantas
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', maxWidth: '65%' }}>
-                        {name.trim()} x{qty}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Inicio de germinación
-                      </Typography>
+                  <ReviewCard color="#43a047">
+                    <ReviewRow label="Plantas" color="#43a047">{`${name.trim()} x${qty}`}</ReviewRow>
+                    <ReviewRow label="Ambiente">
+                      {ambientes.find((a) => a.id === ambienteId)?.number ? `Ambiente ${ambientes.find((a) => a.id === ambienteId).number}` : 'Sin ambiente'}
+                    </ReviewRow>
+                    <ReviewRow label="Inicio de germinación">
                       <Box sx={{ maxWidth: 160 }}>
                         <DatePicker
                           value={birthDate}
@@ -161,8 +192,8 @@ const NewPlant = () => {
                           }}
                         />
                       </Box>
-                    </Box>
-                  </Box>
+                    </ReviewRow>
+                  </ReviewCard>
                 </Box>
               )}
             </Box>

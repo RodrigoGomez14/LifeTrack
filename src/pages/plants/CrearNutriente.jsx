@@ -29,7 +29,7 @@ const CrearNutriente = () => {
     try {
       const _name = name.trim();
       const _brand = brand.trim();
-      await addNutriente({ name: _name, brand: _brand, type: 'Fertilizante', dosis: [] });
+      await addNutriente({ name: _name, brand: _brand, type: 'Fertilizante' });
       setSavedSnapshot({ name: _name, brand: _brand });
     } catch {
       setSnack('Error al guardar');

@@ -10,7 +10,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import { useStore } from '../../store';
 import { addPlantActivity } from '../../services/plants';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import { getBaseName } from '../../components/plants/plantsHelpers';
@@ -261,42 +261,14 @@ const RegistrarMedicion = () => {
               </Box></AnimatedItem>
             )}
 
-            <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-              {ph && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">pH</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{ph}</Typography>
-                </Box>
-              )}
-              {ec && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">EC</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{ec} mS/cm</Typography>
-                </Box>
-              )}
-              {ppm && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">PPM</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{ppm}</Typography>
-                </Box>
-              )}
-              {quantity && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">Agua</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{quantity} ml</Typography>
-                </Box>
-              )}
-              {selectedAditives.length > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">Aditivos</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedAditives.length}</Typography>
-                </Box>
-              )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5 }}>
-                <Typography variant="body2" color="text.secondary">Plantas</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
-              </Box>
-            </Box></AnimatedItem>
+            <AnimatedItem><ReviewCard color="#00BCD4">
+              {ph && <ReviewRow label="pH" value={ph} />}
+              {ec && <ReviewRow label="EC" value={`${ec} mS/cm`} />}
+              {ppm && <ReviewRow label="PPM" value={ppm} />}
+              {quantity && <ReviewRow label="Agua" value={`${quantity} ml`} />}
+              {selectedAditives.length > 0 && <ReviewRow label="Aditivos" value={selectedAditives.length} />}
+              <ReviewRow label="Plantas" value={selectedPlantIds.size} />
+            </ReviewCard></AnimatedItem>
           </AnimatedGroup>
         )}
       </Box>

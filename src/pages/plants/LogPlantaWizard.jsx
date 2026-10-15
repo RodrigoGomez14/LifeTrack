@@ -19,7 +19,7 @@ import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { addPlantActivity } from '../../services/plants';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 import * as db from '../../services/database';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
@@ -488,9 +488,8 @@ const LogPlantaWizard = () => {
             </Box>
           )}
 
-          <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
-              <Typography variant="body2" color="text.secondary">Fecha</Typography>
+          <ReviewCard>
+            <ReviewRow label="Fecha">
               <Box sx={{ maxWidth: 160 }}>
                 <DatePicker
                   value={customDate ? (() => { const [d, m, y] = customDate.split('/'); return new Date(+y, +m - 1, +d); })() : (() => { const [d, m, y] = logDate.split('/'); return new Date(+y, +m - 1, +d); })()}
@@ -505,23 +504,15 @@ const LogPlantaWizard = () => {
                   slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
                 />
               </Box>
-            </Box>
-          </Box>
-
-          <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
+            </ReviewRow>
             {STEPS.map((s) => {
               const raw = values[s.key];
               if (!raw) return null;
               return (
-                <Box key={s.key} sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}`, '&:last-child': { borderBottom: 'none' } }}>
-                  <Typography variant="body2" color="text.secondary">{s.label}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {formatDisplay(raw)}{s.unit ? ` ${s.unit}` : ''}
-                  </Typography>
-                </Box>
+                <ReviewRow key={s.key} label={s.label} value={`${formatDisplay(raw)}${s.unit ? ` ${s.unit}` : ''}`} />
               );
             })}
-          </Box>
+          </ReviewCard>
 
           <TextField
             label="Nota (opcional)"

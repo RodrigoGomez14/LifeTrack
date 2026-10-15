@@ -16,7 +16,7 @@ import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import { getBaseName } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const COLOR = '#9C27B0';
 const STEPS = 2;
@@ -154,17 +154,10 @@ const NuevoTransplante = () => {
         {step === 1 && (
           <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
-            <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Plantas</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Nueva maceta</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>3L</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
-                <Typography variant="body2" color="text.secondary">Fecha</Typography>
+            <AnimatedItem><ReviewCard color={COLOR}>
+              <ReviewRow label="Plantas" value={selectedPlantIds.size} />
+              <ReviewRow label="Nueva maceta" value="3L" />
+              <ReviewRow label="Fecha">
                 <Box sx={{ maxWidth: 160 }}>
                   <DatePicker
                     value={transplantDate}
@@ -177,8 +170,8 @@ const NuevoTransplante = () => {
                     }}
                   />
                 </Box>
-              </Box>
-            </Box></AnimatedItem>
+              </ReviewRow>
+            </ReviewCard></AnimatedItem>
           </AnimatedGroup>
         )}
       </Box>

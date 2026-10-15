@@ -35,22 +35,30 @@ export const SectionCard = ({ title, icon, action, children, sx }) => (
   </Paper>
 );
 
-export const DashedAddCard = ({ label, onClick }) => (
+export const DashedAddCard = ({ label, desc, onClick }) => (
   <Button
     fullWidth
     variant="outlined"
     startIcon={<AddIcon />}
     onClick={onClick}
     sx={{
-      py: 3,
+      py: desc ? 2.5 : 3,
       borderRadius: 2,
       borderStyle: 'dashed',
       textTransform: 'none',
-      fontWeight: 600,
       mb: 2,
       justifyContent: 'center',
     }}
   >
-    {label}
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+      <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+        {label}
+      </Typography>
+      {desc && (
+        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
+          {desc}
+        </Typography>
+      )}
+    </Box>
   </Button>
 );

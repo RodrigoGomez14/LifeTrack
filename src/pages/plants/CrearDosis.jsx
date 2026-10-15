@@ -2,27 +2,24 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, Button, Grid,
-  alpha, Snackbar, Alert, Card,
+  alpha, Snackbar, Alert, Card, Avatar, Checkbox,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
-import GrassIcon from '@mui/icons-material/Grass';
-import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
-import ScienceIcon from '@mui/icons-material/Science';
+import EditIcon from '@mui/icons-material/Edit';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import GppBadOutlinedIcon from '@mui/icons-material/GppBadOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import YardOutlinedIcon from '@mui/icons-material/YardOutlined';
 import { useStore } from '../../store';
-import { addNutrientDosis, addAditiveDosis } from '../../services/plants';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { addAditiveDosis, updateAditiveDosis, removeAditiveDosis } from '../../services/plants';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
-const STAGE_COLORS = { Vegetativo: '#43a047', Floracion: '#e53935' };
 const ADITIVO_COLORS = { Insecticida: '#FF5722', Suplemento: '#7C4DFF' };
 
 const APLICACION_TYPES = [
@@ -38,6 +35,37 @@ const FORMA_TYPES = [
 const TOTAL_STEPS = 4;
 const keypadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'backspace'];
 
+// Fila de selección: Avatar + label + Checkbox. `loaded` = ya tiene dosis (se puede editar).
+const ChoiceRow = ({ avatar, color, title, subtitle, loaded, selected, onClick, onEdit }) => (
+  <Card
+    variant="outlined"
+    onClick={loaded ? onEdit : onClick}
+    sx={{
+      display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, mb: 1, borderRadius: 2,
+      cursor: 'pointer',
+      borderColor: loaded ? alpha(color, 0.3) : (selected ? color : 'divider'),
+      borderWidth: selected && !loaded ? 2 : 1,
+      bgcolor: loaded ? alpha(color, 0.05) : (selected ? alpha(color, 0.05) : 'transparent'),
+      transition: '0.12s',
+      '&:hover': loaded ? { bgcolor: alpha(color, 0.09) } : { borderColor: color },
+    }}
+  >
+    <Avatar sx={{ width: 40, height: 40, bgcolor: alpha(color, 0.12), color }}>{avatar}</Avatar>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>{title}</Typography>
+      {subtitle && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{subtitle}</Typography>}
+    </Box>
+    {loaded ? (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+        <Typography variant="caption" sx={{ color, fontWeight: 600 }}>Cargada</Typography>
+        <EditIcon sx={{ fontSize: 16, color }} />
+      </Box>
+    ) : (
+      <Checkbox checked={!!selected} sx={{ color: selected ? color : 'text.disabled', '&.Mui-checked': { color } }} />
+    )}
+  </Card>
+);
+
 const CrearDosis = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -46,8 +74,7 @@ const CrearDosis = () => {
 
   const params = new URLSearchParams(location.search);
   const itemId = params.get('id') || '';
-  const category = params.get('type') || 'fertilizantes';
-  const isFertilizante = category === 'fertilizantes';
+  const category = params.get('type') || 'insecticidas';
 
   const item = useMemo(() => {
     const aditives = userData?.plants?.aditives;
@@ -57,43 +84,39 @@ const CrearDosis = () => {
 
   const existingDosis = useMemo(() => {
     const raw = item?.dosis;
-    const dosisList = raw
-      ? (Array.isArray(raw) ? raw : Object.values(raw))
+    const list = raw
+      ? (Array.isArray(raw) ? raw.map((d, i) => ({ ...d, _key: i })) : Object.entries(raw).map(([k, d]) => ({ ...d, _key: k })))
       : [];
-    if (isFertilizante) {
-      const map = {};
-      dosisList.forEach(d => { map[`${d.etapa}-${d.semana}`] = d; });
-      return map;
-    } else {
-      const map = {};
-      dosisList.forEach(d => { map[d.aplicacion] = d; });
-      return map;
-    }
-  }, [item, isFertilizante]);
+    const map = {};
+    list.forEach(d => { map[d.aplicacion] = d; });
+    return map;
+  }, [item]);
 
-  // ── nutrient state ──
   const [step, setStep] = useState(0);
-  const [etapa, setEtapa] = useState('');
-  const [semana, setSemana] = useState(null);
-
-  // ── aditivo state ──
   const [aplicacion, setAplicacion] = useState('');
   const [forma, setForma] = useState('');
-
-  // ── shared state ──
   const [amountStr, setAmountStr] = useState('');
+  const [editKey, setEditKey] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
+  const [snackSeverity, setSnackSeverity] = useState('error');
 
-  const accentColor = isFertilizante
-    ? (STAGE_COLORS[etapa] || theme.palette.primary.main)
-    : (ADITIVO_COLORS[item?.type] || theme.palette.primary.main);
+  const isEditing = editKey !== null;
+  const accentColor = ADITIVO_COLORS[item?.type] || theme.palette.primary.main;
 
-  const maxWeek = etapa === 'Vegetativo' ? 5 : 9;
+  const showSnack = (msg, severity = 'error') => { setSnackSeverity(severity); setSnack(msg); };
 
   const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  const goBack = () => setStep((s) => Math.max(s - 1, 0));
+  const goBack = () => {
+    if (isEditing && step === 2) {
+      setEditKey(null);
+      setAmountStr('');
+      setStep(0);
+      return;
+    }
+    setStep((s) => Math.max(s - 1, 0));
+  };
 
   const handleKeyPress = (key) => {
     if (key === 'backspace') { setAmountStr((p) => p.slice(0, -1)); return; }
@@ -110,32 +133,50 @@ const CrearDosis = () => {
   const parsedAmount = amountStr ? parseFloat(amountStr.replace(',', '.')) || 0 : 0;
   const displayAmount = amountStr || '0';
 
-  // ── validaciones ──
-  const canAdvanceStep2 = parsedAmount > 0;
+  const startEdit = (existing) => {
+    setEditKey(existing._key);
+    setAplicacion(existing.aplicacion);
+    setForma(existing.forma);
+    setAmountStr(existing.quantity !== undefined && existing.quantity !== null ? String(existing.quantity).replace('.', ',') : '');
+    setStep(2);
+  };
 
   const handleSubmit = async () => {
-    if (!itemId) return;
+    if (!itemId || !aplicacion || !forma || parsedAmount <= 0) return;
     setSubmitting(true);
     try {
-      if (isFertilizante) {
-        if (!etapa || semana === null || parsedAmount <= 0) return;
-        await addNutrientDosis(itemId, { etapa, semana, quantity: parsedAmount, measure: 'Ml/L' });
-        setSavedSnapshot({
-          itemName: item?.name || '',
-          detail: `${etapa} · Semana ${semana} · ${parsedAmount} Ml/L`,
-          color: accentColor,
-        });
-      } else {
-        if (!aplicacion || !forma || parsedAmount <= 0) return;
-        await addAditiveDosis(category, itemId, { aplicacion, forma, quantity: parsedAmount, measure: 'Ml/L' });
-        setSavedSnapshot({
-          itemName: item?.name || '',
-          detail: `${aplicacion} · ${forma} · ${parsedAmount} Ml/L`,
-          color: accentColor,
-        });
-      }
+      await addAditiveDosis(category, itemId, { aplicacion, forma, quantity: parsedAmount, measure: 'Ml/L' });
+      setSavedSnapshot({ itemName: item?.name || '', detail: `${aplicacion} · ${forma} · ${parsedAmount} Ml/L`, color: accentColor });
     } catch {
-      setSnack('Error al guardar');
+      showSnack('Error al guardar');
+    }
+    setSubmitting(false);
+  };
+
+  const handleUpdate = async () => {
+    if (!itemId || editKey === null || parsedAmount <= 0) return;
+    setSubmitting(true);
+    try {
+      await updateAditiveDosis(category, itemId, editKey, { aplicacion, forma, quantity: parsedAmount, measure: 'Ml/L' });
+      setSavedSnapshot({ itemName: item?.name || '', detail: `${aplicacion} · ${forma} · ${parsedAmount} Ml/L`, color: accentColor, updated: true });
+    } catch {
+      showSnack('Error al actualizar');
+    }
+    setSubmitting(false);
+  };
+
+  const handleDeleteDosis = async () => {
+    if (!itemId || editKey === null) return;
+    if (!window.confirm('¿Eliminar esta dosis?')) return;
+    setSubmitting(true);
+    try {
+      await removeAditiveDosis(category, itemId, editKey);
+      setEditKey(null);
+      setAmountStr('');
+      setStep(0);
+      showSnack('Dosis eliminada', 'success');
+    } catch {
+      showSnack('Error al eliminar');
     }
     setSubmitting(false);
   };
@@ -159,13 +200,11 @@ const CrearDosis = () => {
     if (!savedSnapshot) return null;
     const { itemName, detail, color } = savedSnapshot;
     return (
-      <AnimatedSuccess color={color} title="¡Dosis agregada!">
+      <AnimatedSuccess color={color} title={savedSnapshot.updated ? '¡Dosis actualizada!' : '¡Dosis agregada!'}>
         <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>{itemName}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-          {detail}
-        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{detail}</Typography>
         <Button fullWidth variant="contained" size="large"
-          onClick={() => { setStep(0); setEtapa(''); setSemana(null); setAmountStr(''); setAplicacion(''); setForma(''); setSavedSnapshot(null); }}
+          onClick={() => { setStep(0); setAplicacion(''); setForma(''); setAmountStr(''); setEditKey(null); setSavedSnapshot(null); }}
           sx={{ maxWidth: 320, bgcolor: color, color: 'white', borderRadius: 999, py: 1.5, fontWeight: 600, textTransform: 'none', '&:hover': { opacity: 0.9 } }}>
           Cargar otra
         </Button>
@@ -174,40 +213,23 @@ const CrearDosis = () => {
     );
   };
 
-  const renderSelectCard = (options, selected, onSelect, existingData) => (
+  const renderSelectCard = (options, selected, onSelect) => (
     <AnimatedGroup>
       {options.map((opt) => {
         const Icon = opt.icon;
-        const isSel = selected === opt.key;
-        const existing = existingData?.[opt.key];
-        const disabled = !!existing;
+        const existing = opt.existing;
         return (
           <AnimatedItem key={opt.key}>
-            <Card variant="outlined"
-              onClick={() => { if (!disabled) { onSelect(opt.key); goNext(); } }}
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, mb: 1,
-                borderRadius: 2,
-                cursor: disabled ? 'default' : 'pointer',
-                opacity: disabled ? 0.45 : 1,
-                borderColor: disabled ? theme.palette.divider : (isSel ? opt.color : theme.palette.divider),
-                borderWidth: disabled ? 1 : (isSel ? 2 : 1),
-                bgcolor: disabled ? 'transparent' : (isSel ? alpha(opt.color, 0.04) : 'transparent'),
-                transition: '0.12s',
-                '&:hover': disabled ? {} : { borderColor: opt.color },
-              }}>
-              <Icon sx={{ fontSize: 24, color: disabled ? 'text.disabled' : opt.color }} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: isSel ? 700 : 500, color: disabled ? 'text.disabled' : 'text.primary' }}>
-                  {opt.label}
-                </Typography>
-                {existing && (
-                  <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
-                    {existing}
-                  </Typography>
-                )}
-              </Box>
-            </Card>
+            <ChoiceRow
+              avatar={<Icon fontSize="small" />}
+              color={opt.color}
+              title={opt.label}
+              subtitle={existing ? `${existing.quantity} Ml/L — ${existing.forma}` : undefined}
+              loaded={!!existing}
+              selected={selected === opt.key}
+              onClick={() => { onSelect(opt.key); goNext(); }}
+              onEdit={existing ? () => startEdit(existing) : undefined}
+            />
           </AnimatedItem>
         );
       })}
@@ -219,8 +241,7 @@ const CrearDosis = () => {
       <Grid container spacing={1}>
         {keypadKeys.map((k) => (
           <Grid item xs={4} key={k}>
-            <Button fullWidth
-              onClick={() => handleKeyPress(k)}
+            <Button fullWidth onClick={() => handleKeyPress(k)}
               sx={{ py: 2, fontSize: '1.5rem', color: 'text.primary', fontWeight: 500, '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.4) } }}>
               {k === 'backspace' ? <BackspaceIcon /> : k}
             </Button>
@@ -229,6 +250,8 @@ const CrearDosis = () => {
       </Grid>
     </Box>
   );
+
+  const aplicacionOptions = APLICACION_TYPES.map((t) => ({ ...t, existing: existingDosis[t.key] }));
 
   return (
     <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
@@ -242,240 +265,99 @@ const CrearDosis = () => {
             <IconButton onClick={() => navigate(-1)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
           </Box>
 
-          <WizardProgressDots total={TOTAL_STEPS} current={step} color={accentColor || theme.palette.primary.main} />
+          <WizardProgressDots total={TOTAL_STEPS} current={step} color={accentColor} />
 
           <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-
-            {/* ═══════════════════════ NUTRIENTES ═══════════════════════ */}
-            {isFertilizante && (
-              <>
-                {step === 0 && (
-                  <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <ScienceIcon sx={{ color: '#4CAF50', fontSize: 20 }} />
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{item?.name}</Typography>
-                    </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
-                      ETAPA
-                    </Typography>
-                    {renderSelectCard(
-                      [{ key: 'Vegetativo', label: 'Vegetativo', color: STAGE_COLORS.Vegetativo, icon: GrassIcon },
-                       { key: 'Floracion', label: 'Floración', color: STAGE_COLORS.Floracion, icon: LocalFloristIcon }],
-                      etapa, setEtapa
-                    )}
-                  </Box>
-                )}
-
-                {step === 1 && (
-                  <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      {etapa === 'Vegetativo' ? <GrassIcon sx={{ color: accentColor, fontSize: 18 }} /> : <LocalFloristIcon sx={{ color: accentColor, fontSize: 18 }} />}
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: accentColor }}>{etapa}</Typography>
-                    </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
-                      SEMANA
-                    </Typography>
-                     <AnimatedGroup>
-                      {Array.from({ length: maxWeek }, (_, i) => i + 1).map((n) => {
-                        const key = `${etapa}-${n}`;
-                        const existing = existingDosis[key];
-                        const disabled = !!existing;
-                        return (
-                        <AnimatedItem key={n}>
-                          <Card variant="outlined"
-                            onClick={() => { if (!disabled) { setSemana(n); goNext(); } }}
-                            sx={{
-                              display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, mb: 1,
-                              borderRadius: 2,
-                              cursor: disabled ? 'default' : 'pointer',
-                              opacity: disabled ? 0.45 : 1,
-                              borderColor: disabled ? theme.palette.divider : (semana === n ? accentColor : theme.palette.divider),
-                              borderWidth: disabled ? 1 : (semana === n ? 2 : 1),
-                              bgcolor: disabled ? 'transparent' : (semana === n ? alpha(accentColor, 0.04) : 'transparent'),
-                              transition: '0.12s',
-                              '&:hover': disabled ? {} : { borderColor: accentColor },
-                            }}>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography variant="body2" sx={{ fontWeight: disabled ? 400 : (semana === n ? 700 : 500), color: disabled ? 'text.disabled' : 'text.primary' }}>
-                                Semana {n}
-                              </Typography>
-                              {existing && (
-                                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
-                                  {existing.quantity} Ml/L
-                                </Typography>
-                              )}
-                            </Box>
-                          </Card>
-                        </AnimatedItem>
-                        );
-                      })}
-                    </AnimatedGroup>
-                  </Box>
-                )}
-
-                {step === 2 && (
-                  <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                    <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
-                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          {etapa === 'Vegetativo' ? <GrassIcon sx={{ color: accentColor, fontSize: 18 }} /> : <LocalFloristIcon sx={{ color: accentColor, fontSize: 18 }} />}
-                          <Typography variant="caption" sx={{ fontWeight: 600, color: accentColor }}>
-                            {etapa} · Semana {semana}
-                          </Typography>
-                        </Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 2 }}>
-                          CANTIDAD
-                        </Typography>
-                        <Typography variant="h2" sx={{ fontWeight: 800, color: accentColor }}>
-                          {displayAmount}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">Ml/L</Typography>
-                      </Box>
-                    </AnimatedItem>
-                    <AnimatedItem>{renderNumpad()}</AnimatedItem>
-                  </AnimatedGroup>
-                )}
-
-                {step === 3 && (
-                  <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-                    <AnimatedGroup sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
-                      <AnimatedItem>
-                        <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="body2" color="text.secondary">Nutriente</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{item?.name}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="body2" color="text.secondary">Etapa</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: accentColor }}>{etapa}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="body2" color="text.secondary">Semana</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{semana}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5 }}>
-                            <Typography variant="body2" color="text.secondary">Dosis</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: accentColor }}>{parsedAmount} Ml/L</Typography>
-                          </Box>
-                        </Card>
-                      </AnimatedItem>
-                    </AnimatedGroup>
-                  </Box>
-                )}
-              </>
+            {step === 0 && (
+              <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <BugReportIcon sx={{ color: accentColor, fontSize: 20 }} />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{item?.name}</Typography>
+                </Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
+                  TIPO DE APLICACIÓN
+                </Typography>
+                {renderSelectCard(aplicacionOptions, aplicacion, setAplicacion)}
+              </Box>
             )}
 
-            {/* ═══════════════════════ ADITIVOS ═══════════════════════ */}
-            {!isFertilizante && (
-              <>
-                {step === 0 && (
-                  <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <BugReportIcon sx={{ color: accentColor, fontSize: 20 }} />
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{item?.name}</Typography>
-                    </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
-                      TIPO DE APLICACIÓN
-                    </Typography>
-                    {renderSelectCard(APLICACION_TYPES, aplicacion, setAplicacion,
-                      Object.fromEntries(
-                        Object.entries(existingDosis).map(([k, d]) => [k, `${d.quantity} Ml/L \u2014 ${d.forma}`])
-                      )
-                    )}
-                  </Box>
-                )}
+            {step === 1 && (
+              <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  {(() => {
+                    const Icon = APLICACION_TYPES.find((t) => t.key === aplicacion)?.icon || BugReportIcon;
+                    return <Icon sx={{ color: accentColor, fontSize: 18 }} />;
+                  })()}
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: accentColor }}>{aplicacion}</Typography>
+                </Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
+                  FORMA DE APLICACIÓN
+                </Typography>
+                {renderSelectCard(FORMA_TYPES, forma, setForma)}
+              </Box>
+            )}
 
-                {step === 1 && (
-                  <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
+            {step === 2 && (
+              <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+                <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
+                  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      {(() => {
-                        const Icon = APLICACION_TYPES.find((t) => t.key === aplicacion)?.icon || BugReportIcon;
-                        return <Icon sx={{ color: accentColor, fontSize: 18 }} />;
-                      })()}
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: accentColor }}>{aplicacion}</Typography>
+                      <BugReportIcon sx={{ color: accentColor, fontSize: 18 }} />
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: accentColor }}>
+                        {aplicacion} · {forma}
+                      </Typography>
                     </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
-                      FORMA DE APLICACIÓN
+                    <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 2 }}>
+                      CANTIDAD
                     </Typography>
-                    {renderSelectCard(FORMA_TYPES, forma, setForma)}
+                    <Typography variant="h2" sx={{ fontWeight: 800, color: accentColor }}>
+                      {displayAmount}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">Ml/L</Typography>
                   </Box>
-                )}
+                </AnimatedItem>
+                <AnimatedItem>{renderNumpad()}</AnimatedItem>
+              </AnimatedGroup>
+            )}
 
-                {step === 2 && (
-                  <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                    <AnimatedItem sx={{ flex: 1, display: 'flex' }}>
-                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <BugReportIcon sx={{ color: accentColor, fontSize: 18 }} />
-                          <Typography variant="caption" sx={{ fontWeight: 600, color: accentColor }}>
-                            {aplicacion} · {forma}
-                          </Typography>
-                        </Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 2 }}>
-                          CANTIDAD
-                        </Typography>
-                        <Typography variant="h2" sx={{ fontWeight: 800, color: accentColor }}>
-                          {displayAmount}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">Ml/L</Typography>
-                      </Box>
+            {step === 3 && (
+              <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+                <AnimatedGroup sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
+                  <AnimatedItem>
+                    <ReviewCard color={accentColor}>
+                      <ReviewRow label={item?.type || 'Aditivo'} value={item?.name} />
+                      <ReviewRow label="Tipo" color={accentColor}>{aplicacion}</ReviewRow>
+                      <ReviewRow label="Forma" value={forma} />
+                      <ReviewRow label="Dosis" color={accentColor}>{`${parsedAmount} Ml/L`}</ReviewRow>
+                    </ReviewCard>
+                  </AnimatedItem>
+                  {isEditing && (
+                    <AnimatedItem>
+                      <Button fullWidth onClick={handleDeleteDosis} disabled={submitting}
+                        sx={{ borderRadius: 999, textTransform: 'none', fontWeight: 600, color: 'error.main', '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.08) } }}>
+                        Eliminar dosis
+                      </Button>
                     </AnimatedItem>
-                    <AnimatedItem>{renderNumpad()}</AnimatedItem>
-                  </AnimatedGroup>
-                )}
-
-                {step === 3 && (
-                  <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-                    <AnimatedGroup sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
-                      <AnimatedItem>
-                        <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="body2" color="text.secondary">{item?.type || 'Aditivo'}</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{item?.name}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="body2" color="text.secondary">Tipo</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: accentColor }}>{aplicacion}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Typography variant="body2" color="text.secondary">Forma</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{forma}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5 }}>
-                            <Typography variant="body2" color="text.secondary">Dosis</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: accentColor }}>{parsedAmount} Ml/L</Typography>
-                          </Box>
-                        </Card>
-                      </AnimatedItem>
-                    </AnimatedGroup>
-                  </Box>
-                )}
-              </>
+                  )}
+                </AnimatedGroup>
+              </Box>
             )}
           </Box>
 
-          {/* Footer — both types now 4 steps */}
           {step <= 1 ? null : step < TOTAL_STEPS - 1 ? (
-            <WizardFooter
-              label="Siguiente →"
-              disabled={step === 2 ? !canAdvanceStep2 : false}
-              onClick={goNext}
-              color={accentColor}
-            />
+            <WizardFooter label="Siguiente →" disabled={parsedAmount <= 0} onClick={goNext} color={accentColor} />
           ) : (
             <WizardFooter
-              label="Guardar dosis"
-              disabled={false}
-              onClick={handleSubmit}
+              label={isEditing ? 'Actualizar dosis' : 'Guardar dosis'}
+              onClick={isEditing ? handleUpdate : handleSubmit}
               loading={submitting}
               color={accentColor}
             />
           )}
 
           <Snackbar open={!!snack} autoHideDuration={3000} onClose={() => setSnack('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-            <Alert severity="error" variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>{snack}</Alert>
+            <Alert severity={snackSeverity} variant="filled" onClose={() => setSnack('')} sx={{ borderRadius: 2 }}>{snack}</Alert>
           </Snackbar>
         </>
       )}

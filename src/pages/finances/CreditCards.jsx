@@ -32,18 +32,24 @@ const computeMonth = (userData, cards, year, month, rate) => {
   cards.forEach((card) => {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const configured = card.dates?.[monthKey];
-    const closingDay = configured?.closingDate ? parseFlexibleDate(configured.closingDate).getDate() : (card.defaultClosingDay || 10);
-    const dueDay = configured?.dueDate ? parseFlexibleDate(configured.dueDate).getDate() : (card.defaultDueDay || 25);
-    let dueMonth = month; let dueYear = year;
-    if (dueDay <= closingDay) { dueMonth = month === 12 ? 1 : month + 1; if (month === 12) dueYear = year + 1; }
-    const closingDate = new Date(year, month - 1, closingDay);
-    const dueDate = new Date(dueYear, dueMonth - 1, dueDay);
+    const closingParsed = configured?.closingDate ? parseFlexibleDate(configured.closingDate) : null;
+    const dueParsed = configured?.dueDate ? parseFlexibleDate(configured.dueDate) : null;
+
+    const closingDay = closingParsed ? closingParsed.getDate() : (card.defaultClosingDay || 10);
+    const dueDay = dueParsed ? dueParsed.getDate() : (card.defaultDueDay || 25);
+
+    let dueMonth = dueParsed ? dueParsed.getMonth() + 1 : month;
+    let dueYear = dueParsed ? dueParsed.getFullYear() : year;
+    if (!dueParsed && dueDay <= closingDay) { dueMonth = month === 12 ? 1 : month + 1; if (month === 12) dueYear = year + 1; }
+
+    const closingDate = closingParsed || new Date(year, month - 1, closingDay);
+    const dueDate = dueParsed || new Date(dueYear, dueMonth - 1, dueDay);
     const today = new Date();
     const isFutureMonth = year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth() + 1);
     cardSummaryDates[card.id] = {
       closingDay, dueDay, dueMonth, isFutureMonth,
-      closingLabel: `${DAYS_ES[closingDate.getDay()]} ${closingDay} de ${getMonthName(month)} de ${year}`,
-      dueLabel: `${DAYS_ES[dueDate.getDay()]} ${dueDay} de ${getMonthName(dueMonth)} de ${dueYear}`,
+      closingLabel: `${DAYS_ES[closingDate.getDay()]} ${closingDay} de ${getMonthName(closingDate.getMonth() + 1)} de ${closingDate.getFullYear()}`,
+      dueLabel: `${DAYS_ES[dueDate.getDay()]} ${dueDay} de ${getMonthName(dueDate.getMonth() + 1)} de ${dueDate.getFullYear()}`,
       isConfigured: !!(configured?.closingDate && configured?.dueDate),
     };
   });

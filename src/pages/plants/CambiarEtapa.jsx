@@ -18,7 +18,7 @@ import { STAGES } from '../../components/plants/PlantShared';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const STEPS = 2;
 
@@ -167,23 +167,13 @@ const CambiarEtapa = () => {
         {step === 1 && (
           <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
-            <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Plantas</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Etapa actual</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: currentStage.color }}>{currentStage.label}</Typography>
-              </Box>
+            <AnimatedItem><ReviewCard color={currentStage.color}>
+              <ReviewRow label="Plantas" value={selectedPlantIds.size} />
+              <ReviewRow label="Etapa actual" color={currentStage.color}>{currentStage.label}</ReviewRow>
               {nextStage && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">Nueva etapa</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: nextStage.color }}>{nextStage.label}</Typography>
-                </Box>
+                <ReviewRow label="Nueva etapa" color={nextStage.color}>{nextStage.label}</ReviewRow>
               )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
-                <Typography variant="body2" color="text.secondary">Fecha</Typography>
+              <ReviewRow label="Fecha">
                 <Box sx={{ maxWidth: 160 }}>
                   <DatePicker
                     value={changeDate}
@@ -196,8 +186,8 @@ const CambiarEtapa = () => {
                     }}
                   />
                 </Box>
-              </Box>
-            </Box></AnimatedItem>
+              </ReviewRow>
+            </ReviewCard></AnimatedItem>
           </AnimatedGroup>
         )}
       </Box>

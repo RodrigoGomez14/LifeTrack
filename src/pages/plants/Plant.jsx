@@ -14,6 +14,7 @@ import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
 import { AnimatedGroup, AnimatedItem } from "../../design-system";
 import Layout from "../../components/layout/Layout";
 import { useStore } from "../../store";
@@ -237,55 +238,54 @@ const Plant = () => {
           ))}
         </Box>
 
-        {!isFuture && !plant.isArchived && (plant.etapa === 'Secado' || plant.etapa === 'Curado' || plant.etapa === 'Enfrascado') && (!plant.pesoHumedo || !plant.pesoSeco || isCurado) && (
+        {!isFuture && !plant.isArchived && (plant.etapa === 'Secado' || plant.etapa === 'Curado' || plant.etapa === 'Enfrascado') && (
           <AnimatedItem>
             <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', ml: 0.5 }}>
               ACCIONES IMPORTANTES
             </Typography>
             <Grid container spacing={1} sx={{ mt: 0.5 }}>
-              {!plant.pesoHumedo ? (
-                <Grid item xs={12}>
-                  <Card elevation={0} onClick={() => navigate(`/IndicarPeso?tipo=humedo&id=${plant.id}`)}
-                    sx={{ cursor: 'pointer', borderRadius: 2, bgcolor: '#E65100', transition: 'all 0.15s', '&:hover': { filter: 'brightness(0.9)' } }}>
-                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
-                      <Avatar sx={{ bgcolor: alpha('#fff', 0.25), color: '#fff', width: 40, height: 40, mx: 'auto', mb: 0.75 }}>
-                        <MonitorWeightIcon sx={{ fontSize: 20 }} />
-                      </Avatar>
-                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: '#fff' }} noWrap>
-                        Peso húmedo
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ) : !plant.pesoSeco ? (
-                <Grid item xs={12}>
-                  <Card elevation={0} onClick={() => navigate(`/IndicarPeso?tipo=seco&id=${plant.id}`)}
-                    sx={{ cursor: 'pointer', borderRadius: 2, bgcolor: '#E65100', transition: 'all 0.15s', '&:hover': { filter: 'brightness(0.9)' } }}>
-                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
-                      <Avatar sx={{ bgcolor: alpha('#fff', 0.25), color: '#fff', width: 40, height: 40, mx: 'auto', mb: 0.75 }}>
-                        <MonitorWeightIcon sx={{ fontSize: 20 }} />
-                      </Avatar>
-                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: '#fff' }} noWrap>
-                        Peso seco
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ) : isCurado ? (
-                <Grid item xs={12}>
-                  <Card elevation={0} onClick={() => navigate(`/ArchivarPlanta?id=${plant.id}`)}
-                    sx={{ cursor: 'pointer', borderRadius: 2, bgcolor: '#c62828', transition: 'all 0.15s', '&:hover': { filter: 'brightness(0.9)' } }}>
-                    <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
-                      <Avatar sx={{ bgcolor: alpha('#fff', 0.25), color: '#fff', width: 40, height: 40, mx: 'auto', mb: 0.75 }}>
-                        <ArchiveOutlinedIcon sx={{ fontSize: 20 }} />
-                      </Avatar>
-                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: '#fff' }} noWrap>
-                        Archivar planta
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ) : null}
+              {[
+                { label: 'Peso húmedo', icon: MonitorWeightIcon, done: !!plant.pesoHumedo, color: '#0277BD', onClick: () => navigate(`/IndicarPeso?tipo=humedo&id=${plant.id}`) },
+                { label: 'Peso seco', icon: MonitorWeightIcon, done: !!plant.pesoSeco, color: '#E65100', onClick: () => navigate(`/IndicarPeso?tipo=seco&id=${plant.id}`) },
+                { label: 'Finalizar', icon: ArchiveOutlinedIcon, done: false, color: '#c62828', onClick: () => navigate(`/ArchivarPlanta?id=${plant.id}`) },
+              ].map((action) => {
+                const disabled = action.done;
+                const Icon = action.icon;
+                return (
+                  <Grid item xs={4} key={action.label}>
+                    <Card
+                      elevation={0}
+                      onClick={disabled ? undefined : action.onClick}
+                      sx={{
+                        cursor: disabled ? 'default' : 'pointer',
+                        borderRadius: 2,
+                        bgcolor: disabled ? alpha(theme.palette.text.disabled, 0.12) : action.color,
+                        opacity: disabled ? 0.7 : 1,
+                        transition: 'all 0.15s',
+                        '&:hover': disabled ? {} : { filter: 'brightness(0.9)' },
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.5, textAlign: 'center', '&:last-child': { pb: 1.5 } }}>
+                        <Avatar
+                          sx={{
+                            bgcolor: alpha(disabled ? theme.palette.text.secondary : '#fff', disabled ? 0.12 : 0.25),
+                            color: disabled ? 'text.secondary' : '#fff',
+                            width: 40,
+                            height: 40,
+                            mx: 'auto',
+                            mb: 0.75,
+                          }}
+                        >
+                          <Icon sx={{ fontSize: 20 }} />
+                        </Avatar>
+                        <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', lineHeight: 1.2, color: disabled ? 'text.secondary' : '#fff' }} noWrap>
+                          {action.label}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
             </Grid>
           </AnimatedItem>
         )}
@@ -433,6 +433,7 @@ const Plant = () => {
               { label: 'Insecticida', icon: <BugReportIcon sx={{ fontSize: 18 }} />, color: '#FF5722', tipo: 'insecticida' },
               { label: 'Poda', icon: <ContentCutIcon sx={{ fontSize: 18 }} />, color: '#4CAF50', tipo: 'poda' },
               { label: 'Transplante', icon: <SwapHorizIcon sx={{ fontSize: 18 }} />, color: '#2196F3', tipo: 'transplante' },
+              { label: 'Cambiar ambiente', icon: <MeetingRoomOutlinedIcon sx={{ fontSize: 18 }} />, color: '#3f51b5', tipo: 'ambiente' },
             ].map((act) => (
               <Box key={act.tipo}
                 onClick={() => {
@@ -442,6 +443,7 @@ const Plant = () => {
                     insecticida: '/NuevoInsecticida',
                     poda: '/NuevaPoda',
                     transplante: '/NuevoTransplante',
+                    ambiente: '/CambiarAmbiente',
                   };
                   const route = routeMap[act.tipo] || '/NuevaSolucion';
                   const dateParam = act.tipo === 'solucion'

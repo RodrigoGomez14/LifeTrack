@@ -7,7 +7,7 @@ import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { useAuth } from '../../hooks/useAuth';
 import { getMonthName } from '../../utils';
-import { getCardClosingDates, filterAndSortBillingPeriodTransactions } from '../../components/finances/creditCardsHelpers';
+import { getCardClosingDates, filterAndSortBillingPeriodTransactions, parseFlexibleDate } from '../../components/finances/creditCardsHelpers';
 import { AnimatedGroup, AnimatedItem } from '../../design-system';
 import BirthdayOverlay from '../../components/home/BirthdayOverlay';
 import QuickActions from '../../components/home/QuickActions';
@@ -100,22 +100,23 @@ const computeCardsData = (cardsObj, year, month, monthKey, dollarRate) => {
     const paid = !!card.payments?.[monthKey];
 
     const configured = card.dates?.[monthKey];
-    const closingDay = configured?.closingDate
-      ? Number(configured.closingDate.split('-')[2])
-      : (card.defaultClosingDay || 10);
-    const dueDay = configured?.dueDate
-      ? Number(configured.dueDate.split('-')[2])
-      : (card.defaultDueDay || 25);
+    const closingParsed = configured?.closingDate ? parseFlexibleDate(configured.closingDate) : null;
+    const dueParsed = configured?.dueDate ? parseFlexibleDate(configured.dueDate) : null;
 
-    let dueMonth = month;
-    let dueYear = year;
-    if (dueDay <= closingDay) {
+    const closingDay = closingParsed ? closingParsed.getDate() : (card.defaultClosingDay || 10);
+    const dueDay = dueParsed ? dueParsed.getDate() : (card.defaultDueDay || 25);
+
+    // Si hay fechas configuradas, usar su mes/año reales. Si no, el vencimiento cae
+    // en el mes siguiente cuando su día es <= al de cierre.
+    let dueMonth = dueParsed ? dueParsed.getMonth() + 1 : month;
+    let dueYear = dueParsed ? dueParsed.getFullYear() : year;
+    if (!dueParsed && dueDay <= closingDay) {
       dueMonth = month === 12 ? 1 : month + 1;
       if (month === 12) dueYear = year + 1;
     }
 
-    const closingDate = new Date(year, month - 1, closingDay);
-    const dueDate = new Date(dueYear, dueMonth - 1, dueDay);
+    const closingDate = closingParsed || new Date(year, month - 1, closingDay);
+    const dueDate = dueParsed || new Date(dueYear, dueMonth - 1, dueDay);
 
     return {
       id: cardId, name: card.name || 'Sin nombre', cardType: card.cardType,

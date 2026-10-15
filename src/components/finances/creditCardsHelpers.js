@@ -191,15 +191,30 @@ export function parseFlexibleDate(value) {
   if (!value) return null;
   if (value instanceof Date) return isNaN(value.getTime()) ? null : new Date(value);
   if (typeof value !== 'string') return null;
-  if (value.includes('/')) {
-    const [day, month, year] = value.split('/').map((n) => parseInt(n, 10));
+
+  const trimmed = value.trim();
+
+  // D/M/YYYY
+  if (trimmed.includes('/')) {
+    const [day, month, year] = trimmed.split('/').map((n) => parseInt(n, 10));
     return new Date(year, month - 1, day);
   }
-  if (value.includes('-')) {
-    const [year, month, day] = value.split('-').map((n) => parseInt(n, 10));
+
+  // YYYY-MM-DD o ISO con hora/zona (ej. "2025-09-25T03:00:00.000Z").
+  // Se toma SOLO la parte de fecha para que un timestamp no corra el día.
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+  }
+
+  // D-M-YYYY (variante sin barras)
+  if (/^\d{1,2}-\d{1,2}-\d{4}/.test(trimmed)) {
+    const [day, month, year] = trimmed.split('-').map((n) => parseInt(n, 10));
     return new Date(year, month - 1, day);
   }
-  const fallback = new Date(value);
+
+  const fallback = new Date(trimmed);
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 
@@ -226,6 +241,13 @@ export function getCardClosingDates(card, year, month) {
       : new Date(year, month, 0));
 
   return { prevClosingDate, currentClosingDate };
+}
+
+// Fecha de cierre (Date) del período que cierra en `month`, con el mismo criterio que el
+// filtrado de transacciones: fecha configurada → `defaultClosingDay` → último día del mes.
+// Es la fuente de verdad para decidir si el período ya cerró (ej. card fantasma de resumen).
+export function getPeriodClosingDate(card, year, month) {
+  return getCardClosingDates(card, year, month).currentClosingDate;
 }
 
 // Filtra y ordena las transacciones de una tarjeta por período de facturación.
@@ -267,13 +289,21 @@ export function defaultClosingDateString(card, year, month) {
   return `${year}-${String(month).padStart(2, '0')}-${day}`;
 }
 
-// Calcula la fecha de vencimiento por defecto: cae en el mes siguiente al seleccionado.
+// Calcula la fecha de vencimiento por defecto. Cae en el mes siguiente al seleccionado
+// cuando el día de vencimiento es <= al de cierre (caso habitual); si no, cae en el mismo
+// mes. Mismo criterio que usa el listado/Home para el badge de vencimiento.
 // Devuelve string YYYY-MM-DD o '' si la tarjeta no tiene día default.
 export function defaultDueDateString(card, year, month) {
   if (!card?.defaultDueDay) return '';
-  const dueMonth = month === 12 ? 1 : month + 1;
-  const dueYear = month === 12 ? year + 1 : year;
-  const day = String(card.defaultDueDay).padStart(2, '0');
+  const dueDay = card.defaultDueDay;
+  const closingDay = card.defaultClosingDay || 0;
+  let dueMonth = month;
+  let dueYear = year;
+  if (!closingDay || dueDay <= closingDay) {
+    dueMonth = month === 12 ? 1 : month + 1;
+    if (month === 12) dueYear = year + 1;
+  }
+  const day = String(dueDay).padStart(2, '0');
   return `${dueYear}-${String(dueMonth).padStart(2, '0')}-${day}`;
 }
 

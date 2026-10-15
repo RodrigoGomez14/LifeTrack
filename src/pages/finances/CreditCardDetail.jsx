@@ -16,12 +16,14 @@ import { useStore } from '../../store';
 import { formatNumber, getMonthName, checkSearch } from '../../utils';
 import { remove } from '../../services/database';
 import { getFileUrl } from '../../services/storage';
+import { setCardDatesForMonth } from '../../services/finances';
 import {
   getCardClosingDates, filterAndSortBillingPeriodTransactions,
   defaultClosingDateString, defaultDueDateString,
-  parseFlexibleDate, getCardType, getCardGradient, getCardLabel,
+  parseFlexibleDate, getPeriodClosingDate, getCardType, getCardGradient, getCardLabel,
 } from '../../components/finances/creditCardsHelpers';
 import { getCategoryIcon, getCategoryColor } from '../../components/finances/financesHelpers';
+import CreditCardDatesDialog from '../../components/finances/CreditCardDatesDialog';
 import MonthNav from '../../components/shared/MonthNav';
 
 const parseFechaFlexible = (dateStr) => {
@@ -68,6 +70,8 @@ const CreditCardDetail = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [datesDialogOpen, setDatesDialogOpen] = useState(false);
+  const [savingDates, setSavingDates] = useState(false);
 
   const card = useMemo(() => {
     if (!cardId || !userData?.creditCards?.[cardId]) return null;
@@ -140,6 +144,19 @@ const CreditCardDetail = () => {
     }).catch(() => showAlert('Error al eliminar', 'error'));
   };
 
+  const handleSaveDates = async ({ closingDate, dueDate }) => {
+    setSavingDates(true);
+    try {
+      await setCardDatesForMonth(cardId, monthKey, { closingDate, dueDate });
+      setDatesDialogOpen(false);
+      showAlert('Fechas actualizadas', 'success');
+    } catch {
+      showAlert('Error al guardar las fechas', 'error');
+    } finally {
+      setSavingDates(false);
+    }
+  };
+
   const statement = userData?.creditCards?.[cardId]?.statements?.[monthKey];
   const hasPDF = !!statement;
 
@@ -168,17 +185,28 @@ const CreditCardDetail = () => {
   const currentYear = today.getFullYear();
   const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
   const nextMonthYear = currentMonth === 12 ? currentYear + 1 : currentYear;
-  const isCurrentOrNextMonth =
-    (selectedYear === currentYear && selectedMonth === currentMonth) ||
-    (selectedYear === nextMonthYear && selectedMonth === nextMonth);
+
+  // Cierre del período que se está viendo (mismo criterio que las transacciones).
+  const periodClosingDate = useMemo(
+    () => (card ? getPeriodClosingDate(card, selectedYear, selectedMonth) : null),
+    [card, selectedYear, selectedMonth]
+  );
+
+  // La card fantasma de subir resumen aparece cuando el período YA CERRÓ, hay
+  // movimientos en el período y todavía no se subió el PDF. Sin restricción de
+  // "mes actual/siguiente": permite subir resúmenes atrasados de cualquier mes.
+  const showUploadCard =
+    !!periodClosingDate &&
+    today.getTime() >= periodClosingDate.getTime() &&
+    !hasPDF &&
+    transactions.length > 0;
 
   const hasTransactionsInMonth = (year, month) => {
     const txs = userData?.creditCards?.transactions?.[cardId];
     if (!txs) return false;
     return Object.values(txs).some((tx) => {
-      if (!tx?.date) return false;
-      const [, m, y] = tx.date.split('/').map(Number);
-      return y === year && m === month;
+      const d = parseFlexibleDate(tx?.date);
+      return !!d && d.getFullYear() === year && d.getMonth() + 1 === month;
     });
   };
 
@@ -263,36 +291,39 @@ const CreditCardDetail = () => {
               <MenuItem onClick={() => { setMenuAnchor(null); navigate(`/editarTarjeta/${cardId}`); }}>
                 Editar tarjeta
               </MenuItem>
-              {!datesConfigured && isCurrentOrNextMonth && (
-                <MenuItem onClick={() => { setMenuAnchor(null); navigate(`/tarjetaFechas/${cardId}?mes=${selectedMonth}&anio=${selectedYear}`); }}>
-                  Configurar fechas
-                </MenuItem>
-              )}
               <MenuItem onClick={handleDeleteCard} sx={{ color: theme.palette.error.main }}>
                 Eliminar tarjeta
               </MenuItem>
             </Menu>
           </Box>
 
-          {/* Bottom: dates — siempre visible para altura uniforme */}
+          {/* Bottom: dates — siempre visible. Tocar abre el editor de fechas del período */}
           <>
             <Divider sx={{ borderColor: alpha('#fff', 0.1), my: 1.5 }} />
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 600, letterSpacing: 0.5 }}>
-                  CIERRE
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mt: 0.25 }}>
-                  {datesConfigured ? shortClosingLabel : '−'}
-                </Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center', borderLeft: `1px solid ${alpha('#fff', 0.1)}` }}>
-                <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 600, letterSpacing: 0.5 }}>
-                  VENCE
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mt: 0.25 }}>
-                  {datesConfigured ? shortDueLabel : '−'}
-                </Typography>
+            <Box
+              onClick={() => setDatesDialogOpen(true)}
+              sx={{
+                borderRadius: 2, py: 0.5, cursor: 'pointer', transition: '0.15s',
+                '&:hover': { bgcolor: alpha('#fff', 0.06) },
+              }}
+            >
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 600, letterSpacing: 0.5 }}>
+                    CIERRE
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mt: 0.25 }}>
+                    {datesConfigured ? shortClosingLabel : '−'}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center', borderLeft: `1px solid ${alpha('#fff', 0.1)}` }}>
+                  <Typography variant="caption" sx={{ color: alpha('#fff', 0.5), fontWeight: 600, letterSpacing: 0.5 }}>
+                    VENCE
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#fff', fontWeight: 700, mt: 0.25 }}>
+                    {datesConfigured ? shortDueLabel : '−'}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </>
@@ -318,12 +349,8 @@ const CreditCardDetail = () => {
           </AnimatedItem>
         )}
 
-        {/* Card Subir resumen — solo después del cierre */}
-        {(() => {
-          const closingParsed = currentDates?.closingDate ? parseFlexibleDate(currentDates.closingDate) : null;
-          const isAfterClosing = closingParsed && today >= closingParsed;
-          return isCurrentOrNextMonth && isAfterClosing && !hasPDF;
-        })() && (
+        {/* Card Subir resumen — si el período cerró, tiene movimientos y no hay PDF */}
+        {showUploadCard && (
           <AnimatedItem>
             <Card elevation={0} onClick={() => navigate(`/subirResumen/${cardId}?mes=${selectedMonth}&anio=${selectedYear}`)} sx={{
             borderRadius: 3, border: `1px solid ${theme.palette.divider}`, p: 3,
@@ -334,7 +361,7 @@ const CreditCardDetail = () => {
               <UploadFileIcon />
             </Avatar>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {hasPDF ? 'Reemplazar resumen' : 'Subir resumen PDF'}
+              Subir resumen PDF
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               Solo PDF · Máximo 10MB
@@ -502,6 +529,16 @@ const CreditCardDetail = () => {
           </AnimatedGroup>
         )}
       </AnimatedGroup>
+
+      <CreditCardDatesDialog
+        open={datesDialogOpen}
+        periodLabel={`${getMonthName(selectedMonth)} ${selectedYear}`}
+        initialClosingDate={currentDates?.closingDate || ''}
+        initialDueDate={currentDates?.dueDate || ''}
+        saving={savingDates}
+        onClose={() => setDatesDialogOpen(false)}
+        onSave={handleSaveDates}
+      />
 
       <Snackbar open={snackbar.open} autoHideDuration={5000} onClose={() => setSnackbar((s) => ({ ...s, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert onClose={() => setSnackbar((s) => ({ ...s, open: false }))} severity={snackbar.severity} variant="filled" sx={{ width: '100%', borderRadius: 2 }}>{snackbar.message}</Alert>

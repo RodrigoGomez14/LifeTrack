@@ -18,6 +18,7 @@ import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import SavingsOutlinedIcon from '@mui/icons-material/SavingsOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 
 import { useAuth } from '../../hooks/useAuth';
@@ -44,6 +45,7 @@ export const MENU_GROUPS = [
     items: [
       { path: '/plantas', icon: CannabisIcon, label: 'Plantas' },
       { path: '/nutrientes', icon: ScienceOutlinedIcon, label: 'Nutrientes & Insecticidas' },
+      { path: '/ambientes', icon: MeetingRoomOutlinedIcon, label: 'Ambientes' },
     ],
   },
   {

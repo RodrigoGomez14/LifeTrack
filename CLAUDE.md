@@ -102,6 +102,7 @@ Componentes UI reutilizables en `src/design-system/`:
 - `SectionCard` — card con título, icono, acción opcional y contenido hijo
 - `DashedAddCard` — card con borde punteado para acciones "Agregar nuevo"
 - `SummaryCard` — card con icono, valor grande, label y color
+- `GhostStatCard` — card plana (borde/fondo con alpha) para métricas: icono, label, valor y subtítulo opcional
 - `MiniCard` — card compacta con icono, label, valor y link opcional
 - `SelectableCard` — card seleccionable con check
 - `QuantityCard` — card con control de cantidad (+/−)
@@ -198,6 +199,25 @@ Usada por todos los wizards de Plants para recibir el ID de la planta.
 5. **Código muerto en Aditivos.jsx** (~10 imports sin uso: Divider, ListItemText,
    CardHeader, IconButton, Tooltip, Badge, ArrowBackIcon, FilterListIcon,
    SearchIcon, secondaryColor). Limpiar cuando se rompa ese archivo.
+
+6. **Desfase de fechas de tarjetas (±1-2 días) — DIFERIDO.** El usuario reportó que
+   el cierre/vencimiento guardado a veces no coincidía con el resumen del PDF. Al
+   simular el seteo actual (2026-10-09) las fechas se guardaron correctamente → no es
+   reproducible hoy. Sospechas al investigar:
+   - Conviven **dos formatos** en `card.dates[mes]`: timestamp ISO (sembrado por el
+     alta vieja `NewCreditCard.jsx` con `calculateDate(...).toISOString()`) y
+     `YYYY-MM-DD` (wizard actual `MonthCalendar`/`TarjetasDatesWizard`).
+   - Parsing disperso: `parseFlexibleDate` parte por `-` (frágil con ISO),
+     `Home.jsx:103-108` usa `Number(configured.closingDate.split('-')[2])` → **`NaN`**
+     con ISO, y el `hasTransactionsInMonth` de `CreditCardDetail.jsx` asume `D/M/YYYY`.
+   - El histórico `new Date("YYYY-MM-DD")` (parseado como UTC) retrocede 1 día en
+     UTC-3 al comparar límites de período.
+   - `defaultDueDateString` siempre pone el vencimiento en el mes siguiente, pero
+     `CreditCards.jsx`/`Home.jsx` usan la heurística `dueDay <= closingDay` (puede
+     discrepar por un mes).
+   Pendiente cuando se retome: normalizar toda escritura a `YYYY-MM-DD`, centralizar
+   parseo/formato en un helper único y limpiar valores ISO legacy (`new Date(v)` +
+   componentes locales). **Decisión del usuario: por ahora queda de lado.**
 
 ### Problemas resueltos (referencia histórica)
 
@@ -2277,6 +2297,113 @@ setFecha(new Date());
 **Pendiente — DEPLOY:**
 - **Desplegar la nueva cloud function**: ejecutar `firebase deploy --only functions` desde la raíz del proyecto. Esto **reemplaza** la función vieja (`dailyExpenseReminder`) por la nueva (`checkReminders`). La vieja deja de existir y de consumir datos.
 - **Verificar en Firebase Console** que la función vieja ya no aparece y la nueva tiene schedule `0 9,12,18,22 * * *`.
+
+---
+
+### 2026-10-09 — Card fantasma de resúmenes PDF en /tarjeta: análisis + plan + implementación
+
+**Contexto:** El usuario arrastraba varios meses sin subir los resúmenes porque la
+card fantasma "Subir resumen PDF" no aparecía en los momentos correctos. La sesión
+empezó como análisis puro y siguió con la **implementación completa** del plan (fases
+A-E) más abajo.
+
+**Regla actual encontrada** (`CreditCardDetail.jsx:321-344`):
+`isCurrentOrNextMonth && isAfterClosing && !hasPDF`.
+
+**Causas del síntoma:**
+- **`isCurrentOrNextMonth` limita a mes actual/siguiente** → imposible backfillear
+  meses pasados (causa principal). La rama "mes siguiente" es **código muerto** (su
+  cierre siempre cae en el futuro).
+- La ventana real de la card es `[día de cierre … fin de mes]` del mes actual (ej.
+  25-31 oct). Si no se abre la app esa semana, el mes se pierde.
+- **Divergencia de fallback**: el gate usa `getCardDates()`→`defaultClosingDateString`
+  (sin fallback, devuelve `''`), pero las transacciones usan `getCardClosingDates`
+  (fallback al último día del mes).
+- **`NuevaTarjeta.jsx` no pide `defaultClosingDay`/`defaultDueDay`** (solo name+type) →
+  cards nuevas quedan con `closingDate=''` → la card **nunca** aparece.
+- No hay reemplazo de PDF (label `Reemplazar` inalcanzable por `!hasPDF`) y
+  `SubirResumenTC` vuelve a `/tarjeta` sin `mes/anio` (cae al mes actual).
+
+**Reglas objetivo acordadas:**
+- Mostrar la card si y solo si `closed(M) && !hasPDF(M) && transactions(M).length > 0`,
+  sin restricción de mes actual/siguiente (permite backfill de cualquier período
+  cerrado). Sin movimientos → no se muestra. Con PDF → solo "Ver resumen" (sin
+  reemplazo).
+- `closingDate` del gate debe resolver con el **mismo criterio** que las transacciones
+  (configurado → `defaultClosingDay` → último día del mes).
+
+**Nuevo flujo acordado — wizard 2 pasos:**
+- La card abre `/subirResumen/:cardId?mes=M&anio=Y`.
+- **Paso 1**: subir el PDF del período M. **Paso 2**: setear las fechas del período
+  **siguiente** (M+1), porque el resumen trae las del próximo período. Prefill desde
+  defaults; si `card.dates[M+1]` ya tiene ambas fechas → se muestran **bloqueadas**.
+- **Se persiste todo al final** (botón final del paso 2); el paso 2 es **saltable**.
+- Al finalizar, volver a M (`/tarjeta?id=…&mes=M&anio=Y`), no al mes actual.
+- **Eliminar la feature "Configurar fechas"** (ítem del menú + `/tarjetaFechas` +
+  `TarjetasDatesWizard`): todo el seteo de fechas pasa por el wizard.
+- **Alta de tarjeta** (`NuevaTarjeta.jsx`): agregar paso para `defaultClosingDay`/
+  `defaultDueDay` (bootstrap de la cadena).
+
+**Código muerto eliminado:** `TarjetasDetailSheet.jsx`, `CreditCardStatementUpload.jsx`,
+`CreditCardDatesConfig.jsx` (nadie los importaba) + `FechasTC.jsx`, `TarjetasDatesWizard.jsx`
+y `MonthCalendar.jsx` (flujo viejo de "Configurar fechas").
+
+**Implementado (fases A-E):**
+- **A — Reglas de la card** (`CreditCardDetail.jsx` + `creditCardsHelpers.js`): la card
+  ahora se muestra con `closed(M) && !hasPDF && transactions.length > 0`; se quitó
+  `isCurrentOrNextMonth`. Nuevo helper `getPeriodClosingDate()` con el mismo criterio que
+  las transacciones. `parseFlexibleDate` endurecido (extrae la parte de fecha de un ISO
+  con hora, y soporta `D-M-YYYY`). `hasTransactionsInMonth` usa `parseFlexibleDate`.
+- **B — Wizard de subida** (`TarjetasUploadWizard.jsx` + `SubirResumenTC.jsx`): paso 1 PDF;
+  paso 2 fechas del período siguiente, que **solo existe si esas fechas todavía no están
+  cargadas** (si ya lo están, el wizard se resuelve en un solo paso, sin paso 2). Prefill
+  desde defaults; "Omitir fechas y subir" saltea el paso 2. Todo se persiste al final. Al
+  terminar vuelve al mes visto (`?mes=&anio=`). Eliminado el ítem "Configurar fechas" del
+  menú y la ruta `/tarjetaFechas`.
+- **B.2 — Edición directa de fechas** (`CreditCardDatesDialog.jsx` nuevo + `CreditCardDetail.jsx`):
+  tocar el bloque CIERRE/VENCE del detalle abre un diálogo para editar las fechas de ese
+  período (cualquier mes, pasado incluido), cubriendo los casos que el wizard no alcanza
+  (mes anterior con PDF o sin movimientos, o corregir fechas ya seteadas).
+- **C — Alta con fechas** (`NuevaTarjeta.jsx`): nuevo paso que pide `defaultClosingDay`/
+  `defaultDueDay` (fuente del bootstrap).
+- **D — Normalización** (`Home.jsx`, `CreditCards.jsx`, helpers): `Home` ya no usa
+  `split('-')[2]` (que daba `NaN` con ISO) sino `parseFlexibleDate`; se usan el mes/año
+  reales de las fechas configuradas; `defaultDueDateString` unificado con la heurística
+  `dueDay <= closingDay`.
+- **E — Limpieza**: ver "Código muerto eliminado".
+
+**Build + ESLint verificados** (sin errores; único warning preexistente: `RegistrarMedicion`
+sin usar en `App.js`).
+
+**Pendiente para la próxima sesión:**
+- **Testear en navegador**: backfill de un mes atrasado (debe aparecer la card), subida
+  con paso 2 (prefill/bloqueo/saltar), alta de tarjeta con fechas, y que Home/listado
+  muestren cierre/vencimiento correctos.
+- El desfase de fechas ±1-2 días queda **diferido** (Deuda Técnica #6).
+
+---
+
+### 2026-10-14 — Nutrientes: cronograma por etapa/semana (Fase 1) + plan de Fase 2
+
+**Decisión de modelo:** las dosis de **nutrientes** dejan de vivir dentro de cada aditivo y pasan a un **plan** central:
+`plants/plan/{etapa}/{semana} = { ph, ec, ppm, nutrients: { [nutrientId]: { mlPerL } } }`.
+El **catálogo** `plants/aditives/fertilizantes/{id}` queda solo con `name` + `brand` (sin `dosis`). La dosis oficial es `ml/L`; el volumen real sale del `potVolume` de la planta (como antes). **Insecticidas quedan sin cambios** (siguen con `dosis` por aplicación/forma).
+
+**Fase 1 implementada (editor en desktop):**
+- Nuevo `components/plants/CronogramaTable.jsx`: matriz editable (filas = nutrientes, columnas = semanas de Vegetativo 1–4 / Floración 1–9), primera columna fija, celdas de `ml/L` editables (se guardan al salir de la celda). Arriba, **fila marcada “OBJETIVOS” con pH / EC / PPM** (editables por semana, color por fila). Botón “Agregar nutriente” y quitar de la biblioteca. El volumen de agua NO va en la tabla: sale del `potVolume` de la planta al crear la solución.
+- `/nutrientes`: en **desktop (≥ md)** la tab Nutrientes muestra el cronograma (reemplaza la lista); en **mobile** se mantiene la **lista/catálogo** (sin dosis). Insecticidas: igual que antes.
+- `services/plants.js`: se quitan las dosis de nutrientes; se agregan `setPlanNutrient`, `removePlanNutrient`, `setPlanParam`, `removeNutriente`.
+- `App.js` (`filterData`): agrega `plants.plan`.
+- `CrearNutriente`: crea sin `dosis`. `/CrearDosis`: pasa a ser **solo editor de dosis de insecticidas**.
+- `NuevaSolucion`: `suggestedNutrients` se lee de `plan[etapa][semana].nutrients`.
+- **Sin migración**: el plan arranca vacío (se carga a mano).
+
+**Fase 2 (pendiente):**
+- Objetivos: pH/EC/PPM **ya están** en el cronograma. Falta `temp` y, para `Lavado de raíces`, objetivos por etapa (sin semana).
+- Simulador por semana (receta + objetivos) + guardar/actualizar referencia (“se pisa”).
+- `/NuevaSolucion`: mostrar los **valores esperados** de la `etapa/semana`.
+
+**Nota:** al quitar un nutriente de la biblioteca quedan referencias huérfanas en `plan` (se filtran al render; limpieza pendiente).
 
 ---
 

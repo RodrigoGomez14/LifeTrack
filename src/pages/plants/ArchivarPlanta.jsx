@@ -14,7 +14,7 @@ import { archivePlant } from '../../services/plants';
 import { checkSearch } from '../../utils';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const COLOR = '#c62828';
 const STEPS = 1;
@@ -96,17 +96,10 @@ const ArchivarPlanta = () => {
         <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
 
-          <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-              <Typography variant="body2" color="text.secondary">Planta</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{plant?.name}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-              <Typography variant="body2" color="text.secondary">Etapa actual</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: COLOR }}>{plant?.etapa || '—'}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
-              <Typography variant="body2" color="text.secondary">Fecha</Typography>
+          <AnimatedItem><ReviewCard color={COLOR}>
+            <ReviewRow label="Planta" value={plant?.name} />
+            <ReviewRow label="Etapa actual" color={COLOR}>{plant?.etapa || '—'}</ReviewRow>
+            <ReviewRow label="Fecha">
               <Box sx={{ maxWidth: 160 }}>
                 <DatePicker
                   value={fecha}
@@ -119,8 +112,8 @@ const ArchivarPlanta = () => {
                   }}
                 />
               </Box>
-            </Box>
-          </Box></AnimatedItem>
+            </ReviewRow>
+          </ReviewCard></AnimatedItem>
 
           <AnimatedItem>
             <Box sx={{ p: 2.5, borderRadius: 2, border: `1px solid ${alpha(COLOR, 0.2)}`, bgcolor: alpha(COLOR, 0.06), textAlign: 'center' }}>

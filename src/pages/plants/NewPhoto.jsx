@@ -21,7 +21,7 @@ import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import { getBaseName } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedSuccess } from '../../design-system';
+import { AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const MAX_IMAGES = 10;
 const STEPS_TOTAL = 4;
@@ -376,13 +376,9 @@ const NewPhoto = () => {
               </Typography>
             )}
 
-            <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Fotos</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedImages.length}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Fecha</Typography>
+            <ReviewCard color="#FF9800">
+              <ReviewRow label="Fotos" value={selectedImages.length} />
+              <ReviewRow label="Fecha">
                 <Box sx={{ maxWidth: 160 }}>
                   <DatePicker
                     value={photoDate}
@@ -390,12 +386,9 @@ const NewPhoto = () => {
                     slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
                   />
                 </Box>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5 }}>
-                <Typography variant="body2" color="text.secondary">Plantas</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
-              </Box>
-            </Box>
+              </ReviewRow>
+              <ReviewRow label="Plantas" value={selectedPlantIds.size} />
+            </ReviewCard>
 
             {uploading && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

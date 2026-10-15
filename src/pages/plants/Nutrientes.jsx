@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Card, CardContent, Tabs, Tab,
+  Box, Typography, Card, Avatar, Tabs, Tab,
   alpha, Collapse, IconButton, Menu, MenuItem,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ScienceIcon from '@mui/icons-material/Science';
@@ -12,11 +13,13 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import InboxOutlinedIcon from '@mui/icons-material/InboxOutlined';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
-import { AnimatedGroup, AnimatedItem, DashedAddCard } from '../../design-system';
+import { setPlanNutrient, removePlanNutrient, setPlanParam, removeNutriente } from '../../services/plants';
+import { AnimatedGroup, AnimatedItem, DashedAddCard, GhostStatCard } from '../../design-system';
+import CronogramaTable from '../../components/plants/CronogramaTable';
 
-const STAGE_COLORS = {
-  Vegetativo: '#43a047',
-  Floracion: '#e53935',
+const CATEGORY_COLORS = {
+  fertilizantes: '#4CAF50',
+  insecticidas: '#FF5722',
 };
 
 const APLICACION_COLORS = {
@@ -39,198 +42,245 @@ const TABS = [
   { key: 'insecticidas', label: 'Insecticidas', icon: <BugReportIcon sx={{ fontSize: 18 }} /> },
 ];
 
+// Chip de una dosis (cantidad + unidad + detalle). Solo insecticidas.
+const DoseChip = ({ value, unit, sub, color }) => (
+  <Box
+    sx={{
+      py: 0.75,
+      px: 0.5,
+      borderRadius: 1,
+      border: `1px solid ${alpha(color, 0.18)}`,
+      bgcolor: alpha(color, 0.05),
+      textAlign: 'center',
+    }}
+  >
+    <Typography variant="body2" sx={{ fontWeight: 700, color, fontSize: '0.95rem', lineHeight: 1.15 }}>
+      {value}
+    </Typography>
+    <Typography variant="caption" sx={{ display: 'block', color, opacity: 0.7, fontSize: '0.55rem', lineHeight: 1.1 }}>
+      {unit}
+    </Typography>
+    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.6rem', lineHeight: 1.2, mt: 0.25 }}>
+      {sub}
+    </Typography>
+  </Box>
+);
+
+const DoseGroup = ({ title, color, doses, getSub }) => {
+  if (!doses.length) return null;
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color, display: 'block', mb: 0.75 }}>
+        {title}
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(58px, 1fr))', gap: 0.75 }}>
+        {doses.map((d, i) => (
+          <DoseChip key={i} value={d.quantity} unit="ml/l" sub={getSub(d)} color={color} />
+        ))}
+      </Box>
+    </Box>
+  );
+};
+
 const Nutrientes = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { userData } = useStore();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [tab, setTab] = useState(0);
   const [expandedId, setExpandedId] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [menuEntryId, setMenuEntryId] = useState(null);
-  const [menuEntryCategory, setMenuEntryCategory] = useState('fertilizantes');
 
   const aditives = userData?.plants?.aditives;
+  const plan = userData?.plants?.plan || {};
   const tabKey = TABS[tab].key;
+  const isNutrienteTab = tabKey === 'fertilizantes';
+  const accent = CATEGORY_COLORS[tabKey];
 
-  const entries = tabKey === 'insecticidas'
-    ? getEntries(aditives, 'insecticidas')
-    : getEntries(aditives, tabKey);
+  const nutrientes = getEntries(aditives, 'fertilizantes');
+  const insecticidas = getEntries(aditives, 'insecticidas');
+  const entries = isNutrienteTab ? nutrientes : insecticidas;
 
   const toggleExpand = (id) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  const isNutrienteTab = tabKey === 'fertilizantes';
+  // Handlers del plan (fuente de verdad de las dosis de nutrientes).
+  const handleSetNutrient = (etapa, semana, nutrientId, value) => {
+    if (value > 0) setPlanNutrient(etapa, semana, nutrientId, value);
+    else removePlanNutrient(etapa, semana, nutrientId);
+  };
+  const handleSetParam = (etapa, semana, field, value) => setPlanParam(etapa, semana, field, value);
+  const handleDeleteNutrient = (id) => {
+    if (!window.confirm('¿Quitar este nutriente de la biblioteca? El plan quedará sin esta fila.')) return;
+    removeNutriente(id);
+  };
+
+  const EmptyState = ({ label }) => (
+    <AnimatedItem>
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <InboxOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled', mb: 1.5 }} />
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+          No hay {label} registrados
+        </Typography>
+        <Typography variant="caption" color="text.disabled">
+          Creá uno desde el botón de abajo
+        </Typography>
+      </Box>
+    </AnimatedItem>
+  );
 
   return (
     <Layout title="Nutrientes & Insecticidas">
-      <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, pb: 8 }}>
+      <Box sx={{ maxWidth: { xs: 600, md: 1000 }, mx: 'auto', p: 2, pb: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Tabs
           value={tab}
           onChange={(e, v) => { setTab(v); setExpandedId(null); }}
           variant="fullWidth"
-          sx={{ mb: 2.5, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600, fontSize: '0.85rem', gap: 1 } }}
+          sx={{ minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600, fontSize: '0.85rem', gap: 1 } }}
         >
           {TABS.map((t) => (
             <Tab key={t.key} icon={t.icon} iconPosition="start" label={t.label} />
           ))}
         </Tabs>
 
-        {entries.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <InboxOutlinedIcon sx={{ fontSize: 56, color: 'text.disabled', mb: 1.5 }} />
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              No hay {TABS[tab].label.toLowerCase()} registrados
-            </Typography>
-            <Typography variant="caption" color="text.disabled">
-              Creá uno desde el botón de abajo
-            </Typography>
-          </Box>
-        ) : (
-          <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {entries.map((entry) => {
-            const isExpanded = expandedId === entry.id;
+        {/* Resumen ghost */}
+        <AnimatedGroup sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, maxWidth: 600, width: '100%', mx: 'auto' }}>
+          <AnimatedItem>
+            <GhostStatCard icon={ScienceIcon} label="NUTRIENTES" value={nutrientes.length} color="success" />
+          </AnimatedItem>
+          <AnimatedItem>
+            <GhostStatCard icon={BugReportIcon} label="INSECTICIDAS" value={insecticidas.length} color="warning" />
+          </AnimatedItem>
+        </AnimatedGroup>
 
-            return (
-              <AnimatedItem key={entry.id}><Card variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                <Box
-                  onClick={() => toggleExpand(entry.id)}
-                  sx={{
-                    p: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.5,
-                    bgcolor: alpha(theme.palette.primary.main, 0.03),
-                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                  }}
-                >
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {entry.name}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 0.75, mt: 0.25, flexWrap: 'wrap' }}>
-                      {entry.brand && (
-                        <Typography variant="caption" color="text.secondary">
-                          {entry.brand}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setMenuEntryId(entry.id); setMenuAnchor(e.currentTarget); setMenuEntryCategory(entry._category); }}
-                    sx={{ color: 'text.secondary' }}>
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton size="small" sx={{ color: 'text.secondary', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
-                    <ExpandMoreIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-                <Collapse in={isExpanded}>
-                  <CardContent sx={{ pt: 1.5, pb: 2, borderTop: `1px solid ${theme.palette.divider}`, bgcolor: alpha(theme.palette.common.black, 0.1) }}>
-                    {entry.dosis?.length > 0 ? (
-                      isNutrienteTab ? (
-                        /* ── Cards por etapa ── */
-                        (() => {
-                          const vege = entry.dosis.filter((d) => d.etapa === 'Vegetativo').sort((a, b) => (a.semana || 0) - (b.semana || 0));
-                          const flora = entry.dosis.filter((d) => d.etapa === 'Floracion').sort((a, b) => (a.semana || 0) - (b.semana || 0));
-                           const renderRow = (doses, stageColor, label) => doses.length === 0 ? null : (
-                            <Box key={label} sx={{ mb: 1.5 }}>
-                              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: stageColor, display: 'block', mb: 0.75 }}>
-                                {label}
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 0, flexWrap: 'wrap', borderRadius: 0, border: `1px solid ${alpha(stageColor, 0.12)}`, mx: 'auto', width: 'fit-content' }}>
-                                {doses.map((d, i) => (
-                                  <Box key={i}
-                                    sx={{
-                                      minWidth: 48, py: 1, px: 1.75, borderRadius: 0, textAlign: 'center',
-                                      bgcolor: alpha(stageColor, 0.04),
-                                      borderRight: `1px solid ${alpha(stageColor, 0.1)}`,
-                                      borderBottom: `1px solid ${alpha(stageColor, 0.1)}`,
-                                    }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 700, color: stageColor, fontSize: '1.1rem', lineHeight: 1.2 }}>
-                                      {d.quantity}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: stageColor, fontSize: '0.65rem', lineHeight: 1, display: 'block', opacity: 0.7, mb: 0.5 }}>
-                                      ml/l
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem', lineHeight: 1, display: 'block' }}>
-                                      Sem {d.semana || d.week}
-                                    </Typography>
-                                  </Box>
-                                ))}
-                              </Box>
-                            </Box>
-                          );
-                          return (
-                            <Box>
-                              {renderRow(vege, STAGE_COLORS.Vegetativo, 'VEGETATIVO')}
-                              {renderRow(flora, STAGE_COLORS.Floracion, 'FLORACIÓN')}
-                            </Box>
-                          );
-                        })()
-                      ) : (
-                        /* ── Cards por tipo de aplicación ── */
-                        (() => {
-                          const preventivo = entry.dosis.filter((d) => d.aplicacion === 'Preventivo');
-                          const correctivo = entry.dosis.filter((d) => d.aplicacion === 'Correctivo');
-                           const renderRow = (doses, color, label) => doses.length === 0 ? null : (
-                            <Box key={label} sx={{ mb: 1.5 }}>
-                              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color, display: 'block', mb: 0.75 }}>
-                                {label}
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 0, flexWrap: 'wrap', borderRadius: 0, border: `1px solid ${alpha(color, 0.12)}`, mx: 'auto', width: 'fit-content' }}>
-                                {doses.map((d, i) => (
-                                  <Box key={i}
-                                    sx={{
-                                      minWidth: 48, py: 1, px: 1.75, borderRadius: 0, textAlign: 'center',
-                                      bgcolor: alpha(color, 0.04),
-                                      borderRight: `1px solid ${alpha(color, 0.1)}`,
-                                      borderBottom: `1px solid ${alpha(color, 0.1)}`,
-                                    }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 700, color, fontSize: '1.1rem', lineHeight: 1.2 }}>
-                                      {d.quantity}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color, fontSize: '0.65rem', lineHeight: 1, display: 'block', opacity: 0.7, mb: 0.5 }}>
-                                      ml/l
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem', lineHeight: 1 }}>
-                                      {d.forma || d.name}
-                                    </Typography>
-                                  </Box>
-                                ))}
-                              </Box>
-                            </Box>
-                          );
-                          return (
-                            <Box>
-                              {renderRow(preventivo, APLICACION_COLORS.Preventivo, 'PREVENTIVO')}
-                              {renderRow(correctivo, APLICACION_COLORS.Correctivo, 'CORRECTIVO')}
-                            </Box>
-                          );
-                        })()
-                      )
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">Sin dosis registradas</Typography>
-                    )}
-                    {entry.notes && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, fontStyle: 'italic' }}>
-                        {entry.notes}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Collapse>
-              </Card></AnimatedItem>
-            );
-          })}
-          </AnimatedGroup>
+        {/* ── Nutrientes ── */}
+        {isNutrienteTab && (
+          isDesktop ? (
+            <CronogramaTable
+              nutrients={nutrientes}
+              plan={plan}
+              onSetNutrient={handleSetNutrient}
+              onSetParam={handleSetParam}
+              onAddNutrient={() => navigate('/CrearNutriente')}
+              onDeleteNutrient={handleDeleteNutrient}
+            />
+          ) : (
+            <>
+              {nutrientes.length === 0 ? (
+                <EmptyState label="nutrientes" />
+              ) : (
+                <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {nutrientes.map((n) => (
+                    <AnimatedItem key={n.id}>
+                      <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+                        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: alpha(accent, 0.12), color: accent }}>
+                            <ScienceIcon fontSize="small" />
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{n.name}</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                              {n.brand || 'Nutriente'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Card>
+                    </AnimatedItem>
+                  ))}
+                </AnimatedGroup>
+              )}
+              <AnimatedItem>
+                <DashedAddCard
+                  label="Nuevo nutriente"
+                  desc="Se agrega a la biblioteca"
+                  onClick={() => navigate('/CrearNutriente')}
+                />
+              </AnimatedItem>
+            </>
+          )
         )}
 
-        <AnimatedItem>
-          <Box sx={{ mt: 1.5 }}>
-            <DashedAddCard
-              label={`Nuevo ${TABS[tab].label.toLowerCase().replace(/s$/, '')}`}
-              onClick={() => navigate(isNutrienteTab ? '/CrearNutriente' : '/crearInsecticida')}
-            />
-          </Box>
-        </AnimatedItem>
+        {/* ── Insecticidas ── */}
+        {!isNutrienteTab && (
+          <>
+            {entries.length === 0 ? (
+              <EmptyState label="insecticidas" />
+            ) : (
+              <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {entries.map((entry) => {
+                  const isExpanded = expandedId === entry.id;
+                  const preventivo = entry.dosis.filter((d) => d.aplicacion === 'Preventivo');
+                  const correctivo = entry.dosis.filter((d) => d.aplicacion === 'Correctivo');
+
+                  return (
+                    <AnimatedItem key={entry.id}>
+                      <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, overflow: 'hidden' }}>
+                        <Box
+                          onClick={() => toggleExpand(entry.id)}
+                          sx={{ p: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.5, '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.3) } }}
+                        >
+                          <Avatar sx={{ width: 40, height: 40, bgcolor: alpha(accent, 0.12), color: accent }}>
+                            <BugReportIcon fontSize="small" />
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{entry.name}</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                              {entry.brand || 'Insecticida'}
+                              {entry.dosis.length > 0 ? ` · ${entry.dosis.length} dosis` : ''}
+                            </Typography>
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setMenuEntryId(entry.id); setMenuAnchor(e.currentTarget); }}
+                            sx={{ color: 'text.secondary' }}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            sx={{ color: 'text.secondary', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: '0.2s' }}
+                          >
+                            <ExpandMoreIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+
+                        <Collapse in={isExpanded}>
+                          <Box sx={{ px: 2, py: 2, borderTop: `1px solid ${theme.palette.divider}`, bgcolor: alpha(theme.palette.action.hover, 0.12) }}>
+                            {entry.dosis.length > 0 ? (
+                              <>
+                                <DoseGroup title="PREVENTIVO" color={APLICACION_COLORS.Preventivo} doses={preventivo} getSub={(d) => d.forma || d.name || ''} />
+                                <DoseGroup title="CORRECTIVO" color={APLICACION_COLORS.Correctivo} doses={correctivo} getSub={(d) => d.forma || d.name || ''} />
+                              </>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                Sin dosis registradas
+                              </Typography>
+                            )}
+                            {entry.notes && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, fontStyle: 'italic' }}>
+                                {entry.notes}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Collapse>
+                      </Card>
+                    </AnimatedItem>
+                  );
+                })}
+              </AnimatedGroup>
+            )}
+
+            <AnimatedItem>
+              <DashedAddCard
+                label="Nuevo insecticida"
+                desc="Registrá un insecticida y sus dosis"
+                onClick={() => navigate('/crearInsecticida')}
+              />
+            </AnimatedItem>
+          </>
+        )}
 
         <Menu
           anchorEl={menuAnchor}
@@ -239,7 +289,7 @@ const Nutrientes = () => {
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <MenuItem onClick={() => { setMenuAnchor(null); menuEntryId && navigate(`/CrearDosis?id=${menuEntryId}&type=${menuEntryCategory}`); }}>
+          <MenuItem onClick={() => { setMenuAnchor(null); menuEntryId && navigate(`/CrearDosis?id=${menuEntryId}&type=insecticidas`); }}>
             Agregar dosis
           </MenuItem>
         </Menu>

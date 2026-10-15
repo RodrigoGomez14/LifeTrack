@@ -13,7 +13,7 @@ import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { addPlantActivity } from '../../services/plants';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 import { checkSearch } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import { getBaseName } from '../../components/plants/plantsHelpers';
@@ -358,25 +358,12 @@ const NuevoInsecticida = () => {
                 </AnimatedItem>
 
                 <AnimatedItem>
-                  <Card elevation={0} sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}`, overflow: 'hidden' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary">Tipo</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: COLOR }}>{treatmentType}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary">Insecticida</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedInsecticide?.name}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary">Dosis</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: COLOR }}>{parsedAmount} Ml/L</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="body2" color="text.secondary">Método</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{appMethod}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, px: 2.5 }}>
-                      <Typography variant="body2" color="text.secondary">Fecha</Typography>
+                  <ReviewCard color={COLOR}>
+                    <ReviewRow label="Tipo" color={COLOR}>{treatmentType}</ReviewRow>
+                    <ReviewRow label="Insecticida" value={selectedInsecticide?.name} />
+                    <ReviewRow label="Dosis" color={COLOR}>{`${parsedAmount} Ml/L`}</ReviewRow>
+                    <ReviewRow label="Método" value={appMethod} />
+                    <ReviewRow label="Fecha">
                       <Box sx={{ maxWidth: 160 }}>
                         <DatePicker
                           value={fecha}
@@ -389,8 +376,8 @@ const NuevoInsecticida = () => {
                           }}
                         />
                       </Box>
-                    </Box>
-                  </Card>
+                    </ReviewRow>
+                  </ReviewCard>
                 </AnimatedItem>
 
                 <AnimatedItem>

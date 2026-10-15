@@ -7,7 +7,6 @@ import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { es } from 'date-fns/locale';
@@ -151,10 +150,9 @@ const TarjetasPaymentWizard = ({
     });
   };
 
-  const updatePaymentDate = (index, raw) => {
-    if (!raw) return;
-    const parts = raw.split('-');
-    const dateStr = `${parseInt(parts[2], 10)}/${parseInt(parts[1], 10)}/${parts[0]}`;
+  // Permite editar la fecha de cada cuota (aunque venga prellenada por la regla).
+  const setPaymentDateAt = (index, dateStr) => {
+    if (!dateStr) return;
     setPaymentDates((prev) => {
       const next = [...prev];
       next[index] = dateStr;
@@ -260,7 +258,7 @@ const TarjetasPaymentWizard = ({
       {/* Step 0: Select cards */}
       {step === 0 && (
         <>
-          <AnimatedGroup sx={{ flex: 1, overflow: 'auto', px: 3 }}>
+          <AnimatedGroup sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 3 }}>
             <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block' }}>
               SELECCIONÁ LAS TARJETAS
             </Typography>
@@ -367,7 +365,7 @@ const TarjetasPaymentWizard = ({
 
       {/* Step 2: Cuotas */}
       {step === 2 && (
-        <Box sx={{ flex: 1, overflow: 'auto', px: 3 }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 3 }}>
           <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 2 }}>
             ¿EN CUÁNTOS PAGOS?
           </Typography>
@@ -458,18 +456,12 @@ const TarjetasPaymentWizard = ({
               <Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
                   <Typography variant="body2" color="text.secondary">Fecha</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {(() => {
-                        const d = paymentDates[paymentIndex] || `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
-                        const parts = d.split('/');
-                        const date = new Date(parts[2], parts[1] - 1, parts[0]);
-                        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-                        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                        return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
-                      })()}
-                    </Typography>
-                    <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+                  <Box sx={{ maxWidth: 170 }}>
+                    <DatePicker
+                      value={paymentDates[paymentIndex] ? toDate(paymentDates[paymentIndex]) : today}
+                      onChange={(date) => date && setPaymentDateAt(paymentIndex, fromDate(date))}
+                      slotProps={{ textField: { size: 'small', sx: { '& .MuiOutlinedInput-root': { borderRadius: 2 } } } }}
+                    />
                   </Box>
                 </Box>
               </Card>
@@ -487,8 +479,8 @@ const TarjetasPaymentWizard = ({
 
       {/* Step N: Review */}
       {step === totalSteps - 1 && (
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <AnimatedGroup sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <AnimatedGroup sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 3, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Datos */}
             <AnimatedItem><Card elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5, borderBottom: selectedCards.filter((c) => getCardTotal(c.id) > 0).length > 0 ? `1px solid ${theme.palette.divider}` : 'none' }}>

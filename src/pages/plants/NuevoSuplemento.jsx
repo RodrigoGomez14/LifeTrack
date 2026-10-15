@@ -15,7 +15,7 @@ import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import { getBaseName } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const COLOR = '#9C27B0';
 const STEPS = 4;
@@ -198,28 +198,18 @@ const NuevoSuplemento = () => {
         {step === 3 && (
           <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Revisar</Typography></AnimatedItem>
-            <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography variant="body2" color="text.secondary">Suplementos</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedAditives.length}</Typography>
-              </Box>
+            <AnimatedItem><ReviewCard color={COLOR}>
+              <ReviewRow label="Suplementos" value={selectedAditives.length} />
               {selectedAditives.map((a, i) => (
-                <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 1, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>{a.name}</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500, fontSize: '0.8rem' }}>{a.dosis}</Typography>
-                </Box>
+                <ReviewRow key={i} label={a.name} value={a.dosis} color="text.secondary" />
               ))}
               {notes && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                  <Typography variant="body2" color="text.secondary">Nota</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500, maxWidth: '60%', textAlign: 'right' }}>{notes}</Typography>
-                </Box>
+                <ReviewRow label="Nota">
+                  <Typography variant="body2" sx={{ fontWeight: 500, textAlign: 'right' }}>{notes}</Typography>
+                </ReviewRow>
               )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5 }}>
-                <Typography variant="body2" color="text.secondary">Plantas</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedPlantIds.size}</Typography>
-              </Box>
-            </Box></AnimatedItem>
+              <ReviewRow label="Plantas" value={selectedPlantIds.size} />
+            </ReviewCard></AnimatedItem>
           </AnimatedGroup>
         )}
       </Box>

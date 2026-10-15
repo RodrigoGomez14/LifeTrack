@@ -44,13 +44,37 @@ export const archivePlant = async (plantId, plantData) => {
   return plantId;
 };
 
+// === Ambientes ===
+// Solo guardan el número de ambiente y sus dimensiones (texto libre).
+export const addAmbiente = (data) => db.push('plants/ambientes', data);
+
+export const updateAmbiente = (ambienteId, data) => db.update(`plants/ambientes/${ambienteId}`, data);
+
+export const removeAmbiente = (ambienteId) => db.remove(`plants/ambientes/${ambienteId}`);
+
 // === Nutrientes e insecticidas ===
 
 export const addNutriente = (data) => db.push('plants/aditives/fertilizantes', data);
+export const removeNutriente = (nutrientId) => db.remove(`plants/aditives/fertilizantes/${nutrientId}`);
 export const addInsecticida = (data) => db.push('plants/aditives/insecticidas', data);
 
-export const addNutrientDosis = (nutrientId, data) =>
-  db.push(`plants/aditives/fertilizantes/${nutrientId}/dosis`, data);
-
+// Dosis de insecticidas (por aplicación/forma).
 export const addAditiveDosis = (category, aditiveId, data) =>
   db.push(`plants/aditives/${category}/${aditiveId}/dosis`, data);
+
+export const updateAditiveDosis = (category, aditiveId, dosisKey, data) =>
+  db.update(`plants/aditives/${category}/${aditiveId}/dosis/${dosisKey}`, data);
+
+export const removeAditiveDosis = (category, aditiveId, dosisKey) =>
+  db.remove(`plants/aditives/${category}/${aditiveId}/dosis/${dosisKey}`);
+
+// === Plan de nutrientes por etapa/semana (fuente de verdad de las dosis) ===
+export const setPlanNutrient = (etapa, semana, nutrientId, mlPerL) =>
+  db.update(`plants/plan/${etapa}/${semana}/nutrients/${nutrientId}`, { mlPerL });
+
+export const removePlanNutrient = (etapa, semana, nutrientId) =>
+  db.remove(`plants/plan/${etapa}/${semana}/nutrients/${nutrientId}`);
+
+// Objetivos por semana (pH / EC / PPM). value <= 0 borra el campo.
+export const setPlanParam = (etapa, semana, field, value) =>
+  db.update(`plants/plan/${etapa}/${semana}`, { [field]: Number(value) > 0 ? Number(value) : null });

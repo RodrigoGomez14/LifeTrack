@@ -75,7 +75,7 @@ const DayCell = ({ date, isToday, isSelected, indicators, label, onClick, stageC
   </Box>
 );
 
-const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, selectedDay, onDaySelect, showLabels = true, getStageColor }) => {
+const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, selectedDay, onDaySelect, showLabels = true, getStageColor, getIndicators }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
   const arrowSx = { color: 'text.secondary', p: 0.25, borderRadius: '6px', '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.8) } };
@@ -177,7 +177,7 @@ const WeekStrip = ({ weekOffset: externalOffset, onWeekChange, allPlants, select
         {dates.map((date, i) => {
           const isToday = sameDay(date, today);
           const isSelected = sameDay(date, selectedDay);
-          const indicators = getActivityIndicators(date, allPlants);
+          const indicators = getIndicators ? getIndicators(date) : getActivityIndicators(date, allPlants);
           return (
             <DayCell
               key={i}

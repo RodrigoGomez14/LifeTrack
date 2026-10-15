@@ -92,28 +92,23 @@ const NuevaSolucion = () => {
     const startDate = getStageStartDate(primaryPlant, etapa);
     const daysDiff = startDate ? Math.floor((new Date() - startDate) / (1000 * 60 * 60 * 24)) + 1 : 0;
     const rawWeek = Math.ceil(daysDiff / 7);
-    const maxWeek = etapa === 'Vegetativo' ? 5 : 9;
+    const maxWeek = etapa === 'Vegetativo' ? 4 : 9;
     return { etapa, week: Math.min(rawWeek, maxWeek), startDate, daysIn: daysDiff };
   }, [primaryPlant]);
 
   const suggestedNutrients = useMemo(() => {
     if (!stageInfo || !primaryPlant) return [];
     const { etapa, week } = stageInfo;
-    const potVolume = primaryPlant.potVolume || 0;
-    return fertilizantes
-      .filter((n) => {
-        const raw = n.dosis || [];
-        const dosisArray = Array.isArray(raw) ? raw : Object.values(raw);
-        return dosisArray.some((d) => d.etapa === etapa && Number(d.semana) === week);
+    const planNutrients = userData?.plants?.plan?.[etapa]?.[week]?.nutrients || {};
+    return Object.entries(planNutrients)
+      .map(([nutrientId, dose]) => {
+        const n = fertilizantes.find((f) => f.id === nutrientId);
+        if (!n) return null;
+        const mlPerL = Number(dose?.mlPerL) || 0;
+        return { ...n, suggestion: mlPerL };
       })
-      .map((n) => {
-        const raw = n.dosis || [];
-        const dosisArray = Array.isArray(raw) ? raw : Object.values(raw);
-        const matched = dosisArray.find((d) => d.etapa === etapa && Number(d.semana) === week);
-        const suggested = matched ? matched.quantity : 0;
-        return { ...n, matchedDose: matched, suggestion: suggested };
-      });
-  }, [fertilizantes, stageInfo, primaryPlant]);
+      .filter((n) => n && n.suggestion > 0);
+  }, [fertilizantes, stageInfo, primaryPlant, userData]);
 
   const wizardColor = STAGE_COLORS[stageInfo?.etapa] || '#43a047';
   const numNutrientSteps = suggestedNutrients.length;

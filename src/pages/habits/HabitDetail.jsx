@@ -9,35 +9,24 @@ const HabitDetailPage = () => {
   const { habitId } = useParams();
   const navigate = useNavigate();
 
-  // Función para volver a la página de hábitos
-  const handleBack = () => {
-    navigate('/Habitos');
-  };
+  const handleBack = () => navigate('/Habitos');
 
   // Si no se especificó un ID de hábito en la URL
   if (!habitId) {
     return (
-      <Layout title="Detalles del Hábito">
-        <Box
-          display="flex"
-          flexDirection="column"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="50vh"
-          p={3}
-          textAlign="center"
-        >
-          <Typography variant="h6" color="error" gutterBottom>
-            Error
+      <Layout title="Detalle del Hábito" showBack onBack={handleBack}>
+        <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, py: 8, textAlign: 'center' }}>
+          <Typography variant="h6" fontWeight={700} gutterBottom>
+            Hábito no encontrado
           </Typography>
-          <Typography variant="body1" gutterBottom>
-            No se especificó un ID de hábito
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            No se especificó un ID de hábito.
           </Typography>
           <Button
             variant="contained"
             startIcon={<ArrowBackIcon />}
             onClick={handleBack}
-            sx={{ mt: 2 }}
+            sx={{ borderRadius: 999, textTransform: 'none', fontWeight: 600 }}
           >
             Volver a Hábitos
           </Button>
@@ -47,9 +36,9 @@ const HabitDetailPage = () => {
   }
 
   return (
-    <Layout title="Detalles del Hábito">
-      <Box py={2}>
-        <HabitDetail habitId={habitId} onBack={handleBack} />
+    <Layout title="Detalle del Hábito" showBack onBack={handleBack}>
+      <Box sx={{ maxWidth: 600, mx: 'auto', p: 2, pb: 8 }}>
+        <HabitDetail habitId={habitId} />
       </Box>
     </Layout>
   );

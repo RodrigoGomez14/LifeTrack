@@ -10,9 +10,10 @@ import Savings from './pages/savings/Savings.jsx';
 import FundHistory from './pages/savings/FundHistory.jsx';
 import Loading from './pages/basics/Loading.jsx';
 import Habits from './pages/habits/Habits';
-import HabitsList from './pages/habits/HabitsList';
 import Plant from './pages/plants/Plant.jsx';
 import Jardin from './pages/plants/Jardin.jsx';
+import Ambientes from './pages/plants/Ambientes.jsx';
+import CambiarAmbiente from './pages/plants/CambiarAmbiente.jsx';
 import NewPlant from './pages/plants/NewPlant.jsx';
 import NuevaPoda from './pages/plants/NuevaPoda.jsx';
 import NuevoInsecticida from './pages/plants/NuevoInsecticida.jsx';
@@ -35,7 +36,6 @@ import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import theme from './theme';
 import NewHabit from './pages/habits/NewHabit';
-import EditHabit from './pages/habits/EditHabit';
 import HabitDetailPage from './pages/habits/HabitDetail';
 import CreditCards from './pages/finances/CreditCards.jsx';
 import CreditCardDetail from './pages/finances/CreditCardDetail.jsx';
@@ -43,7 +43,6 @@ import PagarTarjeta from './pages/finances/PagarTarjeta.jsx';
 import NuevaTarjeta from './pages/finances/NuevaTarjeta.jsx';
 import EditarTarjeta from './pages/finances/EditarTarjeta.jsx';
 import SubirResumenTC from './pages/finances/SubirResumenTC.jsx';
-import FechasTC from './pages/finances/FechasTC.jsx';
 import CrearFondo from './pages/savings/CrearFondo.jsx';
 import AgregarAFondo from './pages/savings/AgregarAFondo.jsx';
 import RetirarDeFondo from './pages/savings/RetirarDeFondo.jsx';
@@ -202,6 +201,8 @@ function App() {
       if (data.plants.aditives) {
         groupedPlants['aditives'] = data.plants.aditives;
       }
+      groupedPlants['ambientes'] = data.plants.ambientes || {};
+      groupedPlants['plan'] = data.plants.plan || {};
     }
 
     // Procesar hábitos
@@ -326,16 +327,14 @@ function App() {
           <Route path="/exchange" element={<Exchange />} />
           <Route path="/exchanges" element={<Exchanges />} />
           <Route path="/NuevoHabito" element={<NewHabit />} />
-          <Route path="/EditarHabito/:habitId" element={<EditHabit />} />
           <Route path="/DetalleHabito/:habitId" element={<HabitDetailPage />} />
           <Route path="/Habitos" element={<Habits />} />
-          <Route path="/HabitosList" element={<HabitsList />} />
+          <Route path="/HabitosList" element={<Navigate to="/Habitos" />} />
           <Route path="/tarjetas" element={<CreditCards />} />
           <Route path="/tarjeta" element={<CreditCardDetail />} />
           <Route path="/PagarTarjeta" element={<PagarTarjeta />} />
           <Route path="/nuevaTarjeta" element={<NuevaTarjeta />} />
           <Route path="/editarTarjeta/:cardId" element={<EditarTarjeta />} />
-          <Route path="/tarjetaFechas/:cardId" element={<FechasTC />} />
           <Route path="/subirResumen/:cardId" element={<SubirResumenTC />} />
           <Route path="/Configuracion" element={<Configuracion />} />
           <Route path="/nuevaNotificacion" element={<NuevaNotificacion />} />
@@ -348,7 +347,8 @@ function App() {
           <Route path="/plantas" element={<Jardin />} />
           <Route path="/Planta" element={<Plant />} />
           <Route path="/Jardin" element={<Navigate to="/plantas" />} />
-          <Route path="/Ambientes" element={<Navigate to="/plantas" />} />
+          <Route path="/ambientes" element={<Ambientes />} />
+          <Route path="/CambiarAmbiente" element={<CambiarAmbiente />} />
           <Route path="/NuevaPlanta" element={<NewPlant />} />
           <Route path="/NuevaSolucion" element={<NuevaSolucion />} />
           <Route path="/NuevoSuplemento" element={<NuevoSuplemento />} />

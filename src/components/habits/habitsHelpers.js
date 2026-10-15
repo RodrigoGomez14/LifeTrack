@@ -80,3 +80,52 @@ export const formatWeekRangeDisplay = (date) => {
   }
   return `${startDay} ${startMonth} - ${endDay} ${endMonth} ${year}`;
 };
+
+// Colores y etiquetas por nivel de dificultad (1-5).
+export const DIFFICULTY_COLORS = {
+  1: '#4caf50',
+  2: '#8bc34a',
+  3: '#ff9800',
+  4: '#f44336',
+  5: '#9c27b0',
+};
+
+export const DIFFICULTY_LABELS = {
+  1: 'Muy Fácil',
+  2: 'Fácil',
+  3: 'Moderado',
+  4: 'Difícil',
+  5: 'Muy Difícil',
+};
+
+export const getDifficultyColor = (difficulty) => DIFFICULTY_COLORS[difficulty] || DIFFICULTY_COLORS[1];
+
+export const getDifficultyLabel = (difficulty) => DIFFICULTY_LABELS[difficulty] || DIFFICULTY_LABELS[1];
+
+// Texto legible de la frecuencia de un hábito.
+export const getFrequencyText = (habit) => {
+  switch (habit.frequency) {
+    case 'daily':
+      return 'Diario';
+    case 'weekdays':
+      return 'Lunes a Viernes';
+    case 'weekends':
+      return 'Fines de semana';
+    case 'custom': {
+      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const sorted = [...(habit.customDays || [])].sort((a, b) => a - b);
+      return sorted.map((d) => dayNames[d]).join(', ');
+    }
+    case 'monthly': {
+      const sorted = [...(habit.monthlyDays || [])].sort((a, b) => a - b);
+      return `Día${sorted.length > 1 ? 's' : ''} ${sorted.join(', ')}`;
+    }
+    case 'yearly': {
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const sortedMonths = [...(habit.yearlyMonths || [])].sort((a, b) => a - b);
+      return sortedMonths.map((m) => months[m - 1]).join(', ');
+    }
+    default:
+      return 'No definida';
+  }
+};

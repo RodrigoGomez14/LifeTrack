@@ -15,7 +15,7 @@ import { updatePlant } from '../../services/plants';
 import { checkSearch, getDate } from '../../utils';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
-import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
+import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 
 const COLOR = '#E65100';
 const STEPS = 2;
@@ -166,17 +166,10 @@ const IndicarPeso = () => {
             {step === 1 && (
               <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2, px: 3, pt: 2 }}>
                 <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Confirmar</Typography></AnimatedItem>
-                <AnimatedItem><Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 3, overflow: 'hidden' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                    <Typography variant="body2" color="text.secondary">Planta</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{plant?.name}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, px: 2.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                    <Typography variant="body2" color="text.secondary">{title}</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: COLOR }}>{pesoGramos}g</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, px: 2.5 }}>
-                    <Typography variant="body2" color="text.secondary">Fecha</Typography>
+                <AnimatedItem><ReviewCard color={COLOR}>
+                  <ReviewRow label="Planta" value={plant?.name} />
+                  <ReviewRow label={title} color={COLOR}>{`${pesoGramos}g`}</ReviewRow>
+                  <ReviewRow label="Fecha">
                     <Box sx={{ maxWidth: 160 }}>
                       <DatePicker
                         value={fecha}
@@ -189,8 +182,8 @@ const IndicarPeso = () => {
                         }}
                       />
                     </Box>
-                  </Box>
-                </Box></AnimatedItem>
+                  </ReviewRow>
+                </ReviewCard></AnimatedItem>
               </AnimatedGroup>
             )}
           </Box>
