@@ -13,7 +13,7 @@ import { addPlantActivity } from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getBaseName } from '../../components/plants/plantsHelpers';
+import { getAmbientPlants } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -49,13 +49,7 @@ const RegistrarMedicion = () => {
     ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
     : [];
 
-  const filteredPlants = useMemo(() => {
-    if (selectedPlantIds.size === 0) return activePlants;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return activePlants;
-    return activePlants.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, activePlants]);
+  const filteredPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
 
   const fertilizantes = getFertilizantes(userData?.plants?.aditives);
 

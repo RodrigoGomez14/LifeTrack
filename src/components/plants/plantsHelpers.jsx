@@ -306,6 +306,18 @@ export function getBaseName(name) {
   return name?.replace(/\s+\d+$/, '').trim().toLowerCase() || '';
 }
 
+// Devuelve las plantas activas que comparten ambiente con la planta de origen
+// (la que se pasó por ?id= al entrar al wizard). Si no hay planta de origen
+// (p. ej. se entró sin id) o no existe, devuelve todas las plantas.
+// Las plantas sin ambiente se agrupan entre sí (ambiente "Sin ambiente").
+export function getAmbientPlants(activePlants, originPlantId) {
+  if (!originPlantId) return activePlants;
+  const origin = activePlants.find((p) => p.id === originPlantId);
+  if (!origin) return activePlants;
+  const originAmbiente = origin.ambienteId || null;
+  return activePlants.filter((p) => (p.ambienteId || null) === originAmbiente);
+}
+
 // Devuelve los rangos de etapa como [{ stage, color, start, end }] con timestamps UTC.
 // El end de la etapa actual es hoy; los stages no iniciados no aparecen.
 export function getStageRanges(plant) {

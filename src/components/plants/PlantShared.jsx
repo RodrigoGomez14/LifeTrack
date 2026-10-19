@@ -38,27 +38,82 @@ export const ToolCircle = ({ icon, label, onClick, color }) => {
   );
 };
 
-export const PlantRow = ({ plant, onClick }) => {
-  const stage = STAGES.find((s) => s.key === plant.etapa) || STAGES[0];
+const PlantAvatar = ({ plant, stage, size = 44, iconSize = 20 }) => (
+  <Box sx={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, bgcolor: 'action.hover' }}>
+    {plant.profilePhotoUrl ? (
+      <Box component="img" src={plant.profilePhotoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    ) : (
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(stage.color, 0.15) }}>
+        <CannabisIcon sx={{ fontSize: iconSize, color: '#fff' }} />
+      </Box>
+    )}
+  </Box>
+);
+
+const formatStageDays = (plant, stage) => {
   const daysInStage = calculateDaysInStage(plant, plant.etapa);
   const weeksInStage = daysInStage !== null ? Math.max(1, Math.floor((daysInStage - 1) / 7) + 1) : null;
+  return `D${String(daysInStage || 0).padStart(2, '0')}${weeksInStage !== null ? ` (S${weeksInStage})` : ''}`;
+};
+
+export const PlantRow = ({ plant, onClick }) => {
+  const stage = STAGES.find((s) => s.key === plant.etapa) || STAGES[0];
 
   return (
     <Box onClick={onClick} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, cursor: 'pointer', borderRadius: 2, '&:hover': { bgcolor: 'action.hover' }, transition: '0.1s' }}>
-      <Box sx={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, bgcolor: 'action.hover' }}>
-        {plant.profilePhotoUrl ? (
-          <Box component="img" src={plant.profilePhotoUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: alpha(stage.color, 0.15) }}>
-            <CannabisIcon sx={{ fontSize: 20, color: '#fff' }} />
-          </Box>
-        )}
-      </Box>
+      <PlantAvatar plant={plant} stage={stage} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>{plant.name}</Typography>
       </Box>
       <Typography variant="caption" sx={{ fontWeight: 600, color: stage.color, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
-        D{String(daysInStage || 0).padStart(2, '0')}{weeksInStage !== null ? ` (S${weeksInStage})` : ''}
+        {formatStageDays(plant, stage)}
+      </Typography>
+    </Box>
+  );
+};
+
+export const PlantCard = ({ plant, onClick, color }) => {
+  const stage = STAGES.find((s) => s.key === plant.etapa) || STAGES[0];
+  const tint = color || stage.color;
+
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 0.75,
+        p: 1.25,
+        minWidth: 0,
+        cursor: 'pointer',
+        borderRadius: 2.5,
+        bgcolor: alpha(tint, 0.16),
+        border: '1px solid',
+        borderColor: alpha(tint, 0.32),
+        transition: '0.12s',
+        '&:hover': { bgcolor: alpha(tint, 0.24), borderColor: alpha(tint, 0.55) },
+        '&:active': { transform: 'scale(0.97)' },
+      }}
+    >
+      <PlantAvatar plant={plant} stage={stage} size={52} iconSize={24} />
+      <Typography
+        variant="caption"
+        title={plant.name}
+        sx={{ fontWeight: 600, lineHeight: 1.2, fontSize: 12, textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+      >
+        {plant.name}
+      </Typography>
+      <Box sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: alpha(stage.color, 0.18) }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: stage.color, fontSize: 10.5, whiteSpace: 'nowrap' }}>
+          {formatStageDays(plant, stage)}
+        </Typography>
+      </Box>
+      <Typography
+        variant="caption"
+        sx={{ fontWeight: 600, fontSize: 10, lineHeight: 1.15, textAlign: 'center', color: stage.color, width: '100%', overflowWrap: 'anywhere' }}
+      >
+        {stage.label}
       </Typography>
     </Box>
   );

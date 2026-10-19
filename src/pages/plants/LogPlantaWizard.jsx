@@ -23,6 +23,7 @@ import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } f
 import * as db from '../../services/database';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
+import { getAmbientPlants } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 
 const STAGE_ICONS = {
@@ -42,8 +43,6 @@ const STEPS = [
   { key: 'ppm', label: 'PPM', unit: '', hint: 'Medí las partes por millón' },
   { key: 'waterTemp', label: 'Temp. agua', unit: '°C', hint: 'Medí la temperatura del agua' },
 ];
-
-const getBaseName = (name) => name?.replace(/\s+\d+$/, '').trim().toLowerCase() || '';
 
 const now = () => new Date();
 const formatTime = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -73,11 +72,14 @@ const LogPlantaWizard = () => {
     ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
     : [];
 
+  // Solo las plantas del ambiente de la planta de origen (independiente de la selección).
+  const scopedPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
+
   const { groupA, groupB, groupC } = useMemo(() => {
     const a = [];
     const b = [];
     const c = [];
-    activePlants.forEach((p) => {
+    scopedPlants.forEach((p) => {
       const logs = p.logs ? Object.values(p.logs) : [];
       const completeLog = logs.find((e) =>
         e.date === logDate && e.ph !== undefined && e.ec !== undefined && e.ppm !== undefined
@@ -90,7 +92,7 @@ const LogPlantaWizard = () => {
       }
     });
     return { groupA: a, groupB: b, groupC: c };
-  }, [activePlants, logDate]);
+  }, [scopedPlants, logDate]);
 
   const activeGroup = useMemo(() => {
     if (selectedPlantIds.size === 0) return null;
@@ -216,30 +218,6 @@ const LogPlantaWizard = () => {
   const showGroupB = activeGroup === null || activeGroup === 'b';
   const disabledIds = useMemo(() => new Set(groupC.map((p) => p.id)), [groupC]);
 
-  const filteredGroupA = useMemo(() => {
-    if (selectedPlantIds.size === 0) return groupA;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return groupA;
-    return groupA.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, groupA, activePlants]);
-
-  const filteredGroupB = useMemo(() => {
-    if (selectedPlantIds.size === 0) return groupB;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return groupB;
-    return groupB.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, groupB, activePlants]);
-
-  const filteredGroupC = useMemo(() => {
-    if (selectedPlantIds.size === 0) return groupC;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return groupC;
-    return groupC.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, groupC, activePlants]);
-
   const currentPhFromLog = useMemo(() => {
     if (mode !== 'regulate') return null;
     const firstPlant = groupA.find((p) => selectedPlantIds.has(p.id));
@@ -315,34 +293,34 @@ const LogPlantaWizard = () => {
               </Typography>
             </AnimatedItem>
 
-            {showGroupA && filteredGroupA.length > 0 && (
+            {showGroupA && groupA.length > 0 && (
               <AnimatedItem>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: '#4CAF50', mb: 0.5, display: 'block' }}>
                   {activeGroup === 'a' ? 'CON LOG DEL DÍA' : 'CON LOG — regular pH'}
                 </Typography>
-                <PlantMultiSelect plants={filteredGroupA} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#4CAF50" />
+                <PlantMultiSelect plants={groupA} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#4CAF50" />
               </AnimatedItem>
             )}
 
-            {showGroupB && filteredGroupB.length > 0 && (
+            {showGroupB && groupB.length > 0 && (
               <AnimatedItem>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: activeGroup === 'b' ? theme.palette.primary.main : 'text.secondary', mb: 0.5, mt: showGroupA ? 2 : 0, display: 'block' }}>
                   {activeGroup === 'b' ? 'SIN LOG' : 'SIN LOG — cargar nuevo'}
                 </Typography>
-                <PlantMultiSelect plants={filteredGroupB} selectedIds={selectedPlantIds} onToggle={togglePlant} />
+                <PlantMultiSelect plants={groupB} selectedIds={selectedPlantIds} onToggle={togglePlant} />
               </AnimatedItem>
             )}
 
-            {filteredGroupC.length > 0 && (
+            {groupC.length > 0 && (
               <AnimatedItem>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', mb: 0.5, mt: 2, display: 'block' }}>
                   COMPLETAS · YA REGULADAS
                 </Typography>
-                <PlantMultiSelect plants={filteredGroupC} selectedIds={new Set()} onToggle={() => {}} disabledIds={disabledIds} />
+                <PlantMultiSelect plants={groupC} selectedIds={new Set()} onToggle={() => {}} disabledIds={disabledIds} />
               </AnimatedItem>
             )}
 
-            {(groupA.length === 0 && groupB.length === 0 && groupC.length === 0 && activePlants.length > 0) && (
+            {(groupA.length === 0 && groupB.length === 0 && groupC.length === 0 && scopedPlants.length > 0) && (
               <AnimatedItem>
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
                   No hay plantas activas

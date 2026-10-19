@@ -12,7 +12,7 @@ import { useStore } from '../../store';
 import { updatePlant } from '../../services/plants';
 import { checkSearch } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getBaseName } from '../../components/plants/plantsHelpers';
+import { getAmbientPlants } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
@@ -53,14 +53,8 @@ const CambiarAmbiente = () => {
   const goNext = () => setStep((s) => Math.min(s + 1, STEPS - 1));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  // Al elegir una planta, filtramos por su nombre base para mostrar las "hermanas" (misma genética).
-  const filteredPlants = useMemo(() => {
-    if (selectedPlantIds.size === 0) return activePlants;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return activePlants;
-    return activePlants.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, activePlants]);
+  // Filtramos por el ambiente de la planta de origen (independiente de la selección).
+  const filteredPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
 
   const currentDestLabel =
     ambienteId === NONE

@@ -13,7 +13,7 @@ import { addPlantActivity } from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getBaseName } from '../../components/plants/plantsHelpers';
+import { getAmbientPlants } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -66,24 +66,29 @@ const NuevaSolucion = () => {
     return Object.entries(aditives).map(([id, a]) => ({ id, ...a }));
   }, [userData]);
 
+  const originPlant = useMemo(
+    () => activePlants.find((p) => p.id === plantId) || null,
+    [activePlants, plantId]
+  );
+
   const primaryPlant = useMemo(() => {
     const ids = [...selectedPlantIds];
-    if (!ids.length) return null;
-    return activePlants.find((p) => p.id === ids[0]) || null;
-  }, [selectedPlantIds, activePlants]);
+    if (!ids.length) return originPlant;
+    return activePlants.find((p) => p.id === ids[0]) || originPlant;
+  }, [selectedPlantIds, activePlants, originPlant]);
 
-  const visiblePlants = useMemo(() => {
-    if (!primaryPlant) return activePlants;
-    return activePlants.filter((p) => p.etapa === primaryPlant.etapa && p.potVolume === primaryPlant.potVolume);
-  }, [primaryPlant, activePlants]);
+  // Plantas del mismo ambiente que la de origen (independiente de la selección).
+  const ambientPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
 
-  const filteredVisiblePlants = useMemo(() => {
-    if (selectedPlantIds.size === 0) return visiblePlants;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(visiblePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return visiblePlants;
-    return visiblePlants.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, visiblePlants]);
+  // Solo son seleccionables las de la misma etapa y maceta que la planta de origen.
+  const disabledIds = useMemo(() => {
+    if (!originPlant) return new Set();
+    return new Set(
+      ambientPlants
+        .filter((p) => p.etapa !== originPlant.etapa || p.potVolume !== originPlant.potVolume)
+        .map((p) => p.id)
+    );
+  }, [ambientPlants, originPlant]);
 
   const stageInfo = useMemo(() => {
     if (!primaryPlant) return null;
@@ -257,7 +262,7 @@ const NuevaSolucion = () => {
               <AnimatedItem><Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
                 SELECCIONA LAS PLANTAS
               </Typography></AnimatedItem>
-              <AnimatedItem><PlantMultiSelect plants={filteredVisiblePlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color={wizardColor} /></AnimatedItem>
+              <AnimatedItem><PlantMultiSelect plants={ambientPlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color={wizardColor} disabledIds={disabledIds} /></AnimatedItem>
             </AnimatedGroup>
           </Box>
         )}

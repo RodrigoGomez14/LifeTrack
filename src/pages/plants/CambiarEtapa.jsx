@@ -13,7 +13,7 @@ import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { updatePlant } from '../../services/plants';
 import { checkSearch, getDate } from '../../utils';
-import { getNextStage, getBaseName } from '../../components/plants/plantsHelpers';
+import { getNextStage, getAmbientPlants } from '../../components/plants/plantsHelpers';
 import { STAGES } from '../../components/plants/PlantShared';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
@@ -48,12 +48,23 @@ const CambiarEtapa = () => {
   const currentStage = STAGES.find((s) => s.key === currentStageKey) || STAGES[0];
   const nextStage = next ? STAGES.find((s) => s.key === next.newStage) : null;
 
-  const eligiblePlants = useMemo(() => {
-    return activePlants.filter((p) => {
-      const pEtapa = p.etapa === 'Enfrascado' ? 'Curado' : p.etapa;
-      return pEtapa === currentStageKey;
-    });
-  }, [activePlants, currentStageKey]);
+  const ambientPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
+
+  const eligibleIds = useMemo(() => {
+    return new Set(
+      ambientPlants
+        .filter((p) => {
+          const pEtapa = p.etapa === 'Enfrascado' ? 'Curado' : p.etapa;
+          return pEtapa === currentStageKey;
+        })
+        .map((p) => p.id)
+    );
+  }, [ambientPlants, currentStageKey]);
+
+  const disabledIds = useMemo(
+    () => new Set(ambientPlants.filter((p) => !eligibleIds.has(p.id)).map((p) => p.id)),
+    [ambientPlants, eligibleIds]
+  );
 
   const [step, setStep] = useState(0);
   const [selectedPlantIds, setSelectedPlantIds] = useState(new Set(plantId ? [plantId] : []));
@@ -61,14 +72,6 @@ const CambiarEtapa = () => {
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
-
-  const filteredEligiblePlants = useMemo(() => {
-    if (selectedPlantIds.size === 0) return eligiblePlants;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(eligiblePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return eligiblePlants;
-    return eligiblePlants.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, eligiblePlants]);
 
   const goNext = () => setStep(1);
   const goBack = () => setStep(0);
@@ -154,12 +157,12 @@ const CambiarEtapa = () => {
             <AnimatedItem><Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
               SELECCIONÁ LAS PLANTAS
             </Typography></AnimatedItem>
-            {eligiblePlants.length === 0 ? (
+            {ambientPlants.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                No hay plantas activas en {currentStage.label}
+                No hay plantas activas en este ambiente
               </Typography>
             ) : (
-              <AnimatedItem><PlantMultiSelect plants={filteredEligiblePlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color={currentStage.color} /></AnimatedItem>
+              <AnimatedItem><PlantMultiSelect plants={ambientPlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color={currentStage.color} disabledIds={disabledIds} /></AnimatedItem>
             )}
           </AnimatedGroup>
         )}

@@ -6,20 +6,16 @@ import {
   TextField,
   InputAdornment,
   alpha,
-  Collapse,
   Tabs,
   Tab,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
-import MeetingRoomOutlinedIcon from "@mui/icons-material/MeetingRoomOutlined";
 import Layout from "../../components/layout/Layout";
 import { DashedAddCard, AnimatedGroup, AnimatedItem } from "../../design-system";
 import { useStore } from "../../store";
-import { PlantRow } from "../../components/plants/PlantShared";
+import { PlantRow, PlantCard } from "../../components/plants/PlantShared";
 
 const NONE_KEY = "__none__";
 
@@ -28,7 +24,6 @@ const Jardin = () => {
   const navigate = useNavigate();
   const { userData } = useStore();
   const [search, setSearch] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState({});
   const [tab, setTab] = useState(0);
 
   const allPlants = useMemo(() => {
@@ -90,30 +85,24 @@ const Jardin = () => {
 
     const ordered = ambientesList
       .filter((a) => buckets[a.id])
-      .map((a, i) => ({
+      .map((a) => ({
         key: a.id,
-        label: `Ambiente ${a.number}`,
-        color: palette[i % palette.length],
-        icon: MeetingRoomOutlinedIcon,
+        number: a.number,
+        color: palette[ambientesList.findIndex((env) => env.id === a.id) % palette.length],
         plants: buckets[a.id],
       }));
 
     if (buckets[NONE_KEY]) {
       ordered.unshift({
         key: NONE_KEY,
-        label: "Sin ambiente",
+        number: null,
         color: theme.palette.text.secondary,
-        icon: MeetingRoomOutlinedIcon,
         plants: buckets[NONE_KEY],
       });
     }
 
     return ordered;
   }, [filtered, ambientesList, ambientesMap, theme]);
-
-  const toggleGroup = (key) => {
-    setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
 
   return (
     <Layout title="Plantas">
@@ -153,33 +142,30 @@ const Jardin = () => {
                 {groups.map((group) => (
                   <AnimatedItem key={group.key}>
                     <Box sx={{ mb: 1.5 }}>
-                      <Box
-                        onClick={() => toggleGroup(group.key)}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          px: 1.5,
-                          py: 0.75,
-                          borderRadius: 2,
-                          cursor: 'pointer',
-                          bgcolor: alpha(group.color, 0.06),
-                          '&:hover': { bgcolor: alpha(group.color, 0.1) },
-                          mb: 0.5,
-                        }}
-                      >
-                        <group.icon sx={{ fontSize: 18, color: group.color }} />
-                        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: group.color, flex: 1 }}>
-                          {group.label} ({group.plants.length})
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, mb: 1, px: 0.5 }}>
+                        <Typography
+                          sx={{
+                            fontSize: group.number == null ? '1rem' : '0.7rem',
+                            fontWeight: 700,
+                            letterSpacing: group.number == null ? 0 : 1.5,
+                            textTransform: 'uppercase',
+                            color: alpha(group.color, 0.8),
+                          }}
+                        >
+                          {group.number == null ? 'Sin ambiente' : 'Ambiente'}
                         </Typography>
-                        {collapsedGroups[group.key] ? <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
+                        {group.number != null && (
+                          <Typography sx={{ fontSize: '1.6rem', fontWeight: 800, lineHeight: 1, color: group.color }}>
+                            {group.number}
+                          </Typography>
+                        )}
                       </Box>
 
-                      <Collapse in={!collapsedGroups[group.key]}>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 1 }}>
                         {group.plants.map((plant) => (
-                          <PlantRow key={plant.id} plant={plant} onClick={() => navigate(`/Planta/?${plant.id}`)} />
+                          <PlantCard key={plant.id} plant={plant} color={group.color} onClick={() => navigate(`/Planta/?${plant.id}`)} />
                         ))}
-                      </Collapse>
+                      </Box>
                     </Box>
                   </AnimatedItem>
                 ))}

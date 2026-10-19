@@ -18,7 +18,7 @@ import { addPlantActivity } from '../../services/plants';
 import { checkSearch, getDate } from '../../utils';
 import { useStore } from '../../store';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getBaseName } from '../../components/plants/plantsHelpers';
+import { getAmbientPlants } from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 import { AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
@@ -102,13 +102,7 @@ const NewPhoto = () => {
     ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
     : [];
 
-  const filteredPlants = useMemo(() => {
-    if (selectedPlantIds.size === 0) return activePlants;
-    const firstId = [...selectedPlantIds][0];
-    const base = getBaseName(activePlants.find((p) => p.id === firstId)?.name);
-    if (!base) return activePlants;
-    return activePlants.filter((p) => getBaseName(p.name) === base);
-  }, [selectedPlantIds, activePlants]);
+  const filteredPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
 
   const goNext = () => setStep((s) => Math.min(s + 1, STEPS_TOTAL - 1));
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
