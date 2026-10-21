@@ -13,7 +13,12 @@ import { addPlantActivity } from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getAmbientPlants } from '../../components/plants/plantsHelpers';
+import {
+  getAmbientPlants,
+  getInitialPlantSelection,
+  getRdwcGroups,
+  isHarvestedPlant,
+} from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -33,8 +38,18 @@ const RegistrarMedicion = () => {
   const plantId = checkSearch(location.search);
   const dateParam = new URLSearchParams(location.search).get('date') || '';
 
+  const activePlants = useMemo(
+    () => (userData?.plants?.active
+      ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
+      : []),
+    [userData]
+  );
+  const ambientes = useMemo(() => userData?.plants?.ambientes || {}, [userData]);
+
   const [step, setStep] = useState(0);
-  const [selectedPlantIds, setSelectedPlantIds] = useState(new Set(plantId ? [plantId] : []));
+  const [selectedPlantIds, setSelectedPlantIds] = useState(() =>
+    getInitialPlantSelection(activePlants, ambientes, plantId)
+  );
   const [ph, setPh] = useState('');
   const [ec, setEc] = useState('');
   const [ppm, setPpm] = useState('');
@@ -45,11 +60,15 @@ const RegistrarMedicion = () => {
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
 
-  const activePlants = userData?.plants?.active
-    ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
-    : [];
+  const filteredPlants = useMemo(
+    () => getAmbientPlants(activePlants, plantId, { excludeHarvested: true }),
+    [activePlants, plantId]
+  );
 
-  const filteredPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
+  const originPlant = activePlants.find((p) => p.id === plantId) || null;
+  const originAmbiente = originPlant?.ambienteId ? ambientes[originPlant.ambienteId] : null;
+  const isRdwc = !!originAmbiente?.rdwc && !isHarvestedPlant(originPlant);
+  const rdwcGroups = useMemo(() => getRdwcGroups(filteredPlants, ambientes), [filteredPlants, ambientes]);
 
   const fertilizantes = getFertilizantes(userData?.plants?.aditives);
 
@@ -57,13 +76,20 @@ const RegistrarMedicion = () => {
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
   const hasPlants = selectedPlantIds.size > 0;
-  const hasMeasurements = ph || ec || ppm;
-  const hasWatering = quantity || selectedAditives.length > 0;
 
   const togglePlant = (id) => {
     setSelectedPlantIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // Selección en bloque para RDWC: agrega o quita todo el ambiente de una vez.
+  const handleToggleGroup = (ids, select) => {
+    setSelectedPlantIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (select ? next.add(id) : next.delete(id)));
       return next;
     });
   };
@@ -160,7 +186,9 @@ const RegistrarMedicion = () => {
 ) : (
             <Box sx={{ width: 36 }} />
           )}
-        <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>Riego</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>
+          {isRdwc && originAmbiente ? `Riego · Ambiente ${originAmbiente.number}` : 'Riego'}
+        </Typography>
         <IconButton onClick={() => navigate(-1)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
       </Box>
 
@@ -174,7 +202,37 @@ const RegistrarMedicion = () => {
             <AnimatedItem><Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
               SELECCIONÁ LAS PLANTAS
             </Typography></AnimatedItem>
-            <AnimatedItem><PlantMultiSelect plants={filteredPlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#00BCD4" /></AnimatedItem>
+            {isRdwc && originAmbiente && (
+              <AnimatedItem>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    mb: 1.5,
+                    borderRadius: 2,
+                    border: `1px solid ${alpha('#00BCD4', 0.25)}`,
+                    bgcolor: alpha('#00BCD4', 0.06),
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#00BCD4', display: 'block' }}>
+                    RDWC · AMBIENTE {originAmbiente.number}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Las {filteredPlants.length} plantas comparten la solución. Se registran juntas.
+                    Tocá cualquier planta para seleccionar o destildar todo el sistema.
+                  </Typography>
+                </Box>
+              </AnimatedItem>
+            )}
+            <AnimatedItem>
+              <PlantMultiSelect
+                plants={filteredPlants}
+                selectedIds={selectedPlantIds}
+                onToggle={togglePlant}
+                color="#00BCD4"
+                rdwcGroups={rdwcGroups}
+                onToggleGroup={handleToggleGroup}
+              />
+            </AnimatedItem>
           </AnimatedGroup>
         )}
 

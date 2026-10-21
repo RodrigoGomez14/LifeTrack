@@ -23,6 +23,7 @@ import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 
 import { useAuth } from '../../hooks/useAuth';
 import { useStore } from '../../store';
+import { isItemActive } from './navUtils';
 
 import CannabisIcon from '../icons/CannabisIcon';
 
@@ -52,14 +53,6 @@ export const MENU_GROUPS = [
     items: [{ path: '/Habitos', icon: CheckCircleOutlineIcon, label: 'Hábitos' }],
   },
 ];
-
-const isItemActive = (currentPath, itemPath) => {
-  const curr = currentPath.toLowerCase();
-  const target = itemPath.toLowerCase();
-  if (curr === target) return true;
-  if (target === '/') return false;
-  return curr.startsWith(target + '/');
-};
 
 const Drawer = ({ open, toggleDrawer }) => {
   const theme = useTheme();

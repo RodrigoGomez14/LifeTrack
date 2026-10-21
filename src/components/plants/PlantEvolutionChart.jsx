@@ -10,6 +10,29 @@ const tsToLabel = (ts) => {
   return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
 };
 
+// Rellena linealmente los `null` internos de una serie: entre el último valor
+// conocido y el siguiente, reparte la diferencia en partes iguales según los días.
+// Los `null` iniciales/finales quedan intactos (no inventamos fuera de lo medido).
+const interpolateGaps = (arr) => {
+  const out = arr.slice();
+  let prevIdx = -1;
+  for (let i = 0; i < out.length; i++) {
+    if (out[i] == null) continue;
+    if (prevIdx !== -1) {
+      const span = i - prevIdx;
+      if (span > 1) {
+        const from = out[prevIdx];
+        const to = out[i];
+        for (let k = 1; k < span; k++) {
+          out[prevIdx + k] = Math.round((from + ((to - from) * k) / span) * 100) / 100;
+        }
+      }
+    }
+    prevIdx = i;
+  }
+  return out;
+};
+
 const PlantEvolutionChart = ({ plant, stageRanges = [], timeline = [] }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('sm'));
@@ -24,15 +47,15 @@ const PlantEvolutionChart = ({ plant, stageRanges = [], timeline = [] }) => {
 const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDesktop }) => {
   const multiActionRef = useRef(new Map());
 
-  const { series, categories, xAnnotations, multiMap } = useMemo(() => {
+  const { series, categories, xAnnotations, multiMap, markerSizes } = useMemo(() => {
     const birthTs = parseDateToTimestamp(plant.birthDate);
-    if (!birthTs) return { series: [], categories: [], xAnnotations: [], multiMap: new Map() };
+    if (!birthTs) return { series: [], categories: [], xAnnotations: [], multiMap: new Map(), markerSizes: [] };
 
     const now = new Date();
     const todayTs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
     const totalDays = Math.floor((todayTs - birthTs) / DAY_MS);
-    if (totalDays <= 0) return { series: [], categories: [], xAnnotations: [], multiMap: new Map() };
+    if (totalDays <= 0) return { series: [], categories: [], xAnnotations: [], multiMap: new Map(), markerSizes: [] };
 
     const rawEntries = [
       ...(plant.irrigations ? Object.values(plant.irrigations) : []),
@@ -61,6 +84,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
     const ecArr = [];
     const ppmArr = [];
     const tempArr = [];
+    const measured = [];
 
     // Mapa de mediciones agrupadas por label DD/MM (solo datos del día exacto)
     const measurementsByDay = new Map();
@@ -72,17 +96,28 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       const label = tsToLabel(birthTs + d * DAY_MS);
       cats.push(label);
       const m = measurementsByDay.get(label);
+      measured.push(m != null);
       phArr.push(m?.ph ?? null);
       ecArr.push(m?.ec ?? null);
       ppmArr.push(m?.ppm ?? null);
       tempArr.push(m?.temp ?? null);
     }
 
+    // Unimos los huecos interpolando entre la última y la próxima medición de cada serie.
+    const phData = interpolateGaps(phArr);
+    const ecData = interpolateGaps(ecArr);
+    const ppmData = interpolateGaps(ppmArr);
+    const tempData = interpolateGaps(tempArr);
+
+    // Los marcadores (puntos) solo se dibujan en los días con medición real;
+    // los tramos interpolados quedan como línea lisa.
+    const markerSizes = measured.map((has) => (has ? 3 : 0));
+
     const result = [];
-    if (phArr.some((v) => v != null)) result.push({ name: 'pH', data: phArr, color: '#4CAF50' });
-    if (ecArr.some((v) => v != null)) result.push({ name: 'EC', data: ecArr, color: '#2196F3' });
-    if (ppmArr.some((v) => v != null)) result.push({ name: 'PPM', data: ppmArr, color: '#FF9800' });
-    if (tempArr.some((v) => v != null)) result.push({ name: 'Temp', data: tempArr, color: '#E91E63' });
+    if (phData.some((v) => v != null)) result.push({ name: 'pH', data: phData, color: '#4CAF50' });
+    if (ecData.some((v) => v != null)) result.push({ name: 'EC', data: ecData, color: '#2196F3' });
+    if (ppmData.some((v) => v != null)) result.push({ name: 'PPM', data: ppmData, color: '#FF9800' });
+    if (tempData.some((v) => v != null)) result.push({ name: 'Temp', data: tempData, color: '#E91E63' });
 
     // --- Anotaciones ---
     const catSet = new Set(cats);
@@ -133,7 +168,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       });
     });
 
-    return { series: result, categories: cats, xAnnotations: xAnnot, multiMap };
+    return { series: result, categories: cats, xAnnotations: xAnnot, multiMap, markerSizes };
   }, [plant, stageRanges, timeline, theme.typography.fontFamily]);
 
   // Sincronizar el ref con el mapa calculado
@@ -200,6 +235,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       const phAxis = {
         seriesName: 'pH',
         min: 4, max: 8, tickAmount: 4,
+        decimalsInFloat: 2,
         labels: {
           show: isDesktop,
           style: { colors: '#fff', fontSize: '10px' },
@@ -212,6 +248,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       const ppmAxis = {
         seriesName: 'EC',
         opposite: true,
+        decimalsInFloat: 2,
         labels: {
           show: isDesktop,
           style: { colors: '#fff', fontSize: '10px' },
@@ -225,6 +262,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       const tempAxis = {
         seriesName: 'Temp',
         min: 10, max: 35, tickAmount: 5,
+        decimalsInFloat: 2,
         labels: {
           show: isDesktop,
           style: { colors: '#fff', fontSize: '10px' },
@@ -249,7 +287,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
         },
       },
       stroke: { width: 2.5, curve: 'smooth' },
-      markers: { size: 3, strokeWidth: 0 },
+      markers: { size: markerSizes, strokeWidth: 0 },
       grid: { borderColor: theme.palette.divider, strokeDashArray: 3 },
       xaxis: {
         categories,
@@ -263,6 +301,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       tooltip: {
         shared: true,
         intersect: false,
+        followCursor: true,
         theme: undefined,
         y: {
           formatter: (value, { seriesIndex, w }) => {
@@ -279,7 +318,7 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
       legend: { show: true, position: 'top', horizontalAlign: 'right', fontSize: '11px', markers: { radius: 4 } },
       annotations: { xaxis: xAnnotations },
     };
-  }, [categories, series, xAnnotations, theme, isDesktop]);
+  }, [categories, series, xAnnotations, markerSizes, theme, isDesktop]);
 
   if (series.length === 0) {
     return null;
@@ -287,7 +326,9 @@ const PlantEvolutionChartInner = ({ plant, stageRanges, timeline, theme, isDeskt
 
   return (
     <Box sx={{
-      mt: 1, width: isDesktop ? '90vw' : '95vw', position: 'relative', left: '50%', transform: 'translateX(-50%)',
+      mt: 1,
+      width: isDesktop ? '90vw' : '95vw',
+      ml: isDesktop ? 'calc(50% - 45vw)' : 'calc(50% - 47.5vw)',
       '& .apexcharts-tooltip': {
         background: `${theme.palette.background.default} !important`,
         color: `${theme.palette.text.primary} !important`,

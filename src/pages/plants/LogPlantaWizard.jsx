@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, Typography, IconButton, Button, TextField,
-  Card, Avatar, Chip, Snackbar, Alert, alpha,
+  Chip, Snackbar, Alert, alpha,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
@@ -23,7 +23,12 @@ import { AnimatedGroup, AnimatedItem, AnimatedSuccess, ReviewCard, ReviewRow } f
 import * as db from '../../services/database';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getAmbientPlants } from '../../components/plants/plantsHelpers';
+import {
+  getAmbientPlants,
+  getInitialPlantSelection,
+  getRdwcGroups,
+  isHarvestedPlant,
+} from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 
 const STAGE_ICONS = {
@@ -57,9 +62,19 @@ const LogPlantaWizard = () => {
   const dateParam = new URLSearchParams(location.search).get('date') || '';
   const logDate = dateParam || getDate();
 
+  const activePlants = useMemo(
+    () => (userData?.plants?.active
+      ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
+      : []),
+    [userData]
+  );
+  const ambientes = useMemo(() => userData?.plants?.ambientes || {}, [userData]);
+
   const [step, setStep] = useState(0);
   const [values, setValues] = useState({ ph: '', ec: '', ppm: '', waterTemp: '' });
-  const [selectedPlantIds, setSelectedPlantIds] = useState(new Set(plantId ? [plantId] : []));
+  const [selectedPlantIds, setSelectedPlantIds] = useState(() =>
+    getInitialPlantSelection(activePlants, ambientes, plantId)
+  );
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
@@ -68,12 +83,40 @@ const LogPlantaWizard = () => {
 
   const submittingRef = useRef(false);
 
-  const activePlants = userData?.plants?.active
-    ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
-    : [];
+  // Planta y ambiente de origen (los que llegan por ?id=).
+  const originPlant = activePlants.find((p) => p.id === plantId) || null;
+  const originAmbiente = originPlant?.ambienteId ? ambientes[originPlant.ambienteId] : null;
+  const isRdwc = !!originAmbiente?.rdwc && !isHarvestedPlant(originPlant);
 
-  // Solo las plantas del ambiente de la planta de origen (independiente de la selección).
-  const scopedPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
+  // El listado se acota al ambiente de la planta de origen (?id=) o, si se
+  // entró sin id, al ambiente de la primera planta seleccionada. Se filtra por
+  // `ambienteId` y no por nombre: puede haber plantas homónimas en ambientes
+  // distintos. Sin selección se muestran todas.
+  const scopePlantId = useMemo(() => {
+    if (plantId) return plantId;
+    if (selectedPlantIds.size === 0) return null;
+    return [...selectedPlantIds][0];
+  }, [plantId, selectedPlantIds]);
+
+  const scopedPlants = useMemo(
+    () => getAmbientPlants(activePlants, scopePlantId, { excludeHarvested: true }),
+    [activePlants, scopePlantId]
+  );
+
+  // Grupos RDWC dentro de las plantas visibles. PlantMultiSelect los usa para
+  // seleccionar/deseleccionar todo el ambiente de una sola vez.
+  const rdwcGroups = useMemo(() => getRdwcGroups(scopedPlants, ambientes), [scopedPlants, ambientes]);
+
+  // También cubre el caso sin ?id=: si la selección incluye un bloque RDWC,
+  // el wizard lo trata como una unidad.
+  const selectionIsRdwc = useMemo(() => {
+    if (isRdwc) return true;
+    return [...selectedPlantIds].some((id) => {
+      const plant = activePlants.find((p) => p.id === id);
+      const group = plant?.ambienteId ? rdwcGroups[plant.ambienteId] : null;
+      return !!group && group.includes(id);
+    });
+  }, [isRdwc, selectedPlantIds, activePlants, rdwcGroups]);
 
   const { groupA, groupB, groupC } = useMemo(() => {
     const a = [];
@@ -96,15 +139,27 @@ const LogPlantaWizard = () => {
 
   const activeGroup = useMemo(() => {
     if (selectedPlantIds.size === 0) return null;
+    // En RDWC el bloque se comporta como una unidad: si alguna planta todavía
+    // no tiene log del día, corresponde cargar un log nuevo; si todas lo tienen,
+    // corresponde regular el pH.
+    if (selectionIsRdwc) {
+      return [...selectedPlantIds].some((id) => groupB.some((p) => p.id === id)) ? 'b' : 'a';
+    }
     const firstId = [...selectedPlantIds][0];
     if (groupA.some((p) => p.id === firstId)) return 'a';
     return 'b';
-  }, [selectedPlantIds, groupA]);
+  }, [selectedPlantIds, groupA, groupB, selectionIsRdwc]);
 
-  const headingPlant = useMemo(() => {
-    if (plantId) return activePlants.find((p) => p.id === plantId);
-    return null;
-  }, [activePlants, plantId]);
+  // Las plantas ya completas y reguladas no se pueden seleccionar. Si la
+  // selección inicial (el bloque RDWC completo) las incluía, se sacan.
+  useEffect(() => {
+    if (groupC.length === 0 || selectedPlantIds.size === 0) return;
+    const cIds = new Set(groupC.map((p) => p.id));
+    setSelectedPlantIds((prev) => {
+      const next = new Set([...prev].filter((id) => !cIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [groupC, selectedPlantIds]);
 
   const mode = activeGroup === 'a' ? 'regulate' : null;
   const TOTAL_STEPS = mode === 'regulate' ? 2 : 6;
@@ -122,6 +177,20 @@ const LogPlantaWizard = () => {
       else next.add(id);
       return next;
     });
+  };
+
+  // Selección en bloque para RDWC: agrega o quita todo el ambiente de una vez.
+  const handleToggleGroup = (ids, select) => {
+    setSelectedPlantIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (select ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+
+  const isRdwcPlant = (id) => {
+    const plant = activePlants.find((p) => p.id === id);
+    return !!plant?.ambienteId && !!ambientes[plant.ambienteId]?.rdwc;
   };
 
   const handleKeyPress = (key) => {
@@ -162,7 +231,19 @@ const LogPlantaWizard = () => {
         notes: notes.trim() || '',
       };
       for (const id of selectedPlantIds) {
-        await addPlantActivity(id, 'logs', data);
+        // En RDWC, si esa planta ya tenía un log completo del día, se actualiza
+        // en vez de duplicarlo (protege el caso de estados mezclados).
+        const plant = activePlants.find((p) => p.id === id);
+        const existing = isRdwcPlant(id) && plant?.logs
+          ? Object.entries(plant.logs).find(([, e]) =>
+              e.date === data.date && e.ph !== undefined && e.ec !== undefined && e.ppm !== undefined
+            )
+          : null;
+        if (existing) {
+          await db.update(`plants/active/${id}/logs/${existing[0]}`, data);
+        } else {
+          await addPlantActivity(id, 'logs', data);
+        }
       }
     } catch (err) {
       setSavedSnapshot(null);
@@ -204,6 +285,10 @@ const LogPlantaWizard = () => {
     setValues({ ph: '', ec: '', ppm: '', waterTemp: '' });
     setNotes('');
     setSavedSnapshot(null);
+    // Arranca sin ninguna planta seleccionada: así el paso 1 muestra el
+    // panorama completo (con log / sin log / completas) y no queda sesgado
+    // al modo "regular pH" de la planta anterior.
+    setSelectedPlantIds(new Set());
   };
 
   const formatDisplay = (raw) => {
@@ -273,14 +358,25 @@ const LogPlantaWizard = () => {
           <Box sx={{ width: 36 }} />
         )}
         <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, textAlign: 'center' }}>
-          {headingPlant ? `Log ${headingPlant.name}` : (mode === 'regulate' ? 'Regular pH' : 'Log de planta')}
+          Log diario
         </Typography>
         <IconButton onClick={() => navigate(-1)} size="small" sx={{ color: 'text.secondary' }}><CloseIcon /></IconButton>
       </Box>
 
-      <WizardProgressDots total={TOTAL_STEPS} current={step} color={mode === 'regulate' ? '#4CAF50' : undefined} />
+      {/* En el paso 1 todavía no se sabe si el flujo será log completo o sólo
+          regular pH: mostramos siempre 2 dots. Al avanzar se revela el total
+          real (2 o 6) según la planta elegida. */}
+      <WizardProgressDots
+        total={isPlantStep ? 2 : TOTAL_STEPS}
+        current={step}
+        color={mode === 'regulate' ? '#4CAF50' : undefined}
+      />
 
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* minHeight: 0 es necesario para que el scroll interno del paso 1
+          funcione: sin esto el wrapper crece con el contenido (se nota cuando
+          hay muchas plantas y se entra desde /home) y empuja el footer fuera
+          de la pantalla. */}
+      <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
       {/* Step 0: Plant multi-select */}
       {isPlantStep && (
@@ -293,21 +389,57 @@ const LogPlantaWizard = () => {
               </Typography>
             </AnimatedItem>
 
-            {showGroupA && groupA.length > 0 && (
+            {isRdwc && originAmbiente && (
               <AnimatedItem>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: '#4CAF50', mb: 0.5, display: 'block' }}>
-                  {activeGroup === 'a' ? 'CON LOG DEL DÍA' : 'CON LOG — regular pH'}
-                </Typography>
-                <PlantMultiSelect plants={groupA} selectedIds={selectedPlantIds} onToggle={togglePlant} color="#4CAF50" />
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                    bgcolor: alpha(theme.palette.primary.main, 0.06),
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main', display: 'block' }}>
+                    RDWC · AMBIENTE {originAmbiente.number}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Las {scopedPlants.length} plantas comparten la solución y se registran juntas.
+                    Tocá cualquier planta para seleccionar o destildar todo el sistema.
+                  </Typography>
+                </Box>
               </AnimatedItem>
             )}
 
             {showGroupB && groupB.length > 0 && (
               <AnimatedItem>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: activeGroup === 'b' ? theme.palette.primary.main : 'text.secondary', mb: 0.5, mt: showGroupA ? 2 : 0, display: 'block' }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: activeGroup === 'b' ? theme.palette.primary.main : 'text.secondary', mb: 0.5, display: 'block' }}>
                   {activeGroup === 'b' ? 'SIN LOG' : 'SIN LOG — cargar nuevo'}
                 </Typography>
-                <PlantMultiSelect plants={groupB} selectedIds={selectedPlantIds} onToggle={togglePlant} />
+                <PlantMultiSelect
+                  plants={groupB}
+                  selectedIds={selectedPlantIds}
+                  onToggle={togglePlant}
+                  disabledIds={disabledIds}
+                  rdwcGroups={rdwcGroups}
+                  onToggleGroup={handleToggleGroup}
+                />
+              </AnimatedItem>
+            )}
+
+            {showGroupA && groupA.length > 0 && (
+              <AnimatedItem>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#4CAF50', mb: 0.5, mt: showGroupB ? 2 : 0, display: 'block' }}>
+                  {activeGroup === 'a' ? 'CON LOG DEL DÍA' : 'CON LOG — regular pH'}
+                </Typography>
+                <PlantMultiSelect
+                  plants={groupA}
+                  selectedIds={selectedPlantIds}
+                  onToggle={togglePlant}
+                  color="#4CAF50"
+                  disabledIds={disabledIds}
+                  rdwcGroups={rdwcGroups}
+                  onToggleGroup={handleToggleGroup}
+                />
               </AnimatedItem>
             )}
 
@@ -316,7 +448,13 @@ const LogPlantaWizard = () => {
                 <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled', mb: 0.5, mt: 2, display: 'block' }}>
                   COMPLETAS · YA REGULADAS
                 </Typography>
-                <PlantMultiSelect plants={groupC} selectedIds={new Set()} onToggle={() => {}} disabledIds={disabledIds} />
+                <PlantMultiSelect
+                  plants={groupC}
+                  selectedIds={new Set()}
+                  onToggle={() => {}}
+                  disabledIds={disabledIds}
+                  rdwcGroups={rdwcGroups}
+                />
               </AnimatedItem>
             )}
 

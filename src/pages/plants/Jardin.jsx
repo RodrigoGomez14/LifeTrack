@@ -5,6 +5,7 @@ import {
   Typography,
   TextField,
   InputAdornment,
+  Chip,
   alpha,
   Tabs,
   Tab,
@@ -12,10 +13,12 @@ import {
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import ArchiveOutlinedIcon from "@mui/icons-material/ArchiveOutlined";
+import ParkOutlinedIcon from "@mui/icons-material/ParkOutlined";
 import Layout from "../../components/layout/Layout";
 import { DashedAddCard, AnimatedGroup, AnimatedItem } from "../../design-system";
 import { useStore } from "../../store";
 import { PlantRow, PlantCard } from "../../components/plants/PlantShared";
+import { isGrowingPlant, isHarvestedPlant } from "../../components/plants/plantsHelpers";
 
 const NONE_KEY = "__none__";
 
@@ -31,6 +34,11 @@ const Jardin = () => {
       ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
       : [];
   }, [userData]);
+
+  // Activas = en cultivo. Cosechadas = Secado/Curado/Enfrascado (siguen en
+  // `active` para pesos/fotos, pero ya no ocupan lugar en el ambiente).
+  const growingPlants = useMemo(() => allPlants.filter(isGrowingPlant), [allPlants]);
+  const harvestedPlants = useMemo(() => allPlants.filter(isHarvestedPlant), [allPlants]);
 
   const ambientesList = useMemo(
     () =>
@@ -61,7 +69,7 @@ const Jardin = () => {
     return list;
   }, [userData]);
 
-  const filtered = allPlants.filter(
+  const filtered = growingPlants.filter(
     (p) => !search || (p.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -90,6 +98,7 @@ const Jardin = () => {
         number: a.number,
         color: palette[ambientesList.findIndex((env) => env.id === a.id) % palette.length],
         plants: buckets[a.id],
+        rdwc: !!a.rdwc,
       }));
 
     if (buckets[NONE_KEY]) {
@@ -114,6 +123,7 @@ const Jardin = () => {
           sx={{ mb: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, textTransform: 'none', fontWeight: 600, fontSize: '0.85rem' } }}
         >
           <Tab label="Activas" />
+          <Tab label="Cosechadas" />
           <Tab label="Archivo" />
         </Tabs>
 
@@ -159,6 +169,20 @@ const Jardin = () => {
                             {group.number}
                           </Typography>
                         )}
+                        {group.rdwc && (
+                          <Chip
+                            label="RDWC"
+                            size="small"
+                            sx={{
+                              height: 16,
+                              fontSize: '0.55rem',
+                              fontWeight: 700,
+                              alignSelf: 'center',
+                              bgcolor: alpha(group.color, 0.12),
+                              color: group.color,
+                            }}
+                          />
+                        )}
                       </Box>
 
                       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 1 }}>
@@ -185,6 +209,39 @@ const Jardin = () => {
         )}
 
         {tab === 1 && (
+          <>
+            {harvestedPlants.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <ParkOutlinedIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1.5 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  No hay plantas cosechadas
+                </Typography>
+                <Typography variant="caption" color="text.disabled">
+                  Las plantas en Secado o Curado aparecen acá
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, px: 0.5 }}>
+                  Secado y curado. Cuando las finalices pasan al archivo.
+                </Typography>
+                <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column' }}>
+                  {harvestedPlants.map((plant) => (
+                    <AnimatedItem key={plant.id}>
+                      <PlantRow
+                        plant={plant}
+                        showStage
+                        onClick={() => navigate(`/Planta/?id=${plant.id}`)}
+                      />
+                    </AnimatedItem>
+                  ))}
+                </AnimatedGroup>
+              </>
+            )}
+          </>
+        )}
+
+        {tab === 2 && (
           <>
             {archivedPlants.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 6 }}>

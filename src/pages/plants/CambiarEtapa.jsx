@@ -13,7 +13,7 @@ import { es } from 'date-fns/locale';
 import { useStore } from '../../store';
 import { updatePlant } from '../../services/plants';
 import { checkSearch, getDate } from '../../utils';
-import { getNextStage, getAmbientPlants } from '../../components/plants/plantsHelpers';
+import { buildStageChange, getNextStage, getAmbientPlants } from '../../components/plants/plantsHelpers';
 import { STAGES } from '../../components/plants/PlantShared';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
@@ -38,9 +38,12 @@ const CambiarEtapa = () => {
 
   const plantId = checkSearch(location.search);
 
-  const activePlants = userData?.plants?.active
-    ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
-    : [];
+  const activePlants = useMemo(
+    () => (userData?.plants?.active
+      ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
+      : []),
+    [userData]
+  );
 
   const currentPlant = activePlants.find((p) => p.id === plantId);
   const currentStageKey = (currentPlant?.etapa === 'Enfrascado' ? 'Curado' : currentPlant?.etapa) || 'Germinacion';
@@ -91,13 +94,12 @@ const CambiarEtapa = () => {
     setSubmitting(true);
     try {
       const date = formatDate(changeDate) || getDate();
-      const { newStage, dateField } = next;
+      const { newStage } = next;
+      const stageUpdate = buildStageChange(currentStageKey, next, date);
       const promises = [];
       for (const id of selectedPlantIds) {
-        const updateData = { etapa: newStage, [dateField]: date };
-        if (currentStageKey === 'Secado' && newStage === 'Curado') updateData.finalSecado = date;
         const plant = activePlants.find((p) => p.id === id);
-        promises.push(updatePlant(id, updateData, { isArchived: plant?.isArchived || false }));
+        promises.push(updatePlant(id, stageUpdate, { isArchived: plant?.isArchived || false }));
       }
       await Promise.all(promises);
       setSavedSnapshot({ plantCount: selectedPlantIds.size, newStage, etapa: currentStageKey });

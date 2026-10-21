@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Card, Avatar, IconButton, alpha } from '@mui/material';
+import { Box, Typography, Card, Avatar, IconButton, Chip, alpha } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -9,6 +9,7 @@ import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
 import { AnimatedGroup, AnimatedItem, DashedAddCard } from '../../design-system';
 import { addAmbiente, updateAmbiente, removeAmbiente } from '../../services/plants';
+import { isHarvestedPlant } from '../../components/plants/plantsHelpers';
 import AmbienteForm from '../../components/plants/AmbienteForm';
 
 const Ambientes = () => {
@@ -30,8 +31,12 @@ const Ambientes = () => {
 
   const activePlants = userData?.plants?.active || {};
 
+  // Al cosechar, la planta se saca del ambiente (ambienteId = null). El filtro
+  // por etapa es solo una red de seguridad para datos viejos.
   const plantCount = (ambienteId) =>
-    Object.values(activePlants).filter((p) => p.ambienteId === ambienteId).length;
+    Object.values(activePlants).filter(
+      (p) => p.ambienteId === ambienteId && !isHarvestedPlant(p)
+    ).length;
 
   const handleSave = async ({ id, ...rest }) => {
     if (id) {
@@ -83,9 +88,25 @@ const Ambientes = () => {
                         <MeetingRoomOutlinedIcon fontSize="small" />
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
-                          Ambiente {a.number}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
+                            Ambiente {a.number}
+                          </Typography>
+                          {a.rdwc && (
+                            <Chip
+                              label={a.systemVolume ? `RDWC ${a.systemVolume}L` : 'RDWC'}
+                              size="small"
+                              sx={{
+                                height: 18,
+                                fontSize: '0.6rem',
+                                fontWeight: 700,
+                                flexShrink: 0,
+                                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                color: 'primary.main',
+                              }}
+                            />
+                          )}
+                        </Box>
                         <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                           {a.dimensions ? `${a.dimensions} · ` : ''}
                           {count}/{CAPACITY} planta{count === 1 ? '' : 's'}{count >= CAPACITY ? ' · completo' : ''}
@@ -127,6 +148,7 @@ const Ambientes = () => {
         onClose={() => setFormOpen(false)}
         onSave={handleSave}
         editData={editData}
+        plantCount={editData?.id ? plantCount(editData.id) : 0}
       />
     </Layout>
   );

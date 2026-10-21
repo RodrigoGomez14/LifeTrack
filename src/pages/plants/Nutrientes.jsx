@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Card, Avatar, Tabs, Tab,
@@ -6,16 +6,22 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { Reorder, useDragControls } from 'framer-motion';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ScienceIcon from '@mui/icons-material/Science';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import InboxOutlinedIcon from '@mui/icons-material/InboxOutlined';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import Layout from '../../components/layout/Layout';
 import { useStore } from '../../store';
-import { setPlanNutrient, removePlanNutrient, setPlanParam, removeNutriente } from '../../services/plants';
+import {
+  setPlanNutrient, removePlanNutrient, setPlanParam, removeNutriente, reorderNutrientes,
+} from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, DashedAddCard, GhostStatCard } from '../../design-system';
 import CronogramaTable from '../../components/plants/CronogramaTable';
+import { sortNutrientsByOrder } from '../../components/plants/plantsHelpers';
+import { useReorder } from '../../components/plants/useReorder';
 
 const CATEGORY_COLORS = {
   fertilizantes: '#4CAF50',
@@ -29,12 +35,53 @@ const APLICACION_COLORS = {
 
 const getEntries = (aditives, key) => {
   if (!aditives?.[key]) return [];
-  return Object.entries(aditives[key]).map(([id, a]) => {
+  const entries = Object.entries(aditives[key]).map(([id, a]) => {
     const dosis = a.dosis
       ? (Array.isArray(a.dosis) ? a.dosis : Object.values(a.dosis))
       : [];
     return { id, ...a, dosis, _category: key };
   });
+  // Los nutrientes respetan el orden manual (drag & drop); los insecticidas no.
+  return key === 'fertilizantes' ? sortNutrientsByOrder(entries) : entries;
+};
+
+// Card mobile de nutriente. Igual que la tabla, sólo se arrastra desde el handle.
+const NutrientMobileCard = ({ nutrient, accent }) => {
+  const theme = useTheme();
+  const controls = useDragControls();
+
+  return (
+    <Reorder.Item
+      as="div"
+      value={nutrient.id}
+      dragListener={false}
+      dragControls={controls}
+      whileDrag={{ boxShadow: theme.shadows[6], zIndex: 4 }}
+      style={{ listStyle: 'none' }}
+    >
+      <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar sx={{ width: 40, height: 40, bgcolor: alpha(accent, 0.12), color: accent }}>
+            <ScienceIcon fontSize="small" />
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{nutrient.name}</Typography>
+            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+              {nutrient.brand || 'Nutriente'}
+            </Typography>
+          </Box>
+          <IconButton
+            size="small"
+            aria-label={`Reordenar ${nutrient.name}`}
+            onPointerDown={(e) => controls.start(e)}
+            sx={{ color: 'text.disabled', cursor: 'grab', touchAction: 'none', '&:active': { cursor: 'grabbing' } }}
+          >
+            <DragIndicatorIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      </Card>
+    </Reorder.Item>
+  );
 };
 
 const TABS = [
@@ -98,9 +145,13 @@ const Nutrientes = () => {
   const isNutrienteTab = tabKey === 'fertilizantes';
   const accent = CATEGORY_COLORS[tabKey];
 
-  const nutrientes = getEntries(aditives, 'fertilizantes');
-  const insecticidas = getEntries(aditives, 'insecticidas');
+  const nutrientes = useMemo(() => getEntries(aditives, 'fertilizantes'), [aditives]);
+  const insecticidas = useMemo(() => getEntries(aditives, 'insecticidas'), [aditives]);
   const entries = isNutrienteTab ? nutrientes : insecticidas;
+
+  // El orden de la biblioteca define el orden de los steps del wizard.
+  const handleReorderNutrients = (ids) => reorderNutrientes(ids);
+  const { ordered: orderedNutrientes, reorder: moveNutrient } = useReorder(nutrientes, handleReorderNutrients);
 
   const toggleExpand = (id) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -165,31 +216,24 @@ const Nutrientes = () => {
               onSetParam={handleSetParam}
               onAddNutrient={() => navigate('/CrearNutriente')}
               onDeleteNutrient={handleDeleteNutrient}
+              onReorderNutrients={handleReorderNutrients}
             />
           ) : (
             <>
               {nutrientes.length === 0 ? (
                 <EmptyState label="nutrientes" />
               ) : (
-                <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {nutrientes.map((n) => (
-                    <AnimatedItem key={n.id}>
-                      <Card elevation={0} sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
-                        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Avatar sx={{ width: 40, height: 40, bgcolor: alpha(accent, 0.12), color: accent }}>
-                            <ScienceIcon fontSize="small" />
-                          </Avatar>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{n.name}</Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                              {n.brand || 'Nutriente'}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Card>
-                    </AnimatedItem>
+                <Reorder.Group
+                  as="div"
+                  axis="y"
+                  values={orderedNutrientes.map((n) => n.id)}
+                  onReorder={moveNutrient}
+                  style={{ margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}
+                >
+                  {orderedNutrientes.map((n) => (
+                    <NutrientMobileCard key={n.id} nutrient={n} accent={accent} />
                   ))}
-                </AnimatedGroup>
+                </Reorder.Group>
               )}
               <AnimatedItem>
                 <DashedAddCard

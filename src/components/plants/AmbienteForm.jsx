@@ -5,6 +5,8 @@ import {
   IconButton,
   TextField,
   Button,
+  Switch,
+  FormControlLabel,
   Snackbar,
   Alert,
   alpha,
@@ -18,23 +20,30 @@ import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from "../../design-syste
 
 const STEPS = 2;
 
-// Wizard de ambiente: paso 1 = nro de ambiente, paso 2 = dimensiones.
-const AmbienteForm = ({ open, onClose, onSave, editData }) => {
+// Wizard de ambiente: paso 1 = nro de ambiente, paso 2 = dimensiones + RDWC.
+const AmbienteForm = ({ open, onClose, onSave, editData, plantCount = 0 }) => {
   const theme = useTheme();
   const COLOR = theme.palette.primary.main;
 
   const [step, setStep] = useState(0);
   const [number, setNumber] = useState("");
   const [dimensions, setDimensions] = useState("");
+  const [rdwc, setRdwc] = useState(false);
+  const [systemVolume, setSystemVolume] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(null);
   const [snack, setSnack] = useState("");
+
+  // RDWC solo se puede activar o desactivar con el ambiente vacío.
+  const isRdwcLocked = plantCount > 0;
 
   useEffect(() => {
     if (open) {
       setStep(0);
       setNumber(editData?.number || "");
       setDimensions(editData?.dimensions || "");
+      setRdwc(!!editData?.rdwc);
+      setSystemVolume(editData?.systemVolume ? String(editData.systemVolume) : "");
       setSaving(false);
       setSaved(null);
     }
@@ -46,6 +55,8 @@ const AmbienteForm = ({ open, onClose, onSave, editData }) => {
     setStep(0);
     setNumber("");
     setDimensions("");
+    setRdwc(false);
+    setSystemVolume("");
     setSaved(null);
     setSaving(false);
   };
@@ -54,9 +65,13 @@ const AmbienteForm = ({ open, onClose, onSave, editData }) => {
     if (!number.trim()) return;
     setSaving(true);
     try {
+      const hasRdwc = isRdwcLocked ? !!editData?.rdwc : rdwc;
+      const volume = Number(String(systemVolume).replace(",", "."));
       const payload = {
         number: number.trim(),
         dimensions: dimensions.trim(),
+        rdwc: hasRdwc,
+        systemVolume: hasRdwc && volume > 0 ? volume : null,
         ...(editData?.id ? { id: editData.id } : {}),
       };
       await onSave(payload);
@@ -73,9 +88,14 @@ const AmbienteForm = ({ open, onClose, onSave, editData }) => {
       <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
         Ambiente {saved.number}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: saved.rdwc ? 0.5 : 3 }}>
         {saved.dimensions || "Sin dimensiones"}
       </Typography>
+      {saved.rdwc && (
+        <Typography variant="caption" sx={{ fontWeight: 700, color: COLOR, mb: 3, display: "block" }}>
+          RDWC{saved.systemVolume ? ` · ${saved.systemVolume} L` : ""}
+        </Typography>
+      )}
       {!editData && (
         <Button
           fullWidth
@@ -177,6 +197,50 @@ const AmbienteForm = ({ open, onClose, onSave, editData }) => {
                     placeholder="Ej: 1,2 x 1,2 x 2 m"
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
                   />
+                </AnimatedItem>
+
+                <AnimatedItem>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: `1px solid ${rdwc ? alpha(COLOR, 0.4) : theme.palette.divider}`,
+                      bgcolor: rdwc ? alpha(COLOR, 0.04) : "transparent",
+                    }}
+                  >
+                    <FormControlLabel
+                      sx={{ m: 0, width: "100%" }}
+                      control={
+                        <Switch
+                          checked={rdwc}
+                          onChange={(e) => setRdwc(e.target.checked)}
+                          disabled={isRdwcLocked}
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Sistema RDWC (4+1)
+                        </Typography>
+                      }
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                      Las plantas de este ambiente comparten la solución y se registran juntas.
+                      {isRdwcLocked && " Para activar o desactivar RDWC, el ambiente tiene que estar vacío."}
+                    </Typography>
+
+                    {rdwc && (
+                      <TextField
+                        label="Volumen total del sistema (L)"
+                        value={systemVolume}
+                        onChange={(e) => setSystemVolume(e.target.value)}
+                        fullWidth
+                        type="number"
+                        inputProps={{ inputMode: "decimal", step: 0.1 }}
+                        helperText="Si lo dejás vacío, se usa la suma de las macetas."
+                        sx={{ mt: 2, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                      />
+                    )}
+                  </Box>
                 </AnimatedItem>
               </AnimatedGroup>
             )}

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, IconButton, Button, Tooltip, alpha } from '@mui/material';
 import { useTheme, lighten } from '@mui/material/styles';
+import { Reorder, useDragControls } from 'framer-motion';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import { useReorder } from './useReorder';
 
 const COL_W = 46;
-const NAME_W = 150;
+const NAME_W = 180;
 
 // Etapas con semanas de nutrientes. El cronograma es la fuente de verdad de las dosis.
 const STAGES_DEF = [
@@ -14,7 +17,7 @@ const STAGES_DEF = [
 ];
 
 // Celda editable (se guarda al perder el foco / Enter).
-const PlanCell = ({ value, onCommit, color }) => {
+const PlanCell = ({ value, onCommit, color, tint }) => {
   const [local, setLocal] = useState(value ?? '');
 
   useEffect(() => { setLocal(value ?? ''); }, [value]);
@@ -38,6 +41,7 @@ const PlanCell = ({ value, onCommit, color }) => {
         borderRight: '1px solid',
         borderColor: 'divider',
         py: 0.5,
+        bgcolor: tint ? alpha(tint, 0.045) : 'transparent',
       }}
     >
       <Box
@@ -65,11 +69,84 @@ const PlanCell = ({ value, onCommit, color }) => {
   );
 };
 
-const CronogramaTable = ({ nutrients, plan, onSetNutrient, onSetParam, onAddNutrient, onDeleteNutrient }) => {
+// Fila arrastrable. El drag arranca sólo desde el handle (dragListener={false})
+// para no pelear con los inputs de dosis ni con el scroll horizontal.
+const NutrientRow = ({ nutrient, plan, onSetNutrient, onDeleteNutrient, stickyName }) => {
+  const theme = useTheme();
+  const controls = useDragControls();
+  const [dragging, setDragging] = useState(false);
+
+  return (
+    <Reorder.Item
+      as="div"
+      value={nutrient.id}
+      dragListener={false}
+      dragControls={controls}
+      onDragStart={() => setDragging(true)}
+      onDragEnd={() => setDragging(false)}
+      whileDrag={{ boxShadow: theme.shadows[6], zIndex: 4 }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          // Opaco mientras se arrastra, para que no se vean las filas de atrás.
+          bgcolor: dragging ? 'background.paper' : 'transparent',
+          transition: '0.12s',
+          '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.15) },
+        }}
+      >
+        <Box sx={{ ...stickyName, display: 'flex', alignItems: 'center', gap: 0.25, pl: 0.25, pr: 1, py: 0.5 }}>
+          <Tooltip title="Arrastrar para reordenar">
+            <IconButton
+              size="small"
+              aria-label={`Reordenar ${nutrient.name}`}
+              onPointerDown={(e) => controls.start(e)}
+              sx={{
+                cursor: 'grab',
+                color: 'text.disabled',
+                touchAction: 'none',
+                '&:hover': { color: 'text.secondary' },
+                '&:active': { cursor: 'grabbing' },
+              }}
+            >
+              <DragIndicatorIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }} noWrap>{nutrient.name}</Typography>
+            {nutrient.brand && (
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }} noWrap>{nutrient.brand}</Typography>
+            )}
+          </Box>
+          <Tooltip title="Quitar de la biblioteca">
+            <IconButton size="small" onClick={() => onDeleteNutrient(nutrient.id)} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        {STAGES_DEF.map((st) =>
+          Array.from({ length: st.weeks }, (_, i) => i + 1).map((w) => (
+            <PlanCell
+              key={`${nutrient.id}-${st.key}-${w}`}
+              value={plan?.[st.key]?.[w]?.nutrients?.[nutrient.id]?.mlPerL}
+              tint={st.color}
+              onCommit={(v) => onSetNutrient(st.key, w, nutrient.id, v)}
+            />
+          ))
+        )}
+      </Box>
+    </Reorder.Item>
+  );
+};
+
+const CronogramaTable = ({ nutrients, plan, onSetNutrient, onSetParam, onAddNutrient, onDeleteNutrient, onReorderNutrients }) => {
   const theme = useTheme();
   const totalWeeks = STAGES_DEF.reduce((s, st) => s + st.weeks, 0);
   // Fila "SEMANAS": más clara que el paper, para que divida con luz.
   const dividerBg = lighten(theme.palette.background.paper, 0.16);
+  const { ordered, reorder } = useReorder(nutrients, onReorderNutrients);
 
   if (nutrients.length === 0) {
     return (
@@ -100,28 +177,11 @@ const CronogramaTable = ({ nutrients, plan, onSetNutrient, onSetParam, onAddNutr
     <Box sx={{ width: 'fit-content', maxWidth: '100%', mx: 'auto' }}>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, ml: 0.5 }}>
         Dosis en <strong>ml/L</strong> por semana. Se guarda al salir de la celda (o con Enter).
+        Arrastrá <DragIndicatorIcon sx={{ fontSize: 14, verticalAlign: 'text-bottom' }} /> para ordenar los pasos del wizard.
       </Typography>
 
       <Box sx={{ overflowX: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 2, maxWidth: '100%' }}>
         <Box sx={{ minWidth: NAME_W + totalWeeks * COL_W }}>
-
-          {/* Bandas de etapa */}
-          <Box sx={{ display: 'flex' }}>
-            <Box sx={{ ...stickyName, display: 'flex', alignItems: 'center', px: 1.5, py: 0.75 }} />
-            {STAGES_DEF.map((st) => (
-              <Box
-                key={st.key}
-                sx={{
-                  width: st.weeks * COL_W, flexShrink: 0, textAlign: 'center', py: 0.75,
-                  bgcolor: alpha(st.color, 0.26), color: st.color,
-                  fontWeight: 700, fontSize: '0.7rem', letterSpacing: 1,
-                  borderRight: '1px solid', borderColor: 'divider',
-                }}
-              >
-                {st.label}
-              </Box>
-            ))}
-          </Box>
 
           {/* Medición (pH / EC / PPM) */}
           {[
@@ -156,43 +216,32 @@ const CronogramaTable = ({ nutrients, plan, onSetNutrient, onSetParam, onAddNutr
             </Box>
             {STAGES_DEF.map((st) =>
               Array.from({ length: st.weeks }, (_, i) => i + 1).map((w) => (
-                <Box key={`${st.key}-${w}`} sx={{ width: COL_W, flexShrink: 0, textAlign: 'center', py: 0.5, borderRight: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.72rem', color: 'text.primary' }}>{w}</Typography>
+                <Box key={`${st.key}-${w}`} sx={{ width: COL_W, flexShrink: 0, textAlign: 'center', py: 0.5, borderRight: '1px solid', borderColor: 'divider', bgcolor: alpha(st.color, 0.3) }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.72rem', color: '#fff' }}>{w}</Typography>
                 </Box>
               ))
             )}
           </Box>
 
-          {/* Filas de nutrientes */}
-          {nutrients.map((n) => (
-            <Box
-              key={n.id}
-              sx={{ display: 'flex', borderTop: '1px solid', borderColor: 'divider', transition: '0.12s', '&:hover': { bgcolor: alpha(theme.palette.action.hover, 0.15) } }}
-            >
-              <Box sx={{ ...stickyName, display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.5 }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }} noWrap>{n.name}</Typography>
-                  {n.brand && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }} noWrap>{n.brand}</Typography>
-                  )}
-                </Box>
-                <Tooltip title="Quitar de la biblioteca">
-                  <IconButton size="small" onClick={() => onDeleteNutrient(n.id)} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
-                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              {STAGES_DEF.map((st) =>
-                Array.from({ length: st.weeks }, (_, i) => i + 1).map((w) => (
-                  <PlanCell
-                    key={`${n.id}-${st.key}-${w}`}
-                    value={plan?.[st.key]?.[w]?.nutrients?.[n.id]?.mlPerL}
-                    onCommit={(v) => onSetNutrient(st.key, w, n.id, v)}
-                  />
-                ))
-              )}
-            </Box>
-          ))}
+          {/* Filas de nutrientes (arrastrables para definir el orden del wizard) */}
+          <Reorder.Group
+            as="div"
+            axis="y"
+            values={ordered.map((n) => n.id)}
+            onReorder={reorder}
+            style={{ margin: 0, padding: 0 }}
+          >
+            {ordered.map((n) => (
+              <NutrientRow
+                key={n.id}
+                nutrient={n}
+                plan={plan}
+                stickyName={stickyName}
+                onSetNutrient={onSetNutrient}
+                onDeleteNutrient={onDeleteNutrient}
+              />
+            ))}
+          </Reorder.Group>
         </Box>
       </Box>
 

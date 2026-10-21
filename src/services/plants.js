@@ -1,5 +1,5 @@
 import * as db from './database';
-import { getDate } from '../utils';
+import { getDate, HARVESTED_STAGES } from '../utils';
 
 // === CRUD de plantas ===
 
@@ -44,6 +44,20 @@ export const archivePlant = async (plantId, plantData) => {
   return plantId;
 };
 
+// Normalización para datos viejos: las plantas ya cosechadas que todavía tienen
+// ambiente se sacan del ambiente. Corre al cargar la app y no hace nada si ya
+// está todo limpio.
+export const normalizeHarvestedAmbientes = (activePlants) => {
+  const updates = {};
+  Object.entries(activePlants || {}).forEach(([id, plant]) => {
+    if (plant && HARVESTED_STAGES.includes(plant.etapa) && plant.ambienteId) {
+      updates[`plants/active/${id}/ambienteId`] = null;
+    }
+  });
+  if (Object.keys(updates).length === 0) return Promise.resolve();
+  return db.bulkUpdate(updates);
+};
+
 // === Ambientes ===
 // Solo guardan el número de ambiente y sus dimensiones (texto libre).
 export const addAmbiente = (data) => db.push('plants/ambientes', data);
@@ -67,6 +81,17 @@ export const updateAditiveDosis = (category, aditiveId, dosisKey, data) =>
 
 export const removeAditiveDosis = (category, aditiveId, dosisKey) =>
   db.remove(`plants/aditives/${category}/${aditiveId}/dosis/${dosisKey}`);
+
+// Orden manual de la biblioteca. `ids` es el orden final (primero → último) y
+// define en qué orden aparecen los steps del wizard de Nueva Solución.
+export const reorderNutrientes = (ids = []) => {
+  if (!ids.length) return Promise.resolve();
+  const updates = ids.reduce((acc, id, i) => {
+    acc[`plants/aditives/fertilizantes/${id}/order`] = i;
+    return acc;
+  }, {});
+  return db.bulkUpdate(updates);
+};
 
 // === Plan de nutrientes por etapa/semana (fuente de verdad de las dosis) ===
 export const setPlanNutrient = (etapa, semana, nutrientId, mlPerL) =>

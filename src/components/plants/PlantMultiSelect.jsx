@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Card, Avatar, Checkbox, alpha } from '@mui/material';
+import { Box, Typography, Card, Avatar, Checkbox, Chip, alpha } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import SpaIcon from '@mui/icons-material/Spa';
 import GrassIcon from '@mui/icons-material/Grass';
@@ -19,7 +19,9 @@ const STAGE_COLORS = {
   Secado: '#fb8c00', Curado: '#546e7a',
 };
 
-const PlantMultiSelect = ({ plants, selectedIds, onToggle, color, disabledIds }) => {
+// `rdwcGroups` = { [ambienteId]: [plantId] }. Si una planta pertenece a un grupo
+// RDWC, tocarla selecciona/deselecciona todo el grupo (los deshabilitados se ignoran).
+const PlantMultiSelect = ({ plants, selectedIds, onToggle, color, disabledIds, rdwcGroups, onToggleGroup }) => {
   const theme = useTheme();
   const accent = color || theme.palette.primary.main;
   const disabledSet = disabledIds || new Set();
@@ -39,11 +41,27 @@ const PlantMultiSelect = ({ plants, selectedIds, onToggle, color, disabledIds })
         const stageColor = STAGE_COLORS[p.etapa] || theme.palette.primary.main;
         const isSelected = selectedIds.has(p.id);
         const isDisabled = disabledSet.has(p.id);
+        const rdwcGroup = p.ambienteId ? rdwcGroups?.[p.ambienteId] : null;
+        const selectableGroup = rdwcGroup
+          ? rdwcGroup.filter((id) => !disabledSet.has(id))
+          : null;
+        const isBlock = !!selectableGroup && selectableGroup.length > 0;
+
+        const handleToggle = () => {
+          if (isDisabled) return;
+          if (isBlock && onToggleGroup) {
+            const allSelected = selectableGroup.every((id) => selectedIds.has(id));
+            onToggleGroup(selectableGroup, !allSelected);
+            return;
+          }
+          onToggle(p.id);
+        };
+
         return (
           <Card
             key={p.id}
             variant="outlined"
-            onClick={() => !isDisabled && onToggle(p.id)}
+            onClick={handleToggle}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -69,7 +87,23 @@ const PlantMultiSelect = ({ plants, selectedIds, onToggle, color, disabledIds })
               )}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{p.name}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{p.name}</Typography>
+                {rdwcGroup && (
+                  <Chip
+                    label="RDWC"
+                    size="small"
+                    sx={{
+                      height: 16,
+                      fontSize: '0.55rem',
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      bgcolor: alpha(accent, 0.12),
+                      color: accent,
+                    }}
+                  />
+                )}
+              </Box>
               <Typography variant="caption" color={isDisabled ? 'text.disabled' : 'text.secondary'}>
                 {p.etapa || '?'}{p.potVolume ? ` · ${p.potVolume}L` : ''}{p.quantity > 1 ? ` · x${p.quantity}` : ''}
               </Typography>

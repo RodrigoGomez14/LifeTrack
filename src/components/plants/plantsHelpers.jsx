@@ -5,6 +5,7 @@ import LocalFloristIcon from '@mui/icons-material/LocalFlorist';
 import ParkIcon from '@mui/icons-material/Park';
 import ForestIcon from '@mui/icons-material/Forest';
 import WavesIcon from '@mui/icons-material/Waves';
+import { HARVESTED_STAGES } from '../../utils';
 
 export const STAGES_ORDER = ['Germinacion', 'Vegetativo', 'Floracion', 'Lavado de Raices', 'Secado', 'Curado'];
 
@@ -234,6 +235,17 @@ export function getNextStage(currentStage) {
   }
 }
 
+// Arma el update de un cambio de etapa. Al entrar en una etapa de cosecha
+// (Secado/Curado/Enfrascado) se saca la planta del ambiente: ya no ocupa lugar.
+export function buildStageChange(currentStage, next, date) {
+  if (!next) return null;
+  const { newStage, dateField } = next;
+  const data = { etapa: newStage, [dateField]: date };
+  if (currentStage === 'Secado' && newStage === 'Curado') data.finalSecado = date;
+  if (isHarvestedPlant({ etapa: newStage })) data.ambienteId = null;
+  return data;
+}
+
 // Timeline unificado de todos los eventos de la planta.
 // Devuelve array ordenado cronológicamente:
 // [{ date, type, label, color, data, _id }]
@@ -306,16 +318,96 @@ export function getBaseName(name) {
   return name?.replace(/\s+\d+$/, '').trim().toLowerCase() || '';
 }
 
+// === Cosechadas ===
+// Las plantas en Secado/Curado ya no ocupan un lugar de cultivo: salen de
+// "Activas" y del conteo del ambiente, pero siguen en `plants/active` para
+// poder registrar pesos, fotos y finalmente archivarlas.
+export function isHarvestedPlant(plant) {
+  return !!plant && HARVESTED_STAGES.includes(plant.etapa);
+}
+
+export function isGrowingPlant(plant) {
+  return !!plant && !isHarvestedPlant(plant);
+}
+
 // Devuelve las plantas activas que comparten ambiente con la planta de origen
 // (la que se pasó por ?id= al entrar al wizard). Si no hay planta de origen
 // (p. ej. se entró sin id) o no existe, devuelve todas las plantas.
 // Las plantas sin ambiente se agrupan entre sí (ambiente "Sin ambiente").
-export function getAmbientPlants(activePlants, originPlantId) {
-  if (!originPlantId) return activePlants;
-  const origin = activePlants.find((p) => p.id === originPlantId);
-  if (!origin) return activePlants;
+// Con `excludeHarvested` se sacan las cosechadas; si la planta de origen ya
+// está cosechada, se devuelve solo esa planta (no se mezcla con el cultivo).
+export function getAmbientPlants(activePlants, originPlantId, { excludeHarvested = false } = {}) {
+  const plants = activePlants || [];
+  const origin = originPlantId ? plants.find((p) => p.id === originPlantId) : null;
+
+  if (excludeHarvested && origin && isHarvestedPlant(origin)) return [origin];
+
+  if (!originPlantId || !origin) {
+    return excludeHarvested ? plants.filter(isGrowingPlant) : plants;
+  }
+
   const originAmbiente = origin.ambienteId || null;
-  return activePlants.filter((p) => (p.ambienteId || null) === originAmbiente);
+  const scoped = plants.filter((p) => (p.ambienteId || null) === originAmbiente);
+  return excludeHarvested ? scoped.filter(isGrowingPlant) : scoped;
+}
+
+// === RDWC ===
+
+// Un ambiente es RDWC si tiene la bandera activa. `ambientes` es el mapa
+// `plants/ambientes` ({ [id]: { number, dimensions, rdwc, systemVolume } }).
+export function isRdwcAmbiente(ambientes, ambienteId) {
+  if (!ambienteId || !ambientes) return false;
+  return !!ambientes[ambienteId]?.rdwc;
+}
+
+// Agrupa las plantas en cultivo por ambiente RDWC. Devuelve { [ambienteId]: [plantId] }.
+// Las cosechadas no entran: ya no forman parte del sistema de riego.
+export function getRdwcGroups(plants, ambientes) {
+  const groups = {};
+  (plants || []).forEach((p) => {
+    if (isGrowingPlant(p) && isRdwcAmbiente(ambientes, p.ambienteId)) {
+      if (!groups[p.ambienteId]) groups[p.ambienteId] = [];
+      groups[p.ambienteId].push(p.id);
+    }
+  });
+  return groups;
+}
+
+// Volumen total del sistema RDWC, en litros. Si el ambiente no tiene cargado
+// `systemVolume`, se usa la suma de los potVolume de sus plantas.
+export function getAmbienteSystemVolume(ambiente, plants) {
+  const manual = Number(ambiente?.systemVolume);
+  if (manual > 0) return manual;
+  return (plants || []).reduce((acc, p) => acc + (Number(p.potVolume) || 0), 0);
+}
+
+// Selección inicial del wizard: si la planta de origen está en un ambiente
+// RDWC, se seleccionan todas las plantas de ese ambiente; si no, solo la de
+// origen. Las cosechadas nunca entran al bloque RDWC; si el origen ya está
+// cosechada, queda seleccionada sola.
+export function getInitialPlantSelection(activePlants, ambientes, originPlantId) {
+  if (!originPlantId) return new Set();
+  const origin = (activePlants || []).find((p) => p.id === originPlantId);
+  if (isHarvestedPlant(origin)) return new Set([originPlantId]);
+  if (origin?.ambienteId && isRdwcAmbiente(ambientes, origin.ambienteId)) {
+    return new Set(
+      (activePlants || [])
+        .filter((p) => p.ambienteId === origin.ambienteId && isGrowingPlant(p))
+        .map((p) => p.id)
+    );
+  }
+  return new Set([originPlantId]);
+}
+
+// Orden manual de la biblioteca de nutrientes (drag & drop en /nutrientes).
+// Los que todavía no tienen `order` van al final, respetando el orden original de
+// la lista (que en RTDB es el de las push-keys, o sea el de creación).
+export function sortNutrientsByOrder(nutrients = []) {
+  return [...nutrients].sort((a, b) => {
+    const ao = Number.isFinite(a?.order) ? a.order : Number.MAX_SAFE_INTEGER;
+    const bo = Number.isFinite(b?.order) ? b.order : Number.MAX_SAFE_INTEGER;
+    return ao - bo;
+  });
 }
 
 // Devuelve los rangos de etapa como [{ stage, color, start, end }] con timestamps UTC.

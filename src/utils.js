@@ -10,6 +10,9 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import HelpIcon from '@mui/icons-material/Help';
 import DriveEtaIcon from '@mui/icons-material/DriveEta';
 
+// Etapas de cosecha: la planta deja de ocupar un lugar en el ambiente.
+export const HARVESTED_STAGES = ['Secado', 'Curado', 'Enfrascado'];
+
 // Función para formatear un monto de dinero
 export const formatAmount = (amount, isUSD = false) => {
   if (amount === null || amount === undefined) return '0';

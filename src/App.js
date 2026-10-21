@@ -31,6 +31,7 @@ import Exchange from './pages/finances/Exchange.jsx';
 import Exchanges from './pages/finances/Exchanges.jsx';
 import { subscribeToAuthChanges } from './services/auth';
 import { subscribeToUserData } from './services/database';
+import { normalizeHarvestedAmbientes } from './services/plants';
 import { useStore } from './store'; 
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
@@ -58,7 +59,7 @@ import NuevaSolucion from './pages/plants/NuevaSolucion.jsx';
 import LogPlantaWizard from './pages/plants/LogPlantaWizard.jsx';
 
 function App() {
-  const { userLoggedIn, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
+  const { userLoggedIn, userData, setUserLoggedIn, isLoading, setIsLoading, setUserData, setDollarRate } = useStore();
 
   const filterData = (data) => {
     // El nodo del usuario puede no existir (cuenta nueva) → snapshot.val() es null
@@ -296,6 +297,14 @@ function App() {
       unsubscribe();
     };
   }, [setUserData, setUserLoggedIn, setIsLoading, setDollarRate]);
+
+  // Normalización de datos viejos: las plantas que ya están en cosecha pero
+  // quedaron asociadas a un ambiente se sacan solas (ambienteId = null).
+  // Es idempotente: si ya está todo limpio, no escribe nada.
+  useEffect(() => {
+    if (!userData?.plants?.active) return;
+    normalizeHarvestedAmbientes(userData.plants.active).catch(() => {});
+  }, [userData]);
 
   // Gate principal: mientras isLoading sea true no renderizamos Routes en absoluto.
   // PrivateRoute por extensión nunca evalúa con auth indeterminada.

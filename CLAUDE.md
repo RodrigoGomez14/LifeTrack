@@ -175,6 +175,20 @@ Floracion → Secado → Curado (archivable).
 **Utilidad `checkSearch`:** extrae `?id=` o `?plant=` del query string.
 Usada por todos los wizards de Plants para recibir el ID de la planta.
 
+**Cosechadas:** al pasar a `Secado`, `Curado` o `Enfrascado` la planta se saca
+del ambiente (`ambienteId: null`), sigue en `plants/active` para poder cargar
+pesos/fotos y deja de contar en `/plantas` (Activas) y en el aforo del ambiente.
+`/plantas` tiene tres tabs: Activas, Cosechadas y Archivo. "Finalizar" la mueve
+a `plants/history`. Al cargar la app, `normalizeHarvestedAmbientes()` limpia
+automáticamente los `ambienteId` viejos de plantas que ya están en cosecha.
+
+**RDWC:** `plants/ambientes/{id}` puede tener `rdwc: true` y `systemVolume` (L).
+El switch RDWC solo se puede activar o desactivar con el ambiente vacío. En
+`/LogPlanta`, `/NuevaSolucion` y `/RegistrarMedicion` las plantas de un mismo
+ambiente RDWC se seleccionan en bloque (todo o nada). Las cosechadas nunca entran
+al bloque. El volumen de solución sale de `systemVolume`; si falta, de la suma
+de los `potVolume` de las plantas en cultivo.
+
 ---
 
 ## Deuda Técnica Conocida
@@ -266,8 +280,11 @@ Usada por todos los wizards de Plants para recibir el ID de la planta.
 
 - Existe `setupTests.js` de Create React App (Jest + React Testing Library)
 - `App.test.js` fue borrado (era el test default de CRA, fallaba siempre)
-- Por ahora no hay tests escritos
-- Cuando se escriban, empezar por lógica en `utils.js` y explicar qué se está testeando
+- Primer suite: `src/components/plants/plantsHelpers.test.js` (helpers puros de
+  plantas: RDWC, cosechadas y transiciones de etapa).
+- Correr una vez: `CI=true npm test -- --watchAll=false`. En watch: `npm test`.
+- Criterio: empezar por lógica pura (`plantsHelpers`, `utils`, helpers de
+  finanzas/fechas). No escribir tests de componentes salvo pedido explícito.
 
 ---
 
@@ -2404,6 +2421,67 @@ El **catálogo** `plants/aditives/fertilizantes/{id}` queda solo con `name` + `b
 - `/NuevaSolucion`: mostrar los **valores esperados** de la `etapa/semana`.
 
 **Nota:** al quitar un nutriente de la biblioteca quedan referencias huérfanas en `plan` (se filtran al render; limpieza pendiente).
+
+---
+
+### 2026-10-21 — Nutrientes: reordenar filas con drag & drop (orden del wizard)
+
+**Objetivo:** que el orden de las filas del cronograma defina el orden de los steps del wizard de `/NuevaSolucion`.
+
+**Modelo:** se agrega `order` (número, 0-based) dentro de `plants/aditives/fertilizantes/{id}`. No hay migración: los nutrientes sin `order` van al final respetando el orden de creación (push-keys).
+
+- `services/plants.js`: nuevo `reorderNutrientes(ids)` → `bulkUpdate` de `order` en una sola escritura atómica (se persiste al soltar, no en cada movimiento).
+- `plantsHelpers.jsx`: nuevo `sortNutrientsByOrder(nutrients)` (puro, con tests en `plantsHelpers.test.js`).
+- `CronogramaTable.jsx`: las filas se envuelven en `Reorder.Group` / `Reorder.Item` de **framer-motion** (ya era dependencia). El drag arranca **solo desde el handle** (`DragIndicatorIcon`, `dragControls` + `dragListener={false}`) para no pelear con los inputs de dosis ni con el scroll horizontal. La columna de nombres pasó de 150 a 180 px.
+- `Nutrientes.jsx`: mismo patrón en las cards de mobile; `getEntries` ordena fertilizantes con el helper y se memoiza por `aditives`.
+- `NuevaSolucion.jsx`: `suggestedNutrients` ahora recorre la **biblioteca ordenada** y no `Object.entries(plan...)`, así el orden de los steps sigue el drag.
+- Hook local `components/plants/useReorder.js`: mantiene el orden inmediato durante el gesto y se sincroniza cuando llega el eco de RTDB.
+
+**Nota:** el orden es único y global (no por etapa). Insecticidas, `RegistrarMedicion` y `NuevoSuplemento` siguen usando el orden de creación.
+
+### 2026-10-21 — NuevaSolucion: rediseño del paso "Revisar" como receta
+
+**Problema:** la grilla de tarjetas (solución + 2 columnas de nutrientes) no comunicaba qué había que preparar ni en qué orden.
+
+**Nuevo layout** (una sola card, `maxWidth: 560`, centrada):
+- Título "Revisar" (sin subtítulo).
+- **SE APLICA A** primero: chips de plantas con fondo `alpha(wizardColor, 0.14)` (antes eran sólidos), arriba de la receta.
+- Encabezado teñido con el color de la etapa: **PREPARAR → X L de agua** (en RDWC: "Volumen total del sistema · N plantas").
+- **AGREGAR EN ORDEN**: lista numerada 1..N de nutrientes con dosis > 0. Cada fila: número, nombre, `X ml/L` como subtexto (sin la marca) y el total a verter en grande (`h6`, peso 800). Cuando hay más de una planta y **no** es RDWC, debajo del total va sólo el resultado de `ml × plantas` en ml (`caption`, gris). En RDWC se omite porque el volumen ya es el total del sistema.
+- **Checklist de preparación**: cada fila es clickeable (`role="checkbox"`, también con Enter/Espacio). Al marcarla, el número se convierte en ✓, el nombre se tacha y se atenúa, y la fila pasa a un **fondo claramente más oscuro** (`alpha(common.black, 0.42)`), opuesto al hover que la aclara; el hover sobre una fila marcada oscurece aún más (0.52). Sin label de sección ni contador: la lista arranca directo debajo del encabezado de agua. Estado sólo de sesión (`addedNutrients`), se resetea en "Cargar otra"; no se persiste.
+- Nota opcional en su propia fila, después de la receta.
+- Nuevo helper `formatQty()` (coma decimal, sin ceros de más).
+
+**Pendiente (Fase 2):** sumar los objetivos de pH / EC / PPM de la semana a la receta.
+
+### 2026-10-21 — Log diario: reset de selección en "Cargar otro" + título de navbar
+
+- `LogPlantaWizard.handleLoadAnother`: además de limpiar valores/nota/snapshot, hace `setSelectedPlantIds(new Set())`. Antes la planta quedaba seleccionada y, si ya tenía log completo del día, el paso 1 se sesgaba a `activeGroup === 'a'` (modo "regular pH", sólo pH) y ocultaba el grupo "sin log".
+- El título del header pasa a ser siempre **"Log diario"** (antes `Log {planta}`, `Log Ambiente N` o `Regular pH`).
+- `customDate` no se resetea: "Cargar otro" conserva la fecha elegida para cargar logs atrasados.
+- Orden de los listados del paso 1: **SIN LOG** → **CON LOG — regular pH** → **COMPLETAS · YA REGULADAS** (antes arrancaba por "con log").
+- **Filtro por ambiente al seleccionar**: `scopePlantId` usa el `?id=` si existe; si se entró sin id, usa la primera planta seleccionada. `scopedPlants` se recalcula con `getAmbientPlants`, así el listado largo de `/home` se reduce a las plantas del mismo `ambienteId` (no por nombre: puede haber homónimas). Al destildar la última planta vuelve a mostrarse todo. Los grupos A/B/C y `disabledIds` también quedan acotados al ambiente.
+- **Dots del paso 1**: se muestran siempre **2** (`isPlantStep ? 2 : TOTAL_STEPS`), porque todavía no se sabe si el flujo será "regular pH" (2 pasos) o log completo (6). Recién al avanzar se muestra el total real.
+- **Fix de scroll en el paso 1**: el wrapper entre header/dots y el footer (`flex: 1`) no tenía `minHeight: 0`. Con listas largas (entrar desde `/home` sin `?id=`, que muestra todas las plantas) el wrapper crecía con el contenido, el contenedor `overflow: auto` quedaba sin altura propia y el footer se iba fuera de pantalla. Se agregó `minHeight: 0` + `overflow: hidden` al wrapper. Entrando desde una planta (`?id=`) no se notaba porque la lista es corta.
+
+### 2026-10-21 — Bottom nav mobile + alta rápida global (Gasto / Ingreso)
+
+**Problema:** para cargar un gasto o ingreso había que navegar sí o sí a `/home` y usar las QuickActions. En mobile (donde no hay rail lateral) eso implicaba abrir el Drawer, ir a Home y recién ahí tocar la acción.
+
+**Solución:**
+- Nuevo `components/layout/BottomNav.jsx` (**solo mobile**, `display: { xs: 'flex', md: 'none' }`): 4 tabs (Home, Finanzas, Plantas, Hábitos) + **botón central "+"** que navega directo a `/nuevoMovimiento` en modo **Gasto**. Finanzas (`/gastos`) queda activo en todo el grupo financiero (`/ingresos`, `/tarjetas`, `/exchanges`, `/ahorros`). Altura 62px + `env(safe-area-inset-bottom)` y `zIndex: appBar`.
+- **Muesca real en la barra**: el fondo va en una capa absoluta separada del nav (para que el `mask` no recorte el botón ni los tabs) con `mask-image: radial-gradient(circle at 50% 1px, transparent 34px, #000 35px)`. El botón (56px) está centrado en el filo (`top: -27`), así la muesca es un semicírculo de 35px de radio: 28px del botón + **6px de separación** + 1px del trazo. El borde es un **único path SVG de 2px** (`stroke: alpha(text.primary, 0.18)`) que va recto → arco → recto, con el ancho real de la barra medido con `ResizeObserver` y coordenadas en px para que la curva no se deforme. El trazo se centra en `y=1px` (cubre 0..2) y va con `z-index: 3` para que no lo tape la sombra del botón. Antes el borde eran dos trazos separados (border CSS + anillo) y en la unión se pisaban.
+- `Layout.jsx` expone `goToNewExpense()` y lo pasa a `BottomNav` (mobile) y `MiniDrawerRail` (desktop); agrega `pb` en mobile (`calc(62px + env(safe-area-inset-bottom))`) para que la barra no tape el final del contenido.
+- `MiniDrawerRail.jsx` (desktop) suma un **"+"** arriba del listado, con el mismo destino.
+- Nuevo `components/layout/navUtils.js` con `isItemActive`, extraído de `Drawer.jsx` y reutilizado por `MiniDrawerRail` y `BottomNav` (antes estaba duplicado).
+
+**Decisiones:**
+- **Sin submenú de Gasto/Ingreso**: el "+" va directo a Gasto, que es el caso más frecuente. El wizard ya permite cambiar a Ingreso en el toggle del paso 1, así que un sheet intermedio solo agregaba un tap. (Se eliminó `QuickAddSheet.jsx`.)
+- **No se tocó el AppBar**: la decisión previa de "chrome puro de navegación" se mantiene; en mobile el borde inferior es la zona natural para acciones con el pulgar.
+- **No se tocó `QuickActions.jsx` de Home**: sigue funcionando como acceso contextual; el nuevo control es global.
+- **Sin safe-area forzada**: `public/index.html` no usa `viewport-fit=cover`, así que `env(safe-area-inset-bottom)` resuelve 0 y no hace falta compensar el AppBar superior.
+
+**Archivos:** `components/layout/BottomNav.jsx` (nuevo), `components/layout/navUtils.js` (nuevo), `components/layout/Layout.jsx`, `components/layout/MiniDrawerRail.jsx`, `components/layout/Drawer.jsx`.
 
 ---
 

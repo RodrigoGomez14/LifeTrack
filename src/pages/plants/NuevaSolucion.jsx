@@ -8,12 +8,21 @@ import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BackspaceIcon from '@mui/icons-material/BackspaceOutlined';
+import CheckIcon from '@mui/icons-material/Check';
 import { useStore } from '../../store';
 import { addPlantActivity } from '../../services/plants';
 import { AnimatedGroup, AnimatedItem, AnimatedSuccess } from '../../design-system';
 import { checkSearch, getDate } from '../../utils';
 import PlantMultiSelect from '../../components/plants/PlantMultiSelect';
-import { getAmbientPlants } from '../../components/plants/plantsHelpers';
+import {
+  getAmbientPlants,
+  getAmbienteSystemVolume,
+  getInitialPlantSelection,
+  getRdwcGroups,
+  isGrowingPlant,
+  isHarvestedPlant,
+  sortNutrientsByOrder,
+} from '../../components/plants/plantsHelpers';
 import WizardProgressDots from '../../components/plants/WizardProgressDots';
 import WizardFooter from '../../components/plants/WizardFooter';
 
@@ -25,6 +34,12 @@ const parseDateStr = (str) => {
   const parts = String(str).split('/');
   if (parts.length !== 3) return null;
   return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+};
+
+// Cantidad con coma decimal y sin ceros de más (1.50 → "1,5").
+const formatQty = (value) => {
+  const n = Math.round((Number(value) || 0) * 100) / 100;
+  return String(n).replace('.', ',');
 };
 
 const getStageStartDate = (plant, etapa) => {
@@ -47,23 +62,30 @@ const NuevaSolucion = () => {
 
   const plantId = checkSearch(location.search);
 
+  const activePlants = useMemo(() => userData?.plants?.active
+    ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
+    : [], [userData]);
+  const ambientes = useMemo(() => userData?.plants?.ambientes || {}, [userData]);
+
   const [step, setStep] = useState(0);
-  const [selectedPlantIds, setSelectedPlantIds] = useState(new Set(plantId ? [plantId] : []));
+  const [selectedPlantIds, setSelectedPlantIds] = useState(() =>
+    getInitialPlantSelection(activePlants, ambientes, plantId)
+  );
   const [nutrientAmounts, setNutrientAmounts] = useState({});
   const [editBuffer, setEditBuffer] = useState(null);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [snack, setSnack] = useState('');
+  // Checklist del paso "Revisar": se marca cada nutriente a medida que se agrega.
+  // Vive sólo en la sesión del wizard, no se guarda.
+  const [addedNutrients, setAddedNutrients] = useState(() => new Set());
 
-  const activePlants = useMemo(() => userData?.plants?.active
-    ? Object.entries(userData.plants.active).map(([id, p]) => ({ id, ...p }))
-    : [], [userData]);
-
+  // Ordenados como en /nutrientes: ese orden define los steps del wizard.
   const fertilizantes = useMemo(() => {
     const aditives = userData?.plants?.aditives?.fertilizantes;
     if (!aditives) return [];
-    return Object.entries(aditives).map(([id, a]) => ({ id, ...a }));
+    return sortNutrientsByOrder(Object.entries(aditives).map(([id, a]) => ({ id, ...a })));
   }, [userData]);
 
   const originPlant = useMemo(
@@ -71,24 +93,75 @@ const NuevaSolucion = () => {
     [activePlants, plantId]
   );
 
+  const originAmbiente = originPlant?.ambienteId ? ambientes[originPlant.ambienteId] : null;
+  const originIsHarvested = isHarvestedPlant(originPlant);
+  const originIsRdwc = !!originAmbiente?.rdwc && !originIsHarvested;
+
+  // Ambientes de las plantas seleccionadas (sirve para el caso sin ?id=).
+  const selectedAmbienteIds = useMemo(() => {
+    const ids = new Set();
+    selectedPlantIds.forEach((id) => {
+      const plant = activePlants.find((p) => p.id === id);
+      if (plant?.ambienteId) ids.add(plant.ambienteId);
+    });
+    return ids;
+  }, [selectedPlantIds, activePlants]);
+
+  // El wizard opera en modo RDWC si la planta de origen está en un RDWC o si
+  // las plantas seleccionadas son todas de un mismo ambiente RDWC.
+  const rdwcAmbienteId = originIsHarvested
+    ? null
+    : originIsRdwc
+      ? originPlant.ambienteId
+      : selectedAmbienteIds.size === 1
+        ? [...selectedAmbienteIds][0]
+        : null;
+  const rdwcAmbiente = rdwcAmbienteId && ambientes[rdwcAmbienteId]?.rdwc ? ambientes[rdwcAmbienteId] : null;
+  const isRdwc = !!rdwcAmbiente;
+
   const primaryPlant = useMemo(() => {
+    if (isRdwc && originPlant) return originPlant;
     const ids = [...selectedPlantIds];
     if (!ids.length) return originPlant;
     return activePlants.find((p) => p.id === ids[0]) || originPlant;
-  }, [selectedPlantIds, activePlants, originPlant]);
+  }, [selectedPlantIds, activePlants, originPlant, isRdwc]);
 
   // Plantas del mismo ambiente que la de origen (independiente de la selección).
-  const ambientPlants = useMemo(() => getAmbientPlants(activePlants, plantId), [activePlants, plantId]);
+  const ambientPlants = useMemo(
+    () => getAmbientPlants(activePlants, plantId, { excludeHarvested: true }),
+    [activePlants, plantId]
+  );
 
-  // Solo son seleccionables las de la misma etapa y maceta que la planta de origen.
+  // Plantas en cultivo del sistema RDWC (para calcular el volumen total).
+  // Las cosechadas ya no forman parte del sistema de riego.
+  const rdwcPlants = useMemo(
+    () => (isRdwc
+      ? activePlants.filter((p) => p.ambienteId === rdwcAmbienteId && isGrowingPlant(p))
+      : []),
+    [isRdwc, activePlants, rdwcAmbienteId]
+  );
+
+  // Solo son seleccionables las de la misma etapa y maceta que la planta de
+  // origen. En RDWC se permite todo el ambiente: la solución es compartida.
   const disabledIds = useMemo(() => {
-    if (!originPlant) return new Set();
+    if (isRdwc || !originPlant) return new Set();
     return new Set(
       ambientPlants
         .filter((p) => p.etapa !== originPlant.etapa || p.potVolume !== originPlant.potVolume)
         .map((p) => p.id)
     );
-  }, [ambientPlants, originPlant]);
+  }, [ambientPlants, originPlant, isRdwc]);
+
+  const rdwcGroups = useMemo(() => getRdwcGroups(ambientPlants, ambientes), [ambientPlants, ambientes]);
+
+  // Litros que se usan para calcular agua y nutrientes. En RDWC es el volumen
+  // total del sistema; si no está cargado, cae a la suma de macetas.
+  const solutionVolume = useMemo(() => {
+    if (!isRdwc) return primaryPlant?.potVolume || 0;
+    return getAmbienteSystemVolume(rdwcAmbiente, rdwcPlants) || primaryPlant?.potVolume || 0;
+  }, [isRdwc, rdwcAmbiente, rdwcPlants, primaryPlant]);
+
+  const mixedStages = isRdwc && new Set(rdwcPlants.map((p) => p.etapa)).size > 1;
 
   const stageInfo = useMemo(() => {
     if (!primaryPlant) return null;
@@ -105,14 +178,14 @@ const NuevaSolucion = () => {
     if (!stageInfo || !primaryPlant) return [];
     const { etapa, week } = stageInfo;
     const planNutrients = userData?.plants?.plan?.[etapa]?.[week]?.nutrients || {};
-    return Object.entries(planNutrients)
-      .map(([nutrientId, dose]) => {
-        const n = fertilizantes.find((f) => f.id === nutrientId);
-        if (!n) return null;
-        const mlPerL = Number(dose?.mlPerL) || 0;
-        return { ...n, suggestion: mlPerL };
+    // Se recorre la biblioteca (ya ordenada) y no el plan, así el orden de los
+    // pasos es el que se eligió arrastrando en /nutrientes.
+    return fertilizantes
+      .map((n) => {
+        const mlPerL = Number(planNutrients[n.id]?.mlPerL) || 0;
+        return mlPerL > 0 ? { ...n, suggestion: mlPerL } : null;
       })
-      .filter((n) => n && n.suggestion > 0);
+      .filter(Boolean);
   }, [fertilizantes, stageInfo, primaryPlant, userData]);
 
   const wizardColor = STAGE_COLORS[stageInfo?.etapa] || '#43a047';
@@ -129,6 +202,23 @@ const NuevaSolucion = () => {
     setSelectedPlantIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAdded = (id) => {
+    setAddedNutrients((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // Selección en bloque para RDWC: agrega o quita todo el ambiente de una vez.
+  const handleToggleGroup = (ids, select) => {
+    setSelectedPlantIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (select ? next.add(id) : next.delete(id)));
       return next;
     });
   };
@@ -171,27 +261,27 @@ const NuevaSolucion = () => {
   }, [step, totalSteps, suggestedNutrients]);
 
   const handleSubmit = async () => {
-    if (!hasPlants) return;
+    if (!hasPlants || (isRdwc && solutionVolume <= 0)) return;
     setSubmitting(true);
     try {
       const date = getDate();
-      const potVol = primaryPlant?.potVolume || 0;
       const nutrientList = suggestedNutrients.map((n) => {
         const dose = nutrientAmounts[n.id] !== undefined ? nutrientAmounts[n.id] : n.suggestion;
         return {
           name: n.name,
           brand: n.brand || '',
-          quantity: Math.round(dose * potVol * 10) / 10,
+          quantity: Math.round(dose * solutionVolume * 10) / 10,
           suggestedDose: `${dose} Ml/L`,
         };
       });
-      const waterMl = potVol * 1000;
+      const waterMl = solutionVolume * 1000;
       const data = {
         date,
         type: 'solution',
         stage: stageInfo?.etapa || '',
         week: stageInfo?.week || 1,
         potVolume: primaryPlant?.potVolume || 0,
+        ...(isRdwc ? { rdwc: true, systemVolume: solutionVolume } : {}),
         nutrients: nutrientList.filter((n) => n.quantity > 0),
         waterVolume: waterMl,
         notes: notes.trim() || '',
@@ -199,7 +289,13 @@ const NuevaSolucion = () => {
       for (const id of selectedPlantIds) {
         await addPlantActivity(id, 'irrigations', data);
       }
-      setSavedSnapshot({ nutrients: data.nutrients, waterVolume: waterMl, notes, plantCount: selectedPlantIds.size });
+      setSavedSnapshot({
+        nutrients: data.nutrients,
+        waterVolume: waterMl,
+        notes,
+        plantCount: selectedPlantIds.size,
+        rdwc: isRdwc,
+      });
     } catch {
       setSnack('Error al guardar');
     }
@@ -212,6 +308,7 @@ const NuevaSolucion = () => {
     setEditBuffer(null);
     setNotes('');
     setSavedSnapshot(null);
+    setAddedNutrients(new Set());
   };
 
   if (savedSnapshot) {
@@ -243,6 +340,14 @@ const NuevaSolucion = () => {
 
   const selectedPlants = activePlants.filter((p) => selectedPlantIds.has(p.id));
 
+  // Receta del paso de revisión: sólo lo que efectivamente se va a preparar.
+  const recipeNutrients = suggestedNutrients
+    .map((n) => {
+      const raw = nutrientAmounts[n.id] !== undefined ? nutrientAmounts[n.id] : n.suggestion;
+      return { ...n, dose: Number(raw) || 0 };
+    })
+    .filter((n) => n.dose > 0);
+
   return (
     <Box sx={{ position: 'fixed', inset: 0, bgcolor: 'background.default', userSelect: 'none', display: 'flex', flexDirection: 'column', zIndex: theme.zIndex.modal }}>
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
@@ -262,7 +367,50 @@ const NuevaSolucion = () => {
               <AnimatedItem><Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', mb: 1, display: 'block' }}>
                 SELECCIONA LAS PLANTAS
               </Typography></AnimatedItem>
-              <AnimatedItem><PlantMultiSelect plants={ambientPlants} selectedIds={selectedPlantIds} onToggle={togglePlant} color={wizardColor} disabledIds={disabledIds} /></AnimatedItem>
+
+              {isRdwc && rdwcAmbiente && (
+                <AnimatedItem>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      mb: 1.5,
+                      borderRadius: 2,
+                      border: `1px solid ${alpha(wizardColor, 0.25)}`,
+                      bgcolor: alpha(wizardColor, 0.06),
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: wizardColor, display: 'block' }}>
+                      RDWC · AMBIENTE {rdwcAmbiente.number}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Se registran las {rdwcPlants.length} plantas juntas · {solutionVolume} L de solución.
+                      Tocá cualquier planta para seleccionar o destildar todo el sistema.
+                    </Typography>
+                    {solutionVolume <= 0 && (
+                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                        Cargá el volumen total del sistema en Ambientes.
+                      </Typography>
+                    )}
+                    {mixedStages && (
+                      <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+                        Hay plantas en distintas etapas. La dosis se calcula con {primaryPlant?.etapa || 'la planta de origen'}.
+                      </Typography>
+                    )}
+                  </Box>
+                </AnimatedItem>
+              )}
+
+              <AnimatedItem>
+                <PlantMultiSelect
+                  plants={ambientPlants}
+                  selectedIds={selectedPlantIds}
+                  onToggle={togglePlant}
+                  color={wizardColor}
+                  disabledIds={disabledIds}
+                  rdwcGroups={rdwcGroups}
+                  onToggleGroup={handleToggleGroup}
+                />
+              </AnimatedItem>
             </AnimatedGroup>
           </Box>
         )}
@@ -303,63 +451,167 @@ const NuevaSolucion = () => {
           </Box>
         )}
 
-        {/* Step N+1: Review */}
+        {/* Step N+1: Review — receta a preparar */}
         {step === totalSteps - 1 && (
-          <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, pb: 2 }}>
-            <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <AnimatedItem><Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center' }}>Revisar</Typography></AnimatedItem>
-
-              <AnimatedItem>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  {selectedPlants.map((p) => (
-                    <Chip key={p.id} label={p.name} size="small"
-                      sx={{ bgcolor: wizardColor, color: 'white', fontWeight: 600 }} />
-                  ))}
-                </Box>
-              </AnimatedItem>
-
-              {stageInfo && (
+          <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2, pb: 3 }}>
+            <Box sx={{ width: '100%', maxWidth: 560, mx: 'auto' }}>
+              <AnimatedGroup sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <AnimatedItem>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
-                    <Box sx={{ p: 2, textAlign: 'center', borderRadius: 2, gridColumn: 'span 2', border: `1px solid ${alpha(wizardColor, 0.25)}`, bgcolor: alpha(wizardColor, 0.08) }}>
-                      <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5, color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                        SOLUCIÓN
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: wizardColor }}>
-                        {primaryPlant?.potVolume || 0} L
-                      </Typography>
-                    </Box>
-                    {suggestedNutrients.filter((n) => {
-                      const dose = nutrientAmounts[n.id] !== undefined ? nutrientAmounts[n.id] : n.suggestion;
-                      return dose > 0;
-                    }).map((n) => {
-                      const dose = nutrientAmounts[n.id] !== undefined ? nutrientAmounts[n.id] : n.suggestion;
-                      const vol = primaryPlant?.potVolume || 0;
-                      const total = Math.round(dose * vol * 10) / 10;
-                      return (
-                        <Box key={n.id} sx={{ p: 2, textAlign: 'center', borderRadius: 2, border: `1px solid ${alpha(wizardColor, 0.25)}`, bgcolor: alpha(wizardColor, 0.08) }}>
-                          <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5, color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                            {n.name}
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: wizardColor }}>
-                            {total} ml
-                          </Typography>
-                          <Typography variant="caption" color="text.disabled" sx={{ mt: 0.25, display: 'block' }}>
-                            {dose} Ml/L × {vol} L = {total} ml
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                    <Box sx={{ gridColumn: 'span 2' }}>
-                      <TextField label="Nota (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)}
-                        fullWidth multiline rows={2}
-                        placeholder="Ej: Solucion para etapa vegetativo..."
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-                    </Box>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>Revisar</Typography>
                   </Box>
                 </AnimatedItem>
-              )}
-            </AnimatedGroup>
+
+                {/* Plantas */}
+                <AnimatedItem>
+                  <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 1 }}>
+                    SE APLICA A
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    {selectedPlants.map((p) => (
+                      <Chip key={p.id} label={p.name} size="small"
+                        sx={{ bgcolor: alpha(wizardColor, 0.14), color: wizardColor, fontWeight: 600 }} />
+                    ))}
+                  </Box>
+                </AnimatedItem>
+
+                {/* Receta */}
+                <AnimatedItem>
+                  <Box sx={{ borderRadius: 3, border: `1px solid ${theme.palette.divider}`, bgcolor: 'background.paper', overflow: 'hidden' }}>
+                    {/* Base: agua */}
+                    <Box sx={{ px: 2.5, py: 2.5, textAlign: 'center', bgcolor: alpha(wizardColor, 0.06) }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                        PREPARAR
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800, color: wizardColor, lineHeight: 1.1 }}>
+                        {solutionVolume} L
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        de agua
+                      </Typography>
+                      {isRdwc && (
+                        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.25 }}>
+                          Volumen total del sistema · {rdwcPlants.length} plantas
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Ingredientes, en el orden elegido en /nutrientes */}
+                    {recipeNutrients.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 2 }}>
+                        No hay nutrientes con dosis para esta semana.
+                      </Typography>
+                    ) : (
+                      <Box>
+                        {recipeNutrients.map((n, i) => {
+                          const total = Math.round(n.dose * solutionVolume * 10) / 10;
+                          const isAdded = addedNutrients.has(n.id);
+                          return (
+                            <Box
+                              key={n.id}
+                              role="checkbox"
+                              aria-checked={isAdded}
+                              aria-label={`${n.name}, ${formatQty(total)} ml`}
+                              tabIndex={0}
+                              onClick={() => toggleAdded(n.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleAdded(n.id);
+                                }
+                              }}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                px: 2.5,
+                                py: 1.5,
+                                cursor: 'pointer',
+                                borderTop: i > 0 ? '1px solid' : 'none',
+                                borderColor: 'divider',
+                                transition: 'background-color 0.15s',
+                                // Ya agregado: fondo más oscuro (opuesto al hover).
+                                bgcolor: isAdded ? alpha(theme.palette.common.black, 0.42) : 'transparent',
+                                '&:hover': {
+                                  bgcolor: isAdded
+                                    ? alpha(theme.palette.common.black, 0.52)
+                                    : alpha(theme.palette.action.hover, 0.25),
+                                },
+                                '&:focus-visible': { outline: `2px solid ${wizardColor}`, outlineOffset: -2 },
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 26,
+                                  height: 26,
+                                  borderRadius: '50%',
+                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  bgcolor: isAdded ? wizardColor : alpha(wizardColor, 0.14),
+                                  color: isAdded ? '#fff' : wizardColor,
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  transition: 'background-color 0.15s, color 0.15s',
+                                }}
+                              >
+                                {isAdded ? <CheckIcon sx={{ fontSize: 16 }} /> : i + 1}
+                              </Box>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography
+                                  variant="subtitle1"
+                                  sx={{
+                                    fontWeight: 600,
+                                    lineHeight: 1.2,
+                                    color: isAdded ? 'text.secondary' : 'text.primary',
+                                    textDecoration: isAdded ? 'line-through' : 'none',
+                                  }}
+                                  noWrap
+                                >
+                                  {n.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2, mt: 0.25 }} noWrap>
+                                  {formatQty(n.dose)} ml/L
+                                </Typography>
+                              </Box>
+                              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                                <Typography
+                                  variant="h6"
+                                  sx={{
+                                    fontWeight: 800,
+                                    color: isAdded ? 'text.secondary' : wizardColor,
+                                    whiteSpace: 'nowrap',
+                                    lineHeight: 1.1,
+                                  }}
+                                >
+                                  {formatQty(total)} ml
+                                </Typography>
+                                {!isRdwc && selectedPlants.length > 1 && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ display: 'block', fontWeight: 600, color: 'text.disabled', whiteSpace: 'nowrap', lineHeight: 1.2, mt: 0.25 }}
+                                  >
+                                    {formatQty(Math.round(total * selectedPlants.length * 10) / 10)} ml
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </Box>
+                </AnimatedItem>
+
+                <AnimatedItem>
+                  <TextField label="Nota (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)}
+                    fullWidth multiline rows={2}
+                    placeholder="Ej: Solución para etapa vegetativo..."
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+                </AnimatedItem>
+              </AnimatedGroup>
+            </Box>
           </Box>
         )}
       </Box>
@@ -369,7 +621,7 @@ const NuevaSolucion = () => {
         step === 0 ? (
           <WizardFooter
             label="Siguiente"
-            disabled={!hasPlants}
+            disabled={!hasPlants || (isRdwc && solutionVolume <= 0)}
             onClick={goNext}
             color={wizardColor}
           />
@@ -385,7 +637,7 @@ const NuevaSolucion = () => {
       ) : (
         <WizardFooter
           label={`Guardar solucion${selectedPlantIds.size > 1 ? ` (${selectedPlantIds.size})` : ''}`}
-          disabled={!hasPlants}
+          disabled={!hasPlants || (isRdwc && solutionVolume <= 0)}
           onClick={handleSubmit}
           loading={submitting}
           color={wizardColor}

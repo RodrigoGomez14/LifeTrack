@@ -51,19 +51,30 @@ const PlantAvatar = ({ plant, stage, size = 44, iconSize = 20 }) => (
 );
 
 const formatStageDays = (plant, stage) => {
-  const daysInStage = calculateDaysInStage(plant, plant.etapa);
+  const daysInStage = calculateDaysInStage(plant, stage.key);
   const weeksInStage = daysInStage !== null ? Math.max(1, Math.floor((daysInStage - 1) / 7) + 1) : null;
   return `D${String(daysInStage || 0).padStart(2, '0')}${weeksInStage !== null ? ` (S${weeksInStage})` : ''}`;
 };
 
-export const PlantRow = ({ plant, onClick }) => {
-  const stage = STAGES.find((s) => s.key === plant.etapa) || STAGES[0];
+// `Enfrascado` es una etapa legacy que equivale a Curado.
+const getPlantStage = (plant) => {
+  const key = plant.etapa === 'Enfrascado' ? 'Curado' : plant.etapa;
+  return STAGES.find((s) => s.key === key) || STAGES[0];
+};
+
+export const PlantRow = ({ plant, onClick, showStage = false }) => {
+  const stage = getPlantStage(plant);
 
   return (
     <Box onClick={onClick} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, cursor: 'pointer', borderRadius: 2, '&:hover': { bgcolor: 'action.hover' }, transition: '0.1s' }}>
       <PlantAvatar plant={plant} stage={stage} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }} noWrap>{plant.name}</Typography>
+        {showStage && (
+          <Typography variant="caption" sx={{ fontWeight: 600, color: stage.color, fontSize: 10.5, display: 'block', lineHeight: 1.2 }}>
+            {stage.label}
+          </Typography>
+        )}
       </Box>
       <Typography variant="caption" sx={{ fontWeight: 600, color: stage.color, fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}>
         {formatStageDays(plant, stage)}
@@ -73,7 +84,7 @@ export const PlantRow = ({ plant, onClick }) => {
 };
 
 export const PlantCard = ({ plant, onClick, color }) => {
-  const stage = STAGES.find((s) => s.key === plant.etapa) || STAGES[0];
+  const stage = getPlantStage(plant);
   const tint = color || stage.color;
 
   return (
